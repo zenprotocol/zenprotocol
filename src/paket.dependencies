@@ -1,0 +1,6 @@
+source https://nuget.org/api/v2
+
+nuget FSharp.Core
+nuget xunit
+nuget FsUnit.xUnit
+nuget FsCheck.Xunit
