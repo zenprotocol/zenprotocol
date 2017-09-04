@@ -1,0 +1,10 @@
+type file
+id ZenProtocol.Zulib
+title ZenProtocol Zulib
+version 0.1
+authors ZenProtocol
+description
+    Zen Protocol Zulib library
+files
+    bin/Zulib.dll ==> lib
+    fstar ==> content/Zulib        

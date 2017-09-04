@@ -73,14 +73,26 @@ Target "Zulib.Build" (fun _ ->
     Async.RunSynchronously (checker.Compile (Array.append compileParams files))
 
   if exitCode <> 0 then
-    let errors = Array.filter (fun (msg:FSharpErrorInfo) -> msg.Severity = FSharpErrorSeverity.Error) messages
-    printfn "%d" exitCode
-    failwith "building Zulib failed")
+    let errors = Array.filter (fun (msg:FSharpErrorInfo) -> msg.Severity = FSharpErrorSeverity.Error) messages    
+    printfn "%A" errors
+    failwith "building Zulib failed"    
+    )
+
+Target "Zulib.Pack" (fun _ -> 
+
+  let setParams (p:Fake.Paket.PaketPackParams) = 
+    {p with 
+      OutputPath = "./Release/"
+      TemplateFile = "./Zulib/paket.template"; }
+
+  Paket.Pack setParams    
+)
 
 Target "Zulib" (fun _ -> ())
 
 "Zulib.Extract"
   ==> "Zulib.Build"    
+  ==> "Zulib.Pack"    
   ==> "Zulib"
   
 RunTargetOrDefault "Zulib"
