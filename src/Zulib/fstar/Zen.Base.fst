@@ -1,5 +1,11 @@
 module Zen.Base
 
+val id(#a:Type): a -> a
+let id(#_) x = x
+
+val const_(#a #b:Type): a -> b -> a
+let const_ #_ #_ x _ = x
+
 (** [|>] is equivalent to F#'s [|>]. *)
 unfold val ( |> ) (#a #b:Type): a -> (a->b) -> b
 unfold let ( |> ) #_ #_ x f = f x

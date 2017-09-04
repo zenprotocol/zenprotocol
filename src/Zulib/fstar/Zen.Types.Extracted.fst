@@ -1,20 +1,12 @@
-module Consensus.Types
+module Zen.Types.Extracted
 
 module      A = Zen.Array
 module      V = Zen.Vector
 module     U8 = FStar.UInt8
 module    U32 = FStar.UInt32
 module    U64 = FStar.UInt64
-module Realized = Consensus.Realized
+module Realized = Zen.Types.Realized
 module Crypto = Zen.Crypto
-
-(*assume type lockCore
-assume LC_hasEq: hasEq lockCore
-assume type contract
-assume Contract_hasEq: hasEq contract
-assume type extendedContract
-assume ExtendedContract_hasEq: hasEq extendedContract
-assume type extraData:eqtype*)
 
 type lockCore = Realized.lockCore
 type contract = Realized.contract
@@ -42,7 +34,7 @@ unopteq type blockHeader = {
     nonce: nonce
     }
 
-unopteq type data : nat -> Type =
+noeq type data : nat -> Type =
   | Bool: v:bool -> data 1
   | Byte: v:U8.t -> data 1
   | Empty: data 0
@@ -92,6 +84,7 @@ and dataContainer : nat -> Type =
   | Cont4: _1:dataContainer -> _2:dataContainer -> _3:dataContainer -> _4:dataContainer -> dataContainer
 //noeq type lockCore (n:nat) = {version: U32.t; lockData: list (A.t  byte n)}
 *)
+
 and outputLock =
   | CoinbaseLock of lockCore
   | FeeLock of lockCore
@@ -100,7 +93,7 @@ and outputLock =
   | ContractLock: contractHash:hash -> n:nat -> data n -> outputLock
   | HighVLock: lockcore:lockCore -> typeCode:nat -> outputLock
 and output = {lock: outputLock; spend: spend}
-
+(*)
 type inputData (n:nat) = data n
 
 unopteq type transactionSkeleton = | Tx: l1:nat -> outpoints:V.t outpoint l1

@@ -16,20 +16,27 @@ Target "Zulib.Extract" (fun _ ->
   let args = 
     [| "--lax";"--codegen";"FSharp";
        "--prims";"Zulib/fstar/prims.fst";
-       "--extract_module";"Consensus.Types";
        "--extract_module";"Zen.Base";
        "--extract_module";"Zen.Option";
+       "--extract_module";"Zen.Cost.Extracted";
+       "--codegen-lib";"Zen.Cost";
+       //"--extract_module";"Zen.Cost";
        "--extract_module";"Zen.OptionT";
        "--extract_module";"Zen.Tuple";
        "--extract_module";"Zen.TupleT";
        "--extract_module";"Zen.Vector";
-       "--extract_module";"Zen.Array";
+       "--extract_module";"Zen.Array.Extracted";
+       "--codegen-lib";"Zen.Array";       
+       //"--extract_module";"Zen.Array";
+       "--extract_module";"Zen.Types.Extracted";
+       "--codegen-lib";"Zen.Types";     
+       //"--extract_module";"Zen.Types";
        "--odir";"Zulib/fsharp/Extracted"; |] 
        |> Array.append files
        |> Array.reduce (fun a b -> a + " " + b)  
 
   let exitCode = 
-    ProcessHelper.Shell.Exec ("fstar-any.sh", args)
+    ProcessHelper.Shell.Exec ("../../FStar/bin/fstar.exe", args)
 
   if exitCode <> 0 then    
     failwith "extracting Zulib failed"
@@ -49,16 +56,21 @@ Target "Zulib.Build" (fun _ ->
       "Zulib/fsharp/Realized/FStar.Int64.fs";
       "Zulib/fsharp/Extracted/Zen.Base.fs";
       "Zulib/fsharp/Extracted/Zen.Option.fs";
-      "Zulib/fsharp/Extracted/Zen.Tuple.fs"; 
-      "Zulib/fsharp/Realized/Zen.Cost.fs";
+      "Zulib/fsharp/Extracted/Zen.Tuple.fs";
+      //"Zulib/fsharp/Extracted/Zen.Cost.fs";
+      "Zulib/fsharp/Realized/Zen.Cost.Realized.fs";
+      "Zulib/fsharp/Extracted/Zen.Cost.Extracted.fs";
       "Zulib/fsharp/Extracted/Zen.OptionT.fs";
       "Zulib/fsharp/Extracted/Zen.TupleT.fs";
       "Zulib/fsharp/Extracted/Zen.Vector.fs";
-      "Zulib/fsharp/Realized/Zen.ArrayRealized.fs";
-      "Zulib/fsharp/Extracted/Zen.Array.fs";
+      "Zulib/fsharp/Realized/Zen.Array.Realized.fs";
+      "Zulib/fsharp/Extracted/Zen.Array.Extracted.fs";
+      //"Zulib/fsharp/Extracted/Zen.Array.fs";
       "Zulib/fsharp/Realized/Zen.Crypto.fs"; 
-      "Zulib/fsharp/Realized/Consensus.Realized.fs";
-      "Zulib/fsharp/Extracted/Consensus.Types.fs" |]    
+      "Zulib/fsharp/Realized/Zen.Types.Realized.fs";
+      "Zulib/fsharp/Extracted/Zen.Types.Extracted.fs";
+      //"Zulib/fsharp/Extracted/Zen.Types.fs" 
+    |]    
 
   let checker = FSharpChecker.Create()
 
