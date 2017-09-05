@@ -1,5 +1,5 @@
 ﻿
-module Consensus.Realized
+module Zen.Types.Realized
 
 assume type lockCore
 assume LC_hasEq: hasEq lockCore

@@ -1,39 +1,41 @@
 #light "off"
 module Prims
-open System.Numerics
+open FSharp.Compatibility.OCaml.Pervasives
 module Obj = FSharp.Compatibility.OCaml.Obj
+module Big_int_Z = FSharp.Compatibility.OCaml.Big_int
 
-type int       = bigint
-type nonzero = int
-let ( + )  (x:bigint) (y:int) = x + y
-let ( - )  (x:int) (y:int) = x - y
-let ( * )  (x:int) (y:int) = x * y
-let ( / )  (x:int) (y:int) = x / y
-let ( <= ) (x:int) (y:int) = x <= y
-let ( >= ) (x:int) (y:int) = x >= y
-let ( < )  (x:int) (y:int) = x < y
-let ( > )  (x:int) (y:int) = x > y
-let (mod) (x:int) (y:int) = x % y
-let ( ~- ) (x:int) = (~-) x
-let abs (x:int) = BigInteger.Abs x
-let parse_int = BigInteger.Parse
-let to_string (x:int) = x.ToString()
 
+type int      = Big_int_Z.big_int
+type nonzero  = int
+let ( + )     = Big_int_Z.add_big_int
+let ( - )     = Big_int_Z.sub_big_int
+let ( * )     = Big_int_Z.mult_big_int
+let ( / )     = Big_int_Z.div_big_int
+let ( <= )    = Big_int_Z.le_big_int
+let ( >= )    = Big_int_Z.ge_big_int
+let ( < )     = Big_int_Z.lt_big_int
+let ( > )     = Big_int_Z.gt_big_int
+let ( mod )   = Big_int_Z.mod_big_int
+let ( ~- )    = Big_int_Z.minus_big_int
+let abs       = Big_int_Z.abs_big_int
+let parse_int = Big_int_Z.big_int_of_string
+let to_string = Big_int_Z.string_of_big_int
+
+(** Some misc. types defined in Prims *)
 type unit      = Microsoft.FSharp.Core.unit
 type bool      = Microsoft.FSharp.Core.bool
 type string    = Microsoft.FSharp.Core.string
 type 'a array  = 'a Microsoft.FSharp.Core.array
 type exn       = Microsoft.FSharp.Core.exn
-type 'a list'  = 'a list
 type 'a list   = 'a Microsoft.FSharp.Collections.list
 type 'a option = 'a Microsoft.FSharp.Core.option
 
 type range     = unit
 type nat       = int
 type pos       = int
-type 'd b2t    = B2t of unit
+type 'd b2t    = unit
 
-type 'a squash = Squash of unit
+type 'a squash = unit
 
 type (' p, ' q) c_or =
   | Left of ' p
@@ -71,15 +73,15 @@ type (' p, ' q) l_iff = ((' p, ' q) l_imp, (' q, ' p) l_imp) l_and
 
 type ' p l_not = (' p, l_False) l_imp
 
-type (' a, ' p) l_Forall = L_forall of unit
+type (' a, ' p) l_Forall = unit
 
-type (' a, ' p) l_Exists = L_exists of unit
+type (' a, ' p) l_Exists = unit
 
 
-type (' p, ' q, 'dummyP) eq2 = Eq2 of unit
-type (' p, ' q, 'dummyP, 'dummyQ) eq3 = Eq3 of unit
+type (' p, ' q, 'dummyP) eq2 =  unit
+type (' p, ' q, 'dummyP, 'dummyQ) eq3 =  unit
 
-type prop     = obj
+type prop     = Obj.t
 
 let cut = ()
 let admit () = failwith "no admits"
@@ -94,6 +96,7 @@ let range_of _ = ()
 let mk_range _ _ _ _ _ = ()
 let set_range_of x = x
 
+(* for partially variants of the operators *)
 let op_Equality x y = x = y
 let op_disEquality x y = x<>y
 let op_AmpAmp x y = x && y
@@ -102,8 +105,8 @@ let uu___is_Nil l = l = [] (*consider redefining List.isEmpty as this function*)
 let uu___is_Cons l = not (uu___is_Nil l)
 let strcat x y = x ^ y
 
-let string_of_bool (b:bool) = b.ToString()
-let string_of_int (i:int) = i.ToString()
+let string_of_bool = string_of_bool
+let string_of_int = to_string
 
 type ('a, 'b) dtuple2 =
   | Mkdtuple2 of 'a * 'b
@@ -113,11 +116,11 @@ let __proj__Mkdtuple2__item___1 x = match x with
 let __proj__Mkdtuple2__item___2 x = match x with
   | Mkdtuple2 (_, x) -> x
 
-//open System.Numerics.BigInteger
-let rec pow2 (n:int) = if n = bigint 0 then
-                      bigint 1
-                   else
-                      (bigint 2) * pow2 (n - (bigint 1))
+let rec pow2 n =
+  if n = 0I then
+    1I
+  else
+    2I * pow2 (n - 1I)
 
 let __proj__Cons__item__tl = function
   | _::tl -> tl

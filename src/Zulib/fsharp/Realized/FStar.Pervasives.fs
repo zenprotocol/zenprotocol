@@ -1,6 +1,6 @@
 #light "off"
 module FStar.Pervasives
-
+open FSharp.Compatibility.OCaml.Pervasives
 open Prims
 
 module Native =
@@ -15,8 +15,8 @@ module Native =
 
     type ('a,'b) tuple2 = 'a * 'b
 
-    let fst = Microsoft.FSharp.Core.Operators.fst
-    let snd = Microsoft.FSharp.Core.Operators.snd
+    let fst = fst
+    let snd = snd
 
     let __proj__Mktuple2__1 = fst
     let __proj__Mktuple2__2 = snd
@@ -160,7 +160,7 @@ let __proj__Err__item__msg = (fun ( projectee  :  'Aa result ) -> (match (projec
 msg
 end))
 
-type 'Aa inversion = Inversion of Prims.unit
+type 'Aa inversion = Prims.unit
 
 let allow_inversion = ()
 

@@ -50,7 +50,7 @@ let rec flatten #_ #_ #_ = function
   | VCons hd tl -> append hd =<< (flatten tl)
 
 (** [init l f] returns a vector of length l, for which the [i]th element is [f i]. *)
-val init(#a:Type)(#n:nat): l:nat -> (nat -> cost a n)
+val init(#a:Type)(#n:nat): l:nat -> (i:nat{i<l} -> cost a n)
   -> cost (vector a l) M.(n*l+2)
 let rec init #_ #_ l f = match l with
   | 0 -> 2 +~! VNil
