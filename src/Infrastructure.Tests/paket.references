@@ -1,0 +1,5 @@
+FSharp.Core
+xunit
+FsUnit.xUnit
+FsCheck.Xunit
+FsNetMQ

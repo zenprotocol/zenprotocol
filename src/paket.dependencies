@@ -8,4 +8,7 @@ nuget Zen.FSharp.Compiler.Service
 nuget FAKE
 nuget FSharp.Compatibility.OCaml
 nuget libsodium-net
+nuget FsNetMQ
+nuget FsPickler
+nuget xunit.runner.console
 
