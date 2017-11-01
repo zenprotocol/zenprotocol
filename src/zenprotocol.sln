@@ -13,6 +13,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Infrastructure.Tests", "Inf
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{C58A477F-36B7-429C-AD06-87A465B47F1D}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Messaging", "Messaging\Messaging.fsproj", "{44277422-32E3-4F1B-BD6D-153B7A621444}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -35,6 +37,10 @@ Global
 		{0D32C02C-D4CD-4C42-8E69-33D7B223930B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0D32C02C-D4CD-4C42-8E69-33D7B223930B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0D32C02C-D4CD-4C42-8E69-33D7B223930B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{44277422-32E3-4F1B-BD6D-153B7A621444}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{44277422-32E3-4F1B-BD6D-153B7A621444}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{44277422-32E3-4F1B-BD6D-153B7A621444}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{44277422-32E3-4F1B-BD6D-153B7A621444}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
