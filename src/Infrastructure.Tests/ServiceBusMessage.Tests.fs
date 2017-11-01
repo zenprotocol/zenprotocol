@@ -1,9 +1,9 @@
-module ServiceBusMessage.Tests
+module Infrastructure.ServiceBusMessage.Tests
 
 open Xunit
 open FsUnit.Xunit
 open FsNetMQ
-open ServiceBusMessage
+open Infrastructure.ServiceBusMessage
 
 
 [<Fact>]
@@ -18,9 +18,9 @@ let ``send and recv Register``() =
     use client = Socket.dealer ()
     Socket.connect client "inproc://Register.test"
 
-    ServiceBusMessage.send server msg
+    Infrastructure.ServiceBusMessage.send server msg
 
-    let msg' = ServiceBusMessage.recv client
+    let msg' = Infrastructure.ServiceBusMessage.recv client
 
     msg' |> should equal (Some msg)
 
@@ -53,9 +53,9 @@ let ``send and recv Command``() =
     use client = Socket.dealer ()
     Socket.connect client "inproc://Command.test"
 
-    ServiceBusMessage.send server msg
+    Infrastructure.ServiceBusMessage.send server msg
 
-    let msg' = ServiceBusMessage.recv client
+    let msg' = Infrastructure.ServiceBusMessage.recv client
 
     msg' |> should equal (Some msg)
 
@@ -88,9 +88,9 @@ let ``send and recv RelayCommand``() =
     use client = Socket.dealer ()
     Socket.connect client "inproc://RelayCommand.test"
 
-    ServiceBusMessage.send server msg
+    Infrastructure.ServiceBusMessage.send server msg
 
-    let msg' = ServiceBusMessage.recv client
+    let msg' = Infrastructure.ServiceBusMessage.recv client
 
     msg' |> should equal (Some msg)
 
@@ -123,9 +123,9 @@ let ``send and recv Request``() =
     use client = Socket.dealer ()
     Socket.connect client "inproc://Request.test"
 
-    ServiceBusMessage.send server msg
+    Infrastructure.ServiceBusMessage.send server msg
 
-    let msg' = ServiceBusMessage.recv client
+    let msg' = Infrastructure.ServiceBusMessage.recv client
 
     msg' |> should equal (Some msg)
 
@@ -159,9 +159,9 @@ let ``send and recv RelayRequest``() =
     use client = Socket.dealer ()
     Socket.connect client "inproc://RelayRequest.test"
 
-    ServiceBusMessage.send server msg
+    Infrastructure.ServiceBusMessage.send server msg
 
-    let msg' = ServiceBusMessage.recv client
+    let msg' = Infrastructure.ServiceBusMessage.recv client
 
     msg' |> should equal (Some msg)
 
@@ -195,9 +195,9 @@ let ``send and recv Response``() =
     use client = Socket.dealer ()
     Socket.connect client "inproc://Response.test"
 
-    ServiceBusMessage.send server msg
+    Infrastructure.ServiceBusMessage.send server msg
 
-    let msg' = ServiceBusMessage.recv client
+    let msg' = Infrastructure.ServiceBusMessage.recv client
 
     msg' |> should equal (Some msg)
 
@@ -230,9 +230,9 @@ let ``send and recv RelayResponse``() =
     use client = Socket.dealer ()
     Socket.connect client "inproc://RelayResponse.test"
 
-    ServiceBusMessage.send server msg
+    Infrastructure.ServiceBusMessage.send server msg
 
-    let msg' = ServiceBusMessage.recv client
+    let msg' = Infrastructure.ServiceBusMessage.recv client
 
     msg' |> should equal (Some msg)
 
@@ -264,9 +264,9 @@ let ``send and recv Ack``() =
     use client = Socket.dealer ()
     Socket.connect client "inproc://Ack.test"
 
-    ServiceBusMessage.send server msg
+    Infrastructure.ServiceBusMessage.send server msg
 
-    let msg' = ServiceBusMessage.recv client
+    let msg' = Infrastructure.ServiceBusMessage.recv client
 
     msg' |> should equal (Some msg)
 
@@ -296,6 +296,6 @@ let ``malformed message return None``() =
 
     Frame.send server "hello world"B
 
-    let msg = ServiceBusMessage.recv client
+    let msg = Infrastructure.ServiceBusMessage.recv client
     msg |> should equal None
  

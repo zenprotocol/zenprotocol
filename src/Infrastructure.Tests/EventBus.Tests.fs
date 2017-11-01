@@ -1,8 +1,9 @@
-module EventBus.Tests
+module Infrastructure.EventBus.Tests
 
 open Xunit
 open FsUnit.Xunit
 open FsNetMQ
+open Infrastructure
 
 type Messages = 
     | Hello

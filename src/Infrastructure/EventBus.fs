@@ -1,4 +1,4 @@
-module EventBus
+module Infrastructure.EventBus
 
 open FsNetMQ
 open MBrace.FsPickler

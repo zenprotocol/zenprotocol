@@ -1,4 +1,4 @@
-module ServiceBusMessage
+module Infrastructure.ServiceBusMessage
 
 open System
 open System.Text

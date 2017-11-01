@@ -1,9 +1,9 @@
-module ServiceBus.Tests
+module Infrastructure.ServiceBus.Tests
 
 open Xunit
 open FsUnit.Xunit
 open FsNetMQ
-open ServiceBus
+open Infrastructure.ServiceBus
 
 type Commands = 
     | Greet

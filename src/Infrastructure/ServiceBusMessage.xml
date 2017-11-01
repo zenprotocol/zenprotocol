@@ -5,8 +5,8 @@
         script = "zproto_codec_fs"
         source_dir = "./"
         test_dir ="../Infrastructure.Tests/"
-        module ="ServiceBusMessage"
-        test_module="ServiceBusMessage.Tests"
+        module ="Infrastructure.ServiceBusMessage"
+        test_module="Infrastructure.ServiceBusMessage.Tests"
 >
 
     <message name = "Register" id = "1">
