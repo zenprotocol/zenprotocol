@@ -1,0 +1,47 @@
+<class
+        name = "ServiceBusMessage"
+        signature = "0"
+        title = "ServiceBus Message"
+        script = "zproto_codec_fs"
+        source_dir = "./"
+        test_dir ="../Infrastructure.Tests/"
+        module ="ServiceBusMessage"
+        test_module="ServiceBusMessage.Tests"
+>
+
+    <message name = "Register" id = "1">
+        <field name = "service" type = "string" >Service</field>
+    </message>
+
+    <message name="Command" id = "2">
+        <field name = "service" type="string">Service</field>
+        <field name = "payload" type = "chunk">Payload</field>
+    </message>
+
+    <message name="Relay Command" id = "3">
+        <field name = "payload" type = "chunk">Payload</field>
+    </message>
+
+    <message name="Request" id= "4">
+        <field name = "service" type="string">Service</field>
+        <field name = "payload" type = "chunk">Payload</field>
+    </message>
+    
+    <message name="Relay Request" id="5">
+        <field name="sender" type="chunk">Sender</field>
+        <field name = "payload" type = "chunk">Payload</field>
+    </message>
+    
+    <message name="Response" id="6">
+        <field name="sender" type="chunk">Sender</field>
+        <field name = "payload" type = "chunk">Payload</field>
+    </message>
+    
+    <message name="Relay Response" id="7">
+        <field name = "payload" type = "chunk">Payload</field>
+    </message>
+
+    <message name="Ack" id="8">
+        <field name="dummy" type="number" size="1">Dummy</field>
+    </message>
+</class>

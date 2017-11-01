@@ -47,6 +47,8 @@
     <Compile Include="AssemblyInfo.fs" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ServiceBus.Tests.fs" />
+    <Compile Include="ServiceBusMessage.Tests.fs" />
     <Compile Include="EventBus.Tests.fs" />
     <Content Include="paket.references" />
   </ItemGroup>
