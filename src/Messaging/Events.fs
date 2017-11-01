@@ -1,4 +1,4 @@
-module Events
+module Messaging.Events
 
 open Infrastructure.EventBus
 open Consensus.Types

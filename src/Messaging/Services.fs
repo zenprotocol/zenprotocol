@@ -1,4 +1,4 @@
-module Shared.Services
+module Messaging.Services
 
 open Infrastructure.ServiceBus.Client
 
