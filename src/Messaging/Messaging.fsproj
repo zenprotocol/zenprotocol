@@ -43,6 +43,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="Events.fs" />
     <Compile Include="Services.fs" />
   </ItemGroup>
   <ItemGroup>
