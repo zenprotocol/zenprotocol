@@ -30,7 +30,9 @@ module Broker =
                     (broker.publisher :> System.IDisposable).Dispose ()
                     (broker.subscriber :> System.IDisposable).Dispose ()   
     
-    let create poller name =             
+    let create poller name =
+        // TODO: unlock highwatermark
+                 
         let publisher = Socket.pub ()
         Socket.bind publisher (getPublisherAddress name)
         

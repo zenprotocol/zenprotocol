@@ -45,7 +45,7 @@ module Broker =
     let create poller name = 
         let sendAck server routingId =
             Frame.sendMore server routingId
-            Message.send (Message.Ack {dummy=1uy}) server          
+            Message.send server (Message.Ack {dummy=1uy})          
     
         let sendToService server services serviceName msg =                     
             match Map.tryFind serviceName services with 
@@ -53,7 +53,7 @@ module Broker =
                 match service.routingId with
                 | Some routingId -> 
                     Frame.sendMore server routingId
-                    Message.send msg server
+                    Message.send server msg
                     services
                 | None ->
                     let service = 
@@ -73,7 +73,7 @@ module Broker =
                     service.pendingMessages
                     |> List.iter (fun msg -> 
                         Frame.sendMore server routingId
-                        Message.send msg server) 
+                        Message.send server msg) 
                                         
                 Map.add r.service {routingId=Some routingId; pendingMessages=[]} services                                      
                                                     
@@ -89,7 +89,7 @@ module Broker =
                 sendAck server routingId
                                             
                 Frame.sendMore server r.sender
-                Message.send (Message.RelayResponse {payload=r.payload}) server
+                Message.send server (Message.RelayResponse {payload=r.payload}) 
                 services 
                                                                      
             | _ -> services
@@ -136,14 +136,14 @@ module Agent =
         let socket = Socket.dealer ()
         Socket.connect socket (getBrokerAddress name)
                                                 
-        Message.send (Message.Register {service=service}) socket
+        Message.send socket (Message.Register {service=service})
         waitForAck socket           
         
         let reply sender (msg:'response) =                                
-            Message.send (Message.Response {
+            Message.send socket (Message.Response {
                 sender=sender;
                 payload=binarySerializer.Pickle msg;
-            }) socket                        
+            })                        
             
             waitForAck socket                        
         
@@ -181,7 +181,7 @@ module Client =
         let send client service command =                    
             let payload = binarySerializer.Pickle command
   
-            Message.send (Message.Command {service=service; payload = payload}) client
+            Message.send client (Message.Command {service=service; payload = payload}) 
             
             waitForAck client
                             
@@ -189,7 +189,7 @@ module Client =
         let send<'request,'response> client service (request:'request) =                                           
             let payload = binarySerializer.Pickle request                                                          
                         
-            Message.send (Message.Request {service=service; payload = payload}) client                        
+            Message.send client (Message.Request {service=service; payload = payload})                         
              
             let response = Message.recv client
             

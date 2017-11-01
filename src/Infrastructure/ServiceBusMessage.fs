@@ -306,7 +306,7 @@ let recv socket =
 
     run r stream
 
-let send msg socket =
+let send socket msg =
     let writeMessage = function
         | Register msg -> Register.write msg
         | Command msg -> Command.write msg
@@ -349,5 +349,5 @@ let send msg socket =
         |> Stream.writeNumber1 messageId
         |> writeMessage msg
 
-    Stream.send stream' socket
+    Stream.send socket stream'
 

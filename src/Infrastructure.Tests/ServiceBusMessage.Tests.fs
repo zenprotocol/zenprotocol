@@ -12,16 +12,15 @@ let ``send and recv Register``() =
         service = "Life is short but Now lasts for ever";
     }
 
-    use server = Socket.router ()
+    use server = Socket.dealer ()
     Socket.bind server "inproc://Register.test"
 
     use client = Socket.dealer ()
     Socket.connect client "inproc://Register.test"
 
-    ServiceBusMessage.send msg client
+    ServiceBusMessage.send server msg
 
-    Frame.recv server |> ignore
-    let msg' = ServiceBusMessage.recv server
+    let msg' = ServiceBusMessage.recv client
 
     msg' |> should equal (Some msg)
 
@@ -54,7 +53,7 @@ let ``send and recv Command``() =
     use client = Socket.dealer ()
     Socket.connect client "inproc://Command.test"
 
-    ServiceBusMessage.send msg server
+    ServiceBusMessage.send server msg
 
     let msg' = ServiceBusMessage.recv client
 
@@ -89,7 +88,7 @@ let ``send and recv RelayCommand``() =
     use client = Socket.dealer ()
     Socket.connect client "inproc://RelayCommand.test"
 
-    ServiceBusMessage.send msg server
+    ServiceBusMessage.send server msg
 
     let msg' = ServiceBusMessage.recv client
 
@@ -124,7 +123,7 @@ let ``send and recv Request``() =
     use client = Socket.dealer ()
     Socket.connect client "inproc://Request.test"
 
-    ServiceBusMessage.send msg server
+    ServiceBusMessage.send server msg
 
     let msg' = ServiceBusMessage.recv client
 
@@ -160,7 +159,7 @@ let ``send and recv RelayRequest``() =
     use client = Socket.dealer ()
     Socket.connect client "inproc://RelayRequest.test"
 
-    ServiceBusMessage.send msg server
+    ServiceBusMessage.send server msg
 
     let msg' = ServiceBusMessage.recv client
 
@@ -196,7 +195,7 @@ let ``send and recv Response``() =
     use client = Socket.dealer ()
     Socket.connect client "inproc://Response.test"
 
-    ServiceBusMessage.send msg server
+    ServiceBusMessage.send server msg
 
     let msg' = ServiceBusMessage.recv client
 
@@ -231,7 +230,7 @@ let ``send and recv RelayResponse``() =
     use client = Socket.dealer ()
     Socket.connect client "inproc://RelayResponse.test"
 
-    ServiceBusMessage.send msg server
+    ServiceBusMessage.send server msg
 
     let msg' = ServiceBusMessage.recv client
 
@@ -265,7 +264,7 @@ let ``send and recv Ack``() =
     use client = Socket.dealer ()
     Socket.connect client "inproc://Ack.test"
 
-    ServiceBusMessage.send msg server
+    ServiceBusMessage.send server msg
 
     let msg' = ServiceBusMessage.recv client
 

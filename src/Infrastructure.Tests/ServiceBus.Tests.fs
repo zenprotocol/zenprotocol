@@ -18,20 +18,16 @@ let busName = "test"
     
 let createBroker () = 
      Actor.create (fun shim ->
-            use poller = Poller.create ()
-            use broker = Broker.create poller busName
-            
-            use observer =
-                Poller.addSocket poller shim
-                |> Observable.subscribe (fun _ ->                 
-                    Frame.recv shim |> ignore
-                    Poller.stop poller)
-            
-            Actor.signal shim
-            
-            Poller.run poller
-            
-            Poller.removeSocket poller shim)
+        use poller = Poller.create ()
+        use broker = Broker.create poller busName
+        
+        use observer = Poller.registerEndMessage poller shim            
+        
+        Actor.signal shim
+        
+        Poller.run poller
+        
+        Poller.removeSocket poller shim)
             
 let createAgent delay =  
      Actor.create (fun shim ->
@@ -42,11 +38,7 @@ let createAgent delay =
         use poller = Poller.create ()
         use agent = Agent.create<Commands, Request, Response> poller busName "greeter"                
         
-        use shimObserver =
-            Poller.addSocket poller shim
-            |> Observable.subscribe (fun _ ->                 
-                Frame.recv shim |> ignore
-                Poller.stop poller)
+        use observer = Poller.registerEndMessage poller shim
         
         use agentObserver =
             Agent.observable agent 

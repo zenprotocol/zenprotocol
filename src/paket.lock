@@ -40,7 +40,7 @@ NUGET
       System.Threading.Timer (>= 4.0.1) - restriction: && (< net45) (>= netstandard1.6)
     FSharp.NET.Sdk (1.0.5) - restriction: >= netstandard1.6
       FSharp.Compiler.Tools (>= 4.1.17) - restriction: || (>= net40) (>= netstandard1.3)
-    FsNetMQ (0.2)
+    FsNetMQ (0.2.1)
       FSharp.Core
       NetMQ
     FsPickler (4.5)
