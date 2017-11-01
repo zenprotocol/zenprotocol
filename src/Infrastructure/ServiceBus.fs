@@ -119,6 +119,7 @@ module Agent =
 
     type Agent<'command,'request, 'response> = {
         observable: System.IObservable<Message<'command, 'request,'response>>;
+        observer: System.IDisposable;
         socket: Socket.T;
         poller: Poller.T; 
     }
@@ -130,6 +131,7 @@ module Agent =
                 match x with 
                 | Agent a -> 
                     Poller.removeSocket a.poller a.socket
+                    a.observer.Dispose ()
                     (a.socket :> System.IDisposable).Dispose ()                             
                            
     let create<'command,'request, 'response> poller name service = 
@@ -161,9 +163,13 @@ module Agent =
                     with 
                     | n ->                         
                         failwith "failed"                        
-                | _ -> None)                    
+                | _ -> None)
+            |> FSharp.Control.Reactive.Observable.publish
+        
+        let observer = FSharp.Control.Reactive.Observable.connect observable                      
+                                              
                     
-        Agent {observable=observable; socket=socket;poller=poller;}
+        Agent {observable=observable; socket=socket;poller=poller; observer=observer}
         
     let observable (Agent agent) = agent.observable         
     

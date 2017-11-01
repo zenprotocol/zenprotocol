@@ -1,2 +1,4 @@
 FsNetMQ
 FsPickler
+FSharp.Control.Reactive
+System.Reactive.Linq

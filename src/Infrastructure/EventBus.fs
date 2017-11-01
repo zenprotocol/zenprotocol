@@ -58,6 +58,7 @@ module Agent =
         subscriber: Socket.T;        
         poller: Poller.T;   
         observable: System.IObservable<'a>;    
+        observer: System.IDisposable;
     }  
 
     type T<'a> = 
@@ -66,7 +67,8 @@ module Agent =
             member x.Dispose () =
                 match x with 
                 | Agent agent ->
-                    Poller.removeSocket agent.poller agent.subscriber                     
+                    Poller.removeSocket agent.poller agent.subscriber
+                    agent.observer.Dispose()
                     (agent.subscriber :> System.IDisposable).Dispose () 
 
     let create<'a> poller name =
@@ -81,11 +83,15 @@ module Agent =
                 SingleFrame.recv subscriber
                 |> binarySerializer.UnPickle<'a>
             )
+            |> FSharp.Control.Reactive.Observable.publish
+            
+        let observer = FSharp.Control.Reactive.Observable.connect observable            
             
         let agent = {            
             subscriber=subscriber;
             poller = poller;
             observable = observable;
+            observer = observer;
         }
         
         Agent agent                    
