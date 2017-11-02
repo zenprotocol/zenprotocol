@@ -19,3 +19,6 @@ let serialize mode tx =
 
 let deserialize =
     Binary.unpickle pickler 
+
+let hash =
+    serialize WithoutWitness >> Hash.compute 

@@ -1,6 +1,6 @@
 module Consensus.Types
 
-type Hash = byte[]
+open Consensus.Hash
 
 type Outpoint = {
     txHash: Hash; 
