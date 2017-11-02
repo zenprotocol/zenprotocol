@@ -14,3 +14,4 @@ nuget xunit.runner.console
 nuget FSharp.Control.Reactive
 nuget System.Reactive.Linq
 nuget FSharp.NET.Sdk
+nuget System.ValueTuple
