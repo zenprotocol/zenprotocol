@@ -11,4 +11,6 @@ nuget libsodium-net
 nuget FsNetMQ
 nuget FsPickler
 nuget xunit.runner.console
+nuget FSharp.Control.Reactive
+nuget System.Reactive.Linq
 

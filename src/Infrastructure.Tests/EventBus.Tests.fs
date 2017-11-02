@@ -1,8 +1,9 @@
-module EventBus.Tests
+module Infrastructure.EventBus.Tests
 
 open Xunit
 open FsUnit.Xunit
 open FsNetMQ
+open Infrastructure
 
 type Messages = 
     | Hello
@@ -12,27 +13,20 @@ type Messages =
 let ``send and recv message`` () =                  
     use brokerActor = Actor.create (fun shim ->
         use poller = Poller.create ()
-        use broker = EventBus.Broker.create poller "test"
-    
-        use observer = 
-            Poller.addSocket poller shim |>
-            Observable.subscribe (fun _ ->
-                Frame.recv shim |> ignore
-                Poller.stop poller
-                )
-    
+        use observer = Poller.registerEndMessage poller shim
+        
+        use broker = EventBus.Broker.create poller "test"           
+                
         Actor.signal shim
         Poller.run poller 
     )      
     
     use pubActor = Actor.create (fun shim ->
-        use poller = Poller.create ()
-        use agent = EventBus.Agent.create<Messages> poller "test"
-    
         Actor.signal shim
-        
+                               
         System.Threading.Thread.Sleep 10
-        Agent.publish agent (World "Hello")
+        use publisher = Publisher.create<Messages> "test"
+        Publisher.publish publisher (World "Hello")        
         
         // Wait for signal to exit
         Frame.recv shim |> ignore                               

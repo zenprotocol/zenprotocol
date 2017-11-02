@@ -1,4 +1,4 @@
-module EventBus
+module Infrastructure.EventBus
 
 open FsNetMQ
 open MBrace.FsPickler
@@ -30,7 +30,9 @@ module Broker =
                     (broker.publisher :> System.IDisposable).Dispose ()
                     (broker.subscriber :> System.IDisposable).Dispose ()   
     
-    let create poller name =             
+    let create poller name =
+        // TODO: unlock highwatermark
+                 
         let publisher = Socket.pub ()
         Socket.bind publisher (getPublisherAddress name)
         
@@ -53,10 +55,10 @@ module Broker =
             
 module Agent =    
     type Agent<'a> = {
-        subscriber: Socket.T;
-        publisher: Socket.T; 
+        subscriber: Socket.T;        
         poller: Poller.T;   
         observable: System.IObservable<'a>;    
+        observer: System.IDisposable;
     }  
 
     type T<'a> = 
@@ -65,14 +67,12 @@ module Agent =
             member x.Dispose () =
                 match x with 
                 | Agent agent ->
-                    Poller.removeSocket agent.poller agent.subscriber 
-                    (agent.publisher :> System.IDisposable).Dispose ()
+                    Poller.removeSocket agent.poller agent.subscriber
+                    agent.observer.Dispose()
                     (agent.subscriber :> System.IDisposable).Dispose () 
 
     let create<'a> poller name =
-        let publisher = Socket.pub ()
-        Socket.connect publisher (getSubscriberAddress name)
-        
+               
         let subscriber = Socket.sub ()
         Socket.connect subscriber (getPublisherAddress name)
         Socket.subscribe subscriber ""
@@ -83,21 +83,36 @@ module Agent =
                 SingleFrame.recv subscriber
                 |> binarySerializer.UnPickle<'a>
             )
+            |> FSharp.Control.Reactive.Observable.publish
             
-        let agent = {
-            publisher=publisher;
+        let observer = FSharp.Control.Reactive.Observable.connect observable            
+            
+        let agent = {            
             subscriber=subscriber;
             poller = poller;
             observable = observable;
+            observer = observer;
         }
         
         Agent agent                    
 
-    let observable (Agent agent) = agent.observable        
+    let observable (Agent agent) = agent.observable                                  
         
-    let publish:(T<'a> -> 'a -> unit) = fun (Agent agent) msg -> 
-        binarySerializer.Pickle msg
-        |> Frame.send agent.publisher                      
-        
-                                                            
+module Publisher =
+    type T<'a> = 
+        | Publisher of Socket.T
+        interface System.IDisposable with 
+            member x.Dispose () =
+                match x with 
+                | Publisher socket ->                                        
+                    (socket :> System.IDisposable).Dispose ()
+    
+    let create<'a> name : T<'a> = 
+         let publisher = Socket.pub ()
+         Socket.connect publisher (getSubscriberAddress name)
+         
+         Publisher publisher
 
+    let publish:(T<'a> -> 'a -> unit) = fun (Publisher socket) msg -> 
+        binarySerializer.Pickle<'a> msg
+        |> Frame.send socket
