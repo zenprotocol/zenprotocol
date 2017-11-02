@@ -2,8 +2,6 @@
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\packages\FSharp.NET.Sdk\build\FSharp.NET.Sdk.props" Condition="Exists('..\packages\FSharp.NET.Sdk\build\FSharp.NET.Sdk.props')" Label="Paket" />
   <Import Project="..\packages\FSharp.Compiler.Tools\build\FSharp.Compiler.Tools.props" Condition="Exists('..\packages\FSharp.Compiler.Tools\build\FSharp.Compiler.Tools.props')" Label="Paket" />
-  <Import Project="..\packages\FSharp.NET.Sdk.1.0.5\build\FSharp.NET.Sdk.props" />
-  <Import Project="..\packages\FSharp.Compiler.Tools.4.1.17\build\FSharp.Compiler.Tools.props" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
