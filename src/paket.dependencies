@@ -16,3 +16,5 @@ nuget System.Reactive.Linq
 nuget FSharp.NET.Sdk
 nuget System.ValueTuple
 nuget BouncyCastle
+nuget FSharp.Configuration
+nuget Argu
