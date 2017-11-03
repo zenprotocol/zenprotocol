@@ -43,7 +43,7 @@ let create poller listen bind seeds =
 
     let peers = 
         Seq.map (fun seed ->
-            let peer = Peer.connect socket seed
+            let peer = Peer.connect socket (sprintf "tcp://%s" seed)
             (Peer.routingId peer), peer) seeds
         |> Map.ofSeq          
     
@@ -60,3 +60,7 @@ let create poller listen bind seeds =
     {socket=socket; poller=poller; peers = peers; observable=observable; observer = observer}
     
 let observable manager = manager.observable
+
+let activePeers manager = 
+    Map.filter (fun _ peer -> Peer.isActive peer) manager.peers
+    |> Seq.length

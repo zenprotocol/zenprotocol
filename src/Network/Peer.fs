@@ -21,6 +21,7 @@ type T = Peer of State
 
 let state (Peer state) = state
 let isDead (Peer state) = state = Dead
+let isActive (Peer state) = state = Active
 
 let private closePeer peer socket =
     // TODO: terminate the pipe
@@ -28,9 +29,7 @@ let private closePeer peer socket =
     
     Peer Dead
 
-let connect socket address =
-    let address = sprintf "tcp://%s" address 
-            
+let connect socket address =                
     // TODO: set the routing id
     Socket.connect socket address
     

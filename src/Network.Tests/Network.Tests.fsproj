@@ -46,9 +46,17 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="NetworkMessage.Tests.fs" />
+    <Compile Include="PeersManagerTests.fs" />
+    <Compile Include="PeerTests.fs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="paket.references" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Network\Network.fsproj">
+      <Project>{8471efe5-4b38-4969-ac2a-0bf64a031eba}</Project>
+      <Name>Network</Name>
+    </ProjectReference>
   </ItemGroup>
   <PropertyGroup>
     <FSharpTargetsPath>..\packages\FSharp.Compiler.Tools.4.1.23\tools\Microsoft.FSharp.Targets</FSharpTargetsPath>
