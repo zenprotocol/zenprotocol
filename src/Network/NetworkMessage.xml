@@ -1,0 +1,37 @@
+<class
+        name = "NetworkMessage"
+        signature = "19317"
+        title = "Network Message"
+        script = "zproto_codec_fs"
+        source_dir = "./"
+        test_dir ="../Network.Tests/"
+        module ="Network.Message"
+        test_module="Network.Tests.MessageTests"
+>
+
+    <message name = "Hello" id = "1">
+        <field name="network" type="number" size="4">Network</field>
+        <field name = "version" type = "number" size="4" >Version</field>
+    </message>
+
+    <message name = "Hello Ack" id = "2">
+        <field name="network" type="number" size="4">Network</field>
+        <field name = "version" type = "number" size="4" >Version</field>
+    </message>
+    
+    <message name="Ping" id="3">
+        <field name = "nonce" type = "number" size="4" >Nonce</field>
+    </message>
+
+    <message name="Pong" id="4">
+        <field name = "nonce" type = "number" size="4" >Nonce</field>
+    </message>
+    
+    <message name="Unknown Peer" id="100">
+        <field name="dummy" type="number" size="1" />
+    </message>
+
+    <message name="Unknown Message" id="101">
+        <field name="message id" type="number" size="1" />
+    </message>
+</class>
