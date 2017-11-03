@@ -19,4 +19,12 @@ module Blockchain =
     
     let getMemPool client = 
         Request.send client serviceName GetMemPool        
-                 
+
+module Network =
+    type Command = unit 
+                   
+    type Request = unit
+                
+    type Response = unit        
+
+    let serviceName = "network"                 
