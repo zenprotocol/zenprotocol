@@ -7,28 +7,26 @@ open Network
 
 [<Fact>]
 let ``peers connecting to each other`` () =
-    use hostSocket = Socket.dealer ()
+    printfn "starting..."
+
+    use hostSocket = Socket.peer ()
     Socket.bind hostSocket "inproc://peertopeer"
     
-    use clientSocket = Socket.dealer ()        
+    use clientSocket = Socket.peer ()
     let client = Peer.connect clientSocket "inproc://peertopeer"
     
-    Peer.state client |> should equal Peer.Connecting
+    Peer.state client |> should equal Peer.Connecting    
     
-    let routingId = Peer.recvRoutingId hostSocket
+    let routingId = RoutingId.get hostSocket
     let msg = Message.recv hostSocket
     
     let host = Peer.newPeer hostSocket routingId msg
     
     Peer.state host |> should equal Peer.Active
     
-    Peer.recvRoutingId clientSocket |> ignore
+    RoutingId.get clientSocket |> ignore
     let msg' = Message.recv clientSocket
     
     let client' = Peer.handleMessage clientSocket client msg'
     
-    Peer.state client' |> should equal Peer.Active  
-    
-      
-    
-    
+    Peer.state client' |> should equal Peer.Active

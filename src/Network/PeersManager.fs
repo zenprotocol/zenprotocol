@@ -1,20 +1,20 @@
 module Network.PeersManager
 
 open FsNetMQ
-open Network;
-open Infrastructure;
+open Network
+open Infrastructure
 
 type PeersManager = 
     {
         socket:Socket.T;
         poller: Poller.T;
-        peers: Map<Peer.RoutingId, Peer.T>; 
+        peers: Map<RoutingId.T, Peer.Peer>; 
         observable: System.IObservable<PeersManager->PeersManager>;
         observer: System.IDisposable;
     }
     interface System.IDisposable with
             member p.Dispose() =                
-                p.observer.Dispose() 
+                p.observer.Dispose()                                                 
                 Poller.removeSocket p.poller p.socket
                 (p.socket :> System.IDisposable).Dispose()
          
@@ -31,9 +31,8 @@ let handleMessage routingId msg peersManager =
 
     {peersManager with peers = peers}
                  
-let create poller listen bind seeds =
-    // TODO: use peer socket type 
-    let socket = Socket.dealer () 
+let create poller listen bind seeds =    
+    let socket = Socket.peer () 
     
     if listen then 
         Log.info "Listening on %s" bind
@@ -50,7 +49,7 @@ let create poller listen bind seeds =
     let observable = 
         Poller.addSocket poller socket
         |> Observable.map (fun _ -> 
-            let routingId = Peer.recvRoutingId socket
+            let routingId = RoutingId.get socket
             let msg =  Message.recv socket
             handleMessage routingId msg)
         |> FSharp.Control.Reactive.Observable.publish

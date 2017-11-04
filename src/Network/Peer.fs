@@ -4,8 +4,6 @@ open FsNetMQ
 open Network
 open Infrastructure
 
-type RoutingId = RoutingId of uint32
-
 let networkId = 0ul;
 let version = 0ul;
 
@@ -14,60 +12,71 @@ type State =
     | Active
     | Dead
 
-type T = Peer of State
+type Peer = {
+    routingId: RoutingId.T;
+    state: State;
+}
 
 // TODO: check network on each message
 // TODO: for each message we should minimum version
 
-let state (Peer state) = state
-let isDead (Peer state) = state = Dead
-let isActive (Peer state) = state = Active
+let state peer = peer.state
+let isDead peer = peer.state = Dead
+let isActive peer = peer.state = Active
 
-let private closePeer peer socket =
+let private withState peer state = { peer with state =state; }
+
+let private closePeer socket peer =
     // TODO: terminate the pipe
     // TODO: disconnect the peer if we are conneting one
     
-    Peer Dead
+    withState peer Dead
+    
+let private send socket peer msg = 
+    match RoutingId.trySet socket peer.routingId 0<milliseconds> with
+    | RoutingId.TryResult.HostUnreachable 
+    | RoutingId.TryResult.TimedOut -> closePeer socket peer
+    | RoutingId.TryResult.Ok -> 
+        Message.send socket msg
+        peer
+    
+let private create routingId state = {routingId = routingId; state = state}       
 
-let connect socket address =                
-    // TODO: set the routing id
-    Socket.connect socket address
+let connect socket address =                    
+    let routingId = Peer.connect socket address
     
     Log.info "Connecting to %s" address
     
-    let peer = Peer Connecting
+    let peer = create routingId Connecting
     
     // TODO: use correct values for this
-    let hello = Message.Hello {version=version; network = networkId;}
-    Message.send socket hello
-    
-    peer
+    send socket peer (Message.Hello {version=version; network = networkId;})    
 
-let newPeer socket routingId msg =     
+let newPeer socket routingId msg = 
+    let peer = create routingId Dead 
+    
     match msg with
     | None -> 
-        Message.send socket (Message.UnknownMessage {messageId = 0uy})
-        Peer Dead
+        send socket peer (Message.UnknownMessage {messageId = 0uy})
+        |> closePeer socket
     | Some msg ->
         match msg with
         | Message.Hello _ ->
-            let helloAck = Message.HelloAck {version=0ul; network = networkId;}
-            Message.send socket helloAck
-            
             Log.info "Peer accepted"
             
-            Peer Active
-        | _ ->
-            let unknownPeer = Message.UnknownPeer {dummy = 0uy;}
-            Message.send socket unknownPeer
-            Peer Dead
+            let peer = (withState peer Active)
+            
+            send socket peer (Message.HelloAck {version=0ul; network = networkId;})                                                 
+        | _ ->            
+            send socket peer (Message.UnknownPeer {dummy = 0uy;})
 
 let handleConnectingState socket peer msg = 
     match msg with
     | None -> 
-        Message.send socket (Message.UnknownMessage {messageId = 0uy})
         Log.warning "Received malformed message from peer"
-        closePeer peer socket
+                        
+        send socket peer (Message.UnknownMessage {messageId = 0uy})
+        |> closePeer socket 
     | Some msg -> 
         match msg with 
         | Message.HelloAck _ -> 
@@ -75,32 +84,31 @@ let handleConnectingState socket peer msg =
             
             Log.info "Connected to pear"
             
-            Peer Active        
+            withState peer Active        
         | _ -> 
             Log.warning "Expecting HelloAck" // TODO: print message name
-            // TODO: terminate the pipe
-            // TODO: disconnect the peer if we are conneting one
-            Peer Dead
+            closePeer socket peer            
 
 let handleActiveState socket peer msg =
     match msg with
-    | None -> 
-        Message.send socket (Message.UnknownMessage {messageId = 0uy})
-        
-        closePeer peer socket
+    | None ->         
+        Log.warning "Received malformed message from peer"
+    
+        send socket peer (Message.UnknownMessage {messageId = 0uy})
+        |> closePeer socket
     | Some msg ->  
         match msg with 
         | Message.UnknownPeer _ ->
-            Message.send socket (Message.Hello {version=version;network=networkId})
-            Peer Connecting
-        | _ -> Peer Active                                            
+            
+            let peer = withState peer Connecting
+            
+            send socket peer (Message.Hello {version=version;network=networkId})            
+        | _ -> peer
 
 let handleMessage socket peer msg =    
    match state peer with
    | Connecting -> handleConnectingState socket peer msg 
    | Active -> handleActiveState socket peer msg 
-   | _ -> Peer Dead
+   | _ -> failwith "Dead peer should not receive any messages"
 
-let routingId peer = RoutingId 0ul
-
-let recvRoutingId socket = RoutingId 0ul
+let routingId peer = peer.routingId

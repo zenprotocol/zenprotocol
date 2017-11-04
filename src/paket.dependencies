@@ -8,7 +8,7 @@ nuget Zen.FSharp.Compiler.Service
 nuget FAKE
 nuget FSharp.Compatibility.OCaml
 nuget libsodium-net
-nuget FsNetMQ
+nuget FsNetMQ >= 0.2.4.0
 nuget FsPickler
 nuget xunit.runner.console
 nuget FSharp.Control.Reactive
@@ -18,3 +18,4 @@ nuget System.ValueTuple
 nuget BouncyCastle
 nuget FSharp.Configuration
 nuget Argu
+

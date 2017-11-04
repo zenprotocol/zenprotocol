@@ -5,6 +5,7 @@ open FsNetMQ
 open Infrastructure
 open Messaging.Services.Network
 open Messaging.Events
+open FSharp.Control.Reactive.Observable
 
 type State = PeersManager.PeersManager
 
