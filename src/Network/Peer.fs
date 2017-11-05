@@ -8,9 +8,9 @@ let networkId = 0ul;
 let version = 0ul;
 
 // TODO: those should come from configuration?
-let pingInterval = System.TimeSpan.FromSeconds(10.0)
-let pingTimeout = System.TimeSpan.FromSeconds(5.0)
-let helloTimeout = System.TimeSpan.FromSeconds(5.0)
+let pingInterval = System.TimeSpan.FromSeconds(5.0)
+let pingTimeout = System.TimeSpan.FromSeconds(2.0)
+let helloTimeout = System.TimeSpan.FromSeconds(2.0)
 
 type CloseReason = 
     | NoPingReply
@@ -60,6 +60,15 @@ let isDead peer =
     | _ -> false
     
 let isActive peer = peer.state = Active
+let isConntecting peer = 
+    match peer.state with
+    | Connecting _ -> true
+    | _-> false
+    
+let getAddress peer =
+    match peer.mode with
+    | Listener -> None
+    | Connector address -> Some address    
 
 let private withState peer state = { peer with state =state; }
 

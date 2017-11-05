@@ -49,9 +49,9 @@ NUGET
       System.Threading.Timer (>= 4.0.1) - restriction: && (< net45) (>= netstandard1.6)
     FSharp.NET.Sdk (1.0.5)
       FSharp.Compiler.Tools (>= 4.1.17) - restriction: || (>= net40) (>= netstandard1.3)
-    FsNetMQ (0.2.4)
+    FsNetMQ (0.2.5)
       FSharp.Core
-      NetMQ (4.0.0.83-pre)
+      NetMQ (4.0.0.156-pre)
     FsPickler (4.5)
       FSharp.Core (>= 3.1)
     FsUnit.xUnit (3.0)
@@ -185,7 +185,7 @@ NUGET
       Microsoft.NETCore.Platforms (>= 1.1) - restriction: && (< monotouch) (< net46) (>= netstandard1.3) (< xamarinios) (< xamarinmac) (< xamarintvos) (< xamarinwatchos)
       Microsoft.NETCore.Targets (>= 1.1) - restriction: && (< monotouch) (< net46) (>= netstandard1.3) (< xamarinios) (< xamarinmac) (< xamarintvos) (< xamarinwatchos)
       System.Runtime (>= 4.3) - restriction: && (< monotouch) (< net46) (>= netstandard1.3) (< xamarinios) (< xamarinmac) (< xamarintvos) (< xamarinwatchos)
-    NetMQ (4.0.0.83-pre)
+    NetMQ (4.0.0.156-pre)
       AsyncIO (>= 0.1.40) - restriction: || (>= net40) (>= netstandard1.3)
       Microsoft.NETCore.UniversalWindowsPlatform (>= 5.3.3) - restriction: >= uap10.0
       NETStandard.Library (>= 1.3) - restriction: && (< net40) (>= netstandard1.3) (< uap10.0)

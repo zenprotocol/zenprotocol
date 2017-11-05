@@ -5,7 +5,7 @@ open FsNetMQ
 open Infrastructure
 open Messaging.Services.Network
 open Messaging.Events
-open FSharp.Control.Reactive.Observable
+open FSharp.Control
 
 type State = PeersManager.PeersManager
 
@@ -39,9 +39,13 @@ let main busName externalIp listen bind seeds =
             Observable.merge sbObservable ebObservable
             |> Observable.merge (PeersManager.observable peersManager)
             |> Observable.scan (fun state handler -> handler state) peersManager 
-            |> Observable.subscribe ignore     
+            |> Reactive.Observable.subscribe ignore     
         
         Actor.signal shim
-        Poller.run poller
+        
+        try 
+            Poller.run poller
+        with
+        | x -> printfn "%A" x             
     )
                     

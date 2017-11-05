@@ -53,10 +53,13 @@
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="NetworkMessage.fs" />
     <Compile Include="Peer.fs" />
+    <Compile Include="Peers.fs" />
+    <Compile Include="AddressBook.fs" />
     <Compile Include="PeersManager.fs" />
     <Compile Include="Main.fs" />
     <Content Include="paket.references" />
     <Content Include="NetworkMessage.xml" />
+    
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Consensus\Consensus.fsproj">

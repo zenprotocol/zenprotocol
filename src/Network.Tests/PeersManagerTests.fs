@@ -20,10 +20,10 @@ let ``Two peers connect to each other``() =
             fun (m1,m2) ->  
                 Poller.stop poller
                 
-                PeersManager.activePeers m1 |> should equal 1
-                PeersManager.activePeers m2 |> should equal 1
+                PeersManager.countActivePeers m1 |> should equal 1
+                PeersManager.countActivePeers m2 |> should equal 1
                 
-                printf "%d %d" (PeersManager.activePeers m1) (PeersManager.activePeers m2)
+                printf "%d %d" (PeersManager.countActivePeers m1) (PeersManager.countActivePeers m2)
                 
                 
                 m1,m2
