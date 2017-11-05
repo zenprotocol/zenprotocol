@@ -42,6 +42,7 @@
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Hash.fs" />
     <Compile Include="Types.fs" />
+    <Compile Include="UtxsoSet.fs" />
     <Compile Include="Transaction.fs" />
     <Content Include="paket.references" />
   </ItemGroup>

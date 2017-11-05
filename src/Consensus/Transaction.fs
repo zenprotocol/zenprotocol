@@ -1,6 +1,8 @@
 module Consensus.Transaction
 
 open Consensus.Types
+open Consensus.UtxoSet
+
 open MBrace.FsPickler.Combinators
 
 let pickler = Pickler.auto<Transaction>
@@ -21,4 +23,49 @@ let deserialize =
     Binary.unpickle pickler 
 
 let hash =
-    serialize WithoutWitness >> Hash.compute 
+    serialize WithoutWitness >> Hash.compute
+
+let private validateOrphancy set tx =
+    match getUtxos set tx.inputs with
+    | Some utxos -> 
+        Ok (tx, utxos)
+    | None -> Error "orphan"
+
+let private validateAmounts (tx, outputs) =
+    let addToMap newKey newValue map =
+        if Map.containsKey newKey map
+        then
+            Map.map (
+                fun key value -> 
+                    if (key = newKey) 
+                    then newValue + value 
+                    else newValue)
+                map
+        else
+            Map.add newKey newValue map            
+    let sumAmounts = List.fold (fun map output -> addToMap output.spend.asset output.spend.amount map) Map.empty
+
+    let inputSums = sumAmounts tx.outputs
+    let outputSums = sumAmounts outputs
+    
+    if Map.count inputSums <> Map.count outputSums then 
+        Error "invalid amounts"
+    else
+        let validateAmount state inputAsset inputAmount = 
+            match state with 
+            | false -> false
+            | true -> 
+                match Map.tryFind inputAsset outputSums with
+                | None -> false
+                | Some outputAmount -> inputAmount = outputAmount
+    
+        if Map.fold validateAmount true inputSums
+            then Ok tx
+            else Error "invalid amounts"
+
+let validate set =
+    let (>=>) f1 f2 x = Result.bind f2 (f1 x)
+
+    validateOrphancy set
+    >=> 
+    validateAmounts 
