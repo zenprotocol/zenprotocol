@@ -53,6 +53,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="PeersManagerHelper.fs" />
     <Compile Include="NetworkMessage.Tests.fs" />
     <Compile Include="PeersManagerTests.fs" />
     <Compile Include="PeerTests.fs" />

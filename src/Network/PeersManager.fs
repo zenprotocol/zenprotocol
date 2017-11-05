@@ -5,7 +5,7 @@ open Network
 open Infrastructure
 
 let maxConnections = 1
-let timerInterval = 10 * 1000<milliseconds> // 10 seconds
+let timerInterval = 1 * 1000<milliseconds> // 10 seconds
 
 type State = 
     | Offline

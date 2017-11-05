@@ -8,9 +8,10 @@ let networkId = 0ul;
 let version = 0ul;
 
 // TODO: those should come from configuration?
-let pingInterval = System.TimeSpan.FromSeconds(5.0)
-let pingTimeout = System.TimeSpan.FromSeconds(2.0)
-let helloTimeout = System.TimeSpan.FromSeconds(2.0)
+// For now those are configured for fast unit testing
+let pingInterval = System.TimeSpan.FromSeconds(2.0)
+let pingTimeout = System.TimeSpan.FromSeconds(1.0)
+let helloTimeout = System.TimeSpan.FromSeconds(1.0)
 
 type CloseReason = 
     | NoPingReply
