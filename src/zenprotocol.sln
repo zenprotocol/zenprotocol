@@ -3,6 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
 VisualStudioVersion = 12.0.0.0
 MinimumVisualStudioVersion = 10.0.0.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".paket", ".paket", "{3687651F-3E94-4443-9367-64C31CA13A48}"
+	ProjectSection(SolutionItems) = preProject
+		..\paket.dependencies = ..\paket.dependencies
+	EndProjectSection
+EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Consensus", "Consensus\Consensus.fsproj", "{5EC4457B-615A-4BBD-B3D5-D0E311B9D5E9}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Consensus.Tests", "Consensus.Tests\Consensus.Tests.fsproj", "{B5E951FC-AE90-4EF1-9365-3E2B5A56B510}"
@@ -18,11 +23,6 @@ EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Node", "Node\Node.fsproj", "{9755DEA0-2931-486A-984A-0FAD1C44EDF7}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Blockchain", "Blockchain\Blockchain.fsproj", "{16B10D81-C99E-4562-810C-9B637234C72D}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{D96A8074-E357-4F09-8830-D9330AD92E30}"
-	ProjectSection(SolutionItems) = preProject
-		paket.dependencies = ../paket.dependencies
-	EndProjectSection
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Network", "Network\Network.fsproj", "{8471EFE5-4B38-4969-AC2A-0BF64A031EBA}"
 EndProject
