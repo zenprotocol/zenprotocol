@@ -5,6 +5,11 @@ open FsUnit.Xunit
 open FsNetMQ
 open Network
 
+let isConnecting peer =
+    match Peer.state peer with
+    | Peer.Connecting _ -> true
+    | _ -> false
+
 [<Fact>]
 let ``peers connecting to each other`` () =
     printfn "starting..."
@@ -15,7 +20,7 @@ let ``peers connecting to each other`` () =
     use clientSocket = Socket.peer ()
     let client = Peer.connect clientSocket "inproc://peertopeer"
     
-    Peer.state client |> should equal Peer.Connecting    
+    isConnecting client |> should be True    
     
     let routingId = RoutingId.get hostSocket
     let msg = Message.recv hostSocket

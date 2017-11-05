@@ -4,17 +4,27 @@ open FsNetMQ
 open Network
 open Infrastructure
 
+let timerInterval = 10 * 1000<milliseconds> // 10 seconds
+
+type State = 
+    | Offline
+    | Satisfying
+    | Active
+
 type PeersManager = 
     {
-        socket:Socket.T;
+        socket: Socket.T;
+        timer:  Timer.T;
         poller: Poller.T;
         peers: Map<RoutingId.T, Peer.Peer>; 
         observable: System.IObservable<PeersManager->PeersManager>;
         observer: System.IDisposable;
+        state: State;
     }
     interface System.IDisposable with
             member p.Dispose() =                
-                p.observer.Dispose()                                                 
+                p.observer.Dispose()             
+                Poller.removeTimer p.poller p.timer                                    
                 Poller.removeSocket p.poller p.socket
                 (p.socket :> System.IDisposable).Dispose()
          
@@ -30,9 +40,17 @@ let handleMessage routingId msg peersManager =
         | false -> Map.add routingId peer peersManager.peers
 
     {peersManager with peers = peers}
+    
+let handleTimer peersManager =
+    let peers = 
+        Map.map (fun _ -> Peer.handleTick peersManager.socket) peersManager.peers
+        |> Map.filter (fun _ peer -> not (Peer.isDead peer))
+    
+    {peersManager with peers = peers}
                  
 let create poller listen bind seeds =    
-    let socket = Socket.peer () 
+    let socket = Socket.peer ()
+    let timer = Timer.create timerInterval 
     
     if listen then 
         Log.info "Listening on %s" bind
@@ -44,9 +62,13 @@ let create poller listen bind seeds =
         Seq.map (fun seed ->
             let peer = Peer.connect socket (sprintf "tcp://%s" seed)
             (Peer.routingId peer), peer) seeds
-        |> Map.ofSeq          
+        |> Map.ofSeq
     
-    let observable = 
+    let timerObservable = 
+        Poller.addTimer poller timer
+        |> Observable.map (fun _ -> handleTimer)
+    
+    let socketObservable = 
         Poller.addSocket poller socket
         |> Observable.map (fun _ -> 
             let routingId = RoutingId.get socket
@@ -54,9 +76,19 @@ let create poller listen bind seeds =
             handleMessage routingId msg)
         |> FSharp.Control.Reactive.Observable.publish
         
-    let observer = FSharp.Control.Reactive.Observable.connect observable                  
+    let observer = FSharp.Control.Reactive.Observable.connect socketObservable
     
-    {socket=socket; poller=poller; peers = peers; observable=observable; observer = observer}
+    let observable = Observable.merge socketObservable timerObservable
+    
+    {
+        socket=socket; 
+        poller=poller; 
+        peers = peers; 
+        observable=observable; 
+        observer = observer; 
+        timer = timer; 
+        state = Offline
+    }
     
 let observable manager = manager.observable
 
