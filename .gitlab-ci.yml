@@ -1,0 +1,14 @@
+image: mono:5.4
+
+before_script:
+ - apt-get update
+ - apt-get install -y -qq libsodium-dev fsharp
+
+build:
+ stage: build
+ script:
+ - mono .paket/paket.exe restore
+ - msbuild src/zenprotocol.sln
+ - mono packages/xunit.runner.console/tools/net452/xunit.console.exe src/Consensus.Tests/bin/Debug/Consensus.Tests.dll
+ - mono packages/xunit.runner.console/tools/net452/xunit.console.exe src/Infrastructure.Tests/bin/Debug/Infrastructure.Tests.dll
+ - mono packages/xunit.runner.console/tools/net452/xunit.console.exe src/Network.Tests/bin/Debug/Network.Tests.dll
