@@ -3,3 +3,4 @@ FSharp.Control.Reactive
 System.Reactive.Linq
 FSharp.Configuration
 Argu
+FSharp.Core

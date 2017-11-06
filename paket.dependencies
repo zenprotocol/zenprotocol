@@ -1,6 +1,8 @@
 source https://nuget.org/api/v2
 
-nuget FSharp.Core
+framework: 462
+
+nuget FSharp.Core 4.1.18
 nuget xunit
 nuget FsUnit.xUnit
 nuget FsCheck.Xunit
@@ -8,13 +10,11 @@ nuget Zen.FSharp.Compiler.Service
 nuget FAKE
 nuget FSharp.Compatibility.OCaml
 nuget libsodium-net
-nuget FsNetMQ
+nuget FsNetMQ >= 0.2.5.0
 nuget FsPickler
 nuget xunit.runner.console
 nuget FSharp.Control.Reactive
 nuget System.Reactive.Linq
-nuget FSharp.NET.Sdk
-nuget System.ValueTuple
 nuget BouncyCastle
 nuget FSharp.Configuration
 nuget Argu

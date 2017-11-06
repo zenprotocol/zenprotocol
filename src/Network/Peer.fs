@@ -4,70 +4,137 @@ open FsNetMQ
 open Network
 open Infrastructure
 
-type RoutingId = RoutingId of uint32
-
 let networkId = 0ul;
 let version = 0ul;
 
-type State =    
-    | Connecting
-    | Active
-    | Dead
+// TODO: those should come from configuration?
+// For now those are configured for fast unit testing
+let pingInterval = System.TimeSpan.FromSeconds(2.0)
+let pingTimeout = System.TimeSpan.FromSeconds(1.0)
+let helloTimeout = System.TimeSpan.FromSeconds(1.0)
 
-type T = Peer of State
+type CloseReason = 
+    | NoPingReply
+    | Unreachable
+    | PipeFull
+    | UnknownMessage
+    | UnknownPeer
+    | NoHelloAck
+    | ExpectingHelloAck
+    | NoPong
+
+type State =    
+    | Connecting of sent:System.DateTime
+    | Active
+    | Dead of reason:CloseReason
+    
+type PingState = 
+    | NoPing of lastPong: System.DateTime
+    | WaitingForPong of nonce:uint32 * pingSent:System.DateTime
+    
+type PeerMode =
+    | Connector of address:string
+    | Listener
+
+type Peer = {
+    mode: PeerMode
+    routingId: RoutingId.T;
+    state: State;
+    ping: PingState;
+}
+
+let private random = new System.Random()
+let private getNonce () = 
+    let bytes = Array.create 4 0uy
+    random.NextBytes (bytes)
+    System.BitConverter.ToUInt32(bytes,0)
+    
+let private getNow () = System.DateTime.UtcNow        
 
 // TODO: check network on each message
 // TODO: for each message we should minimum version
 
-let state (Peer state) = state
-let isDead (Peer state) = state = Dead
-let isActive (Peer state) = state = Active
-
-let private closePeer peer socket =
-    // TODO: terminate the pipe
-    // TODO: disconnect the peer if we are conneting one
+let state peer = peer.state
+let isDead peer = 
+    match peer.state with
+    | Dead _ -> true
+    | _ -> false
     
-    Peer Dead
+let isActive peer = peer.state = Active
+let isConntecting peer = 
+    match peer.state with
+    | Connecting _ -> true
+    | _-> false
+    
+let getAddress peer =
+    match peer.mode with
+    | Listener -> None
+    | Connector address -> Some address    
 
-let connect socket address =                
-    // TODO: set the routing id
-    Socket.connect socket address
+let private withState peer state = { peer with state =state; }
+
+let private disconnect socket peer = 
+    match peer.mode with 
+    | Listener -> peer
+    | Connector address ->
+        Socket.disconnect socket address
+        peer
+
+let private closePeer socket reason peer =        
+    Log.info "Closing peer because of %A" reason
+    
+    disconnect socket peer |> ignore
+    withState peer (Dead reason)   
+    
+let private send socket peer msg = 
+    match RoutingId.trySet socket peer.routingId 0<milliseconds> with
+    | RoutingId.TryResult.HostUnreachable -> closePeer socket Unreachable peer  
+    | RoutingId.TryResult.TimedOut -> closePeer socket PipeFull peer  
+    | RoutingId.TryResult.Ok -> 
+        Message.send socket msg 
+        peer
+    
+let private create mode routingId state = 
+    {mode=mode; routingId = routingId; state = state; ping = NoPing (getNow ())}     
+
+let connect socket address = 
+    let routingId = Peer.connect socket address
     
     Log.info "Connecting to %s" address
     
-    let peer = Peer Connecting
+    let peer = create (Connector address) routingId (Connecting (getNow ()))
     
     // TODO: use correct values for this
-    let hello = Message.Hello {version=version; network = networkId;}
-    Message.send socket hello
-    
-    peer
+    send socket peer (Message.Hello {version=version; network = networkId;})    
 
-let newPeer socket routingId msg =     
+let newPeer socket routingId msg = 
+    let createPeer = create Listener routingId
+    
     match msg with
     | None -> 
-        Message.send socket (Message.UnknownMessage {messageId = 0uy})
-        Peer Dead
+        let peer = createPeer (Dead UnknownMessage)        
+        send socket peer (Message.UnknownMessage {messageId = 0uy})
+        |> disconnect socket                
     | Some msg ->
         match msg with
         | Message.Hello _ ->
-            let helloAck = Message.HelloAck {version=0ul; network = networkId;}
-            Message.send socket helloAck
-            
             Log.info "Peer accepted"
             
-            Peer Active
+            let peer = createPeer Active
+            
+            send socket peer (Message.HelloAck {version=0ul; network = networkId;})                                                 
         | _ ->
-            let unknownPeer = Message.UnknownPeer {dummy = 0uy;}
-            Message.send socket unknownPeer
-            Peer Dead
+            let peer = createPeer (Dead UnknownPeer)                        
+            send socket peer (Message.UnknownPeer {dummy = 0uy;})
+            |> disconnect socket
 
 let handleConnectingState socket peer msg = 
     match msg with
     | None -> 
-        Message.send socket (Message.UnknownMessage {messageId = 0uy})
         Log.warning "Received malformed message from peer"
-        closePeer peer socket
+                        
+        send socket peer (Message.UnknownMessage {messageId = 0uy})
+        |> closePeer socket UnknownMessage 
     | Some msg -> 
         match msg with 
         | Message.HelloAck _ -> 
@@ -75,32 +142,68 @@ let handleConnectingState socket peer msg =
             
             Log.info "Connected to pear"
             
-            Peer Active        
-        | _ -> 
-            Log.warning "Expecting HelloAck" // TODO: print message name
-            // TODO: terminate the pipe
-            // TODO: disconnect the peer if we are conneting one
-            Peer Dead
+            {peer with state=Active; ping=NoPing (getNow ())}            
+        | _ ->            
+            closePeer socket ExpectingHelloAck peer
 
 let handleActiveState socket peer msg =
     match msg with
-    | None -> 
-        Message.send socket (Message.UnknownMessage {messageId = 0uy})
-        
-        closePeer peer socket
+    | None ->
+        Log.warning "Received malformed message from peer"
+    
+        send socket peer (Message.UnknownMessage {messageId = 0uy})
+        |> closePeer socket UnknownMessage
     | Some msg ->  
         match msg with 
         | Message.UnknownPeer _ ->
-            Message.send socket (Message.Hello {version=version;network=networkId})
-            Peer Connecting
-        | _ -> Peer Active                                            
+            Log.info "Reconnecting to peer"
+        
+            // NetMQ reconnection, just sending Hello again            
+            let peer = withState peer (Connecting (getNow ()))            
+            send socket peer (Message.Hello {version=version;network=networkId})
+        | Message.Ping ping ->
+            // TODO: should we check when we last answer a ping? the other peer might try to spoof us
+            send socket peer (Message.Pong {nonce = ping.nonce})
+        | Message.Pong pong ->
+            match peer.ping with
+            | NoPing _ -> peer
+            | WaitingForPong (nonce,_) ->
+                match nonce = pong.nonce with
+                | true -> {peer with ping=NoPing (getNow ())}
+                | false -> peer
+        | _ -> peer
 
 let handleMessage socket peer msg =    
    match state peer with
-   | Connecting -> handleConnectingState socket peer msg 
+   | Connecting _ -> handleConnectingState socket peer msg 
    | Active -> handleActiveState socket peer msg 
-   | _ -> Peer Dead
+   | _ -> failwith "Dead peer should not receive any messages"
 
-let routingId peer = RoutingId 0ul
+let handleTick socket peer =
+    match peer.state with
+    | Active -> 
+        match peer.ping with
+        | NoPing lastPong -> 
+            match (getNow ()) - lastPong > pingInterval with
+            | false -> peer
+            | _ ->
+                let nonce = getNonce ()
+                let peer = send socket peer (Message.Ping {nonce=nonce})
+                match peer.state with
+                | Active -> 
+                    {peer with ping=WaitingForPong (nonce, (getNow ()))}
+                | _ -> peer
+        | WaitingForPong (nonce,sentTime) ->
+            match (getNow ()) - sentTime > pingTimeout with
+            | false -> peer
+            | true -> closePeer socket NoPong peer
+    | Connecting sent ->
+        match (getNow ()) - sent > helloTimeout with
+        | false -> peer
+        | true -> 
+            Log.info "Peer didn't reply to hello message"
+            
+            closePeer socket NoHelloAck peer
+    | _ -> failwith "Dead peer should not receive any ticks requests" 
 
-let recvRoutingId socket = RoutingId 0ul
+let routingId peer = peer.routingId
