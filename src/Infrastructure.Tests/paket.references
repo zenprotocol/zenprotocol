@@ -1,7 +1,7 @@
 FSharp.Core
 xunit
 FsUnit.xUnit
-FsCheck.Xunit
 FsNetMQ
 FSharp.Control.Reactive
 System.Reactive.Linq
+FSharp.Data

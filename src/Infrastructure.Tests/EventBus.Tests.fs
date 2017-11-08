@@ -40,6 +40,6 @@ let ``send and recv message`` () =
             Poller.stop poller            
             msg |> should equal (World "Hello"))
                 
-    Poller.run poller                
+    Poller.run poller
              
         
