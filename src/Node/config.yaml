@@ -2,6 +2,10 @@ chain: local
 
 externalIp: null
 
+api:
+  enabled: true
+  bind: 127.0.0.1:31567
+
 networks:  
   local:    
     listen: false
