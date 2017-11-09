@@ -3,6 +3,7 @@ module Api.Server
 open Infrastructure
 open Infrastructure.Http
 open FSharp.Data
+open Api.Types
 
 type T = 
     {
@@ -10,11 +11,8 @@ type T =
         observable: System.IObservable<T->T> 
     }
     interface System.IDisposable with
-        member x.Dispose() = 
+        member x.Dispose() =
             (x.agent :> System.IDisposable).Dispose()
-
-type BalanceJson = JsonProvider<"""[{"asset": "hash", "balance": 10000}]""">
-type TransactionSendJson = JsonProvider<"""[{"asset": "hash", "amount": 10000, "to": "address"}]""">
 
 let handleRequest (request,reply) =    
     match request with
@@ -24,7 +22,7 @@ let handleRequest (request,reply) =
                     
         reply StatusCode.OK (JsonContent balances)
     | Get ("/wallet/address", _) ->
-        let value = JsonValue.String "someaddress"
+        let value = JsonValue.Parse ("""{"address":"abdasda"}""")
         reply StatusCode.OK (JsonContent value)
         
     | Post ("/wallet/transaction/send", Some body) ->

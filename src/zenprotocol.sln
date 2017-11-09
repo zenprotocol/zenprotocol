@@ -30,6 +30,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Infrastructure.Tests", "Inf
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Api", "Api\Api.fsproj", "{BC871DA3-27D5-447D-A35E-D5DA8E8F9BC7}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Cli", "Cli\Cli.fsproj", "{F2AB0CFF-5137-4A1C-858A-D317181B29FE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -76,6 +78,10 @@ Global
 		{BC871DA3-27D5-447D-A35E-D5DA8E8F9BC7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BC871DA3-27D5-447D-A35E-D5DA8E8F9BC7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BC871DA3-27D5-447D-A35E-D5DA8E8F9BC7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F2AB0CFF-5137-4A1C-858A-D317181B29FE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F2AB0CFF-5137-4A1C-858A-D317181B29FE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F2AB0CFF-5137-4A1C-858A-D317181B29FE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F2AB0CFF-5137-4A1C-858A-D317181B29FE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
