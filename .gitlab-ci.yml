@@ -9,6 +9,7 @@ build:
  script:
  - mono .paket/paket.exe restore
  - msbuild src/zenprotocol.sln
+ - cp packages/zen_secp256k1_linux/output/libsecp256k1.so /usr/lib 
  - mono packages/xunit.runner.console/tools/net452/xunit.console.exe src/Consensus.Tests/bin/Debug/Consensus.Tests.dll
  - mono packages/xunit.runner.console/tools/net452/xunit.console.exe src/Infrastructure.Tests/bin/Debug/Infrastructure.Tests.dll
  - mono packages/xunit.runner.console/tools/net452/xunit.console.exe src/Network.Tests/bin/Debug/Network.Tests.dll

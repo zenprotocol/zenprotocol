@@ -19,5 +19,5 @@ nuget BouncyCastle
 nuget FSharp.Configuration
 nuget Argu
 nuget FSharp.Data
-nuget zen_secp256k1_linux 0.1.0.23-v6ad5cdb42a1a
+nuget zen_secp256k1_linux 0.1.0.24-v6ad5cdb42a1a
 nuget zen_z3_linux 4.5.1.4-v1f29cebd4df6
