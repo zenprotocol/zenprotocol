@@ -3,3 +3,4 @@ FsPickler
 FSharp.Control.Reactive
 System.Reactive.Linq
 FSharp.Core
+FSharp.Data

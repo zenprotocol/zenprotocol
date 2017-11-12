@@ -61,7 +61,13 @@ let main argv =
     
     let listen,bind,seeds = getNetworkParameters config
     use networkActor = Network.Main.main busName config.externalIp listen bind seeds
-            
+    
+    use apiActor =    
+        if config.api.enabled then 
+            (Api.Main.main busName config.api.bind) :> System.IDisposable
+        else            
+            { new System.IDisposable with member x.Dispose() = ()}                            
+                       
     printfn "running..."
     
     printfn "Press enter to exit"

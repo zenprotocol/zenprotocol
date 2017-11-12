@@ -4,3 +4,7 @@ System.Reactive.Linq
 FSharp.Configuration
 Argu
 FSharp.Core
+zen_secp256k1_linux
+zen_z3_linux
+zen_secp256k1_osx
+zen_z3_osx
