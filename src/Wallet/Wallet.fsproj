@@ -41,7 +41,7 @@
   <ItemGroup>
     <Compile Include="Address.fs" />
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="Wallet.fs" />
+    <Compile Include="Account.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
   <ItemGroup>

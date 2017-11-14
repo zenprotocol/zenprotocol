@@ -13,18 +13,18 @@ let commandHandler command wallet = wallet
 let requestHandler (requestId:ServiceBus.Agent.RequestId) request wallet = 
     match request with 
     | GetBalance -> 
-        let balance = Wallet.getBalance wallet
+        let balance = Account.getBalance wallet
         requestId.reply balance
         wallet
     | GetAddress ->
-        let address = Wallet.getAddress wallet
+        let address = Account.getAddress wallet
         requestId.reply address
         wallet
     | _ -> wallet
 
 let main busName =
     Actor.create busName serviceName (fun poller sbObservable ebObservable ->                       
-        let wallet = Wallet.create ()
+        let wallet = Account.create ()
         
         let sbObservable = 
             sbObservable
