@@ -15,30 +15,20 @@ let commandHandler command (state:State) = state
 let requestHandler request reply (state:State) = state
 
 let main busName =
-    Actor.create (fun shim ->   
-        use poller = Poller.create ()
-        use emObserver = Poller.registerEndMessage poller shim
-        
-        use sbAgent = ServiceBus.Agent.create<Command, Request> poller busName serviceName
-        use ebAgent = EventBus.Agent.create<Event> poller busName
-        
+    Actor.create busName serviceName (fun poller sbObservable ebObservable  ->                   
         let sbObservable = 
-            ServiceBus.Agent.observable sbAgent
+            sbObservable
             |> Observable.map (fun message ->
                 match message with 
                 | ServiceBus.Agent.Command c -> commandHandler c 
                 | ServiceBus.Agent.Request (r, reply) -> requestHandler r reply)                
         
         let ebObservable = 
-            EventBus.Agent.observable ebAgent
+            ebObservable
             |> Observable.map eventHandler
             
-        use observer =             
-            Observable.merge sbObservable ebObservable
-            |> Observable.scan (fun state handler -> handler state) () 
-            |> Observable.subscribe ignore     
-        
-        Actor.signal shim
-        Poller.run poller
+                     
+        Observable.merge sbObservable ebObservable
+        |> Observable.scan (fun state handler -> handler state) ()                 
     )
                     

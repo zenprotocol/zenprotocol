@@ -113,7 +113,15 @@ module Broker =
 
 module Agent = 
 
-    type RequestId = RequestId of byte[] 
+    type RequestId(socket:FsNetMQ.Socket.T, sender:byte[]) = 
+        member this.reply<'a>(msg:'a) =
+            Message.send socket (Message.Response {
+               sender=sender;                
+               payload=binarySerializer.Pickle msg;
+            }) 
+            
+            waitForAck socket 
+            
     
     type Message<'command,'request> = 
         | Command of 'command
@@ -134,15 +142,7 @@ module Agent =
                 | Agent a -> 
                     Poller.removeSocket a.poller a.socket
                     a.observer.Dispose ()
-                    (a.socket :> System.IDisposable).Dispose ()                             
-                
-    let reply (Agent agent) (RequestId sender) msg =                                
-        Message.send agent.socket (Message.Response {
-            sender=sender;                
-            payload=binarySerializer.Pickle msg;
-        })                        
-        
-        waitForAck agent.socket                                     
+                    (a.socket :> System.IDisposable).Dispose ()
                            
     let create<'command,'request> poller name service = 
         let socket = Socket.dealer ()
@@ -161,7 +161,7 @@ module Agent =
                 | Message.RelayRequest r ->                            
                     try 
                         let payload = binarySerializer.UnPickle<'request> r.payload                    
-                        Some (Request ((RequestId r.sender), payload))
+                        Some (Request (new RequestId(socket, r.sender), payload))
                     with 
                     | n ->                         
                         failwith "failed"                        

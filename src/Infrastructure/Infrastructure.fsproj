@@ -39,6 +39,7 @@
     <Reference Include="System.Numerics" />
   </ItemGroup>
   <ItemGroup>
+    
     <Compile Include="AssemblyInfo.fs" />
   </ItemGroup>
   <ItemGroup>
@@ -46,6 +47,7 @@
     <Compile Include="ServiceBusMessage.fs" />
     <Compile Include="ServiceBus.fs" />
     <Compile Include="EventBus.fs" />
+    <Compile Include="Actor.fs" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Http.fs" />

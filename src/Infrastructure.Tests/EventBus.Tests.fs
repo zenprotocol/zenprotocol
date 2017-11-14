@@ -5,6 +5,8 @@ open FsUnit.Xunit
 open FsNetMQ
 open Infrastructure
 
+module Actor = FsNetMQ.Actor
+
 type Messages = 
     | Hello
     | World of string

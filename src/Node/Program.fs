@@ -3,6 +3,8 @@ open FSharp.Configuration
 open Argu
 open Infrastructure
 
+module Actor = FsNetMQ.Actor
+
 [<NoAppSettings>]
 type Argument = 
     | Chain of string

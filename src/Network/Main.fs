@@ -16,36 +16,22 @@ let commandHandler command (state:State) = state
 let requestHandler request reply (state:State) = state
 
 let main busName externalIp listen bind seeds =
-    Actor.create (fun shim ->   
-        use poller = Poller.create ()
-        use emObserver = Poller.registerEndMessage poller shim
-        
-        use sbAgent = ServiceBus.Agent.create<Command, Request> poller busName serviceName
-        use ebAgent = EventBus.Agent.create<Event> poller busName
+    Actor.create busName serviceName (fun poller sbObservable ebObservable ->           
         use peersManager = PeersManager.create poller listen bind seeds 
         
         let sbObservable = 
-            ServiceBus.Agent.observable sbAgent
+            sbObservable
             |> Observable.map (fun message ->
                 match message with 
                 | ServiceBus.Agent.Command c -> commandHandler c 
                 | ServiceBus.Agent.Request (r, reply) -> requestHandler r reply)                
         
         let ebObservable = 
-            EventBus.Agent.observable ebAgent
+            ebObservable
             |> Observable.map eventHandler
-            
-        use observer =             
-            Observable.merge sbObservable ebObservable
-            |> Observable.merge (PeersManager.observable peersManager)
-            |> Observable.scan (fun state handler -> handler state) peersManager 
-            |> Reactive.Observable.subscribe ignore     
-        
-        Actor.signal shim
-        
-        try 
-            Poller.run poller
-        with
-        | x -> printfn "%A" x             
+                    
+        Observable.merge sbObservable ebObservable
+        |> Observable.merge (PeersManager.observable peersManager)
+        |> Observable.scan (fun state handler -> handler state) peersManager             
     )
                     

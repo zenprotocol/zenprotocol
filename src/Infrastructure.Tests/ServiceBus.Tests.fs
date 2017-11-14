@@ -44,7 +44,7 @@ let createAgent delay =
             Agent.observable agent 
             |> Observable.subscribe (fun msg ->                                                                                            
                 match msg with 
-                | Agent.Request (requestId, _) -> Agent.reply agent requestId World
+                | Agent.Request (requestId, _) -> requestId.reply World
                 | _ -> ())       
         
         if delay = 0 then Actor.signal shim
