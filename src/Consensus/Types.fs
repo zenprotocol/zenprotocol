@@ -1,6 +1,7 @@
 module Consensus.Types
 
 open Consensus.Hash
+open Consensus.Crypto
 
 type Outpoint = {
     txHash: Hash
@@ -20,8 +21,11 @@ type Output = {
     spend: Spend
 }
 
+type Witness = 
+    PKWitness of Signature
+
 type Transaction = {
     inputs: Outpoint list;
     outputs: Output list;
-    witnesses: byte[] list
+    witnesses: Witness list
 }

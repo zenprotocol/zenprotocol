@@ -61,6 +61,7 @@ let main argv =
     
     let listen,bind,seeds = getNetworkParameters config
     use networkActor = Network.Main.main busName config.externalIp listen bind seeds
+    use walletActor = Wallet.Main.main busName
     
     use apiActor =    
         if config.api.enabled then 

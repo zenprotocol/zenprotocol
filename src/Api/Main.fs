@@ -17,7 +17,7 @@ let main busName bind =
         use emObserver = Poller.registerEndMessage poller shim                     
                 
         use ebAgent = EventBus.Agent.create<Event> poller busName
-        use server = Server.create poller bind
+        use server = Server.create poller busName bind
                 
         let ebObservable = 
             EventBus.Agent.observable ebAgent

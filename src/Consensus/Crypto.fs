@@ -149,6 +149,8 @@ module PublicKey =
             | Native.Result.Ok -> Some (PublicKey publicKey)
             | _ -> None
                      
+    let hash = serialize >> Hash.compute
+                     
 module Signature =        
     let serialize (Signature signature) =
         let bytes = Array.create SerializedSignatureLength 0uy

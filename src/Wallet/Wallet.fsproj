@@ -5,14 +5,13 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{9755DEA0-2931-486A-984A-0FAD1C44EDF7}</ProjectGuid>
-    <OutputType>Exe</OutputType>
-    <RootNamespace>Node</RootNamespace>
-    <AssemblyName>zen-node</AssemblyName>
+    <ProjectGuid>{289A59EB-D1D4-499F-87B9-F75B799829C0}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <RootNamespace>Wallet</RootNamespace>
+    <AssemblyName>Wallet</AssemblyName>
     <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <DocumentationFile>bin\$(Configuration)\$(AssemblyName).xml</DocumentationFile>
-    <Name>Node</Name>
+    <Name>Wallet</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -34,51 +33,32 @@
     <OtherFlags>--warnon:1182</OtherFlags>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Accessibility" />
     <Reference Include="mscorlib" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Address.fs" />
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="Program.fs" />
-    <Content Include="config.yaml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="paket.references" />
-    <Content Include="zen-cli">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="zen-node">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <None Include="App.config" />
+    <Compile Include="Wallet.fs" />
+    <Compile Include="Main.fs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Api\Api.fsproj">
-      <Project>{bc871da3-27d5-447d-a35e-d5da8e8f9bc7}</Project>
-      <Name>Api</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Blockchain\Blockchain.fsproj">
-      <Project>{16b10d81-c99e-4562-810c-9b637234c72d}</Project>
-      <Name>Blockchain</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Cli\Cli.fsproj">
-      <Project>{f2ab0cff-5137-4a1c-858a-d317181b29fe}</Project>
-      <Name>Cli</Name>
+    <Content Include="paket.references" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Consensus\Consensus.fsproj">
+      <Project>{5ec4457b-615a-4bbd-b3d5-d0e311b9d5e9}</Project>
+      <Name>Consensus</Name>
     </ProjectReference>
     <ProjectReference Include="..\Infrastructure\Infrastructure.fsproj">
       <Project>{81161f64-d019-422c-a3cf-321cde6ca209}</Project>
       <Name>Infrastructure</Name>
     </ProjectReference>
-    <ProjectReference Include="..\Network\Network.fsproj">
-      <Project>{8471efe5-4b38-4969-ac2a-0bf64a031eba}</Project>
-      <Name>Network</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Wallet\Wallet.fsproj">
-      <Project>{289a59eb-d1d4-499f-87b9-f75b799829c0}</Project>
-      <Name>Wallet</Name>
+    <ProjectReference Include="..\Messaging\Messaging.fsproj">
+      <Project>{44277422-32e3-4f1b-bd6d-153b7a621444}</Project>
+      <Name>Messaging</Name>
     </ProjectReference>
   </ItemGroup>
   <PropertyGroup>
@@ -99,67 +79,12 @@
   <Import Project="$(FSharpTargetsPath)" Condition="Exists('$(FSharpTargetsPath)')" />
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6.2'">
-      <PropertyGroup>
-        <__paket__zen_z3_osx_targets>net40\zen_z3_osx</__paket__zen_z3_osx_targets>
-      </PropertyGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6.2'">
-      <PropertyGroup>
-        <__paket__zen_z3_linux_targets>net40\zen_z3_linux</__paket__zen_z3_linux_targets>
-      </PropertyGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6.2'">
-      <PropertyGroup>
-        <__paket__zen_secp256k1_osx_targets>net40\zen_secp256k1_osx</__paket__zen_secp256k1_osx_targets>
-      </PropertyGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6.2'">
-      <PropertyGroup>
-        <__paket__zen_secp256k1_linux_targets>net40\zen_secp256k1_linux</__paket__zen_secp256k1_linux_targets>
-      </PropertyGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6.2'">
-      <ItemGroup>
-        <Reference Include="Argu">
-          <HintPath>..\..\packages\Argu\lib\net40\Argu.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6.2'">
       <ItemGroup>
         <Reference Include="Microsoft.CSharp">
           <Paket>True</Paket>
         </Reference>
         <Reference Include="AsyncIO">
           <HintPath>..\..\packages\AsyncIO\lib\net40\AsyncIO.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6.2'">
-      <ItemGroup>
-        <Reference Include="FSharp.Configuration">
-          <HintPath>..\..\packages\FSharp.Configuration\lib\net45\FSharp.Configuration.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-        <Reference Include="SharpYaml">
-          <HintPath>..\..\packages\FSharp.Configuration\lib\net45\SharpYaml.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
@@ -274,8 +199,4 @@
       </ItemGroup>
     </When>
   </Choose>
-  <Import Project="..\..\packages\zen_secp256k1_linux\build\$(__paket__zen_secp256k1_linux_targets).targets" Condition="Exists('..\..\packages\zen_secp256k1_linux\build\$(__paket__zen_secp256k1_linux_targets).targets')" Label="Paket" />
-  <Import Project="..\..\packages\zen_secp256k1_osx\build\$(__paket__zen_secp256k1_osx_targets).targets" Condition="Exists('..\..\packages\zen_secp256k1_osx\build\$(__paket__zen_secp256k1_osx_targets).targets')" Label="Paket" />
-  <Import Project="..\..\packages\zen_z3_linux\build\$(__paket__zen_z3_linux_targets).targets" Condition="Exists('..\..\packages\zen_z3_linux\build\$(__paket__zen_z3_linux_targets).targets')" Label="Paket" />
-  <Import Project="..\..\packages\zen_z3_osx\build\$(__paket__zen_z3_osx_targets).targets" Condition="Exists('..\..\packages\zen_z3_osx\build\$(__paket__zen_z3_osx_targets).targets')" Label="Paket" />
 </Project>

@@ -2,6 +2,7 @@ module Consensus.Transaction
 
 open Consensus.Types
 open Consensus.UtxoSet
+open Consensus.Crypto
 
 open MBrace.FsPickler.Combinators
 
@@ -69,3 +70,15 @@ let validate set =
     validateOrphancy set
     >=> 
     validateAmounts 
+    
+let sign tx secretKey =
+    let txHash = hash tx
+
+    let witnessInput _ = 
+        PKWitness (Crypto.sign secretKey txHash)
+         
+    // TODO: Should we also use sighash and not sign entire transaction?
+    let witnesses = List.foldBack (fun input witnesses -> 
+        (witnessInput input) :: witnesses) tx.inputs []         
+        
+    {tx with witnesses = witnesses}

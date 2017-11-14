@@ -1,29 +1,43 @@
 module Api.Server
 
+open Consensus
 open Infrastructure
+open Infrastructure.ServiceBus
 open Infrastructure.Http
 open FSharp.Data
 open Api.Types
+open Messaging.Services
 
 type T = 
     {
+        client: Client.T
         agent: Server.T
         observable: System.IObservable<T->T> 
     }
     interface System.IDisposable with
         member x.Dispose() =
+            (x.client :> System.IDisposable).Dispose()
             (x.agent :> System.IDisposable).Dispose()
 
-let handleRequest (request,reply) =    
+let handleRequest client (request,reply) =    
     match request with
     | Get ("/wallet/balance", _) ->            
-        let balance = new BalanceJson.Root ("0", 2)
-        let balances = JsonValue.Array [|balance.JsonValue|]
-                    
-        reply StatusCode.OK (JsonContent balances)
+        let balances = Wallet.getBalance client
+
+        let json = 
+            balances
+            |> Map.toSeq
+            |> Seq.map (fun (key,value) -> new BalanceJson.Root(Hash.toString key, int64 value)) 
+            |> Seq.map (fun balance -> balance.JsonValue)
+            |> Seq.toArray
+            |> JsonValue.Array
+    
+        reply StatusCode.OK (JsonContent json)
     | Get ("/wallet/address", _) ->
-        let value = JsonValue.Parse ("""{"address":"abdasda"}""")
-        reply StatusCode.OK (JsonContent value)
+        let address = Wallet.getAddress client 
+    
+        let json = new AddressJson.Root(address)
+        reply StatusCode.OK (JsonContent json.JsonValue)
         
     | Post ("/wallet/transaction/send", Some body) ->
         let transactionSend = TransactionSendJson.Parse (body)
@@ -35,19 +49,21 @@ let handleRequest (request,reply) =
     | _ ->
         reply StatusCode.NotFound NoContent    
 
-let create poller bind = 
+let create poller busName bind = 
     let httpAgent = Http.Server.create poller bind
     
     Log.info "Api running on %s" bind
+    
+    let client = Client.create busName
     
     let observable = 
         Http.Server.observable httpAgent 
         |> Observable.map (fun request -> 
             fun (server:T) ->
-                handleRequest request
+                handleRequest client request
                 server
         )
         
-    {agent = httpAgent; observable = observable}
+    {agent = httpAgent; observable = observable; client = client}
     
 let observable server = server.observable              

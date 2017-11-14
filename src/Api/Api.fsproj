@@ -48,6 +48,10 @@
     <Content Include="paket.references" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Consensus\Consensus.fsproj">
+      <Project>{5ec4457b-615a-4bbd-b3d5-d0e311b9d5e9}</Project>
+      <Name>Consensus</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Infrastructure\Infrastructure.fsproj">
       <Project>{81161f64-d019-422c-a3cf-321cde6ca209}</Project>
       <Name>Infrastructure</Name>

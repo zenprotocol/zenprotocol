@@ -20,7 +20,7 @@ let main busName externalIp listen bind seeds =
         use poller = Poller.create ()
         use emObserver = Poller.registerEndMessage poller shim
         
-        use sbAgent = ServiceBus.Agent.create<Command, Request, Response> poller busName serviceName
+        use sbAgent = ServiceBus.Agent.create<Command, Request> poller busName serviceName
         use ebAgent = EventBus.Agent.create<Event> poller busName
         use peersManager = PeersManager.create poller listen bind seeds 
         
