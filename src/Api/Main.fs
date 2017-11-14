@@ -13,7 +13,7 @@ let eventHandler event (state:State) = state
 
 let main busName bind =
     Actor.create busName "Api" (fun poller sbObservable ebObservable ->            
-        use server = Server.create poller busName bind
+        let server = Server.create poller busName bind
                 
         let ebObservable = 
             ebObservable
@@ -22,8 +22,10 @@ let main busName bind =
         let httpObservable = 
             Server.observable server                        
             
-                     
-        ebObservable
-        |> Observable.merge httpObservable             
-        |> Observable.scan (fun state handler -> handler state) server        
+        let observable =              
+            ebObservable
+            |> Observable.merge httpObservable             
+            |> Observable.scan (fun state handler -> handler state) server        
+    
+        Disposables.toDisposable server, observable
     )

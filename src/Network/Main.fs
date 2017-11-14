@@ -17,7 +17,7 @@ let requestHandler request reply (state:State) = state
 
 let main busName externalIp listen bind seeds =
     Actor.create busName serviceName (fun poller sbObservable ebObservable ->           
-        use peersManager = PeersManager.create poller listen bind seeds 
+        let peersManager = PeersManager.create poller listen bind seeds 
         
         let sbObservable = 
             sbObservable
@@ -29,9 +29,12 @@ let main busName externalIp listen bind seeds =
         let ebObservable = 
             ebObservable
             |> Observable.map eventHandler
-                    
-        Observable.merge sbObservable ebObservable
-        |> Observable.merge (PeersManager.observable peersManager)
-        |> Observable.scan (fun state handler -> handler state) peersManager             
+           
+        let observable =             
+            Observable.merge sbObservable ebObservable
+            |> Observable.merge (PeersManager.observable peersManager)
+            |> Observable.scan (fun state handler -> handler state) peersManager             
+    
+        Disposables.toDisposable peersManager,observable
     )
                     

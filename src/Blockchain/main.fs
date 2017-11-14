@@ -4,6 +4,7 @@ open FsNetMQ
 open Infrastructure
 open Messaging.Services.Blockchain
 open Messaging.Events
+open FSharp.Control
 
 // TODO: should be the state of the blockchain actor
 type State = unit     
@@ -28,7 +29,10 @@ let main busName =
             |> Observable.map eventHandler
             
                      
-        Observable.merge sbObservable ebObservable
-        |> Observable.scan (fun state handler -> handler state) ()                 
+        let observable =                      
+            Observable.merge sbObservable ebObservable
+            |> Observable.scan (fun state handler -> handler state) ()                 
+    
+        Disposables.empty, observable 
     )
                     

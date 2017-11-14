@@ -36,8 +36,11 @@ let main busName =
         let ebObservable = 
             ebObservable
             |> Observable.map eventHandler
-                    
-        Observable.merge sbObservable ebObservable
-        |> Observable.scan (fun state handler -> handler state) wallet             
+           
+        let observable =             
+            Observable.merge sbObservable ebObservable
+            |> Observable.scan (fun state handler -> handler state) wallet             
+    
+        Disposables.empty, observable
     )
                     

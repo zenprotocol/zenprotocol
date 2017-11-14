@@ -1,2 +1,4 @@
 FsNetMQ
 FSharp.Core
+FSharp.Control.Reactive
+System.Reactive.Linq

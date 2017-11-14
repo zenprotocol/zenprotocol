@@ -39,7 +39,6 @@
     <Reference Include="System.Numerics" />
   </ItemGroup>
   <ItemGroup>
-    
     <Compile Include="AssemblyInfo.fs" />
   </ItemGroup>
   <ItemGroup>
@@ -51,6 +50,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Http.fs" />
+    <Compile Include="Disposables.fs" />
     <Content Include="ServiceBusMessage.xml" />
     <Content Include="paket.references" />
   </ItemGroup>
