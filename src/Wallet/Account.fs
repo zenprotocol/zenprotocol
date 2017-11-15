@@ -20,9 +20,9 @@ let create () =
         publicKeyHash = PublicKey.hash publicKey;
     }
         
-let handleTransaction account txHash (tx:Transaction) =
+let handleTransaction txHash (tx:Transaction) account =
     
-    let handleOutput (index,output) outpoints = 
+    let handleOutput outpoints (index,output) = 
         match output.lock with
         | PK pkHash -> 
             match pkHash = account.publicKeyHash with
@@ -31,15 +31,13 @@ let handleTransaction account txHash (tx:Transaction) =
                 let outpoint = {txHash=txHash;index=index;}
                 Map.add outpoint output.spend outpoints            
         | _ -> outpoints
+           
+    let outpoints = List.fold (fun state o -> Map.remove o state) account.outpoints tx.inputs         
     
     let outputsWithIndex = List.mapi (fun i output -> (uint32 i,output)) tx.outputs
-    
-    let outpoints = 
-        account.outpoints
-        |> List.foldBack Map.remove tx.inputs
-        |> List.foldBack handleOutput outputsWithIndex
+    let outpoints' = List.fold handleOutput outpoints outputsWithIndex
         
-    {account with outpoints = outpoints}
+    {account with outpoints = outpoints'}
     
 let getBalance account =
     let balance = Map.empty
@@ -54,10 +52,11 @@ let getAddress account =
      
 let createTransaction account address asset amount =
     let collectInputs (inputs, collectedAmount) outpoint spend =
-        match spend.asset with
-        | asset when amount > collectedAmount -> (outpoint :: inputs, spend.amount + collectedAmount)
-        | _ -> (inputs, collectedAmount)  
- 
+        if amount > collectedAmount && asset = spend.asset then
+            (outpoint :: inputs, spend.amount + collectedAmount)
+        else 
+            (inputs, collectedAmount)  
+                              
     // TODO: should the address be validated at a higher level?
     match Address.getPublicKeyHash address with
     | None -> Error "Invalid address"

@@ -4,6 +4,9 @@ open Org.BouncyCastle.Crypto.Digests
 
 type Hash = Hash of byte[]
 
+let zero = 
+    Hash (Array.create 32 0uy)
+
 let compute bytes = 
     let hash = Array.zeroCreate 32
     let sha3 = new Sha3Digest(256)

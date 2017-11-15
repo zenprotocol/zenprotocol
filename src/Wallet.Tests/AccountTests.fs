@@ -1,0 +1,170 @@
+module Wallet.Tests.AccountTests
+
+open Xunit
+open FsUnit.Xunit
+open Consensus
+open Consensus.Types
+open Wallet
+
+let balanceShouldBe asset expected account =     
+    let balance = Account.getBalance account
+    
+    let actual = 
+        match Map.tryFind asset balance with
+        | Some value -> value
+        | None -> 0UL
+         
+    actual |> should equal expected
+    
+let anotherAsset = Hash.compute "anotherasset"B    
+
+[<Fact>]
+let ``received tokens``() =
+    let account = Account.create()
+    
+    let output = {lock = PK account.publicKeyHash; spend={asset=Hash.zero;amount=10UL}}
+    
+    let tx = {inputs=[];outputs=[output];witnesses=[]}
+    
+    let account' = Account.handleTransaction (Transaction.hash tx) tx account 
+    
+    let balances = Account.getBalance account'    
+    
+    account' |> balanceShouldBe Hash.zero 10UL        
+
+[<Fact>]        
+let ``tokens spent``() = 
+    let account = Account.create()
+        
+    let output = {lock = PK account.publicKeyHash; spend={asset=Hash.zero;amount=10UL}}
+    
+    let tx = {inputs=[];outputs=[output;output];witnesses=[]}
+    let txHash = (Transaction.hash tx)
+    
+    let tx' = {inputs=[{txHash=txHash; index=0ul}];outputs=[];witnesses=[]}
+    
+    let account' = 
+        Account.handleTransaction txHash tx account 
+
+    let account'' = 
+        Account.handleTransaction (Transaction.hash tx') tx' account'        
+            
+    account' |> balanceShouldBe Hash.zero 20UL            
+    account'' |> balanceShouldBe Hash.zero 10UL
+                                
+[<Fact>]
+let ``creating, not enough tokens``() =
+    let account = Account.create()
+    
+    let output = {lock = PK account.publicKeyHash; spend={asset=Hash.zero;amount=10UL}}
+    
+    let tx = {inputs=[];outputs=[output];witnesses=[]}
+    
+    let account' = Account.handleTransaction (Transaction.hash tx) tx account 
+
+    let result = Account.createTransaction account (Account.getAddress account) Hash.zero 11UL 
+    
+    let expected:Result<Transaction,string> = Error "Not enough tokens" 
+    
+    result |> should equal expected
+    
+[<Fact>]
+let ``creating, no change``() = 
+    let bob = Account.create ()
+    let alice = Account.create ()               
+        
+    // giving some money to bob
+    let output = {lock = PK bob.publicKeyHash; spend={asset=Hash.zero;amount=10UL}}    
+    let tx = {inputs=[];outputs=[output];witnesses=[]}    
+    let bob' = Account.handleTransaction (Transaction.hash tx) tx bob
+
+    // sending money to alice
+    let result = Account.createTransaction bob' (Account.getAddress alice) Hash.zero 10UL 
+    
+    match result with 
+    | Error x -> failwithf "expected transaction %s" x
+    | Ok tx -> 
+        let alice' = Account.handleTransaction (Transaction.hash tx) tx alice
+        let bob'' = Account.handleTransaction (Transaction.hash tx) tx bob
+        
+        alice' |> balanceShouldBe Hash.zero 10UL
+        bob'' |> balanceShouldBe Hash.zero 0UL
+        
+[<Fact>]
+let ``creating, with change``() = 
+    let bob = Account.create ()
+    let alice = Account.create ()                
+        
+    // giving some money to bob
+    let output = {lock = PK bob.publicKeyHash; spend={asset=Hash.zero;amount=10UL}}    
+    let tx = {inputs=[];outputs=[output];witnesses=[]}    
+    let bob' = Account.handleTransaction (Transaction.hash tx) tx bob
+
+    // sending money to alice
+    let result = Account.createTransaction bob' (Account.getAddress alice) Hash.zero 7UL 
+    
+    match result with 
+    | Error x -> failwithf "expected transaction %s" x
+    | Ok tx -> 
+        let alice' = Account.handleTransaction (Transaction.hash tx) tx alice
+        let bob'' = Account.handleTransaction (Transaction.hash tx) tx bob
+        
+        alice' |> balanceShouldBe Hash.zero 7UL
+        bob'' |> balanceShouldBe Hash.zero 3UL
+        
+[<Fact>] 
+let ``picking the correct asset``() = 
+    let bob = Account.create ()
+    let alice = Account.create ()          
+        
+    // giving some money to bob
+    let output = {lock = PK bob.publicKeyHash; spend={asset=anotherAsset;amount=10UL}}
+    let output2 = {lock = PK bob.publicKeyHash; spend={asset=Hash.zero;amount=10UL}}    
+        
+    let tx = {inputs=[];outputs=[output; output2];witnesses=[]}    
+    let bob' = Account.handleTransaction (Transaction.hash tx) tx bob
+    
+    Map.count bob'.outpoints |> should equal 2
+    bob' |> balanceShouldBe anotherAsset 10UL
+
+    // sending money to alice
+    let result = Account.createTransaction bob' (Account.getAddress alice) Hash.zero 7UL 
+    
+    match result with 
+    | Error x -> failwithf "expected transaction %s" x
+    | Ok tx -> 
+        List.length tx.inputs |> should equal 1
+    
+        let alice' = Account.handleTransaction (Transaction.hash tx) tx alice
+        let bob'' = Account.handleTransaction (Transaction.hash tx) tx bob'                        
+                
+        alice' |> balanceShouldBe Hash.zero 7UL
+        bob'' |> balanceShouldBe Hash.zero 3UL 
+        
+        alice' |> balanceShouldBe anotherAsset 0UL
+        bob'' |> balanceShouldBe anotherAsset 10UL
+        
+
+[<Fact>] 
+let ``picking from multiple inputs``() = 
+    let bob = Account.create ()
+    let alice = Account.create ()               
+        
+    // giving some money to bob
+    let output = {lock = PK bob.publicKeyHash; spend={asset=Hash.zero;amount=5UL}}
+    let output2 = {lock = PK bob.publicKeyHash; spend={asset=Hash.zero;amount=7UL}}    
+        
+    let tx = {inputs=[];outputs=[output; output2];witnesses=[]}    
+    let bob' = Account.handleTransaction (Transaction.hash tx) tx bob    
+
+    // sending money to alice
+    let result = Account.createTransaction bob' (Account.getAddress alice) Hash.zero 10UL 
+    
+    match result with 
+    | Error x -> failwithf "expected transaction %s" x
+    | Ok tx ->             
+        let alice' = Account.handleTransaction (Transaction.hash tx) tx alice
+        let bob'' = Account.handleTransaction (Transaction.hash tx) tx bob'                        
+                
+        alice' |> balanceShouldBe Hash.zero 10UL
+        bob'' |> balanceShouldBe Hash.zero 2UL         
