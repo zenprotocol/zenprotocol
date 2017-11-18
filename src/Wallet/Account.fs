@@ -47,8 +47,8 @@ let getBalance account =
      | Some amount -> Map.add spend.asset (amount+spend.amount) balance
      | None -> Map.add spend.asset spend.amount balance) Map.empty account.outpoints
      
-let getAddress account = 
-    Address.getPublicKeyAddress account.publicKeyHash
+let getAddress account chain = 
+    Address.getPublicKeyAddress account.publicKeyHash chain
      
 let createTransaction account address asset amount =
     let collectInputs (inputs, collectedAmount) outpoint spend =
@@ -57,7 +57,8 @@ let createTransaction account address asset amount =
         else 
             (inputs, collectedAmount)  
                               
-    // TODO: should the address be validated at a higher level?
+    // TODO: should the address be validated at a higher level + checking the HRP
+    // match the chain
     match Address.getPublicKeyHash address with
     | None -> Error "Invalid address"
     | Some pkHash -> 

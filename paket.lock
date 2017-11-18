@@ -6,12 +6,16 @@ NUGET
     Baseclass.Contrib.Nuget.Output (2.4)
     BouncyCastle (1.8.1)
     FAKE (4.63.2)
+    FsBech32 (0.1.0.7)
+      FSharp.Compiler.Tools
+      FSharp.Core
     FsCheck (2.10.3)
       FSharp.Core (>= 4.1)
     FsCheck.Xunit (2.10.3)
       FsCheck (>= 2.10.3)
       xunit.extensibility.execution (>= 2.2 < 3.0)
     FSharp.Compatibility.OCaml (0.1.12)
+    FSharp.Compiler.Tools (4.1.29)
     FSharp.Configuration (1.3.1)
       FSharp.Core (>= 4.0.0.1)
     FSharp.Control.Reactive (3.5)

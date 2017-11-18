@@ -2,6 +2,7 @@
 open FSharp.Configuration
 open Argu
 open Infrastructure
+open Consensus.ChainParameters
 
 module Actor = FsNetMQ.Actor
 
@@ -39,12 +40,17 @@ let getNetworkParameters (config:Config) =
     | "main" -> config.networks.main.listen,config.networks.main.bind,config.networks.main.seeds
     | c -> failwithf "unkown chain %s" c 
 
+let getChain (config:Config) = 
+    match config.chain with
+    | "main" -> Main
+    | _ -> Test
+
 [<EntryPoint>]
 let main argv = 
     let errorHandler = ProcessExiter(colorizer = function ErrorCode.HelpText -> None | _ -> Some System.ConsoleColor.Red)
 
     let config = new Config()           
-    config.Load("config.yaml")
+    config.Load("config.yaml")        
     
     let parser = ArgumentParser.Create<Argument>(programName = "zen-node.exe", errorHandler = errorHandler)            
     let results = parser.Parse argv
@@ -63,7 +69,9 @@ let main argv =
     
     let listen,bind,seeds = getNetworkParameters config
     use networkActor = Network.Main.main busName config.externalIp listen bind seeds
-    use walletActor = Wallet.Main.main busName
+    
+    let chain = getChain config
+    use walletActor = Wallet.Main.main busName chain
     
     use apiActor =    
         if config.api.enabled then 

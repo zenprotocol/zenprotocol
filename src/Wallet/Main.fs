@@ -10,19 +10,19 @@ let eventHandler event wallet = wallet
 
 let commandHandler command wallet = wallet
 
-let requestHandler (requestId:ServiceBus.Agent.RequestId) request wallet = 
+let requestHandler chain (requestId:ServiceBus.Agent.RequestId) request wallet = 
     match request with 
     | GetBalance -> 
         let balance = Account.getBalance wallet
         requestId.reply balance
         wallet
     | GetAddress ->
-        let address = Account.getAddress wallet
+        let address = Account.getAddress wallet chain
         requestId.reply address
         wallet
     | _ -> wallet
 
-let main busName =
+let main busName chain =
     Actor.create busName serviceName (fun poller sbObservable ebObservable ->                       
         let wallet = Account.create ()
         
@@ -31,7 +31,7 @@ let main busName =
             |> Observable.map (fun message ->
                 match message with 
                 | ServiceBus.Agent.Command c -> commandHandler c 
-                | ServiceBus.Agent.Request (requestId, r) -> requestHandler requestId r)                
+                | ServiceBus.Agent.Request (requestId, r) -> requestHandler chain requestId r)                
         
         let ebObservable = 
             ebObservable

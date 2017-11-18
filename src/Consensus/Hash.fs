@@ -1,6 +1,7 @@
 module Consensus.Hash
 
 open Org.BouncyCastle.Crypto.Digests
+open FsBech32
 
 type Hash = Hash of byte[]
 
@@ -21,7 +22,5 @@ let fromBytes bytes =
     | 32 -> Some (Hash bytes)
     | _ -> None
     
-let toString (Hash hash) = 
-    // TODO: we should use base32 part from bech32, this shouldn't include checksum and hrp
-    
-    System.Convert.ToBase64String (hash)
+let toString (Hash hash) =        
+    Base32.encode hash
