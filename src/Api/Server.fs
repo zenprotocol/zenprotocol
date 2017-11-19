@@ -1,12 +1,13 @@
 module Api.Server
 
+open FSharp.Data
 open Consensus
 open Infrastructure
 open Infrastructure.ServiceBus
 open Infrastructure.Http
-open FSharp.Data
 open Api.Types
 open Messaging.Services
+open Messaging.Services.Wallet
 
 type T = 
     {
@@ -40,12 +41,20 @@ let handleRequest client (request,reply) =
         reply StatusCode.OK (JsonContent json.JsonValue)
         
     | Post ("/wallet/transaction/send", Some body) ->
-        let transactionSend = TransactionSendJson.Parse (body)
+        let transactionSend = TransactionSendJson.Parse (body)        
         
-        // TODO: validate the data is correct
-        
-        reply StatusCode.OK NoContent
-                         
+        match Hash.fromString transactionSend.Asset with
+        | None -> 
+            reply StatusCode.BadRequest (TextContent "asset not valid")
+        | Some assetHash ->         
+            
+            // TODO: validate address and only send the wallet the pkHash
+            
+            match Wallet.createTransaction client transactionSend.To assetHash (uint64 transactionSend.Amount) with
+            | Error error -> reply StatusCode.BadRequest (TextContent error)
+            | Created tx ->
+                Blockchain.validateTransaction client tx
+                reply StatusCode.OK NoContent
     | _ ->
         reply StatusCode.NotFound NoContent    
 

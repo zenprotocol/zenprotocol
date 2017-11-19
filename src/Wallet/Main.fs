@@ -6,7 +6,11 @@ open Messaging.Services.Wallet
 open Messaging.Events
 open Wallet
 
-let eventHandler event wallet = wallet
+let eventHandler event account = 
+    match event with 
+    | TransactionAddedToMemPool (txHash,tx) ->
+        Account.handleTransaction txHash tx account
+    | _ -> account 
 
 let commandHandler command wallet = wallet
 
@@ -20,11 +24,21 @@ let requestHandler chain (requestId:ServiceBus.Agent.RequestId) request wallet =
         let address = Account.getAddress wallet chain
         requestId.reply address
         wallet
+    | CreateTransaction (address, asset, amount) ->            
+        match Account.createTransaction wallet address asset amount with
+        | Ok tx -> 
+            requestId.reply (Created tx)
+            
+        | Result.Error tx -> 
+            requestId.reply (Error tx)
+        
+        wallet
+            
     | _ -> wallet
 
-let main busName chain =
-    Actor.create busName serviceName (fun poller sbObservable ebObservable ->                       
-        let wallet = Account.create ()
+let main busName chain root =
+    Actor.create<Command,Request,Event, Account.T> busName serviceName (fun poller sbObservable ebObservable ->                       
+        let wallet = if root then Account.createRoot () else Account.create ()
         
         let sbObservable = 
             sbObservable

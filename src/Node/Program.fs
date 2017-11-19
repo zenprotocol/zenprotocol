@@ -55,13 +55,16 @@ let main argv =
     let parser = ArgumentParser.Create<Argument>(programName = "zen-node.exe", errorHandler = errorHandler)            
     let results = parser.Parse argv
     
+    let mutable root = false 
+    
     List.iter (fun arg -> 
         match arg with 
         | Chain chain -> config.chain <- chain            
         | Localhost ->
             config.chain <- "local"
             config.networks.local.listen <- true
-            config.networks.local.seeds.Clear ()              
+            config.networks.local.seeds.Clear ()  
+            root <- true            
     ) (results.GetAllResults())
                               
     use brokerActor = createBroker ()    
@@ -71,7 +74,7 @@ let main argv =
     use networkActor = Network.Main.main busName config.externalIp listen bind seeds
     
     let chain = getChain config
-    use walletActor = Wallet.Main.main busName chain
+    use walletActor = Wallet.Main.main busName chain root
     
     use apiActor =    
         if config.api.enabled then 
@@ -83,6 +86,6 @@ let main argv =
     
     printfn "Press enter to exit"
     
-    System.Console.ReadLine () |> ignore
+    System.Console.ReadLine () |> ignore        
     
     0 // return an integer exit code

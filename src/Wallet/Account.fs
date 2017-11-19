@@ -11,6 +11,10 @@ type T = {
     publicKeyHash: Hash
 }
 
+let rootSecretKey = SecretKey [|189uy; 140uy; 82uy; 12uy; 79uy; 140uy; 35uy; 59uy; 11uy; 41uy; 199uy;
+                           58uy; 23uy; 63uy; 112uy; 239uy; 45uy; 147uy; 51uy; 246uy; 34uy; 16uy;
+                           156uy; 2uy; 111uy; 184uy; 140uy; 218uy; 136uy; 240uy; 57uy; 24uy |]
+
 let create () = 
     let secretKey, publicKey = KeyPair.create ()
 
@@ -18,7 +22,7 @@ let create () =
         outpoints = Map.empty;
         secretKey = secretKey;
         publicKeyHash = PublicKey.hash publicKey;
-    }
+    }                   
         
 let handleTransaction txHash (tx:Transaction) account =
     
@@ -78,3 +82,14 @@ let createTransaction account address asset amount =
                 | true -> {inputs=inputs; outputs=[output]; witnesses=[]}
                 
             Ok (Transaction.sign tx account.secretKey)
+            
+
+let createRoot () =             
+    let account = 
+        {
+            outpoints = Map.empty;
+            secretKey = rootSecretKey;
+            publicKeyHash = ChainParameters.rootPKHash;
+        }
+        
+    handleTransaction ChainParameters.rootTxHash ChainParameters.rootTx account             

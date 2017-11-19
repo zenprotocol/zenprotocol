@@ -16,7 +16,7 @@ let commandHandler command (state:State) = state
 let requestHandler request reply (state:State) = state
 
 let main busName externalIp listen bind seeds =
-    Actor.create busName serviceName (fun poller sbObservable ebObservable ->           
+    Actor.create<Command, Request, Event, State> busName serviceName (fun poller sbObservable ebObservable ->           
         let peersManager = PeersManager.create poller listen bind seeds 
         
         let sbObservable = 

@@ -43,10 +43,9 @@ let main argv =
     match results.TryGetSubCommand() with
     | Some (Send args) ->        
         let asset,amount,address = args.GetResult <@ Send_Arguments @>
-        let send = new TransactionSendJson.Root(asset, amount, address)
-        let array = JsonValue.Array [| send.JsonValue |]
+        let send = new TransactionSendJson.Root(asset, amount, address)        
         
-        let response = array.Request (sprintf  "http://127.0.0.1:%d/wallet/transaction/send" port)
+        let response = send.JsonValue.Request (sprintf  "http://127.0.0.1:%d/wallet/transaction/send" port)
         
         match response.StatusCode, response.Body with
         | 200,_ -> printfn "Success"
@@ -57,8 +56,8 @@ let main argv =
         let balance = 
             BalanceJson.Load(sprintf "http://127.0.0.1:%d/wallet/balance" port)
                 
-        printfn "Asset\t| Balance"
-        printfn "======================="
+        printfn "Asset\t\t| Balance"
+        printfn "============================"
         
         Array.iter (fun (assertBalance:BalanceJson.Root) -> 
             printfn " %s\t| %d" assertBalance.Asset assertBalance.Balance) balance                                                                   

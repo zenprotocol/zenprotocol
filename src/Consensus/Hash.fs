@@ -23,4 +23,10 @@ let fromBytes bytes =
     | _ -> None
     
 let toString (Hash hash) =        
-    Base32.encode hash
+    Base16.encode hash
+    
+let fromString encoded = 
+    match Base16.decode encoded with
+    | None -> None
+    | Some decoded -> Hash decoded |> Some     
+    
