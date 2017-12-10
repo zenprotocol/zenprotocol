@@ -7,7 +7,6 @@ open Messaging.Services.Blockchain
 open Messaging.Events
 open Consensus
 
-// TODO: should be the state of the blockchain actor
 type State = UtxoSet.T * MemPool.T
 
 let eventHandler event (state:State) = state
@@ -15,13 +14,14 @@ let eventHandler event (state:State) = state
 let commandHandler publisher command (utxoSet, mempool) = 
     match command with
     | ValidateTransaction tx ->
-        match Transaction.validate utxoSet tx with
-        | Ok tx ->      
-            let txHash = Transaction.hash tx
-            
-            match MemPool.containsTransaction txHash mempool with
-            | true -> utxoSet,mempool // Nothing to do, already in mempool
-            | false ->                             
+        let txHash = Transaction.hash tx
+    
+        match MemPool.containsTransaction txHash mempool with
+        | true -> utxoSet,mempool // Nothing to do, already in mempool
+        | false -> 
+            match Transaction.validate utxoSet tx with
+            | Ok tx ->      
+                                                                
                 let utxoSet = UtxoSet.handleTransaction txHash tx utxoSet
                 let mempool = MemPool.add txHash tx mempool
                 
@@ -30,12 +30,11 @@ let commandHandler publisher command (utxoSet, mempool) =
                 Log.info "Transaction %s added to mempool" (Hash.toString txHash)
                 
                 utxoSet,mempool
-        | Error error -> 
-            // TODO: we should do something with the error here, like writing to log
-            // and banning peer?
-            // TODO: check if should be added to orphan list
-            
-            utxoSet,mempool
+            | Error error -> 
+                // TODO: we should do something with the error here, like writing to log
+                // and banning peer?
+                // TODO: check if should be added to orphan list
+                utxoSet,mempool
                          
     | _ -> utxoSet,mempool
 
@@ -70,4 +69,3 @@ let main busName =
     
         Disposables.empty, observable 
     )
-                    
