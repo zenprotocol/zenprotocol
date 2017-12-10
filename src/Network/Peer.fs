@@ -140,7 +140,7 @@ let handleConnectingState socket peer msg =
         | Message.HelloAck _ -> 
             // TODO: check network match, save version
             
-            Log.info "Connected to pear"
+            Log.info "Connected to peer"
             
             {peer with state=Active; ping=NoPing (getNow ())}            
         | _ ->            
