@@ -28,7 +28,7 @@ let hash =
     serialize WithoutWitness >> Hash.compute
 
 let private validateOrphancy set tx =
-    match getUtxos set tx.inputs with
+    match getUtxos tx.inputs set with
     | Some utxos -> 
         Ok (tx, utxos)
     | None -> Error "orphan"
