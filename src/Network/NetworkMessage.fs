@@ -15,6 +15,8 @@ let PingMessageId = 3uy
 [<LiteralAttribute>]
 let PongMessageId = 4uy
 [<LiteralAttribute>]
+let TransactionMessageId = 5uy
+[<LiteralAttribute>]
 let UnknownPeerMessageId = 100uy
 [<LiteralAttribute>]
 let UnknownMessageMessageId = 101uy
@@ -37,6 +39,10 @@ type Pong = {
         nonce : uint32
     }
 
+type Transaction = {
+        tx : byte[]
+    }
+
 type UnknownPeer = {
         dummy : byte
     }
@@ -50,6 +56,7 @@ type T =
     | HelloAck of HelloAck
     | Ping of Ping
     | Pong of Pong
+    | Transaction of Transaction
     | UnknownPeer of UnknownPeer
     | UnknownMessage of UnknownMessage
 
@@ -137,6 +144,27 @@ module Pong =
                     }: Pong)
         }
 
+module Transaction =
+    let getMessageSize (msg:Transaction) =
+        0 +
+            4 + Array.length msg.tx +
+            0
+
+    let write (msg:Transaction) stream =
+        stream
+        |> Stream.writeNumber4 (uint32 (Array.length msg.tx))
+        |> Stream.writeBytes msg.tx (Array.length msg.tx)
+
+    let read =
+        reader {
+            let! txLength = Stream.readNumber4
+            let! tx = Stream.readBytes (int txLength)
+
+            return ({
+                        tx = tx;
+                    }: Transaction)
+        }
+
 module UnknownPeer =
     let getMessageSize (msg:UnknownPeer) =
         0 +
@@ -200,6 +228,10 @@ let recv socket =
             match Pong.read stream with
             | None,stream -> None,stream
             | Some msg, stream -> Some (Pong msg), stream
+        | TransactionMessageId ->
+            match Transaction.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (Transaction msg), stream
         | UnknownPeerMessageId ->
             match UnknownPeer.read stream with
             | None,stream -> None,stream
@@ -226,6 +258,7 @@ let send socket msg =
         | HelloAck msg -> HelloAck.write msg
         | Ping msg -> Ping.write msg
         | Pong msg -> Pong.write msg
+        | Transaction msg -> Transaction.write msg
         | UnknownPeer msg -> UnknownPeer.write msg
         | UnknownMessage msg -> UnknownMessage.write msg
 
@@ -235,6 +268,7 @@ let send socket msg =
         | HelloAck _ -> HelloAckMessageId
         | Ping _ -> PingMessageId
         | Pong _ -> PongMessageId
+        | Transaction _ -> TransactionMessageId
         | UnknownPeer _ -> UnknownPeerMessageId
         | UnknownMessage _ -> UnknownMessageMessageId
 
@@ -244,6 +278,7 @@ let send socket msg =
         | HelloAck msg -> HelloAck.getMessageSize msg
         | Ping msg -> Ping.getMessageSize msg
         | Pong msg -> Pong.getMessageSize msg
+        | Transaction msg -> Transaction.getMessageSize msg
         | UnknownPeer msg -> UnknownPeer.getMessageSize msg
         | UnknownMessage msg -> UnknownMessage.getMessageSize msg
 

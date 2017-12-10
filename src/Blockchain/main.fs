@@ -8,33 +8,36 @@ open Messaging.Events
 open Consensus
 
 // TODO: should be the state of the blockchain actor
-type State = UtxoSet.T
+type State = UtxoSet.T * MemPool.T
 
 let eventHandler event (state:State) = state
 
-let commandHandler publisher command (utxoSet:UtxoSet.T) = 
+let commandHandler publisher command (utxoSet, mempool) = 
     match command with
     | ValidateTransaction tx ->
         match Transaction.validate utxoSet tx with
         | Ok tx ->      
             let txHash = Transaction.hash tx
-            let utxoSet = UtxoSet.handleTransaction txHash tx utxoSet
             
-            // TODO: add transaction to mempool
-            
-            EventBus.Publisher.publish publisher (TransactionAddedToMemPool (txHash,tx))
-            
-            utxoSet
-            
-            // TODO: log transaction validated            
-            // TODO: command network to relay transaction? or should the event is enough
+            match MemPool.containsTransaction txHash mempool with
+            | true -> utxoSet,mempool // Nothing to do, already in mempool
+            | false ->                             
+                let utxoSet = UtxoSet.handleTransaction txHash tx utxoSet
+                let mempool = MemPool.add txHash tx mempool
+                
+                EventBus.Publisher.publish publisher (TransactionAddedToMemPool (txHash,tx))
+                
+                Log.info "Transaction %s added to mempool" (Hash.toString txHash)
+                
+                utxoSet,mempool
         | Error error -> 
             // TODO: we should do something with the error here, like writing to log
             // and banning peer?
             // TODO: check if should be added to orphan list
             
-            utxoSet             
-    | _ -> utxoSet
+            utxoSet,mempool
+                         
+    | _ -> utxoSet,mempool
 
 let requestHandler request reply (state:State) = state
 
@@ -55,11 +58,15 @@ let main busName =
 
         let utxoSet = 
             UtxoSet.create() 
-            |> UtxoSet.handleTransaction ChainParameters.rootTxHash ChainParameters.rootTx            
+            |> UtxoSet.handleTransaction ChainParameters.rootTxHash ChainParameters.rootTx
+            
+        let mempool = 
+            MemPool.create ()
+            |> MemPool.add ChainParameters.rootTxHash ChainParameters.rootTx            
                      
         let observable =                      
             Observable.merge sbObservable ebObservable
-            |> Observable.scan (fun state handler -> handler state) utxoSet             
+            |> Observable.scan (fun state handler -> handler state) (utxoSet,mempool)             
     
         Disposables.empty, observable 
     )

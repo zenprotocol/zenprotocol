@@ -21,6 +21,7 @@ let serialize mode tx =
     Binary.pickle pickler tx
 
 let deserialize =
+    // TODO: should return an option
     Binary.unpickle pickler 
 
 let hash =

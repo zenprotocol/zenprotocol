@@ -32,6 +32,8 @@ let ``peers connecting to each other`` () =
     RoutingId.get clientSocket |> ignore
     let msg' = Message.recv clientSocket
     
-    let client' = Peer.handleMessage clientSocket client msg'
+    let next _ = ()
+    
+    let client' = Peer.handleMessage clientSocket next client msg'
     
     Peer.state client' |> should equal Peer.Active

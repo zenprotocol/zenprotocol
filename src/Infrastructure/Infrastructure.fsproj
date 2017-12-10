@@ -47,10 +47,9 @@
     <Compile Include="ServiceBus.fs" />
     <Compile Include="EventBus.fs" />
     <Compile Include="Actor.fs" />
-  </ItemGroup>
-  <ItemGroup>
     <Compile Include="Http.fs" />
     <Compile Include="Disposables.fs" />
+    <Compile Include="Subject.fs" />
     <Content Include="ServiceBusMessage.xml" />
     <Content Include="paket.references" />
   </ItemGroup>

@@ -86,7 +86,7 @@ let private closePeer socket reason peer =
     disconnect socket peer |> ignore
     withState peer (Dead reason)   
     
-let private send socket peer msg = 
+let send socket peer msg = 
     match RoutingId.trySet socket peer.routingId 0<milliseconds> with
     | RoutingId.TryResult.HostUnreachable -> closePeer socket Unreachable peer  
     | RoutingId.TryResult.TimedOut -> closePeer socket PipeFull peer  
@@ -146,7 +146,7 @@ let handleConnectingState socket peer msg =
         | _ ->            
             closePeer socket ExpectingHelloAck peer
 
-let handleActiveState socket peer msg =
+let handleActiveState socket next peer msg =
     match msg with
     | None ->
         Log.warning "Received malformed message from peer"
@@ -171,12 +171,16 @@ let handleActiveState socket peer msg =
                 match nonce = pong.nonce with
                 | true -> {peer with ping=NoPing (getNow ())}
                 | false -> peer
-        | _ -> peer
+        | msg -> 
+            // Application message, push message to observable
+            // TODO: we should actually check the message is application message            
+            next msg
+            peer
 
-let handleMessage socket peer msg =    
+let handleMessage socket next peer msg =    
    match state peer with
    | Connecting _ -> handleConnectingState socket peer msg 
-   | Active -> handleActiveState socket peer msg 
+   | Active -> handleActiveState socket next peer msg 
    | _ -> failwith "Dead peer should not receive any messages"
 
 let handleTick socket peer =
@@ -204,6 +208,6 @@ let handleTick socket peer =
             Log.info "Peer didn't reply to hello message"
             
             closePeer socket NoHelloAck peer
-    | _ -> failwith "Dead peer should not receive any ticks requests" 
+    | _ -> failwith "Dead peer should not receive any ticks requests"
 
 let routingId peer = peer.routingId

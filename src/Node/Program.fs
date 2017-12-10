@@ -9,11 +9,13 @@ module Actor = FsNetMQ.Actor
 [<NoAppSettings>]
 type Argument = 
     | Chain of string
+    | Api of string
     | Localhost    
     with
         interface IArgParserTemplate with
             member s.Usage =
                 match s with
+                | Api _ -> "Enable api and set bind address"
                 | Chain _ -> "specify chain (local,test or main)."
                 | Localhost -> "specify if the node should local chain host"                              
 
@@ -60,11 +62,15 @@ let main argv =
     List.iter (fun arg -> 
         match arg with 
         | Chain chain -> config.chain <- chain            
-        | Localhost ->
+        | Localhost ->                        
             config.chain <- "local"
             config.networks.local.listen <- true
             config.networks.local.seeds.Clear ()  
-            root <- true            
+            root <- true 
+        | Api address -> 
+            config.api.enabled <- true
+            config.api.bind <- address
+                       
     ) (results.GetAllResults())
                               
     use brokerActor = createBroker ()    
