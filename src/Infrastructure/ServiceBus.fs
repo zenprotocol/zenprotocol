@@ -113,41 +113,43 @@ module Broker =
 
 module Agent = 
 
-    type Message<'command,'request, 'response> = 
+    type RequestId(socket:FsNetMQ.Socket.T, sender:byte[]) = 
+        member this.reply<'a>(msg:'a) =
+            Message.send socket (Message.Response {
+               sender=sender;                
+               payload=binarySerializer.Pickle msg;
+            }) 
+            
+            waitForAck socket 
+            
+    
+    type Message<'command,'request> = 
         | Command of 'command
-        | Request of 'request * ('response -> unit)
+        | Request of RequestId * 'request 
 
-    type Agent<'command,'request, 'response> = {
-        observable: System.IObservable<Message<'command, 'request,'response>>;
+    type Agent<'command,'request> = {
+        observable: System.IObservable<Message<'command, 'request>>;
         observer: System.IDisposable;
         socket: Socket.T;
         poller: Poller.T; 
     }
 
-    type T<'command,'request, 'response> = 
-        | Agent of Agent<'command,'request, 'response>
+    type T<'command,'request> = 
+        | Agent of Agent<'command,'request>
         interface System.IDisposable with
             member x.Dispose () =
                 match x with 
                 | Agent a -> 
                     Poller.removeSocket a.poller a.socket
                     a.observer.Dispose ()
-                    (a.socket :> System.IDisposable).Dispose ()                             
+                    (a.socket :> System.IDisposable).Dispose ()
                            
-    let create<'command,'request, 'response> poller name service = 
+    let create<'command,'request> poller name service = 
         let socket = Socket.dealer ()
         Socket.connect socket (getBrokerAddress name)
                                                 
         Message.send socket (Message.Register {service=service})
-        waitForAck socket           
-        
-        let reply sender (msg:'response) =                                
-            Message.send socket (Message.Response {
-                sender=sender;
-                payload=binarySerializer.Pickle msg;
-            })                        
-            
-            waitForAck socket                        
+        waitForAck socket                       
         
         let observable =
             Poller.addSocket poller socket
@@ -159,7 +161,7 @@ module Agent =
                 | Message.RelayRequest r ->                            
                     try 
                         let payload = binarySerializer.UnPickle<'request> r.payload                    
-                        Some (Request (payload, (reply r.sender)))
+                        Some (Request (new RequestId(socket, r.sender), payload))
                     with 
                     | n ->                         
                         failwith "failed"                        

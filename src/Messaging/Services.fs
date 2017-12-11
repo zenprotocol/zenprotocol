@@ -1,5 +1,7 @@
 module Messaging.Services
 
+open Consensus
+open Consensus.Types
 open Infrastructure.ServiceBus.Client
 
 module Blockchain = 
@@ -27,4 +29,29 @@ module Network =
                 
     type Response = unit        
 
-    let serviceName = "network"                 
+    let serviceName = "network"       
+    
+module Wallet = 
+    type Command = unit
+    
+    type Request = 
+        | GetAddress
+        | GetBalance
+        | CreateTransaction of address:string * asset:Hash.Hash * amount:uint64
+                              
+    type CreateTransactionResult =
+        | Created of Transaction
+        | Error of string                             
+                                         
+    let serviceName = "wallet"
+    
+    let getBalance client =
+        Request.send<Request, Map<Hash.Hash,uint64>> client serviceName GetBalance
+        
+    let getAddress client =
+        Request.send<Request, string> client serviceName GetAddress
+        
+    let createTransaction client address asset amount =     
+        Request.send<Request, CreateTransactionResult> client serviceName (CreateTransaction (address,asset,amount))
+    
+            

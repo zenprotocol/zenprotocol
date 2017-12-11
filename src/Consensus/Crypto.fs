@@ -56,7 +56,7 @@ module Native =
     extern Result secp256k1_ec_pubkey_serialize(
         Context ctx,
         byte[] output,
-        uint32& outputlen,
+        int64 *outputlen,
         byte[] pubkey,
         uint32 flags
     );
@@ -130,15 +130,25 @@ type KeyPair = SecretKey * PublicKey
 let private rng = new System.Security.Cryptography.RNGCryptoServiceProvider()        
 let private context = Native.secp256k1_context_create (Native.SECP256K1_CONTEXT_SIGN ||| Native.SECP256K1_CONTEXT_VERIFY)            
     
+module SecretKey = 
+    let getPublicKey (SecretKey secretKey) = 
+    
+        let publicKey = Array.create PublicKeyLength 0uy
+                
+        match Native.secp256k1_ec_pubkey_create (context, publicKey, secretKey) with
+        | Native.Result.Ok -> Some (PublicKey.PublicKey publicKey)
+        | Native.Result.Error ->  None
+        | x -> failwithf "Unexpected result %A" x                    
+    
 module PublicKey =      
     let serialize (PublicKey publicKey) =
         let bytes = Array.create SerializedPublicKeyLength 0uy
-        let mutable length = uint32 SerializedPublicKeyLength
+        let mutable length = int64 SerializedPublicKeyLength
      
-        match Native.secp256k1_ec_pubkey_serialize(context, bytes, &length, publicKey, Native.SECP256K1_EC_COMPRESSED) with
+        match Native.secp256k1_ec_pubkey_serialize(context, bytes, &&length, publicKey, Native.SECP256K1_EC_COMPRESSED) with
         | Native.Result.Ok -> 
-            if 33ul = length then bytes else failwith "Wrong serialized size" 
-        | _ -> failwith "failed to serialize public key"
+            if 33L = length then bytes else failwith "Wrong serialized size" 
+        | _ -> failwith "failed to serialize public key"                   
         
     let deserialize bytes =             
         match Array.length bytes = 33 with
@@ -147,7 +157,9 @@ module PublicKey =
             let publicKey = Array.create PublicKeyLength 0uy
             match Native.secp256k1_ec_pubkey_parse(context, publicKey, bytes, 33ul) with
             | Native.Result.Ok -> Some (PublicKey publicKey)
-            | _ -> None
+            | _ -> None                            
+                     
+    let hash = serialize >> Hash.compute        
                      
 module Signature =        
     let serialize (Signature signature) =

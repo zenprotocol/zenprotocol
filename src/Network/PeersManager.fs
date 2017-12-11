@@ -18,6 +18,7 @@ type PeersManager =
         poller: Poller.T;
         peers: Peers.T; 
         observable: System.IObservable<PeersManager->PeersManager>;
+        subject: Subject.T<Message.T>;
         observer: System.IDisposable;
         state: State;
         addressBook: AddressBook.T;
@@ -47,15 +48,17 @@ let checkState manager =
         | true -> Online
         | false -> Offline
         
-    // TODO: publishing events        
+    // TODO: publishing events
             
     {manager with peers = peers; state = state}
                            
          
 let handleMessage routingId msg peersManager =
+    let next = Subject.next peersManager.subject
+
     let peer = 
         match Peers.tryGet peersManager.peers routingId with
-        | Some peer -> Peer.handleMessage peersManager.socket peer msg
+        | Some peer -> Peer.handleMessage peersManager.socket next peer msg
         | None -> Peer.newPeer peersManager.socket routingId msg
         
     let peers = 
@@ -99,15 +102,18 @@ let create poller listen bind seeds =
         
     let observer = FSharp.Control.Reactive.Observable.connect socketObservable
     
-    let observable = Observable.merge socketObservable timerObservable
+    let observable = Observable.merge socketObservable timerObservable       
     
     let addressBook = AddressBook.create (Seq.map (sprintf "tcp://%s") seeds)
+    
+    let subject = Subject.create ()
     
     {
         socket=socket; 
         poller=poller; 
         peers = Peers.empty; 
-        observable=observable; 
+        observable = observable;
+        subject = subject;
         observer = observer; 
         timer = timer; 
         state = Offline;
@@ -117,8 +123,18 @@ let create poller listen bind seeds =
     
 let observable manager = manager.observable
 
+let messageObservable manager : System.IObservable<Message.T> = Subject.observable manager.subject 
+
 let countActivePeers manager = 
     Peers.activePeers manager.peers
     |> Seq.length
 
-                             
+let publish msg manager =
+    // sending msg to all connected peers    
+    let peers = Peers.run manager.peers (fun peer -> 
+        match Peer.isActive peer with
+        | true -> Peer.send manager.socket peer msg
+        | false -> peer)
+    
+    {manager with peers = peers} |> checkState
+                                      

@@ -10,6 +10,8 @@ open FSharp.Control.Reactive
 open FSharp.Data
 open System.Net
 
+module Actor = FsNetMQ.Actor 
+
 let runServer _ =     
     Actor.create (fun shim ->
         let threadId = System.Threading.Thread.CurrentThread.ManagedThreadId

@@ -147,6 +147,40 @@ let ``Pong size fits stream ``() =
     messageSize |> should equal offset
 
 [<Fact>]
+let ``send and recv Transaction``() =
+    let msg = Transaction {
+        tx = "Captcha Diem"B;
+    }
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://Transaction.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://Transaction.test"
+
+    Network.Message.send server msg
+
+    let msg' = Network.Message.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Fact>]
+let ``Transaction size fits stream ``() =
+    let transaction:Transaction = {
+        tx = "Captcha Diem"B;
+    }
+
+    let messageSize = Transaction.getMessageSize transaction
+
+    let stream =
+        Stream.create messageSize
+        |> Transaction.write transaction
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Fact>]
 let ``send and recv UnknownPeer``() =
     let msg = UnknownPeer {
         dummy = 123uy;

@@ -36,7 +36,7 @@ let createAgent delay =
             System.Threading.Thread.Sleep delay 
              
         use poller = Poller.create ()
-        use agent = Agent.create<Commands, Request, Response> poller busName "greeter"                
+        use agent = Agent.create<Commands, Request> poller busName "greeter"                
         
         use observer = Poller.registerEndMessage poller shim
         
@@ -44,7 +44,7 @@ let createAgent delay =
             Agent.observable agent 
             |> Observable.subscribe (fun msg ->                                                                                            
                 match msg with 
-                | Agent.Request (_, reply) -> reply World
+                | Agent.Request (requestId, _) -> requestId.reply World
                 | _ -> ())       
         
         if delay = 0 then Actor.signal shim
@@ -70,7 +70,7 @@ let ``send command while agent is up`` () =
     use client = sendCommand 10 "greeter" Greet               
     
     use poller = Poller.create ()    
-    use agent = Agent.create<Commands, Request, Response> poller "test" "greeter"                                         
+    use agent = Agent.create<Commands, Request> poller "test" "greeter"                                         
                    
     use observer = 
         Agent.observable agent 
@@ -93,7 +93,7 @@ let ``send command while agent still not up`` () =
     System.Threading.Thread.Sleep 10 
     
     use poller = Poller.create ()    
-    use agent = Agent.create<Commands, Request, Response> poller "test" "greeter"                                         
+    use agent = Agent.create<Commands, Request> poller "test" "greeter"                                         
                                                            
     use observer = 
         Agent.observable agent 

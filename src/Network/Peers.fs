@@ -34,4 +34,4 @@ let remove peers key = Map.remove key peers
 
 let run peers f = 
     Map.map (fun _ peer -> f peer) peers
-    |> Map.filter (fun _ -> Peer.isDead >> not)
+    |> Map.filter (fun _ -> Peer.isDead >> not)       

@@ -113,6 +113,6 @@ module Publisher =
          
          Publisher publisher
 
-    let publish:(T<'a> -> 'a -> unit) = fun (Publisher socket) msg -> 
+    let publish :(T<'a> -> 'a -> unit) = fun (Publisher socket) msg -> 
         binarySerializer.Pickle<'a> msg
         |> Frame.send socket
