@@ -2,5 +2,5 @@ FSharp.Core
 xunit
 FsUnit.xUnit
 FsCheck.Xunit
-zen_secp256k1_linux
 FSharp.Compiler.Tools
+zen_secp256k1_linux

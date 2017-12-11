@@ -2,3 +2,4 @@ FSharp.Core
 FsNetMQ
 FSharp.Control.Reactive
 FSharp.Data
+FSharp.Compiler.Tools

@@ -36,6 +36,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Wallet", "Wallet\Wallet.fsp
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Wallet.Tests", "Wallet.Tests\Wallet.Tests.fsproj", "{B00B9A97-D059-434D-81B9-BDC5D07A7DDB}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Blockchain.Tests", "Blockchain.Tests\Blockchain.Tests.fsproj", "{890069D1-B830-4407-BE70-265647B318CE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -94,6 +96,10 @@ Global
 		{B00B9A97-D059-434D-81B9-BDC5D07A7DDB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B00B9A97-D059-434D-81B9-BDC5D07A7DDB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B00B9A97-D059-434D-81B9-BDC5D07A7DDB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{890069D1-B830-4407-BE70-265647B318CE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{890069D1-B830-4407-BE70-265647B318CE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{890069D1-B830-4407-BE70-265647B318CE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{890069D1-B830-4407-BE70-265647B318CE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -103,5 +109,6 @@ Global
 		{0BE814E1-FD31-40B9-BD24-4572E3EF79C0} = {C58A477F-36B7-429C-AD06-87A465B47F1D}
 		{058F4AA6-A889-4724-A96F-F947DE57B63A} = {C58A477F-36B7-429C-AD06-87A465B47F1D}
 		{B00B9A97-D059-434D-81B9-BDC5D07A7DDB} = {C58A477F-36B7-429C-AD06-87A465B47F1D}
+		{890069D1-B830-4407-BE70-265647B318CE} = {C58A477F-36B7-429C-AD06-87A465B47F1D}
 	EndGlobalSection
 EndGlobal

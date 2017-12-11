@@ -1,4 +1,4 @@
-module Infrastructure.MemPool
+module Blockchain.MemPool
 
 open Consensus
 open Consensus.Types
