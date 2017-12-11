@@ -40,7 +40,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="EffectsWriter.fs" />
     <Compile Include="MemPool.fs" />
+    <Compile Include="Handler.fs" />
     <Compile Include="main.fs" />
     <None Include="Script.fsx" />
   </ItemGroup>

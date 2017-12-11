@@ -9,8 +9,6 @@ open Consensus
 
 type State = UtxoSet.T * MemPool.T
 
-let eventHandler event (state:State) = state
-
 let commandHandler publisher command (utxoSet, mempool) = 
     match command with
     | ValidateTransaction tx ->
@@ -38,22 +36,20 @@ let commandHandler publisher command (utxoSet, mempool) =
                          
     | _ -> utxoSet,mempool
 
-let requestHandler request reply (state:State) = state
-
 let main busName =
     Actor.create<Command,Request,Event,State> busName serviceName (fun poller sbObservable ebObservable  ->  
         let publisher = EventBus.Publisher.create<Event> busName
                                 
         let sbObservable = 
             sbObservable
-            |> Observable.map (fun message ->
+            |> Observable.map (fun message ->                
                 match message with 
-                | ServiceBus.Agent.Command c -> commandHandler publisher c 
-                | ServiceBus.Agent.Request (r, reply) -> requestHandler r reply)                
+                | ServiceBus.Agent.Command c -> Handler.handleCommand c 
+                | ServiceBus.Agent.Request (r, reply) -> Handler.handleRequest r reply)                
         
         let ebObservable = 
             ebObservable
-            |> Observable.map eventHandler
+            |> Observable.map Handler.handleEvent
 
         let utxoSet = 
             UtxoSet.create() 
@@ -65,7 +61,10 @@ let main busName =
                      
         let observable =                      
             Observable.merge sbObservable ebObservable
-            |> Observable.scan (fun state handler -> handler state) (utxoSet,mempool)             
+            |> Observable.scan (fun state handler -> 
+                let effectWriter = handler state
+                EffectsWriter.run effectWriter publisher
+                ) (utxoSet,mempool)             
     
         Disposables.empty, observable 
     )

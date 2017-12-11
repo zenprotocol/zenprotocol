@@ -9,4 +9,4 @@ let create () = Map.empty
 
 let containsTransaction = Map.containsKey 
 
-let add = Map.add     
+let add = Map.add

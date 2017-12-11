@@ -46,6 +46,7 @@
     <Compile Include="ServiceBusMessage.fs" />
     <Compile Include="ServiceBus.fs" />
     <Compile Include="EventBus.fs" />
+    <Compile Include="Writer.fs" />
     <Compile Include="Actor.fs" />
     <Compile Include="Http.fs" />
     <Compile Include="Disposables.fs" />

@@ -5,7 +5,4 @@ open Consensus
 open Consensus.Types
 
 type Event = 
-    | TransactionAddedToMemPool of txHash:Hash.Hash * Transaction
-    
-let publish (publisher:Publisher.T<Event>) (event:Event) = 
-    Publisher.publish publisher event
+    | TransactionAddedToMemPool of txHash:Hash.Hash * Transaction   
