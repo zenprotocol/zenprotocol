@@ -40,9 +40,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="ValidateTransactionTests.fs" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="ValidateTransactionTests.fs" />
     <Content Include="paket.references" />
   </ItemGroup>
   <ItemGroup>
@@ -67,7 +67,7 @@
       <Name>Wallet</Name>
     </ProjectReference>
   </ItemGroup>
-  <Import Project="$(FSharpTargetsPath)" Condition="Exists('$(FSharpTargetsPath)')" />
+  <Import Project="$(FSharpTargetsPath)" />
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6.2'">
       <PropertyGroup>
