@@ -12,7 +12,7 @@ type SerializationMode =
     | Full
     | WithoutWitness
 
-type ValitationError =
+type ValidationError =
     | Orphan of Transaction
     | DoubleSpend of Transaction
     | General of string

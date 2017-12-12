@@ -14,7 +14,7 @@ let txInMode mode tx =
     | Transaction.Full -> tx
     | Transaction.WithoutWitness -> {tx with witnesses=[]}
 
-type ValidationError = Transaction.ValitationError
+type ValidationError = Transaction.ValidationError
 
 [<Property>]
 let ``Transaction serialization round trip produces same result``(mode:Transaction.SerializationMode) (tx:Transaction) =
