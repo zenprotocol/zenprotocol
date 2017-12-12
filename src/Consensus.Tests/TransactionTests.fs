@@ -68,9 +68,52 @@ let ``Transaction should have invalid amounts``(utxos:Map<Outpoint, Output>) =
     (Transaction.validateInputs utxos' tx = Error (ValidationError.General "invalid amounts"))
 
 [<Property>]
-let ``Transaction should fail with inputs empty error``(tx:Transaction) =
+let ``Transaction validation should fail with inputs empty error``(tx:Transaction) =
     Transaction.validateBasic {tx with inputs = List.empty} = Error (ValidationError.General "inputs empty")
 
 [<Property>]
-let ``Transaction should fail with outputs empty error``(tx:Transaction) =
+let ``Transaction validation should fail with outputs empty error``(tx:Transaction) =
     (tx.inputs.Length <> 0) ==> (Transaction.validateBasic {tx with outputs = List.empty} = Error (ValidationError.General "outputs empty"))
+
+[<Test>]
+let ``Transaction validation should fail with outputs overflow error``() =
+    let tx = {  
+        inputs = 
+            [{ 
+                txHash = Hash.zero; 
+                index = 0ul 
+            }];
+        witnesses = [];
+        outputs = 
+            [
+                { lock = (PK Hash.zero); spend = {asset = Hash.zero; amount = System.UInt64.MaxValue } };
+                { lock = (PK Hash.zero); spend = {asset = Hash.zero; amount = 1UL } }
+            ]
+    }    
+    Transaction.validateBasic tx |> should equal (Error (ValidationError.General "outputs overflow") : Result<Transaction, ValidationError>)
+
+[<Test>]
+let ``Transaction validation should fail with duplicate inputs error``() =
+    let input = { 
+        txHash = Hash.zero; 
+        index = 0ul 
+    }
+    let tx = {  
+        inputs = [ input; input ];
+        witnesses = [];
+        outputs = [ { lock = (PK Hash.zero); spend = {asset = Hash.zero; amount = 1UL } } ]
+    }    
+    Transaction.validateBasic tx |> should equal (Error (ValidationError.General "inputs duplicated") : Result<Transaction, ValidationError>)
+
+[<Test>]
+let ``Transaction validation should fail with inputs structurally invalid error``() =
+    let tx = {  
+        inputs =
+            [{ 
+                txHash = Hash (Array.create 31 0uy); 
+                index = 0ul 
+            }];
+        witnesses = [];
+        outputs = [ { lock = (PK Hash.zero); spend = {asset = Hash.zero; amount = 1UL } } ]
+    }    
+    Transaction.validateBasic tx |> should equal (Error (ValidationError.General "inputs structurally invalid") : Result<Transaction, ValidationError>)
