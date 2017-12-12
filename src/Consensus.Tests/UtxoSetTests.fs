@@ -69,7 +69,7 @@ let ``Should find Utxo``() =
     
 [<Property>]
 let ``Distinct outpoint count should match utxos count``(utxos:Map<Outpoint, Output>) =
-    let utxos  = Map.map (fun key value -> Unspent value) utxos
+    let utxos  = Map.map (fun _ value -> Unspent value) utxos
     let distinctOutpoints = utxos |> Map.toList |> List.map fst
 
     match UtxoSet.getUtxos distinctOutpoints utxos with
@@ -78,12 +78,12 @@ let ``Distinct outpoint count should match utxos count``(utxos:Map<Outpoint, Out
     
 [<Property>]
 let ``Should be some utxos``(utxos:Map<Outpoint, Output>) =
-    let utxos  = Map.map (fun key value -> Unspent value) utxos
+    let utxos  = Map.map (fun _ value -> Unspent value) utxos
 
     Option.isSome <| UtxoSet.getUtxos (utxos |> Map.toList |> List.map fst) utxos
 
 [<Property>]
 let ``Should be none utxos``(utxos:Map<Outpoint, Output>) (outpoints:List<Outpoint>) =
-    let utxos  = Map.map (fun key value -> Unspent value) utxos
+    let utxos  = Map.map (fun _ value -> Unspent value) utxos
 
     (outpoints |> List.distinct |> List.length > Map.count utxos) ==> (Option.isNone <| UtxoSet.getUtxos outpoints utxos)

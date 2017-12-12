@@ -17,7 +17,7 @@ let commandHandler publisher command (utxoSet, mempool) =
         match MemPool.containsTransaction txHash mempool with
         | true -> utxoSet,mempool // Nothing to do, already in mempool
         | false -> 
-            match Transaction.validate utxoSet tx with
+            match Transaction.validateInputs utxoSet tx with
             | Ok tx ->      
                                                                 
                 let utxoSet = UtxoSet.handleTransaction txHash tx utxoSet

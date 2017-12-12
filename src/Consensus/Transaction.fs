@@ -12,11 +12,89 @@ type SerializationMode =
     | Full
     | WithoutWitness
 
+type ValitationError =
+    | Orphan of Transaction
+    | General of string
+
+let private addSpend s m =
+    let (+) a b =
+        try 
+            Some (Operators.Checked.(+) a b) with 
+        | :? System.OverflowException -> None
+    let value = 
+        match Map.tryFind s.asset m with
+            | Some (Some v) -> v
+            | _ -> 0UL
+    Map.add s.asset (value + s.amount) m
+
+let private foldSpends = 
+    List.map (fun o -> o.spend) 
+    >> List.fold (fun map s -> addSpend s map) Map.empty
+
+let private checkSpends m = 
+    Map.exists (fun _ v -> Option.isNone v) m |> not
+
+let private checkInputsOverflow (tx, outputs) =
+    let outputs' = foldSpends tx.outputs
+    match checkSpends outputs' && outputs' = foldSpends outputs with
+        | true -> Ok tx
+        | false -> General "invalid amounts" |> Error
+
+let private checkInputsNotEmpty tx = 
+    match List.isEmpty tx.inputs with
+        | true -> General "inputs empty" |> Error
+        | false -> Ok tx
+
+let private checkOutputsNotEmpty tx =
+    match List.isEmpty tx.outputs with
+        | true -> General "outputs empty" |> Error
+        | false -> Ok tx
+
+let private checkOutputsOverflow tx =
+    match tx.outputs 
+          |> foldSpends
+          |> checkSpends with
+        | true -> Ok tx
+        | false -> General "outputs overflow" |> Error
+
+let private checkDuplicateInputs tx =
+    let (==) a b = List.length a = List.length b
+    match List.distinct tx.inputs == tx.inputs with
+        | true -> Ok tx
+        | false -> General "inputs duplicated" |> Error
+
+let private checkInputsStructure tx =
+    match tx.inputs |> List.exists (fun i -> not (Hash.isValid i.txHash)) with
+        | true -> General "inputs structurally invalid" |> Error
+        | false -> Ok tx
+
+let private checkOrphan set tx =
+    match getUtxos tx.inputs set with
+    | Some utxos -> 
+        Ok (tx, utxos)
+    | None -> 
+        Orphan tx |> Error
+
+let validateBasic = 
+    let (>=>) f1 f2 x = Result.bind f2 (f1 x)
+
+    checkInputsNotEmpty  >=> 
+    checkOutputsNotEmpty >=> 
+    checkOutputsOverflow >=> 
+    checkDuplicateInputs >=> 
+    checkInputsStructure
+
+let validateInputs set =
+    let (>=>) f1 f2 x = Result.bind f2 (f1 x)
+
+    checkOrphan set >=> 
+    checkInputsOverflow 
+
 let serialize mode tx =
     let tx = 
         match mode with
-        | Full -> tx
-        | WithoutWitness -> {tx with witnesses=[]}
+            | Full -> tx
+            | WithoutWitness -> {tx with witnesses=[]}
 
     Binary.pickle pickler tx
 
@@ -26,52 +104,7 @@ let deserialize =
 
 let hash =
     serialize WithoutWitness >> Hash.compute
-
-let private validateOrphancy set tx =
-    match getUtxos tx.inputs set with
-    | Some utxos -> 
-        Ok (tx, utxos)
-    | None -> Error "orphan"
-
-let private validateAmounts (tx, outputs) =
-    let addToMap newKey newValue map =
-        if Map.containsKey newKey map
-        then
-            Map.map (
-                fun key value -> 
-                    if (key = newKey) 
-                    then newValue + value 
-                    else newValue)
-                map
-        else
-            Map.add newKey newValue map            
-    let sumAmounts = List.fold (fun map output -> addToMap output.spend.asset output.spend.amount map) Map.empty
-
-    let inputSums = sumAmounts tx.outputs
-    let outputSums = sumAmounts outputs
-    
-    if Map.count inputSums <> Map.count outputSums then 
-        Error "invalid amounts"
-    else
-        let validateAmount state inputAsset inputAmount = 
-            match state with 
-            | false -> false
-            | true -> 
-                match Map.tryFind inputAsset outputSums with
-                | None -> false
-                | Some outputAmount -> inputAmount = outputAmount
-    
-        if Map.fold validateAmount true inputSums
-            then Ok tx
-            else Error "invalid amounts"
-
-let validate set =
-    let (>=>) f1 f2 x = Result.bind f2 (f1 x)
-
-    validateOrphancy set
-    >=> 
-    validateAmounts 
-    
+        
 let sign tx secretKey =
     let txHash = hash tx
 

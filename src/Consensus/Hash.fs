@@ -29,4 +29,6 @@ let fromString encoded =
     match Base16.decode encoded with
     | None -> None
     | Some decoded -> Hash decoded |> Some     
-    
+
+let isValid (Hash hash) =
+    Array.length hash = 32
