@@ -1,12 +1,12 @@
-module Blockchain.Tests.ValidateTransactionTests
+﻿module Blockchain.Tests.ValidateTransactionTests
 
 // This tests only for ValidateTransaction command
 // We don't need to cover the entire outcome of transaction validation
 // we have transaction validation tests for that.
 // We are checking that all events are raised, tx enter mempool, utxoset or orphan tx list
 
-open Xunit
-open FsUnit.Xunit
+open NUnit.Framework
+open FsUnit
 open Blockchain
 open Consensus
 open Consensus.Types
@@ -29,7 +29,7 @@ let txOutpoints = List.mapi (fun i _ -> {txHash=txHash;index= uint32 i}) tx.outp
 let shouldBeenRaised (events:Event list) event = 
     List.find ((=) event) events |> ignore
 
-[<Fact>]
+[<Test>]
 let ``valid transaction raise events and update state``() =
     let utxoSet = 
         UtxoSet.create() 
@@ -56,7 +56,7 @@ let ``valid transaction raise events and update state``() =
     // Checking the tx is in the utxoset
     UtxoSet.getUtxos txOutpoints utxoSet' |> should equal (Some tx.outputs) 
 
-[<Fact>]
+[<Test>]
 let ``Invalid tx doesn't raise events or update state``() =
     // the only difference from the valid test is that the mempool and utxoset do not have the 
     // root tx
@@ -78,7 +78,7 @@ let ``Invalid tx doesn't raise events or update state``() =
     // Checking the tx is not in the utxoset
     UtxoSet.getUtxos txOutpoints utxoSet' |> should equal None 
     
-[<Fact>]
+[<Test>]
 let ``tx already in mempool nothing happen`` () = 
     let utxoSet = 
         UtxoSet.create() 

@@ -1,12 +1,12 @@
-module Infrastructure.ServiceBusMessage.Tests
+﻿module Infrastructure.ServiceBusMessage.Tests
 
-open Xunit
-open FsUnit.Xunit
+open NUnit.Framework
+open FsUnit
 open FsNetMQ
 open Infrastructure.ServiceBusMessage
 
 
-[<Fact>]
+[<Test>]
 let ``send and recv Register``() =
     let msg = Register {
         service = "Life is short but Now lasts for ever";
@@ -24,7 +24,7 @@ let ``send and recv Register``() =
 
     msg' |> should equal (Some msg)
 
-[<Fact>]
+[<Test>]
 let ``Register size fits stream ``() =
     let register:Register = {
         service = "Life is short but Now lasts for ever";
@@ -40,7 +40,7 @@ let ``Register size fits stream ``() =
 
     messageSize |> should equal offset
 
-[<Fact>]
+[<Test>]
 let ``send and recv Command``() =
     let msg = Command {
         service = "Life is short but Now lasts for ever";
@@ -59,7 +59,7 @@ let ``send and recv Command``() =
 
     msg' |> should equal (Some msg)
 
-[<Fact>]
+[<Test>]
 let ``Command size fits stream ``() =
     let command:Command = {
         service = "Life is short but Now lasts for ever";
@@ -76,7 +76,7 @@ let ``Command size fits stream ``() =
 
     messageSize |> should equal offset
 
-[<Fact>]
+[<Test>]
 let ``send and recv RelayCommand``() =
     let msg = RelayCommand {
         payload = "Captcha Diem"B;
@@ -94,7 +94,7 @@ let ``send and recv RelayCommand``() =
 
     msg' |> should equal (Some msg)
 
-[<Fact>]
+[<Test>]
 let ``RelayCommand size fits stream ``() =
     let relaycommand:RelayCommand = {
         payload = "Captcha Diem"B;
@@ -110,7 +110,7 @@ let ``RelayCommand size fits stream ``() =
 
     messageSize |> should equal offset
 
-[<Fact>]
+[<Test>]
 let ``send and recv Request``() =
     let msg = Request {
         service = "Life is short but Now lasts for ever";
@@ -129,7 +129,7 @@ let ``send and recv Request``() =
 
     msg' |> should equal (Some msg)
 
-[<Fact>]
+[<Test>]
 let ``Request size fits stream ``() =
     let request:Request = {
         service = "Life is short but Now lasts for ever";
@@ -146,7 +146,7 @@ let ``Request size fits stream ``() =
 
     messageSize |> should equal offset
 
-[<Fact>]
+[<Test>]
 let ``send and recv RelayRequest``() =
     let msg = RelayRequest {
         sender = "Captcha Diem"B;
@@ -165,7 +165,7 @@ let ``send and recv RelayRequest``() =
 
     msg' |> should equal (Some msg)
 
-[<Fact>]
+[<Test>]
 let ``RelayRequest size fits stream ``() =
     let relayrequest:RelayRequest = {
         sender = "Captcha Diem"B;
@@ -182,7 +182,7 @@ let ``RelayRequest size fits stream ``() =
 
     messageSize |> should equal offset
 
-[<Fact>]
+[<Test>]
 let ``send and recv Response``() =
     let msg = Response {
         sender = "Captcha Diem"B;
@@ -201,7 +201,7 @@ let ``send and recv Response``() =
 
     msg' |> should equal (Some msg)
 
-[<Fact>]
+[<Test>]
 let ``Response size fits stream ``() =
     let response:Response = {
         sender = "Captcha Diem"B;
@@ -218,7 +218,7 @@ let ``Response size fits stream ``() =
 
     messageSize |> should equal offset
 
-[<Fact>]
+[<Test>]
 let ``send and recv RelayResponse``() =
     let msg = RelayResponse {
         payload = "Captcha Diem"B;
@@ -236,7 +236,7 @@ let ``send and recv RelayResponse``() =
 
     msg' |> should equal (Some msg)
 
-[<Fact>]
+[<Test>]
 let ``RelayResponse size fits stream ``() =
     let relayresponse:RelayResponse = {
         payload = "Captcha Diem"B;
@@ -252,7 +252,7 @@ let ``RelayResponse size fits stream ``() =
 
     messageSize |> should equal offset
 
-[<Fact>]
+[<Test>]
 let ``send and recv Ack``() =
     let msg = Ack {
         dummy = 123uy;
@@ -270,7 +270,7 @@ let ``send and recv Ack``() =
 
     msg' |> should equal (Some msg)
 
-[<Fact>]
+[<Test>]
 let ``Ack size fits stream ``() =
     let ack:Ack = {
         dummy = 123uy;
@@ -286,7 +286,7 @@ let ``Ack size fits stream ``() =
 
     messageSize |> should equal offset
 
-[<Fact>]
+[<Test>]
 let ``malformed message return None``() =
     use server = Socket.dealer ()
     Socket.bind server "inproc://ServiceBusMessage.test"

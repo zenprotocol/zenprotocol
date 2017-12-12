@@ -1,13 +1,13 @@
-module PeersManagerTests
+﻿module PeersManagerTests
 
-open Xunit
-open FsUnit.Xunit
+open NUnit.Framework
+open FsUnit
 open FsNetMQ
 open Network
 open Network.Tests.PeersManagerHelper
             
 
-[<Fact>]
+[<Test>]
 let ``Two peers connect to each other``() =            
     use manager1 = startPeer true
     use manager2 = startPeer false
@@ -17,7 +17,7 @@ let ``Two peers connect to each other``() =
     1 |> should equal (getActivePeers manager1)
     1 |> should equal (getActivePeers manager2)
     
-[<Fact>]    
+[<Test>]    
 let ``multiple peers connecting to host`` () =
     use host = startPeer true
     use peer = startPeer false
@@ -42,7 +42,7 @@ let ``multiple peers connecting to host`` () =
     1 |> should equal (getActivePeers peer)    
     1 |> should equal (getActivePeers host)
     
-[<Fact>]    
+[<Test>]    
 let ``peer reconnect when other peer is down``()=
     let host = startPeer true
     use peer = startPeer false

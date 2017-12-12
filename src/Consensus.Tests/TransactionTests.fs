@@ -1,11 +1,13 @@
-module Consensus.Tests.TransactionTests
+﻿module Consensus.Tests.TransactionTests
 
 open Consensus
 open Consensus.Types
 open Consensus.Hash
 open Consensus.UtxoSet
-open FsCheck.Xunit
+open NUnit.Framework
 open FsCheck
+open FsCheck.NUnit
+open FsUnit
 
 let txInMode mode tx =
     match mode with
@@ -67,4 +69,8 @@ let ``Transaction should have invalid amounts``(utxos:Map<Outpoint, Output>) =
 
 [<Property>]
 let ``Transaction should fail with inputs empty error``(tx:Transaction) =
-    List.isEmpty tx.inputs ==> (Transaction.validateBasic tx = Error (ValidationError.General "inputs empty"))
+    Transaction.validateBasic {tx with inputs = List.empty} = Error (ValidationError.General "inputs empty")
+
+[<Property>]
+let ``Transaction should fail with outputs empty error``(tx:Transaction) =
+    (tx.inputs.Length <> 0) ==> (Transaction.validateBasic {tx with outputs = List.empty} = Error (ValidationError.General "outputs empty"))

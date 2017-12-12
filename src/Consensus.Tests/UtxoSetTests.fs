@@ -1,14 +1,15 @@
-module Consensus.Tests.UtxoSetTests
+﻿module Consensus.Tests.UtxoSetTests
 
 open Consensus
 open Consensus.Types
 open Consensus.Hash
 open Consensus.UtxoSet
-open FsCheck.Xunit
+open NUnit.Framework
+open FsCheck.NUnit
 open FsCheck
-open FsUnit.Xunit
+open FsUnit
 
-[<Xunit.Fact>]
+[<Test>]
 let ``handling transaction add outputs to set``() = 
     let tx1 = {
         inputs = [];
@@ -30,7 +31,7 @@ let ``handling transaction add outputs to set``() =
     UtxoSet.isSomeSpent tx2.inputs set |> should equal false
     UtxoSet.getUtxos tx2.inputs set |> should equal (Some tx1.outputs)
         
-[<Xunit.Fact>]
+[<Test>]
 let ``handling transaction mark inputs as spent``() = 
     let tx1 = {
         inputs = [];
@@ -55,7 +56,7 @@ let ``handling transaction mark inputs as spent``() =
     UtxoSet.isSomeSpent tx2.inputs set |> should equal true
         
         
-[<Xunit.Fact>]
+[<Test>]
 let ``Should find Utxo``() =
     let hash = Hash [| 100uy |]
     let outpoint = { txHash = hash; index = 100u }
@@ -65,7 +66,7 @@ let ``Should find Utxo``() =
     
     match outputResult with 
     | None -> failwith ""
-    | Some utxos -> Xunit.Assert.Equal (utxos.[0], output)
+    | Some utxos -> Assert.AreEqual (utxos.[0], output)
     
 [<Property>]
 let ``Distinct outpoint count should match utxos count``(utxos:Map<Outpoint, Output>) =

@@ -1,7 +1,7 @@
-module Wallet.Tests.AccountTests
+﻿module Wallet.Tests.AccountTests
 
-open Xunit
-open FsUnit.Xunit
+open NUnit.Framework
+open FsUnit
 open Consensus
 open Consensus.ChainParameters
 open Consensus.Types
@@ -19,7 +19,7 @@ let balanceShouldBe asset expected account =
     
 let anotherAsset = Hash.compute "anotherasset"B    
 
-[<Fact>]
+[<Test>]
 let ``received tokens``() =
     let account = Account.create()
     
@@ -33,7 +33,7 @@ let ``received tokens``() =
     
     account' |> balanceShouldBe Hash.zero 10UL        
 
-[<Fact>]        
+[<Test>]        
 let ``tokens spent``() = 
     let account = Account.create()
         
@@ -53,7 +53,7 @@ let ``tokens spent``() =
     account' |> balanceShouldBe Hash.zero 20UL            
     account'' |> balanceShouldBe Hash.zero 10UL
                                 
-[<Fact>]
+[<Test>]
 let ``creating, not enough tokens``() =
     let account = Account.create()
     
@@ -69,7 +69,7 @@ let ``creating, not enough tokens``() =
     
     result |> should equal expected
     
-[<Fact>]
+[<Test>]
 let ``creating, no change``() = 
     let bob = Account.create ()
     let alice = Account.create ()               
@@ -91,7 +91,7 @@ let ``creating, no change``() =
         alice' |> balanceShouldBe Hash.zero 10UL
         bob'' |> balanceShouldBe Hash.zero 0UL
         
-[<Fact>]
+[<Test>]
 let ``creating, with change``() = 
     let bob = Account.create ()
     let alice = Account.create ()                
@@ -113,7 +113,7 @@ let ``creating, with change``() =
         alice' |> balanceShouldBe Hash.zero 7UL
         bob'' |> balanceShouldBe Hash.zero 3UL
         
-[<Fact>] 
+[<Test>] 
 let ``picking the correct asset``() = 
     let bob = Account.create ()
     let alice = Account.create ()          
@@ -146,7 +146,7 @@ let ``picking the correct asset``() =
         bob'' |> balanceShouldBe anotherAsset 10UL
         
 
-[<Fact>] 
+[<Test>] 
 let ``picking from multiple inputs``() = 
     let bob = Account.create ()
     let alice = Account.create ()               

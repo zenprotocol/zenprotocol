@@ -1,7 +1,7 @@
-module Network.Tests.PeerTests
+﻿module Network.Tests.PeerTests
 
-open Xunit
-open FsUnit.Xunit
+open NUnit.Framework
+open FsUnit
 open FsNetMQ
 open Network
 
@@ -10,7 +10,7 @@ let isConnecting peer =
     | Peer.Connecting _ -> true
     | _ -> false
 
-[<Fact>]
+[<Test>]
 let ``peers connecting to each other`` () =
     printfn "starting..."
 

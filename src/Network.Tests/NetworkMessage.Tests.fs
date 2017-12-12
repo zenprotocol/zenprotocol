@@ -1,12 +1,12 @@
-module Network.Tests.MessageTests
+﻿module Network.Tests.MessageTests
 
-open Xunit
-open FsUnit.Xunit
+open NUnit.Framework
+open FsUnit
 open FsNetMQ
 open Network.Message
 
 
-[<Fact>]
+[<Test>]
 let ``send and recv Hello``() =
     let msg = Hello {
         network = 123ul;
@@ -25,7 +25,7 @@ let ``send and recv Hello``() =
 
     msg' |> should equal (Some msg)
 
-[<Fact>]
+[<Test>]
 let ``Hello size fits stream ``() =
     let hello:Hello = {
         network = 123ul;
@@ -42,7 +42,7 @@ let ``Hello size fits stream ``() =
 
     messageSize |> should equal offset
 
-[<Fact>]
+[<Test>]
 let ``send and recv HelloAck``() =
     let msg = HelloAck {
         network = 123ul;
@@ -61,7 +61,7 @@ let ``send and recv HelloAck``() =
 
     msg' |> should equal (Some msg)
 
-[<Fact>]
+[<Test>]
 let ``HelloAck size fits stream ``() =
     let helloack:HelloAck = {
         network = 123ul;
@@ -78,7 +78,7 @@ let ``HelloAck size fits stream ``() =
 
     messageSize |> should equal offset
 
-[<Fact>]
+[<Test>]
 let ``send and recv Ping``() =
     let msg = Ping {
         nonce = 123ul;
@@ -96,7 +96,7 @@ let ``send and recv Ping``() =
 
     msg' |> should equal (Some msg)
 
-[<Fact>]
+[<Test>]
 let ``Ping size fits stream ``() =
     let ping:Ping = {
         nonce = 123ul;
@@ -112,7 +112,7 @@ let ``Ping size fits stream ``() =
 
     messageSize |> should equal offset
 
-[<Fact>]
+[<Test>]
 let ``send and recv Pong``() =
     let msg = Pong {
         nonce = 123ul;
@@ -130,7 +130,7 @@ let ``send and recv Pong``() =
 
     msg' |> should equal (Some msg)
 
-[<Fact>]
+[<Test>]
 let ``Pong size fits stream ``() =
     let pong:Pong = {
         nonce = 123ul;
@@ -146,7 +146,7 @@ let ``Pong size fits stream ``() =
 
     messageSize |> should equal offset
 
-[<Fact>]
+[<Test>]
 let ``send and recv Transaction``() =
     let msg = Transaction {
         tx = "Captcha Diem"B;
@@ -164,7 +164,7 @@ let ``send and recv Transaction``() =
 
     msg' |> should equal (Some msg)
 
-[<Fact>]
+[<Test>]
 let ``Transaction size fits stream ``() =
     let transaction:Transaction = {
         tx = "Captcha Diem"B;
@@ -180,7 +180,7 @@ let ``Transaction size fits stream ``() =
 
     messageSize |> should equal offset
 
-[<Fact>]
+[<Test>]
 let ``send and recv UnknownPeer``() =
     let msg = UnknownPeer {
         dummy = 123uy;
@@ -198,7 +198,7 @@ let ``send and recv UnknownPeer``() =
 
     msg' |> should equal (Some msg)
 
-[<Fact>]
+[<Test>]
 let ``UnknownPeer size fits stream ``() =
     let unknownpeer:UnknownPeer = {
         dummy = 123uy;
@@ -214,7 +214,7 @@ let ``UnknownPeer size fits stream ``() =
 
     messageSize |> should equal offset
 
-[<Fact>]
+[<Test>]
 let ``send and recv UnknownMessage``() =
     let msg = UnknownMessage {
         messageId = 123uy;
@@ -232,7 +232,7 @@ let ``send and recv UnknownMessage``() =
 
     msg' |> should equal (Some msg)
 
-[<Fact>]
+[<Test>]
 let ``UnknownMessage size fits stream ``() =
     let unknownmessage:UnknownMessage = {
         messageId = 123uy;
@@ -248,7 +248,7 @@ let ``UnknownMessage size fits stream ``() =
 
     messageSize |> should equal offset
 
-[<Fact>]
+[<Test>]
 let ``malformed message return None``() =
     use server = Socket.dealer ()
     Socket.bind server "inproc://NetworkMessage.test"

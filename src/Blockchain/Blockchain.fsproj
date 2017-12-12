@@ -46,11 +46,7 @@
     <Compile Include="Handler.fs" />
     <Compile Include="main.fs" />
     <None Include="Script.fsx" />
-  </ItemGroup>
-  <ItemGroup>
     <Content Include="paket.references" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\Consensus\Consensus.fsproj">
       <Project>{5ec4457b-615a-4bbd-b3d5-d0e311b9d5e9}</Project>
       <Name>Consensus</Name>

@@ -1,7 +1,7 @@
-module Infrastructure.EventBus.Tests
+﻿module Infrastructure.EventBus.Tests
 
-open Xunit
-open FsUnit.Xunit
+open NUnit.Framework
+open FsUnit
 open FsNetMQ
 open Infrastructure
 
@@ -11,7 +11,7 @@ type Messages =
     | Hello
     | World of string
 
-[<Fact>]
+[<Test>]
 let ``send and recv message`` () =                  
     use brokerActor = Actor.create (fun shim ->
         use poller = Poller.create ()

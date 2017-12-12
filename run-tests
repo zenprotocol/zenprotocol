@@ -1,0 +1,6 @@
+#!/bin/bash
+
+mono packages/NUnit.ConsoleRunner/tools/nunit3-console.exe src/Consensus.Tests/bin/Debug/Consensus.Tests.dll
+mono packages/NUnit.ConsoleRunner/tools/nunit3-console.exe src/Infrastructure.Tests/bin/Debug/Infrastructure.Tests.dll
+mono packages/NUnit.ConsoleRunner/tools/nunit3-console.exe src/Network.Tests/bin/Debug/Network.Tests.dll
+mono packages/NUnit.ConsoleRunner/tools/nunit3-console.exe src/Wallet.Tests/bin/Debug/Wallet.Tests.dll

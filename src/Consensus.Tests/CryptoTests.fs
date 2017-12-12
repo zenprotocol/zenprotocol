@@ -1,11 +1,11 @@
 module Consensus.Tests.CryptoTests
 
-open Xunit
-open FsUnit.Xunit
+open NUnit.Framework
+open FsUnit
 open Consensus.Crypto
 open Consensus.Hash
 
-[<Fact>]
+[<Test>]
 let ``sign and verify``() = 
     let secretKey, publicKey = KeyPair.create()
     
@@ -20,7 +20,7 @@ let ``sign and verify``() =
     
     result |> should equal VerifyResult.Valid
     
-[<Fact>]
+[<Test>]
 let ``serialize and deserialize publickey``() = 
     let _, publicKey = KeyPair.create ()
     
@@ -30,7 +30,7 @@ let ``serialize and deserialize publickey``() =
     
     publicKey' |> should equal (Some publicKey)
 
-[<Fact>]
+[<Test>]
 let ``serialize and deserialize signature``() =
     let secretKey, publicKey = KeyPair.create()
             
