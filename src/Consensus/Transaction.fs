@@ -14,6 +14,7 @@ type SerializationMode =
 
 type ValitationError =
     | Orphan of Transaction
+    | DoubleSpend of Transaction
     | General of string
 
 let private addSpend s m =
@@ -34,9 +35,9 @@ let private foldSpends =
 let private checkSpends m = 
     Map.exists (fun _ v -> Option.isNone v) m |> not
 
-let private checkInputsOverflow (tx, outputs) =
-    let outputs' = foldSpends tx.outputs
-    match checkSpends outputs' && outputs' = foldSpends outputs with
+let private checkAmounts (tx, inputs) =
+    let (==) a b = foldSpends a = foldSpends b
+    match tx.outputs == inputs with
         | true -> Ok tx
         | false -> General "invalid amounts" |> Error
 
@@ -73,7 +74,10 @@ let private checkOrphan set tx =
     | Some utxos -> 
         Ok (tx, utxos)
     | None -> 
-        Orphan tx |> Error
+        Error <| 
+            match UtxoSet.isSomeSpent tx.inputs set with
+                | true -> DoubleSpend tx
+                | false -> Orphan tx         
 
 let validateBasic = 
     let (>=>) f1 f2 x = Result.bind f2 (f1 x)
@@ -88,7 +92,7 @@ let validateInputs set =
     let (>=>) f1 f2 x = Result.bind f2 (f1 x)
 
     checkOrphan set >=> 
-    checkInputsOverflow 
+    checkAmounts
 
 let serialize mode tx =
     let tx = 
