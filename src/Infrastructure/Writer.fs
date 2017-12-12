@@ -19,4 +19,5 @@ let ret x =
 type WriterBuilder<'effect>() = 
     member this.Bind<'a,'b> ((mx:Writer<'effect,'a>), (f:'a-> Writer<'effect, 'b>)) = 
         bind mx f
-    member this.Return<'a> (x) : Writer<'effect, 'a> = ret x   
+    member this.Return<'a> (x) : Writer<'effect, 'a> = ret x
+    member this.ReturnFrom<'a> (mx: Writer<'effect, 'a>) = mx

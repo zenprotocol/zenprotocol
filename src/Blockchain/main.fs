@@ -7,7 +7,7 @@ open Messaging.Services.Blockchain
 open Messaging.Events
 open Consensus
 
-type State = UtxoSet.T * MemPool.T
+type State = UtxoSet.T * MemPool.T * OrphanPool.T
 
 let commandHandler publisher command (utxoSet, mempool) = 
     match command with
@@ -58,13 +58,16 @@ let main busName =
         let mempool = 
             MemPool.create ()
             |> MemPool.add ChainParameters.rootTxHash ChainParameters.rootTx            
+                   
+        let orphanPool = 
+            OrphanPool.create ()                   
                      
         let observable =                      
             Observable.merge sbObservable ebObservable
             |> Observable.scan (fun state handler -> 
                 let effectWriter = handler state
                 EffectsWriter.run effectWriter publisher
-                ) (utxoSet,mempool)             
+                ) (utxoSet,mempool,orphanPool)             
     
         Disposables.empty, observable 
     )
