@@ -1,6 +1,6 @@
 FSharp.Core
-xunit
-FsUnit.xUnit
+NUnit
+FsUnit
 FsNetMQ
 FSharp.Control.Reactive
 System.Reactive.Linq

@@ -43,8 +43,7 @@
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Events.fs" />
     <Compile Include="Services.fs" />
-  </ItemGroup>
-  <ItemGroup>
+    <Content Include="paket.references" />
     <ProjectReference Include="..\Consensus\Consensus.fsproj">
       <Project>{5ec4457b-615a-4bbd-b3d5-d0e311b9d5e9}</Project>
       <Name>Consensus</Name>
@@ -53,9 +52,6 @@
       <Project>{81161f64-d019-422c-a3cf-321cde6ca209}</Project>
       <Name>Infrastructure</Name>
     </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="paket.references" />
   </ItemGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>

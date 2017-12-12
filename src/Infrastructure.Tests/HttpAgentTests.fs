@@ -1,8 +1,7 @@
-module Infrastructure.Tests.HttpAgentTests
+﻿module Infrastructure.Tests.HttpAgentTests
 
-open Xunit
-open Xunit.Abstractions
-open FsUnit.Xunit
+open NUnit.Framework
+open FsUnit
 open FsNetMQ
 open Infrastructure
 open Infrastructure.Http
@@ -48,7 +47,7 @@ let runServer _ =
         Poller.run poller        
     )
 
-[<Fact>]
+[<Test>]
 let ``sending get request``() =
     use agent = runServer ()
     
@@ -56,7 +55,7 @@ let ``sending get request``() =
     
     result |> should equal "get"
 
-[<Fact>]
+[<Test>]
 let ``post json body`` () = 
     use agent = runServer ()
 
@@ -68,7 +67,7 @@ let ``post json body`` () =
     
     result |> should equal "post"
 
-[<Fact>]
+[<Test>]
 let ``using unsupported content type``() =
     use agent = runServer ()
         
@@ -84,7 +83,7 @@ let ``using unsupported content type``() =
         (ex.Response :?> HttpWebResponse).StatusCode |> should equal StatusCode.UnsupportedMediaType
 
    
-[<Fact>]
+[<Test>]
 let ``json response``() = 
     use agent = runServer ()
        
@@ -92,7 +91,7 @@ let ``json response``() =
        
     result |> should equal """{"balance":100}"""
    
-[<Fact>]
+[<Test>]
 let ``mutliple requests``() =              
     use agent = runServer ()
     Http.RequestString "http://127.0.0.1:45123/hello/"  |> ignore        

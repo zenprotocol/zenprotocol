@@ -4,16 +4,16 @@ framework: 462
 
 nuget FSharp.Compiler.Tools
 nuget FSharp.Core
-nuget xunit
-nuget FsUnit.xUnit >= 3.1.0-beta2
-nuget FsCheck.Xunit
+nuget NUnit
+nuget NUnit.ConsoleRunner
+nuget FsUnit
+nuget FsCheck.NUnit >= 3.0.0-alpha2
 nuget Zen.FSharp.Compiler.Service
 nuget FAKE
 nuget FSharp.Compatibility.OCaml
 nuget libsodium-net
 nuget FsNetMQ >= 0.2.5.0
 nuget FsPickler
-nuget xunit.runner.console
 nuget FSharp.Control.Reactive
 nuget System.Reactive.Linq
 nuget BouncyCastle

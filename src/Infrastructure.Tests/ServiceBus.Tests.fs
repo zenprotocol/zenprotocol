@@ -1,7 +1,7 @@
-module Infrastructure.ServiceBus.Tests
+﻿module Infrastructure.ServiceBus.Tests
 
-open Xunit
-open FsUnit.Xunit
+open NUnit.Framework
+open FsUnit
 open FsNetMQ
 open Infrastructure.ServiceBus
 
@@ -63,7 +63,7 @@ let sendCommand delay service command =
                 
         Client.Command.send client service command)
                     
-[<Fact>]
+[<Test>]
 let ``send command while agent is up`` () =    
    
     use broker = createBroker ()    
@@ -84,7 +84,7 @@ let ``send command while agent is up`` () =
         
     Poller.run poller
     
-[<Fact>]
+[<Test>]
 let ``send command while agent still not up`` () =    
    
     use broker = createBroker ()    
@@ -107,7 +107,7 @@ let ``send command while agent still not up`` () =
         
     Poller.run poller      
     
-[<Fact>]
+[<Test>]
 let ``send request while agent is up`` () =    
    
     use broker = createBroker ()
@@ -120,7 +120,7 @@ let ``send request while agent is up`` () =
     
     response |> should equal (World)     
              
-[<Fact>]
+[<Test>]
 let ``send request while agent is still not up`` () =    
    
     use broker = createBroker ()
