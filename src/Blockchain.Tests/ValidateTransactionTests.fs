@@ -167,7 +167,7 @@ let ``orphan transaction is eventually invalid``() =
         let output' = {output with spend = {amount = output.spend.amount - 1UL; asset = output.spend.asset}}
         let outputs = output' :: List.tail tx.outputs
         let tx' = { tx with outputs = outputs}
-        Transaction.sign tx' account1.secretKey                              
+        Transaction.sign tx' [account1.keyPair]                              
     let tx2Hash = Transaction.hash tx2
     
     // Sending orphan transaction first, which should be added to orphan list

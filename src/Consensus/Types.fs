@@ -22,7 +22,7 @@ type Output = {
 }
 
 type Witness = 
-    PKWitness of Signature
+    PKWitness of PublicKey * Signature
 
 type Transaction = {
     inputs: Outpoint list;

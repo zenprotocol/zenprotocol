@@ -38,14 +38,16 @@ let ``Different transactions don't produce same hashing result``(tx1:Transaction
 [<Property>]
 let ``Transaction should be orphan``(tx:Transaction) (utxos:Map<Outpoint, Output>) =
     let utxos  = Map.map (fun _ value -> Unspent value) utxos
-    (tx.inputs |> List.distinct |> List.length > Map.count utxos) ==> (Transaction.validateInputs utxos tx = Error (ValidationError.Orphan tx))
+    let txHash = Transaction.hash tx
+    (tx.inputs |> List.distinct |> List.length > Map.count utxos) ==> (Transaction.validateInputs utxos txHash tx = Error (ValidationError.Orphan tx))
 
 [<Property>]
 let ``Transaction should not be orphan``(tx:Transaction) =
     let emptyHash = Hash [||]
     let outputs = List.map (fun _ -> Unspent { lock = PK emptyHash; spend = { asset = emptyHash; amount = 1UL }}) tx.inputs
     let utxos = Map.ofList (List.zip tx.inputs outputs) 
-    Transaction.validateInputs utxos tx <> Error (ValidationError.Orphan tx)
+    let txHash = Transaction.hash tx
+    Transaction.validateInputs utxos txHash tx <> Error (ValidationError.Orphan tx)
 
 [<Property>]
 let ``Transaction should be valid``(utxos:Map<Outpoint, Output>) =
@@ -54,7 +56,8 @@ let ``Transaction should be valid``(utxos:Map<Outpoint, Output>) =
     let snd = Map.toList >> List.map snd
     (utxos |> fst |> List.distinct |> List.length = Map.count utxos) ==>
     let tx = { inputs = fst utxos; outputs = snd utxos; witnesses = [] }
-    (Transaction.validateInputs utxos' tx = Ok tx)
+    let txHash = Transaction.hash tx
+    (Transaction.validateInputs utxos' txHash tx = Ok tx)
         
 [<Property>]
 let ``Transaction should have invalid amounts``(utxos:Map<Outpoint, Output>) =
@@ -65,7 +68,8 @@ let ``Transaction should have invalid amounts``(utxos:Map<Outpoint, Output>) =
     (utxos |> fst |> List.distinct |> List.length = Map.count utxos && Map.count utxos > 0) ==>
     let mutate output = { output with spend = {output.spend with amount = output.spend.amount - 1UL }}
     let tx = { inputs = fst utxos; outputs = (snd >> List.map mutate) utxos; witnesses = [] }
-    (Transaction.validateInputs utxos' tx = Error (ValidationError.General "invalid amounts"))
+    let txHash = Transaction.hash tx
+    (Transaction.validateInputs utxos' txHash tx = Error (ValidationError.General "invalid amounts"))
 
 [<Property>]
 let ``Transaction validation should fail with inputs empty error``(tx:Transaction) =
@@ -117,3 +121,42 @@ let ``Transaction validation should fail with inputs structurally invalid error`
         outputs = [ { lock = (PK Hash.zero); spend = {asset = Hash.zero; amount = 1UL } } ]
     }    
     Transaction.validateBasic tx |> should equal (Error (ValidationError.General "inputs structurally invalid") : Result<Transaction, ValidationError>)
+
+[<Test>]
+let ``Signed transaction should be valid``() =
+    let keyPair = Crypto.KeyPair.create()
+    let _, (Crypto.PublicKey publicKeyBytes) = keyPair
+    let outputLock = Types.Lock.PK (Hash.compute publicKeyBytes)
+    let input = { 
+        txHash = Hash (Array.create 32 0uy)
+        index = 0ul 
+    }
+    let output = { lock = outputLock; spend = {asset = Hash.zero; amount = 1UL } }
+    let tx = {  
+        inputs = [ input ]
+        witnesses = [];
+        outputs = [ output ]
+    }
+    let signedTx = Transaction.sign tx [keyPair]
+    let utxos = Map.ofSeq [ input, Unspent output ]
+    let txHash = Transaction.hash tx
+    Transaction.validateInputs utxos txHash signedTx |> should equal (Ok signedTx : Result<Transaction, ValidationError>)
+
+[<Test>]
+let ``Signed transaction validation result should be invalid witness``() =
+    let keyPair = Crypto.KeyPair.create()
+    let outputLock = Types.Lock.PK (Hash.zero) // an invalid address
+    let input = { 
+        txHash = Hash (Array.create 32 0uy)
+        index = 0ul 
+    }
+    let output = { lock = outputLock; spend = {asset = Hash.zero; amount = 1UL } }
+    let tx = {  
+        inputs = [ input ]
+        witnesses = [];
+        outputs = [ output ]
+    }
+    let signedTx = Transaction.sign tx [keyPair]
+    let utxos = Map.ofSeq [ input, Unspent output ]
+    let txHash = Transaction.hash tx
+    Transaction.validateInputs utxos txHash signedTx |> should equal (Error (ValidationError.General "invalid witness") : Result<Transaction, ValidationError>)

@@ -158,8 +158,10 @@ module PublicKey =
             match Native.secp256k1_ec_pubkey_parse(context, publicKey, bytes, 33ul) with
             | Native.Result.Ok -> Some (PublicKey publicKey)
             | _ -> None                            
-                     
-    let hash = serialize >> Hash.compute        
+
+    //TODO: let hash = serialize >> Hash.compute                                  
+    let bytes (PublicKey bytes) = bytes
+    let hash = bytes >> Hash.compute  
                      
 module Signature =        
     let serialize (Signature signature) =
@@ -175,7 +177,12 @@ module Signature =
         | Native.Result.Ok -> Some (Signature signature)
         | _ -> None                   
     
-module KeyPair =             
+module KeyPair =        
+    let fromSecretKey secretKey = 
+        match  SecretKey.getPublicKey secretKey with
+        | Some publicKey -> secretKey,publicKey 
+        | None -> failwith "invalid publickey"           
+         
     let rec create () : KeyPair =    
         let secretKey = Array.create SecretKeyLength 0uy   
         rng.GetBytes (secretKey)
