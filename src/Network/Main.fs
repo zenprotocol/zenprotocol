@@ -23,9 +23,13 @@ let eventHandler event (peersManager:State) =
 let networkHandler client msg (state:State) = 
     match msg with 
     | Message.Transaction msg ->
-        let tx = Transaction.deserialize msg.tx
-        Services.Blockchain.validateTransaction client tx
-        state
+        match Transaction.deserialize msg.tx with
+        | Some tx ->
+            Services.Blockchain.validateTransaction client tx
+            state
+        | None ->
+            //TODO: log non-deserializable transaction
+            state
     | _ -> 
         // TODO: log unknown message
         state

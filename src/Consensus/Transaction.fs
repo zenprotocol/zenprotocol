@@ -123,9 +123,10 @@ let serialize mode tx =
 
     Binary.pickle pickler tx
 
-let deserialize =
-    // TODO: should return an option
-    Binary.unpickle pickler 
+let deserialize tx =
+    try
+        Some (Binary.unpickle pickler tx) with
+    | _ -> None
 
 let hash =
     serialize WithoutWitness >> Hash.compute

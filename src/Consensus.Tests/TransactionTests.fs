@@ -20,7 +20,7 @@ type ValidationError = Transaction.ValidationError
 let ``Transaction serialization round trip produces same result``(mode:Transaction.SerializationMode) (tx:Transaction) =
     tx
     |> Transaction.serialize mode
-    |> Transaction.deserialize = txInMode mode tx
+    |> Transaction.deserialize = Some (txInMode mode tx)
 
 [<Property>]
 let ``Different transactions don't produce same serialization result``(mode:Transaction.SerializationMode) (tx1:Transaction) (tx2:Transaction) =
