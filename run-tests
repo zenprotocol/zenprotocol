@@ -2,8 +2,8 @@
 
 set -u
 
-mono packages/NUnit.ConsoleRunner/tools/nunit3-console.exe --labels=Before src/Consensus.Tests/bin/Debug/Consensus.Tests.dll
-mono packages/NUnit.ConsoleRunner/tools/nunit3-console.exe --labels=Before src/Infrastructure.Tests/bin/Debug/Infrastructure.Tests.dll
-mono packages/NUnit.ConsoleRunner/tools/nunit3-console.exe --labels=Before src/Network.Tests/bin/Debug/Network.Tests.dll
-mono packages/NUnit.ConsoleRunner/tools/nunit3-console.exe --labels=Before src/Wallet.Tests/bin/Debug/Wallet.Tests.dll
-mono packages/NUnit.ConsoleRunner/tools/nunit3-console.exe --labels=Before src/Blockchain.Tests/bin/Debug/Blockchain.Tests.dll
+mono packages/NUnit.ConsoleRunner/tools/nunit3-console.exe --labels=Before --stoponerror src/Consensus.Tests/bin/Debug/Consensus.Tests.dll
+mono packages/NUnit.ConsoleRunner/tools/nunit3-console.exe --labels=Before --stoponerror --workers=1 src/Infrastructure.Tests/bin/Debug/Infrastructure.Tests.dll
+mono packages/NUnit.ConsoleRunner/tools/nunit3-console.exe --labels=Before --stoponerror --workers=1 src/Network.Tests/bin/Debug/Network.Tests.dll
+mono packages/NUnit.ConsoleRunner/tools/nunit3-console.exe --labels=Before --stoponerror src/Wallet.Tests/bin/Debug/Wallet.Tests.dll
+mono packages/NUnit.ConsoleRunner/tools/nunit3-console.exe --labels=Before --stoponerror src/Blockchain.Tests/bin/Debug/Blockchain.Tests.dll
