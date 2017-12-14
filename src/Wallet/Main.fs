@@ -33,8 +33,17 @@ let requestHandler chain (requestId:ServiceBus.Agent.RequestId) request wallet =
             requestId.reply (Error tx)
         
         wallet
+    | CreateContractActivationTransaction (code) ->
+        match Account.createContractActivationTransaction wallet code with
+        | Ok tx -> 
+            requestId.reply (Created tx)
             
-    | _ -> wallet
+        | Result.Error tx -> 
+            requestId.reply (Error tx)
+        
+        wallet
+    | _ ->
+        wallet
 
 let main busName chain root =
     Actor.create<Command,Request,Event, Account.T> busName serviceName (fun poller sbObservable ebObservable ->                       

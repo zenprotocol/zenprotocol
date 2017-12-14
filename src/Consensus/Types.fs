@@ -25,7 +25,8 @@ type Witness =
     PKWitness of array<byte> * Signature
 
 type Transaction = {
-    inputs: Outpoint list;
-    outputs: Output list;
+    inputs: Outpoint list
+    outputs: Output list
     witnesses: Witness list
+    contract: string Option
 }

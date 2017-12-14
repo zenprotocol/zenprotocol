@@ -49,8 +49,9 @@ let ``Transaction should be orphan``() =
     let output = { lock = Types.Lock.PK (Hash.zero); spend = {asset = Hash.zero; amount = 1UL } }
     let tx = {  
         inputs = [ input; orphanInput ]
-        witnesses = [];
+        witnesses = []
         outputs = [ output ]
+        contract = None
     }
     let utxos = Map.ofSeq [ input, Unspent output ]
     let txHash = Transaction.hash tx
@@ -65,8 +66,9 @@ let ``Transaction basic validation should be Ok``() =
     let output = { lock = Types.Lock.PK (Hash.zero); spend = {asset = Hash.zero; amount = 1UL } }
     let tx = {  
         inputs = [ input ]
-        witnesses = [];
+        witnesses = []
         outputs = [ output ]
+        contract = None
     }
     Transaction.validateBasic tx |> should equal (Ok tx : Result<Transaction, ValidationError>)
         
@@ -77,7 +79,7 @@ let ``Transaction should have invalid amounts``(utxos:Map<Outpoint, Output>) =
     let snd = Map.toList >> List.map snd
     (utxos |> fst |> List.distinct |> List.length = Map.count utxos && Map.count utxos > 0) ==>
     let mutate output = { output with spend = {output.spend with amount = output.spend.amount - 1UL }}
-    let tx = { inputs = fst utxos; outputs = (snd >> List.map mutate) utxos; witnesses = [] }
+    let tx = { inputs = fst utxos; outputs = (snd >> List.map mutate) utxos; witnesses = []; contract = None }
     let txHash = Transaction.hash tx
     (Transaction.validateInputs utxos' txHash tx = Error (ValidationError.General "invalid amounts"))
 
@@ -113,12 +115,13 @@ let ``Transaction validation should fail with outputs overflow error``() =
                 txHash = Hash.zero; 
                 index = 0ul 
             }];
-        witnesses = [];
+        witnesses = []
         outputs = 
             [
                 { lock = (PK Hash.zero); spend = {asset = Hash.zero; amount = System.UInt64.MaxValue } };
                 { lock = (PK Hash.zero); spend = {asset = Hash.zero; amount = 1UL } }
             ]
+        contract = None
     }    
     Transaction.validateBasic tx |> should equal (Error (ValidationError.General "outputs overflow") : Result<Transaction, ValidationError>)
 
@@ -129,9 +132,10 @@ let ``Transaction validation should fail with duplicate inputs error``() =
         index = 0ul 
     }
     let tx = {  
-        inputs = [ input; input ];
-        witnesses = [];
+        inputs = [ input; input ]
+        witnesses = []
         outputs = [ { lock = (PK Hash.zero); spend = {asset = Hash.zero; amount = 1UL } } ]
+        contract = None
     }    
     Transaction.validateBasic tx |> should equal (Error (ValidationError.General "inputs duplicated") : Result<Transaction, ValidationError>)
 
@@ -142,9 +146,10 @@ let ``Transaction validation should fail with inputs structurally invalid error`
             [{ 
                 txHash = Hash (Array.create 31 0uy); 
                 index = 0ul 
-            }];
-        witnesses = [];
+            }]
+        witnesses = []
         outputs = [ { lock = (PK Hash.zero); spend = {asset = Hash.zero; amount = 1UL } } ]
+        contract = None
     }    
     Transaction.validateBasic tx |> should equal (Error (ValidationError.General "inputs structurally invalid") : Result<Transaction, ValidationError>)
 
@@ -160,8 +165,9 @@ let ``Signed transaction should be valid``() =
     let output = { lock = outputLock; spend = {asset = Hash.zero; amount = 1UL } }
     let tx = {  
         inputs = [ input ]
-        witnesses = [];
+        witnesses = []
         outputs = [ output ]
+        contract = None
     }
     let signedTx = Transaction.sign tx [keyPair]
     let utxos = Map.ofSeq [ input, Unspent output ]
@@ -179,8 +185,9 @@ let ``Signed transaction validation result should be invalid witness``() =
     let output = { lock = outputLock; spend = {asset = Hash.zero; amount = 1UL } }
     let tx = {  
         inputs = [ input ]
-        witnesses = [];
+        witnesses = []
         outputs = [ output ]
+        contract = None
     }
     let signedTx = Transaction.sign tx [keyPair]
     let utxos = Map.ofSeq [ input, Unspent output ]

@@ -25,7 +25,7 @@ let ``received tokens``() =
     
     let output = {lock = PK account.publicKeyHash; spend={asset=Hash.zero;amount=10UL}}
     
-    let tx = {inputs=[];outputs=[output];witnesses=[]}
+    let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
     
     let account' = Account.handleTransaction (Transaction.hash tx) tx account 
     
@@ -39,10 +39,10 @@ let ``tokens spent``() =
         
     let output = {lock = PK account.publicKeyHash; spend={asset=Hash.zero;amount=10UL}}
     
-    let tx = {inputs=[];outputs=[output;output];witnesses=[]}
+    let tx = {inputs=[];outputs=[output;output];witnesses=[];contract=None}
     let txHash = (Transaction.hash tx)
     
-    let tx' = {inputs=[{txHash=txHash; index=0ul}];outputs=[];witnesses=[]}
+    let tx' = {inputs=[{txHash=txHash; index=0ul}];outputs=[];witnesses=[];contract=None}
     
     let account' = 
         Account.handleTransaction txHash tx account 
@@ -59,7 +59,7 @@ let ``creating, not enough tokens``() =
     
     let output = {lock = PK account.publicKeyHash; spend={asset=Hash.zero;amount=10UL}}
     
-    let tx = {inputs=[];outputs=[output];witnesses=[]}
+    let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
     
     let account' = Account.handleTransaction (Transaction.hash tx) tx account 
 
@@ -76,7 +76,7 @@ let ``creating, no change``() =
         
     // giving some money to bob
     let output = {lock = PK bob.publicKeyHash; spend={asset=Hash.zero;amount=10UL}}    
-    let tx = {inputs=[];outputs=[output];witnesses=[]}    
+    let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
     let bob' = Account.handleTransaction (Transaction.hash tx) tx bob
 
     // sending money to alice
@@ -98,7 +98,7 @@ let ``creating, with change``() =
         
     // giving some money to bob
     let output = {lock = PK bob.publicKeyHash; spend={asset=Hash.zero;amount=10UL}}    
-    let tx = {inputs=[];outputs=[output];witnesses=[]}    
+    let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
     let bob' = Account.handleTransaction (Transaction.hash tx) tx bob
 
     // sending money to alice
@@ -122,7 +122,7 @@ let ``picking the correct asset``() =
     let output = {lock = PK bob.publicKeyHash; spend={asset=anotherAsset;amount=10UL}}
     let output2 = {lock = PK bob.publicKeyHash; spend={asset=Hash.zero;amount=10UL}}    
         
-    let tx = {inputs=[];outputs=[output; output2];witnesses=[]}    
+    let tx = {inputs=[];outputs=[output; output2];witnesses=[];contract=None}
     let bob' = Account.handleTransaction (Transaction.hash tx) tx bob
     
     Map.count bob'.outpoints |> should equal 2
@@ -144,7 +144,6 @@ let ``picking the correct asset``() =
         
         alice' |> balanceShouldBe anotherAsset 0UL
         bob'' |> balanceShouldBe anotherAsset 10UL
-        
 
 [<Test>] 
 let ``picking from multiple inputs``() = 
@@ -155,7 +154,7 @@ let ``picking from multiple inputs``() =
     let output = {lock = PK bob.publicKeyHash; spend={asset=Hash.zero;amount=5UL}}
     let output2 = {lock = PK bob.publicKeyHash; spend={asset=Hash.zero;amount=7UL}}    
         
-    let tx = {inputs=[];outputs=[output; output2];witnesses=[]}    
+    let tx = {inputs=[];outputs=[output; output2];witnesses=[];contract=None}
     let bob' = Account.handleTransaction (Transaction.hash tx) tx bob    
 
     // sending money to alice
@@ -168,4 +167,4 @@ let ``picking from multiple inputs``() =
         let bob'' = Account.handleTransaction (Transaction.hash tx) tx bob'                        
                 
         alice' |> balanceShouldBe Hash.zero 10UL
-        bob'' |> balanceShouldBe Hash.zero 2UL         
+        bob'' |> balanceShouldBe Hash.zero 2UL
