@@ -12,7 +12,7 @@ type SerializationMode =
     | Full
     | WithoutWitness
 
-type ValitationError =
+type ValidationError =
     | Orphan of Transaction
     | DoubleSpend of Transaction
     | General of string
@@ -35,11 +35,48 @@ let private foldSpends =
 let private checkSpends m = 
     Map.exists (fun _ v -> Option.isNone v) m |> not
 
-let private checkAmounts (tx, inputs) =
+let private checkAmounts (txHash, tx, inputs) =
     let (==) a b = foldSpends a = foldSpends b
     match tx.outputs == inputs with
-        | true -> Ok tx
+        | true -> Ok (txHash, tx, inputs)
         | false -> General "invalid amounts" |> Error
+
+let checkWitnesses (Hash.Hash txHash, tx, inputs) =
+    let verify publicKey signature txHash = 
+        match Crypto.verify publicKey signature txHash with
+            | VerifyResult.Valid -> 
+                true
+            | VerifyResult.Invalid -> 
+                false
+
+    let verifyResult = 
+        match List.length tx.witnesses = List.length inputs with
+            | false ->
+                false
+            | true ->
+                List.zip tx.witnesses inputs 
+                |> List.fold (
+                    fun state (PKWitness (serializedPublicKey, signature), {lock=PK pkHash}) -> 
+                        match state with 
+                            | false -> 
+                                false
+                            | true -> 
+                                match PublicKey.deserialize serializedPublicKey with
+                                | None -> 
+                                    false
+                                | Some publicKey ->
+                                    match PublicKey.hashSerialized serializedPublicKey = pkHash with
+                                        | false -> 
+                                            false
+                                        | true -> 
+                                            verify publicKey signature txHash
+                ) true
+    
+    match verifyResult with 
+        | true ->
+            Ok tx
+        | false ->
+            General "invalid witness" |> Error
 
 let private checkInputsNotEmpty tx = 
     match List.isEmpty tx.inputs with
@@ -69,30 +106,31 @@ let private checkInputsStructure tx =
         | true -> General "inputs structurally invalid" |> Error
         | false -> Ok tx
 
-let private checkOrphan set tx =
+let private checkOrphan set txHash tx =
     match getUtxos tx.inputs set with
     | Some utxos -> 
-        Ok (tx, utxos)
+        Ok (txHash, tx, utxos)
     | None -> 
         Error <| 
             match UtxoSet.isSomeSpent tx.inputs set with
                 | true -> DoubleSpend tx
-                | false -> Orphan tx         
+                | false -> Orphan tx
 
 let validateBasic = 
     let (>=>) f1 f2 x = Result.bind f2 (f1 x)
 
-    checkInputsNotEmpty  >=> 
-    checkOutputsNotEmpty >=> 
-    checkOutputsOverflow >=> 
-    checkDuplicateInputs >=> 
-    checkInputsStructure
+    checkInputsNotEmpty
+    >=> checkOutputsNotEmpty
+    >=> checkOutputsOverflow
+    >=> checkDuplicateInputs
+    >=> checkInputsStructure
 
-let validateInputs set =
+let validateInputs set txHash =
     let (>=>) f1 f2 x = Result.bind f2 (f1 x)
 
-    checkOrphan set >=> 
-    checkAmounts
+    checkOrphan set txHash
+    >=> checkAmounts
+    >=> checkWitnesses
 
 let serialize mode tx =
     let tx = 
@@ -102,21 +140,20 @@ let serialize mode tx =
 
     Binary.pickle pickler tx
 
-let deserialize =
-    // TODO: should return an option
-    Binary.unpickle pickler 
+let deserialize tx =
+    try
+        Some (Binary.unpickle pickler tx) with
+    | _ -> None
 
 let hash =
     serialize WithoutWitness >> Hash.compute
         
-let sign tx secretKey =
+let sign tx keyPairs =
     let txHash = hash tx
 
-    let witnessInput _ = 
-        PKWitness (Crypto.sign secretKey txHash)
-         
-    // TODO: Should we also use sighash and not sign entire transaction?
-    let witnesses = List.foldBack (fun input witnesses -> 
-        (witnessInput input) :: witnesses) tx.inputs []         
-        
-    {tx with witnesses = witnesses}
+    //// TODO: Should we also use sighash and not sign entire transaction?
+    { tx with 
+        witnesses = 
+            List.map ( 
+                fun ((secretKey, publicKey)) -> PKWitness (PublicKey.serialize publicKey, Crypto.sign secretKey txHash)
+            ) keyPairs }

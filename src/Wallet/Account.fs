@@ -6,8 +6,8 @@ open Consensus.Crypto
 open Consensus.Types
 
 type T = {
-    outpoints: Map<Outpoint, Spend>;
-    secretKey: SecretKey
+    outpoints: Map<Outpoint, Output>
+    keyPair: KeyPair
     publicKeyHash: Hash
 }
 
@@ -19,9 +19,9 @@ let create () =
     let secretKey, publicKey = KeyPair.create ()
 
     {
-        outpoints = Map.empty;
-        secretKey = secretKey;
-        publicKeyHash = PublicKey.hash publicKey;
+        outpoints = Map.empty
+        keyPair = (secretKey, publicKey)
+        publicKeyHash = PublicKey.hash publicKey
     }                   
         
 let handleTransaction txHash (tx:Transaction) account =
@@ -33,7 +33,7 @@ let handleTransaction txHash (tx:Transaction) account =
             | false -> outpoints
             | true -> 
                 let outpoint = {txHash=txHash;index=index;}
-                Map.add outpoint output.spend outpoints            
+                Map.add outpoint output outpoints            
         | _ -> outpoints
            
     let outpoints = List.fold (fun state o -> Map.remove o state) account.outpoints tx.inputs         
@@ -44,52 +44,48 @@ let handleTransaction txHash (tx:Transaction) account =
     {account with outpoints = outpoints'}
     
 let getBalance account =
-    let balance = Map.empty
-    
-    Map.fold (fun balance _ spend -> 
-     match Map.tryFind spend.asset balance with
-     | Some amount -> Map.add spend.asset (amount+spend.amount) balance
-     | None -> Map.add spend.asset spend.amount balance) Map.empty account.outpoints
+    Map.fold (fun balance _ output -> 
+        match Map.tryFind output.spend.asset balance with
+        | Some amount -> Map.add output.spend.asset (amount+output.spend.amount) balance
+        | None -> Map.add output.spend.asset output.spend.amount balance) Map.empty account.outpoints
      
 let getAddress account chain = 
     Address.getPublicKeyAddress account.publicKeyHash chain
      
 let createTransaction account address asset amount =
-    let collectInputs (inputs, collectedAmount) outpoint spend =
-        if amount > collectedAmount && asset = spend.asset then
-            (outpoint :: inputs, spend.amount + collectedAmount)
+    let collectInputs ((inputs, keys), collectedAmount) outpoint output =
+        if amount > collectedAmount && asset = output.spend.asset then
+            ((outpoint :: inputs, account.keyPair :: keys), output.spend.amount + collectedAmount)
         else 
-            (inputs, collectedAmount)  
+            ((inputs, keys), collectedAmount)  
                               
     // TODO: should the address be validated at a higher level + checking the HRP
     // match the chain
     match Address.getPublicKeyHash address with
     | None -> Error "Invalid address"
     | Some pkHash -> 
-        let inputs, collectedAmount = Map.fold collectInputs ([],0UL) account.outpoints
+        let (inputs, keys), collectedAmount = Map.fold collectInputs (([],[]),0UL) account.outpoints
         
         match collectedAmount >= amount with
         | false -> Error "Not enough tokens"
         | true ->
-            let output = {spend={asset=asset;amount=amount};lock=PK pkHash}
-                                              
-            //  checking if change is needed
-            let tx = 
+            let outputs = 
+                {spend={asset=asset;amount=amount};lock=PK pkHash} :: 
+                // checking if change is needed
                 match collectedAmount = amount with
-                | false ->
-                    let change = {spend={asset=asset;amount=(collectedAmount - amount)};lock=PK account.publicKeyHash}
-                    {inputs=inputs; outputs=[output;change]; witnesses=[]}
-                | true -> {inputs=inputs; outputs=[output]; witnesses=[]}
-                
-            Ok (Transaction.sign tx account.secretKey)
+                    | true ->
+                        []
+                    | false -> 
+                        [{spend={asset=asset;amount=(collectedAmount - amount)};lock=PK account.publicKeyHash}]
+            Ok (Transaction.sign {inputs=inputs; outputs=outputs; witnesses=[]} keys)
             
 
-let createRoot () =             
+let createRoot () =                
     let account = 
         {
-            outpoints = Map.empty;
-            secretKey = rootSecretKey;
-            publicKeyHash = ChainParameters.rootPKHash;
+            outpoints = Map.empty
+            keyPair = KeyPair.fromSecretKey rootSecretKey
+            publicKeyHash = ChainParameters.rootPKHash
         }
         
     handleTransaction ChainParameters.rootTxHash ChainParameters.rootTx account             

@@ -9,7 +9,7 @@ open Consensus.Transaction
 
 let validateOrphanTransaction (utxoSet, mempool, orphanPool) txHash tx  =                                 
     effectsWriter {            
-        match Transaction.validateInputs utxoSet tx with
+        match Transaction.validateInputs utxoSet txHash tx with
         | Ok tx ->
             let utxoSet = UtxoSet.handleTransaction txHash tx utxoSet
             let mempool = MemPool.add txHash tx mempool
@@ -43,17 +43,17 @@ let validateTransaction tx (utxoSet, mempool, orphanPool) =
                 
                 return (utxoSet,mempool, orphanPool)
             | Ok tx ->
-                match Transaction.validateInputs utxoSet tx with
-                | Error (General error) ->
-                    Log.info "Transacation %s failed inputs validation: %s" (Hash.toString txHash) error
-                            
-                    return (utxoSet,mempool, orphanPool)
+                match Transaction.validateInputs utxoSet txHash tx with   
                 | Error (Orphan tx) ->                                                                                                         
                     let orphanPool = OrphanPool.add txHash tx orphanPool
                     
                     Log.info "Transaction %s is orphan, adding to orphan pool" (Hash.toString txHash)                                                
                                         
-                    return (utxoSet,mempool, orphanPool)                                
+                    return (utxoSet,mempool, orphanPool)               
+                | Error error ->
+                     Log.info "Transacation %s failed inputs validation: %A" (Hash.toString txHash) error
+                             
+                     return (utxoSet,mempool, orphanPool)                 
                 | Ok tx ->                                                                        
                     let utxoSet = UtxoSet.handleTransaction txHash tx utxoSet
                     let mempool = MemPool.add txHash tx mempool
