@@ -85,6 +85,22 @@ let ``Transaction should have invalid amounts``(utxos:Map<Outpoint, Output>) =
 let ``Transaction validation should fail with inputs empty error``(tx:Transaction) =
     Transaction.validateBasic {tx with inputs = List.empty} = Error (ValidationError.General "inputs empty")
 
+[<Test>]
+let ``Transaction validation should fail with outputs invalid error``() =
+    let tx = {  
+        inputs = 
+            [{ 
+                txHash = Hash.zero; 
+                index = 0ul 
+            }];
+        witnesses = [];
+        outputs = 
+            [
+                { lock = (PK Hash.zero); spend = {asset = Hash.zero; amount = 0UL } }
+            ]
+    }    
+    Transaction.validateBasic tx |> should equal (Error (ValidationError.General "outputs invalid") : Result<Transaction, ValidationError>)
+
 [<Property>]
 let ``Transaction validation should fail with outputs empty error``(tx:Transaction) =
     (tx.inputs.Length <> 0) ==> (Transaction.validateBasic {tx with outputs = List.empty} = Error (ValidationError.General "outputs empty"))
