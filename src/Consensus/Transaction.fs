@@ -42,23 +42,40 @@ let private checkAmounts (txHash, tx, inputs) =
         | false -> General "invalid amounts" |> Error
 
 let checkWitnesses (Hash.Hash txHash, tx, inputs) =
+    let verify publicKey signature txHash = 
+        match Crypto.verify publicKey signature txHash with
+            | VerifyResult.Valid -> 
+                true
+            | VerifyResult.Invalid -> 
+                false
+
     let verifyResult = 
-        List.zip tx.witnesses inputs 
-        |> List.fold (
-            fun state (PKWitness (publicKey, signature), {lock=PK pkHash}) -> 
-                match state with 
-                    | VerifyResult.Invalid -> VerifyResult.Invalid                         
-                    | VerifyResult.Valid -> 
-                        match PublicKey.hash publicKey = pkHash with
+        match List.length tx.witnesses = List.length inputs with
+            | false ->
+                false
+            | true ->
+                List.zip tx.witnesses inputs 
+                |> List.fold (
+                    fun state (PKWitness (serializedPublicKey, signature), {lock=PK pkHash}) -> 
+                        match state with 
                             | false -> 
-                                VerifyResult.Invalid
+                                false
                             | true -> 
-                                Crypto.verify publicKey signature txHash
-        ) VerifyResult.Valid
+                                match PublicKey.deserialize serializedPublicKey with
+                                | None -> 
+                                    false
+                                | Some publicKey ->
+                                    match PublicKey.hashSerialized serializedPublicKey = pkHash with
+                                        | false -> 
+                                            false
+                                        | true -> 
+                                            verify publicKey signature txHash
+                ) true
+    
     match verifyResult with 
-        | VerifyResult.Valid ->
+        | true ->
             Ok tx
-        | VerifyResult.Invalid ->
+        | false ->
             General "invalid witness" |> Error
 
 let private checkInputsNotEmpty tx = 
@@ -138,5 +155,5 @@ let sign tx keyPairs =
     { tx with 
         witnesses = 
             List.map ( 
-                fun ((secretKey, publicKey)) -> PKWitness (publicKey, Crypto.sign secretKey txHash)
+                fun ((secretKey, publicKey)) -> PKWitness (PublicKey.serialize publicKey, Crypto.sign secretKey txHash)
             ) keyPairs }

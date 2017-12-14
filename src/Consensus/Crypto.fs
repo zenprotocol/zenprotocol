@@ -159,9 +159,9 @@ module PublicKey =
             | Native.Result.Ok -> Some (PublicKey publicKey)
             | _ -> None                            
 
-    //TODO: let hash = serialize >> Hash.compute                                  
-    let bytes (PublicKey bytes) = bytes
-    let hash = bytes >> Hash.compute  
+    let hash = serialize >> Hash.compute
+
+    let hashSerialized = Hash.compute                        
                      
 module Signature =        
     let serialize (Signature signature) =

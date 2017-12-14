@@ -22,7 +22,7 @@ type Output = {
 }
 
 type Witness = 
-    PKWitness of PublicKey * Signature
+    PKWitness of array<byte> * Signature
 
 type Transaction = {
     inputs: Outpoint list;
