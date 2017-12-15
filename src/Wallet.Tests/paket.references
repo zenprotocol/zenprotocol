@@ -3,4 +3,5 @@ NUnit
 FsUnit
 FsCheck.NUnit
 zen_secp256k1_linux
+zen_secp256k1_osx
 FSharp.Compiler.Tools
