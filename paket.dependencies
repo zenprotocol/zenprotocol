@@ -25,3 +25,4 @@ nuget zen_z3_linux 4.5.1.6-v1f29cebd4df6
 nuget zen_secp256k1_osx 0.1.0.25-v6ad5cdb42a1a
 nuget zen_z3_osx 4.5.1.7-v1f29cebd4df6
 nuget FsBech32 >= 0.1.0.7
+nuget ZFStar
