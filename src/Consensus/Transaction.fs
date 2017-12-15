@@ -49,7 +49,7 @@ let checkWitnesses (Hash.Hash txHash, tx, inputs) =
             | VerifyResult.Invalid -> 
                 false
 
-    let verifyResult = 
+    let isValid = 
         match List.length tx.witnesses = List.length inputs with
             | false ->
                 false
@@ -72,7 +72,7 @@ let checkWitnesses (Hash.Hash txHash, tx, inputs) =
                                             verify publicKey signature txHash
                 ) true
     
-    match verifyResult with 
+    match isValid with 
         | true ->
             Ok tx
         | false ->
@@ -86,7 +86,10 @@ let private checkInputsNotEmpty tx =
 let private checkOutputsNotEmpty tx =
     match List.isEmpty tx.outputs with
         | true -> General "outputs empty" |> Error
-        | false -> Ok tx
+        | false -> 
+            match List.exists (fun output -> output.spend.amount = 0UL) tx.outputs with
+                | true -> General "outputs invalid" |> Error
+                | false -> Ok tx
 
 let private checkOutputsOverflow tx =
     match tx.outputs 
