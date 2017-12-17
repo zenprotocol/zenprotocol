@@ -79,6 +79,9 @@ let add(#_) a b = a + b
 val add_mod(#n:nat): uint_t n -> uint_t n -> uint_t n
 let add_mod #n a b = (a + b) % (pow2 n)
 
+val checked_add(#n:nat): uint_t n -> uint_t n -> option (uint_t n)
+let checked_add #n a b = if fits (a + b) n then Some (a + b) else None
+
 (* Subtraction primitives *)
 val sub(#n:nat): a:uint_t n -> b:uint_t n -> Pure (uint_t n)
   (requires (size (a - b) n))
@@ -88,6 +91,9 @@ let sub(#_) a b = a - b
 val sub_mod(#n:nat): a:uint_t n -> b:uint_t n -> uint_t n
 let sub_mod #n a b = (a - b) % (pow2 n)
 
+val checked_sub(#n:nat): uint_t n -> uint_t n -> option (uint_t n)
+let checked_sub #n a b = if fits (a - b) n then Some (a - b) else None
+
 (* Multiplication primitives *)
 val mul(#n:nat): a:uint_t n -> b:uint_t n -> Pure (uint_t n)
   (requires (size (a * b) n))
@@ -96,9 +102,12 @@ let mul(#_) a b = a * b
 
 val mul_mod(#n:nat): a:uint_t n -> b:uint_t n -> uint_t n
 let mul_mod #n a b = (a * b) % (pow2 n)
+
+val checked_mul(#n:nat): uint_t n -> uint_t n -> option (uint_t n)
+let checked_mul #n a b = if fits (a * b) n then Some (a * b) else None
+
 (*
-val mul_div(#n:nat): a:uint_t n -> b:uint_t n -> Tot (uint_t n)
-#reset-options "--max_fuel 0 --max_ifuel 0 --z3rlimit 20"
+val mul_div(#n:nat): uint_t n -> uint_t n -> uint_t n
 let mul_div #n a b =
   FStar.Math.Lemmas.lemma_mult_lt_sqr a b (pow2 n);
   (a * b) / (pow2 n)
@@ -109,6 +118,12 @@ val div(#n:nat): a:uint_t n -> b:uint_t n{b <> 0} -> Pure (uint_t n)
   (requires (size (a / b) n))
   (ensures (fun c -> b <> 0 ==> a / b = c))
 let div(#_) a b = a / b
+
+val checked_div(#n:nat): a:uint_t n -> b:uint_t n -> option (uint_t n)
+let checked_div(#n) a b =
+  if b = 0 then None else
+  if fits (a / b) n then Some (a / b) else None
+
 (*
 val div_size: #n:pos -> a:uint_t n -> b:uint_t n{b <> 0} ->
   Lemma (requires (size a n)) (ensures (size (a / b) n))

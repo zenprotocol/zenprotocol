@@ -15,7 +15,8 @@ unfold let at #_ #_ arr i = elem i arr
 unfold val get(#a:Type)(#l:nat): array a l -> i:nat{i<l} -> cost a 1
 unfold let get = at
 
-unfold let op_Array_Access = at
+unfold val op_Array_Access (#a:Type)(#l:nat): array a l -> i:nat{i<l} -> cost a 1
+unfold let op_Array_Access #_ #_ arr i = arr `at` i
 
 (** create returns an array of length l in which each element is x. *)
 val create(#a:Type): l:nat -> x:a -> cost (array a l) (l+1)

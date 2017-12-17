@@ -5,9 +5,9 @@ open Prims
 include FStar.Pervasives.Native
 
 noeq type result (a:Type) =
-  | V   : v:a -> result a
-  | E   : e:exn -> result a
-  | Err : msg:string -> result a
+  | OK   : v:a -> result a
+  | EX   : e:exn -> result a
+  | ERR : msg:string -> result a
 
 (* An SMT-pattern to control unfolding inductives;
    In a proof, you can say `allow_inversion (option a)`
@@ -23,14 +23,12 @@ let allow_inversion (a:Type)
 val invertOption : a:Type -> Lemma
   (requires True)
   (ensures (forall (x:option a). None? x \/ Some? x))
-  [SMTPatT (option a)]
+  [SMTPat (option a)]
 let invertOption a = allow_inversion (option a)
 
 type either 'a 'b =
   | Inl : v:'a -> either 'a 'b
   | Inr : v:'b -> either 'a 'b
-
-
 
 val dfst : #a:Type -> #b:(a -> GTot Type) -> dtuple2 a b -> Tot a
 let dfst #a #b t = Mkdtuple2?._1 t
@@ -72,3 +70,7 @@ let rec false_elim (#a:Type) (u:unit{false}) : Tot a = false_elim ()
 type __internal_ocaml_attributes =
   | PpxDerivingShow
   | PpxDerivingShowConstant of string
+  | CInline
+  | Substitute
+  | Gc
+  | Comment of string

@@ -110,14 +110,14 @@ module Native =
 
 
 type 'Aa result =
-| V of 'Aa
-| E of Prims.exn
-| Err of Prims.string
+| OK of 'Aa
+| EX of Prims.exn
+| ERR of Prims.string
 
 
 
-let uu___is_V = (fun ( projectee  :  'Aa result ) -> (match (projectee) with
-| V (v) -> begin
+let uu___is_OK = (fun ( projectee  :  'Aa result ) -> (match (projectee) with
+| OK (v) -> begin
 true
 end
 | uu____552 -> begin
@@ -125,14 +125,14 @@ false
 end))
 
 
-let __proj__V__item__v = (fun ( projectee  :  'Aa result ) -> (match (projectee) with
-| V (v) -> begin
+let __proj__OK__item__v = (fun ( projectee  :  'Aa result ) -> (match (projectee) with
+| OK (v) -> begin
 v
 end))
 
 
-let uu___is_E = (fun ( projectee  :  'Aa result ) -> (match (projectee) with
-| E (e) -> begin
+let uu___is_EX = (fun ( projectee  :  'Aa result ) -> (match (projectee) with
+| EX (e) -> begin
 true
 end
 | uu____594 -> begin
@@ -140,14 +140,14 @@ false
 end))
 
 
-let __proj__E__item__e = (fun ( projectee  :  'Aa result ) -> (match (projectee) with
-| E (e) -> begin
+let __proj__EX__item__e = (fun ( projectee  :  'Aa result ) -> (match (projectee) with
+| EX (e) -> begin
 e
 end))
 
 
-let uu___is_Err = (fun ( projectee  :  'Aa result ) -> (match (projectee) with
-| Err (msg) -> begin
+let uu___is_ERR = (fun ( projectee  :  'Aa result ) -> (match (projectee) with
+| ERR (msg) -> begin
 true
 end
 | uu____636 -> begin
@@ -155,10 +155,61 @@ false
 end))
 
 
-let __proj__Err__item__msg = (fun ( projectee  :  'Aa result ) -> (match (projectee) with
-| Err (msg) -> begin
+let __proj__ERR__item__msg = (fun ( projectee  :  'Aa result ) -> (match (projectee) with
+| ERR (msg) -> begin
 msg
 end))
+
+type ex_pre =
+obj
+
+
+type 'Aa ex_post =
+'Aa result  ->  obj
+
+
+type 'Aa ex_wp =
+Prims.unit  ->  ex_pre
+
+
+type ('Aa, 'Ax, 'Ap) ex_return =
+'Ap
+
+
+type ('Ar1, 'Aa, 'Ab, 'Awp1, 'Awp2, 'Ap) ex_bind_wp =
+Prims.unit
+
+
+type ('Aa, 'Awp, 'Apost) ex_ite_wp =
+Prims.unit
+
+
+type ('Aa, 'Ap, 'Awp_then, 'Awp_else, 'Apost) ex_if_then_else =
+Prims.unit
+
+
+type ('Aa, 'Awp1, 'Awp2) ex_stronger =
+Prims.unit
+
+
+type ('Aa, 'Ab, 'Awp, 'Ap) ex_close_wp =
+Prims.unit
+
+
+type ('Aa, 'Aq, 'Awp, 'Ap) ex_assert_p =
+Prims.unit
+
+
+type ('Aa, 'Aq, 'Awp, 'Ap) ex_assume_p =
+Prims.unit
+
+
+type ('Aa, 'Ap) ex_null_wp =
+Prims.unit
+
+
+type ('Aa, 'Awp) ex_trivial =
+'Awp
 
 type 'Aa inversion = Prims.unit
 
@@ -269,6 +320,10 @@ let rec false_elim = (fun ( u  :  Prims.unit ) -> (false_elim ()))
 type __internal_ocaml_attributes =
 | PpxDerivingShow
 | PpxDerivingShowConstant of Prims.string
+| CInline
+| Substitute
+| Gc
+| Comment of Prims.string
 
 
 let uu___is_PpxDerivingShow : __internal_ocaml_attributes  ->  Prims.bool = (fun ( projectee  :  __internal_ocaml_attributes ) -> (match (projectee) with
