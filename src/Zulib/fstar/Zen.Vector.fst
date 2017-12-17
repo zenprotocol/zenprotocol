@@ -21,7 +21,7 @@ let isEmpty #_ #_ = function | VNil      -> 3 +~! true
 val hd(#a:Type)(#l:nat): v:vector a l{VCons? v} -> cost a 2
 let hd #_ #_ (VCons hd _) = 2 +~! hd
 
-(** [tl v] returns the first element of [v].
+(** [tl v] returns the tail of [v].
     Requires [v] to be nonempty.*)
 val tl(#a:Type)(#l:nat): v:vector a l{VCons? v} -> cost (vector a (l-1)) 2
 let tl #_ #_ (VCons _ tl) = 2 +~! tl
@@ -34,20 +34,32 @@ let rec nth #_ #_ (VCons hd tl) = function
 
 (** [append v1 v2] appends the elements of [v2] to the end of [v1]. *)
 val append(#a:Type)(#l1 #l2:nat):
-  vector a l1 -> vector a l2 -> cost (vector a (l1+l2)) M.(4*(l1+1))
-let rec append #_ #_ #_ v1 v2 = match v1 with
-  | VNil -> 4 +~! v2
-  | VCons hd tl -> 4 +! (VCons hd <$> (append tl v2))
+  vector a l1 -> vector a l2 -> cost (vector a (l1+l2)) M.(4*l1+4)
+let rec append #a #l1 #l2 v1 v2 =
+  4 +! begin match v1 with
+       | VCons hd tl ->
+           VCons hd <$> append tl v2 <: cost (vector a (l1+l2)) M.(4*l1)
+       | VNil -> ret v2
+       end
 
-let (@@) = append
+unfold val (@@) (#a:Type)(#l1 #l2:nat):
+  vector a l1 -> vector a l2 -> cost (vector a (l1+l2)) M.(4*l1+4)
+unfold let (@@) #_ #_ #_ v1 v2 = append v1 v2
 
+(*
 (** [flatten v], where [v] is a vector of vectors of constant length,
     returns the vector of elements of vectors in [v], preserving their order. *)
 val flatten(#a:Type)(#l1 #l2:nat):
-  vector (vector a l1) l2 -> cost (vector a M.(l1*l2)) M.(4*(l1+1)*(l2+1))
-let rec flatten #_ #_ #_ = function
-  | VNil -> autoRet VNil
-  | VCons hd tl -> append hd =<< (flatten tl)
+  vector (vector a l2) l1 -> cost (vector a M.(l1*l2)) M.(4*l1*(l2+2)+4)
+let rec flatten #a #l1 #l2 v =
+  4 +!
+  begin match v with
+  | VCons hd tl ->
+    admit();
+    append hd =<< flatten tl
+  | VNil -> ret (VNil <: vector a M.(l1*l2))
+  end
+*)
 
 (** [init l f] returns a vector of length l, for which the [i]th element is [f i]. *)
 val init(#a:Type)(#n:nat): l:nat -> (i:nat{i<l} -> cost a n)
@@ -80,7 +92,6 @@ let countWhere #_ #_ #_ f =
   admit();
   foldl ctr 0
 
-
 val zip(#a #b:Type)(#l:nat):
   vector a l -> vector b l -> cost (vector (a*b) l) M.(3*l+3)
 let rec zip #_ #_ #_ v1 v2 =
@@ -88,30 +99,11 @@ let rec zip #_ #_ #_ v1 v2 =
                 | VCons hd1 tl1 ->
   match v2 with | VCons hd2 tl2 -> 3 +! (VCons (hd1,hd2) <$> (zip tl1 tl2))
 
-val sortedBy(#a:Type)(#l #n:nat): (a -> cost int n) -> vector a l -> GTot Type0
-let rec sortedBy #_ #_ #_ f = function
-  | VNil | VCons _ VNil -> true
-  | VCons hd tl -> force (f hd) <= force (f (VCons?.hd tl)) /\ sortedBy f tl
+val of2(#a:Type): a*a -> cost (vector a 2) 3
+let of2 #_ (x,y) = incRet 3 (VCons x (VCons y VNil))
 
-val uniqueBy(#a:Type)(#l #n:nat): (a -> cost int n) -> vector a l -> GTot Type0
-let rec uniqueBy #_ #_ #_ f = function
-  | VNil | VCons _ VNil -> true
-  | VCons hd tl -> force (f hd) < force (f (VCons?.hd tl))
-                /\ sortedBy f tl /\ uniqueBy f tl
-
-assume val mkUnique(#a:Type)(#l #n:nat):
-  f:(a->cost int n) -> v:vector a l{sortedBy f v}
-  -> cost (l':nat & v':vector a l'{uniqueBy f v'}) M.(l*n*12+6)
-
-
-val of_t(#a:Type): a -> cost (vector a 1) 2
-let of_t #_ x = incRet 2 (VCons x VNil)
-
-val of_t2(#a:Type): a*a -> cost (vector a 2) 3
-let of_t2 #_ (x,y) = incRet 3 (VCons x (VCons y VNil))
-
-val of_t3(#a:Type): a*a*a -> cost (vector a 3) 4
-let of_t3 #_ (x,y,z) = incRet 4 (VCons x (VCons y (VCons z VNil)))
+val of3(#a:Type): a*a*a -> cost (vector a 3) 4
+let of3 #_ (x,y,z) = incRet 4 (VCons x (VCons y (VCons z VNil)))
 (*)
 val vcons_length_pos(#a:Type)(#l:nat): v:(vector a l){VCons? v}
   -> Lemma (l >= 1 /\ l-1 >=0)

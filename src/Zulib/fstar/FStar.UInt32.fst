@@ -4,6 +4,7 @@ let n = 32
 
 open FStar.UInt
 open FStar.Mul
+open FStar.Option
 
 private type t' = | Mk: v:uint_t n -> t'
 type t = t'
@@ -23,6 +24,9 @@ val add_mod: a:t -> b:t -> Pure t
   (ensures (fun c -> (v a + v b) % pow2 n = v c))
 let add_mod a b = Mk (add_mod (v a) (v b))
 
+val checked_add: a:t -> b:t -> option t
+let checked_add a b = map Mk (checked_add (v a) (v b))
+
 (* Subtraction primitives *)
 val sub: a:t -> b:t -> Pure t
   (requires (size (v a - v b) n))
@@ -34,6 +38,9 @@ val sub_mod: a:t -> b:t -> Pure t
   (ensures (fun c -> (v a - v b) % pow2 n = v c))
 let sub_mod a b = Mk (sub_mod (v a) (v b))
 
+val checked_sub: a:t -> b:t -> option t
+let checked_sub a b = map Mk (checked_sub (v a) (v b))
+
 (* Multiplication primitives *)
 val mul: a:t -> b:t -> Pure t
   (requires (size (v a * v b) n))
@@ -44,6 +51,9 @@ val mul_mod: a:t -> b:t -> Pure t
   (requires True)
   (ensures (fun c -> (v a * v b) % pow2 n = v c))
 let mul_mod a b = Mk (mul_mod (v a) (v b))
+
+val checked_mul: a:t -> b:t -> option t
+let checked_mul a b = map Mk (checked_mul (v a) (v b))
 
 (*
 val mul_div: a:t -> b:t -> Pure t
@@ -57,6 +67,9 @@ val div: a:t -> b:t{v b <> 0} -> Pure t
   (requires (True))
   (ensures (fun c -> v b <> 0 ==> v a / v b = v c))
 let div a b = Mk (div (v a) (v b))
+
+val checked_div: a:t -> b:t -> option t
+let checked_div a b = map Mk (checked_div (v a) (v b))
 
 (* Modulo primitives *)
 val rem: a:t -> b:t{v b <> 0} -> Pure t
@@ -122,12 +135,16 @@ assume val gte_mask: a:t -> b:t -> Tot (c:t{(v a >= v b ==> v c = pow2 n - 1) /\
 (* Infix notations *)
 unfold let op_Plus_Hat = add
 unfold let op_Plus_Percent_Hat = add_mod
+unfold let (+?^) = checked_add
 unfold let op_Subtraction_Hat = sub
 unfold let op_Subtraction_Percent_Hat = sub_mod
+unfold let (-?^) = checked_sub
 unfold let op_Star_Hat = mul
 unfold let op_Star_Percent_Hat = mul_mod
+unfold let ( *?^) = checked_mul
 //unfold let op_Star_Slash_Hat = mul_div
 unfold let op_Slash_Hat = div
+unfold let (/?^) = checked_div
 unfold let op_Percent_Hat = rem
 //unfold let op_Hat_Hat = logxor
 //unfold let op_Amp_Hat = logand
