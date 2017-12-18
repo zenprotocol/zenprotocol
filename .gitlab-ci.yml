@@ -2,7 +2,7 @@ image: mono:5.4
 
 before_script:
  - apt-get update
- - apt-get install -y -qq libsodium-dev fsharp
+ - apt-get install -y -qq fsharp libgomp1
 
 build:
  stage: build
