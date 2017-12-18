@@ -5,3 +5,4 @@ System.Reactive.Linq
 FSharp.Core
 FSharp.Data
 FSharp.Compiler.Tools
+Zen.FSharp.Compiler.Service

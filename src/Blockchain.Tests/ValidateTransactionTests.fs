@@ -59,7 +59,7 @@ let ``valid transaction raise events and update state``() =
 
 [<Test>]
 let ``Invalid tx doesn't raise events or update state``() = 
-    let invalidTx = {inputs=[];outputs=[];witnesses=[];}   
+    let invalidTx = {inputs=[];outputs=[];witnesses=[];contract=None}
                    
     let result = Handler.handleCommand (ValidateTransaction invalidTx) (utxoSet, mempool, OrphanPool.create())
     

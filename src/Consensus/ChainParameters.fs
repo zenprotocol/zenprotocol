@@ -16,6 +16,7 @@ let rootTx=
         inputs=[];
         outputs=[{lock = PK rootPKHash; spend= {asset = Hash.zero;amount=100000000UL}}]; 
         witnesses=[]
+        contract=None
     }
     
 let rootTxHash = Transaction.hash rootTx

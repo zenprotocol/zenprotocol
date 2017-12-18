@@ -77,8 +77,13 @@ let createTransaction account address asset amount =
                         []
                     | false -> 
                         [{spend={asset=asset;amount=(collectedAmount - amount)};lock=PK account.publicKeyHash}]
-            Ok (Transaction.sign {inputs=inputs; outputs=outputs; witnesses=[]} keys)
+            Ok (Transaction.sign {inputs=inputs; outputs=outputs; witnesses=[]; contract = None} keys)
             
+let createContractActivationTransaction account code =
+    let input, output = Map.toSeq account.outpoints |> Seq.head
+    let output' = {output with lock=PK account.publicKeyHash}
+    printfn "%A" code
+    Ok (Transaction.sign {inputs=[ input ]; outputs=[ output' ]; witnesses=[]; contract = Some code} [ account.keyPair ])
 
 let createRoot () =                
     let account = 

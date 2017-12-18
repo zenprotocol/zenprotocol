@@ -12,16 +12,18 @@ open FsUnit
 [<Test>]
 let ``handling transaction add outputs to set``() = 
     let tx1 = {
-        inputs = [];
-        witnesses = [];
-        outputs = [{lock = (PK Hash.zero); spend = {asset=Hash.zero; amount=1UL}}]          
+        inputs = []
+        witnesses = []
+        outputs = [{lock = (PK Hash.zero); spend = {asset=Hash.zero; amount=1UL}}]
+        contract = None
     }    
     let tx1Hash = Transaction.hash tx1
     
     let tx2 = {
-        inputs= [{txHash = tx1Hash; index=0ul}];
-        witnesses = [];
-        outputs=[];
+        inputs= [{txHash = tx1Hash; index=0ul}]
+        witnesses = []
+        outputs=[]
+        contract = None
     }   
         
     let set = 
@@ -34,16 +36,18 @@ let ``handling transaction add outputs to set``() =
 [<Test>]
 let ``handling transaction mark inputs as spent``() = 
     let tx1 = {
-        inputs = [];
-        witnesses = [];
-        outputs = [{lock = (PK Hash.zero); spend = {asset=Hash.zero; amount=1UL}}]          
+        inputs = []
+        witnesses = []
+        outputs = [{lock = (PK Hash.zero); spend = {asset=Hash.zero; amount=1UL}}]
+        contract = None
     }    
     let tx1Hash = Transaction.hash tx1
     
     let tx2 = {
-        inputs= [{txHash = tx1Hash; index=0ul}];
-        witnesses = [];
-        outputs=[];
+        inputs= [{txHash = tx1Hash; index=0ul}]
+        witnesses = []
+        outputs=[]
+        contract = None
     }
     let tx2Hash = Transaction.hash tx2
         
