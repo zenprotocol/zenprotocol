@@ -100,6 +100,7 @@ let ``Transaction validation should fail with outputs invalid error``() =
             [
                 { lock = (PK Hash.zero); spend = {asset = Hash.zero; amount = 0UL } }
             ]
+        contract = None
     }    
     Transaction.validateBasic tx |> should equal (Error (ValidationError.General "outputs invalid") : Result<Transaction, ValidationError>)
 
