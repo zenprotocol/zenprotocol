@@ -11,7 +11,7 @@ nuget Zen.FSharp.Compiler.Service
 nuget FAKE
 nuget FSharp.Compatibility.OCaml
 nuget libsodium-net
-nuget FsNetMQ >= 0.2.5.0
+nuget FsNetMQ >= 0.2.7.0
 nuget FsPickler
 nuget FSharp.Control.Reactive
 nuget System.Reactive.Linq

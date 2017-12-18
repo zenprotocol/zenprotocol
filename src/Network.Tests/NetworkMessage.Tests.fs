@@ -1,4 +1,4 @@
-﻿module Network.Tests.MessageTests
+module Network.Tests.MessageTests
 
 open NUnit.Framework
 open FsUnit
@@ -80,9 +80,7 @@ let ``HelloAck size fits stream ``() =
 
 [<Test>]
 let ``send and recv Ping``() =
-    let msg = Ping {
-        nonce = 123ul;
-    }
+    let msg = Ping 123ul
 
     use server = Socket.dealer ()
     Socket.bind server "inproc://Ping.test"
@@ -98,9 +96,8 @@ let ``send and recv Ping``() =
 
 [<Test>]
 let ``Ping size fits stream ``() =
-    let ping:Ping = {
-        nonce = 123ul;
-    }
+    let ping:Ping =
+        123ul
 
     let messageSize = Ping.getMessageSize ping
 
@@ -114,9 +111,7 @@ let ``Ping size fits stream ``() =
 
 [<Test>]
 let ``send and recv Pong``() =
-    let msg = Pong {
-        nonce = 123ul;
-    }
+    let msg = Pong 123ul
 
     use server = Socket.dealer ()
     Socket.bind server "inproc://Pong.test"
@@ -132,9 +127,8 @@ let ``send and recv Pong``() =
 
 [<Test>]
 let ``Pong size fits stream ``() =
-    let pong:Pong = {
-        nonce = 123ul;
-    }
+    let pong:Pong =
+        123ul
 
     let messageSize = Pong.getMessageSize pong
 
@@ -148,9 +142,7 @@ let ``Pong size fits stream ``() =
 
 [<Test>]
 let ``send and recv Transaction``() =
-    let msg = Transaction {
-        tx = "Captcha Diem"B;
-    }
+    let msg = Transaction ("Captcha Diem"B)
 
     use server = Socket.dealer ()
     Socket.bind server "inproc://Transaction.test"
@@ -166,9 +158,8 @@ let ``send and recv Transaction``() =
 
 [<Test>]
 let ``Transaction size fits stream ``() =
-    let transaction:Transaction = {
-        tx = "Captcha Diem"B;
-    }
+    let transaction:Transaction =
+        "Captcha Diem"B
 
     let messageSize = Transaction.getMessageSize transaction
 
@@ -182,9 +173,7 @@ let ``Transaction size fits stream ``() =
 
 [<Test>]
 let ``send and recv UnknownPeer``() =
-    let msg = UnknownPeer {
-        dummy = 123uy;
-    }
+    let msg = UnknownPeer
 
     use server = Socket.dealer ()
     Socket.bind server "inproc://UnknownPeer.test"
@@ -198,27 +187,10 @@ let ``send and recv UnknownPeer``() =
 
     msg' |> should equal (Some msg)
 
-[<Test>]
-let ``UnknownPeer size fits stream ``() =
-    let unknownpeer:UnknownPeer = {
-        dummy = 123uy;
-    }
-
-    let messageSize = UnknownPeer.getMessageSize unknownpeer
-
-    let stream =
-        Stream.create messageSize
-        |> UnknownPeer.write unknownpeer
-
-    let offset = Stream.getOffset stream
-
-    messageSize |> should equal offset
 
 [<Test>]
 let ``send and recv UnknownMessage``() =
-    let msg = UnknownMessage {
-        messageId = 123uy;
-    }
+    let msg = UnknownMessage 123uy
 
     use server = Socket.dealer ()
     Socket.bind server "inproc://UnknownMessage.test"
@@ -234,9 +206,8 @@ let ``send and recv UnknownMessage``() =
 
 [<Test>]
 let ``UnknownMessage size fits stream ``() =
-    let unknownmessage:UnknownMessage = {
-        messageId = 123uy;
-    }
+    let unknownmessage:UnknownMessage =
+        123uy
 
     let messageSize = UnknownMessage.getMessageSize unknownmessage
 

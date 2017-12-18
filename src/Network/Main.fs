@@ -8,31 +8,40 @@ open Messaging.Services.Network
 open Messaging.Events
 open Consensus
 open Messaging
+open Network
+open Network.Transport
 
-type State = PeersManager.PeersManager
+type State = Connector.T * AddressBook.T
 
-let eventHandler event (peersManager:State) = 
+let maxConnections = 1
+
+let eventHandler transport event (connector,addressBook) = 
     match event with 
     | Event.TransactionAddedToMemPool (txHash, tx) ->
-        let bytes = Transaction.serialize Transaction.Full tx
-        let msg = Message.Transaction {tx=bytes}
+        let bytes = Transaction.serialize Transaction.Full tx        
             
-        PeersManager.publish msg peersManager
-    | _ -> peersManager
+        Transport.publishTransaction transport bytes
+        connector,addressBook
+    | _ -> connector,addressBook
 
-let networkHandler client msg (state:State) = 
+let transportHandler transport client msg (connector,addressBook) = 
     match msg with 
-    | Message.Transaction msg ->
-        match Transaction.deserialize msg.tx with
+    | InProcMessage.Transaction msg ->
+        match Transaction.deserialize msg with
         | Some tx ->
             Services.Blockchain.validateTransaction client tx
-            state
+            connector,addressBook
         | None ->
             //TODO: log non-deserializable transaction
-            state
+            connector,addressBook
+    | InProcMessage.Connected address ->       
+        (Connector.connected connector address),addressBook
+    | InProcMessage.Disconnected address ->
+        let connector = Connector.disconnected connector address  
+        (Connector.connect transport addressBook connector),addressBook  
     | _ -> 
         // TODO: log unknown message
-        state
+        connector, addressBook
 
 let commandHandler command (state:State) = state
 
@@ -40,7 +49,13 @@ let requestHandler request reply (state:State) = state
 
 let main busName externalIp listen bind seeds =
     Actor.create<Command, Request, Event, State> busName serviceName (fun poller sbObservable ebObservable ->           
-        let peersManager = PeersManager.create poller listen bind seeds 
+        let transport = Transport.create listen bind
+        
+        let addressBook = AddressBook.create seeds
+        
+        let connector = 
+            Connector.create maxConnections
+            |> Connector.connect transport addressBook
         
         let client = ServiceBus.Client.create busName
         
@@ -53,18 +68,18 @@ let main busName externalIp listen bind seeds =
         
         let ebObservable = 
             ebObservable
-            |> Observable.map eventHandler
+            |> Observable.map (eventHandler transport)
             
-        let networkObservable = 
-            PeersManager.messageObservable peersManager
-            |> Observable.map (networkHandler client)
+        let transportObservable = 
+            Transport.addToPoller poller transport            
+            |> Observable.map (fun _ -> Transport.recv transport)            
+            |> Observable.map (transportHandler transport client)
            
         let observable =             
             Observable.merge sbObservable ebObservable
-            |> Observable.merge networkObservable
-            |> Observable.merge (PeersManager.observable peersManager)
-            |> Observable.scan (fun state handler -> handler state) peersManager             
+            |> Observable.merge transportObservable            
+            |> Observable.scan (fun state handler -> handler state) (connector,addressBook)
     
-        Disposables.toDisposable peersManager,observable
+        Disposables.toDisposable transport,observable
     )
                     

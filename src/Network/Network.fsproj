@@ -42,13 +42,15 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="NetworkMessage.fs" />
-    <Compile Include="Peer.fs" />
-    <Compile Include="Peers.fs" />
+    <Compile Include="Transport\InProcMessage.fs" />
+    <Compile Include="Transport\Peer.fs" />
+    <Compile Include="Transport\Transport.fs" />
     <Compile Include="AddressBook.fs" />
-    <Compile Include="PeersManager.fs" />
+    <Compile Include="Connector.fs" />
     <Compile Include="Main.fs" />
     <Content Include="paket.references" />
     <Content Include="NetworkMessage.xml" />
+    <Content Include="Transport\InProcMessage.xml" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Consensus\Consensus.fsproj">
