@@ -32,7 +32,6 @@
     </message>
     
     <message name="Unknown Peer" id="100">
-        <field name="dummy" type="number" size="1" />
     </message>
 
     <message name="Unknown Message" id="101">

@@ -1,0 +1,30 @@
+<class
+        name = "InProcMessage"
+        signature = "19634"
+        title = "Inproc Message"
+        script = "zproto_codec_fs"
+        source_dir = "./"
+        test_dir ="../../Network.Tests/"
+        module ="Network.Transport.InProcMessage"
+        test_module="Network.Tests.InProcMessageTests"
+>
+    <message name="Connect" id="1">
+        <field name="address" type="longstr">Address</field>
+    </message>
+    
+    <message name="Connected" id="2">
+        <field name="address" type="longstr">Address</field>
+    </message>
+
+    <message name="Accepted" id="3">
+        
+    </message>
+
+    <message name="Disconnected" id="4">
+        <field name="address" type="longstr">Address</field>
+    </message>
+    
+    <message name="Transaction" id="10">
+        <field name="tx" type="chunk">Tx</field>
+    </message>
+</class>

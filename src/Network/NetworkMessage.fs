@@ -31,25 +31,18 @@ type HelloAck = {
         version : uint32
     }
 
-type Ping = {
-        nonce : uint32
-    }
+type Ping =
+        uint32
 
-type Pong = {
-        nonce : uint32
-    }
+type Pong =
+        uint32
 
-type Transaction = {
-        tx : byte[]
-    }
+type Transaction =
+        byte[]
 
-type UnknownPeer = {
-        dummy : byte
-    }
 
-type UnknownMessage = {
-        messageId : byte
-    }
+type UnknownMessage =
+        byte
 
 type T =
     | Hello of Hello
@@ -57,8 +50,9 @@ type T =
     | Ping of Ping
     | Pong of Pong
     | Transaction of Transaction
-    | UnknownPeer of UnknownPeer
+    | UnknownPeer
     | UnknownMessage of UnknownMessage
+
 
 module Hello =
     let getMessageSize (msg:Hello) =
@@ -82,6 +76,7 @@ module Hello =
                         version = version;
                     }: Hello)
         }
+
 
 module HelloAck =
     let getMessageSize (msg:HelloAck) =
@@ -108,99 +103,64 @@ module HelloAck =
 
 module Ping =
     let getMessageSize (msg:Ping) =
-        0 +
-            4 +
-            0
+            4
 
     let write (msg:Ping) stream =
         stream
-        |> Stream.writeNumber4 msg.nonce
+        |> Stream.writeNumber4 msg
 
     let read =
         reader {
-            let! nonce = Stream.readNumber4
+            let! msg = Stream.readNumber4
 
-            return ({
-                        nonce = nonce;
-                    }: Ping)
+            return msg
         }
 
 module Pong =
     let getMessageSize (msg:Pong) =
-        0 +
-            4 +
-            0
+            4
 
     let write (msg:Pong) stream =
         stream
-        |> Stream.writeNumber4 msg.nonce
+        |> Stream.writeNumber4 msg
 
     let read =
         reader {
-            let! nonce = Stream.readNumber4
+            let! msg = Stream.readNumber4
 
-            return ({
-                        nonce = nonce;
-                    }: Pong)
+            return msg
         }
 
 module Transaction =
     let getMessageSize (msg:Transaction) =
-        0 +
-            4 + Array.length msg.tx +
-            0
+            4 + Array.length msg
 
     let write (msg:Transaction) stream =
         stream
-        |> Stream.writeNumber4 (uint32 (Array.length msg.tx))
-        |> Stream.writeBytes msg.tx (Array.length msg.tx)
+        |> Stream.writeNumber4 (uint32 (Array.length msg))
+        |> Stream.writeBytes msg (Array.length msg)
 
     let read =
         reader {
-            let! txLength = Stream.readNumber4
-            let! tx = Stream.readBytes (int txLength)
+            let! msgLength = Stream.readNumber4
+            let! msg = Stream.readBytes (int msgLength)
 
-            return ({
-                        tx = tx;
-                    }: Transaction)
-        }
-
-module UnknownPeer =
-    let getMessageSize (msg:UnknownPeer) =
-        0 +
-            1 +
-            0
-
-    let write (msg:UnknownPeer) stream =
-        stream
-        |> Stream.writeNumber1 msg.dummy
-
-    let read =
-        reader {
-            let! dummy = Stream.readNumber1
-
-            return ({
-                        dummy = dummy;
-                    }: UnknownPeer)
+            return msg
         }
 
 module UnknownMessage =
     let getMessageSize (msg:UnknownMessage) =
-        0 +
-            1 +
-            0
+            1
 
     let write (msg:UnknownMessage) stream =
         stream
-        |> Stream.writeNumber1 msg.messageId
+        |> Stream.writeNumber1 msg
 
     let read =
         reader {
-            let! messageId = Stream.readNumber1
+            let! msg = Stream.readNumber1
 
-            return ({
-                        messageId = messageId;
-                    }: UnknownMessage)
+            return msg
         }
 
 
@@ -233,9 +193,7 @@ let recv socket =
             | None,stream -> None,stream
             | Some msg, stream -> Some (Transaction msg), stream
         | UnknownPeerMessageId ->
-            match UnknownPeer.read stream with
-            | None,stream -> None,stream
-            | Some msg, stream -> Some (UnknownPeer msg), stream
+            Some UnknownPeer, stream
         | UnknownMessageMessageId ->
             match UnknownMessage.read stream with
             | None,stream -> None,stream
@@ -259,7 +217,7 @@ let send socket msg =
         | Ping msg -> Ping.write msg
         | Pong msg -> Pong.write msg
         | Transaction msg -> Transaction.write msg
-        | UnknownPeer msg -> UnknownPeer.write msg
+        | UnknownPeer -> id
         | UnknownMessage msg -> UnknownMessage.write msg
 
     let messageId =
@@ -279,7 +237,7 @@ let send socket msg =
         | Ping msg -> Ping.getMessageSize msg
         | Pong msg -> Pong.getMessageSize msg
         | Transaction msg -> Transaction.getMessageSize msg
-        | UnknownPeer msg -> UnknownPeer.getMessageSize msg
+        | UnknownPeer -> 0
         | UnknownMessage msg -> UnknownMessage.getMessageSize msg
 
     //  Signature + message ID + message size

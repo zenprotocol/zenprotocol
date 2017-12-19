@@ -11,7 +11,7 @@ nuget Zen.FSharp.Compiler.Service
 nuget FAKE
 nuget FSharp.Compatibility.OCaml
 nuget libsodium-net
-nuget FsNetMQ >= 0.2.5.0
+nuget FsNetMQ >= 0.2.7.0
 nuget FsPickler
 nuget FSharp.Control.Reactive
 nuget System.Reactive.Linq
@@ -20,7 +20,7 @@ nuget FSharp.Configuration
 nuget Argu
 nuget FSharp.Data
 nuget zen_secp256k1_linux 0.1.0.25-v6ad5cdb42a1a
-nuget zen_z3_linux 4.5.1.6-v1f29cebd4df6
+nuget zen_z3_linux 4.5.1.7-v1f29cebd4df
 nuget zen_secp256k1_osx 0.1.0.25-v6ad5cdb42a1a
 nuget zen_z3_osx 4.5.1.7-v1f29cebd4df6
 nuget FsBech32 >= 0.1.0.7
