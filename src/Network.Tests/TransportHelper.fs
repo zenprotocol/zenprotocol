@@ -5,6 +5,7 @@ open Network.Transport
 open FsNetMQ
 
 let address = "127.0.0.1:5556"
+let addressBook = AddressBook.create (seq {yield address})
 
 let startPeer listener = 
     let transport = Transport.create listener address
