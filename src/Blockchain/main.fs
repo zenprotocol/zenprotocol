@@ -7,7 +7,7 @@ open Messaging.Services.Blockchain
 open Messaging.Events
 open Consensus
 
-type State = UtxoSet.T * MemPool.T * OrphanPool.T
+type State = UtxoSet.T * MemPool.T * OrphanPool.T * ActiveContractSet.T
 
 let main busName =
     Actor.create<Command,Request,Event,State> busName serviceName (fun poller sbObservable ebObservable  ->  
@@ -34,13 +34,15 @@ let main busName =
                    
         let orphanPool = 
             OrphanPool.create ()                   
+
+        let acs = ActiveContractSet.create ()
                      
         let observable =                      
             Observable.merge sbObservable ebObservable
             |> Observable.scan (fun state handler -> 
                 let effectWriter = handler state
                 EffectsWriter.run effectWriter publisher
-                ) (utxoSet,mempool,orphanPool)             
+                ) (utxoSet,mempool,orphanPool,acs)             
     
         Disposables.empty, observable 
     )

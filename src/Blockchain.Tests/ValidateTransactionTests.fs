@@ -38,12 +38,13 @@ let txOutpoints = getTxOutpints txHash tx
 let utxoSet = UtxoSet.create() |> UtxoSet.handleTransaction ChainParameters.rootTxHash ChainParameters.rootTx                
 let mempool = MemPool.create () |> MemPool.add ChainParameters.rootTxHash ChainParameters.rootTx
 let orphanPool = OrphanPool.create()       
+let acs = ActiveContractSet.create()       
 
 [<Test>]
 let ``valid transaction raise events and update state``() =                                          
-    let result = Handler.handleCommand (ValidateTransaction tx) (utxoSet, mempool, OrphanPool.create())
+    let result = Handler.handleCommand (ValidateTransaction tx) (utxoSet, mempool, OrphanPool.create(), ActiveContractSet.create())
     
-    let events, (utxoSet', mempool', _) = Writer.unwrap result
+    let events, (utxoSet', mempool', _, _) = Writer.unwrap result
         
     // Checking that the event raised
     events |> should contain (TransactionAddedToMemPool (txHash, tx))    
@@ -61,9 +62,9 @@ let ``valid transaction raise events and update state``() =
 let ``Invalid tx doesn't raise events or update state``() = 
     let invalidTx = {inputs=[];outputs=[];witnesses=[];contract=None}
                    
-    let result = Handler.handleCommand (ValidateTransaction invalidTx) (utxoSet, mempool, OrphanPool.create())
+    let result = Handler.handleCommand (ValidateTransaction invalidTx) (utxoSet, mempool, OrphanPool.create(), ActiveContractSet.create())
     
-    let events, (utxoSet', mempool', orphanPool') = Writer.unwrap result
+    let events, (utxoSet', mempool', orphanPool', acs') = Writer.unwrap result
     
     // Checking no events raised
     events |> should haveLength 0
@@ -79,9 +80,9 @@ let ``Invalid tx doesn't raise events or update state``() =
     
 [<Test>]
 let ``tx already in mempool nothing happen`` () =                       
-    let result = Handler.handleCommand (ValidateTransaction ChainParameters.rootTx) (utxoSet, mempool, OrphanPool.create())
+    let result = Handler.handleCommand (ValidateTransaction ChainParameters.rootTx) (utxoSet, mempool, OrphanPool.create(), ActiveContractSet.create())
     
-    let events, (utxoSet', mempool', _) = Writer.unwrap result
+    let events, (utxoSet', mempool', _, _) = Writer.unwrap result
     
     // Checking no events raised
     events |> should haveLength 0
@@ -94,10 +95,11 @@ let ``tx already in mempool nothing happen`` () =
 let ``orphan tx added to orphan list``() =
     let utxoSet = UtxoSet.create()
     let mempool = MemPool.create ()
+    let acs = MemPool.create ()
                    
-    let result = Handler.handleCommand (ValidateTransaction tx) (utxoSet, mempool, orphanPool)
+    let result = Handler.handleCommand (ValidateTransaction tx) (utxoSet, mempool, orphanPool, acs)
     
-    let events, (utxoSet', mempool', orphanPool') = Writer.unwrap result
+    let events, (utxoSet', mempool', orphanPool', acs') = Writer.unwrap result
     
     // Checking no events raised
     events |> should haveLength 0
@@ -125,8 +127,8 @@ let ``origin tx hit mempool, orphan tx should be added to mempool``() =
     let tx2Hash = Transaction.hash tx2             
     
     // Sending orphan transaction first, which should be added to orphan list
-    let result = Handler.handleCommand (ValidateTransaction tx2) (utxoSet, mempool, orphanPool)    
-    let events, (utxoSet', mempool', orphanPool') = Writer.unwrap result
+    let result = Handler.handleCommand (ValidateTransaction tx2) (utxoSet, mempool, orphanPool, acs)    
+    let events, (utxoSet', mempool', orphanPool', acs') = Writer.unwrap result
     
     // Checking that the transaction is only in the mempool and no event were raised
     events |> should haveLength 0
@@ -135,8 +137,8 @@ let ``origin tx hit mempool, orphan tx should be added to mempool``() =
     OrphanPool.containsTransaction tx2Hash orphanPool' |> should equal true
 
     // Sending origin, which should cause both transaction to be added to the mempool
-    let result' = Handler.handleCommand (ValidateTransaction tx1) (utxoSet', mempool', orphanPool')    
-    let events', (utxoSet'', mempool'', orphanPool'') = Writer.unwrap result'
+    let result' = Handler.handleCommand (ValidateTransaction tx1) (utxoSet', mempool', orphanPool', acs')    
+    let events', (utxoSet'', mempool'', orphanPool'', _) = Writer.unwrap result'
     
     // Checking that both transaction added to mempool and published
     events' |> should haveLength 2 
@@ -171,8 +173,8 @@ let ``orphan transaction is eventually invalid``() =
     let tx2Hash = Transaction.hash tx2
     
     // Sending orphan transaction first, which should be added to orphan list
-    let result = Handler.handleCommand (ValidateTransaction tx2) (utxoSet, mempool, orphanPool)    
-    let events, (utxoSet', mempool', orphanPool') = Writer.unwrap result
+    let result = Handler.handleCommand (ValidateTransaction tx2) (utxoSet, mempool, orphanPool, acs)    
+    let events, (utxoSet', mempool', orphanPool', acs') = Writer.unwrap result
     
     // Checking that the transaction is only in the mempool and no event were raised
     events |> should haveLength 0
@@ -181,8 +183,8 @@ let ``orphan transaction is eventually invalid``() =
     OrphanPool.containsTransaction tx2Hash orphanPool' |> should equal true
     
      // Sending origin, which should cause orphan transaction to be rejected and removed from orphan list
-    let result' = Handler.handleCommand (ValidateTransaction tx1) (utxoSet', mempool', orphanPool')    
-    let events', (utxoSet'', mempool'', orphanPool'') = Writer.unwrap result'
+    let result' = Handler.handleCommand (ValidateTransaction tx1) (utxoSet', mempool', orphanPool', acs')    
+    let events', (utxoSet'', mempool'', orphanPool'', acs'') = Writer.unwrap result'
     
     // Checking that the origin tx is published and orphan removed as invalid
     events' |> should haveLength 1
@@ -218,11 +220,11 @@ let ``two orphan transaction spending same input``() =
     
     // Sending both tx2 and tx3, both should be added to orphan pool
     let result = 
-        Handler.handleCommand (ValidateTransaction tx2) (utxoSet, mempool, orphanPool)        
+        Handler.handleCommand (ValidateTransaction tx2) (utxoSet, mempool, orphanPool, acs)        
         >>= 
         Handler.handleCommand (ValidateTransaction tx3)
                     
-    let events, (utxoSet', mempool', orphanPool') = Writer.unwrap result
+    let events, (utxoSet', mempool', orphanPool', acs') = Writer.unwrap result
     
     // Checking that the transaction is only in the mempool and no event were raised
     events |> should haveLength 0
@@ -234,8 +236,8 @@ let ``two orphan transaction spending same input``() =
     OrphanPool.containsTransaction tx3Hash orphanPool' |> should equal true
 
     // Sending origin, which should pick one of the transactions (we cannot know which one, for now at least)
-    let result' = Handler.handleCommand (ValidateTransaction tx1) (utxoSet', mempool', orphanPool')
-    let events', (utxoSet'', mempool'', orphanPool'') = Writer.unwrap result'
+    let result' = Handler.handleCommand (ValidateTransaction tx1) (utxoSet', mempool', orphanPool', acs')
+    let events', (utxoSet'', mempool'', orphanPool'', acs'') = Writer.unwrap result'
     
     // Checking that both transaction added to mempool and published
     events' |> should haveLength 2
@@ -251,3 +253,70 @@ let ``two orphan transaction spending same input``() =
     OrphanPool.containsTransaction tx3Hash orphanPool'' |> should equal false
     OrphanPool.containsTransaction tx2Hash orphanPool'' |> should equal false
     OrphanPool.containsTransaction tx1Hash orphanPool'' |> should equal false
+
+[<Test>]
+let ``Valid contract should be added to ActiveContractSet``() =
+    let rootAccount = Account.createRoot ()
+    let contractCode = "val test: nat -> nat\nlet test i = i + 1"
+    let cHash = Contract.hash contractCode
+
+    let tx = 
+        match Account.createContractActivationTransaction rootAccount contractCode with 
+            | Ok tx ->
+                tx
+            | _ ->
+                failwith "couldn't get tx"
+
+    let txHash = Transaction.hash tx
+
+    let result = 
+        Handler.handleCommand (ValidateTransaction tx) (utxoSet, mempool, orphanPool, acs)        
+                    
+    let events, (_, mempool, orphanPool, acs) = Writer.unwrap result
+    
+    // Checking that the contract is in the ACS
+    ActiveContractSet.containsContract cHash acs |> should equal true
+
+    // Checking that TransactionAddedToMemPool was published
+    events |> should haveLength 1
+    events |> should contain (TransactionAddedToMemPool (txHash, tx))
+
+    // Checking that the transaction was added to mempool 
+    MemPool.containsTransaction txHash mempool |> should equal true
+
+    // Checking that the transaction was not added to orphans 
+    OrphanPool.containsTransaction txHash orphanPool |> should equal false
+
+[<Test>]
+let ``Invalid contract should not be added to ActiveContractSet``() =
+    let rootAccount = Account.createRoot ()
+    let contractCode = "x"
+    let cHash = Contract.hash contractCode
+
+    let tx = 
+        match Account.createContractActivationTransaction rootAccount contractCode with 
+            | Ok tx -> tx
+            | _ -> failwith "couldn't get tx"
+
+    let txHash = Transaction.hash tx
+
+    let result = 
+        Handler.handleCommand (ValidateTransaction tx) (utxoSet, mempool, orphanPool, acs)        
+                    
+    let events, (_, mempool, orphanPool, acs) = Writer.unwrap result
+    
+    // Checking that the contract is in not the ACS
+    ActiveContractSet.containsContract cHash acs |> should equal false
+
+    //TODO: TBD following
+
+    // Checking that TransactionAddedToMemPool was published
+
+    events |> should haveLength 1
+    events |> should contain (TransactionAddedToMemPool (txHash, tx))
+
+    // Checking that the transaction was not added to mempool 
+    MemPool.containsTransaction txHash mempool |> should equal true
+
+    // Checking that the transaction was added to orphans 
+    OrphanPool.containsTransaction txHash orphanPool |> should equal false

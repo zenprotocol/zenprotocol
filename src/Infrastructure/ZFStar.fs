@@ -1,4 +1,4 @@
-﻿module ZFStar
+﻿module Infrastructure.ZFStar
 
 open System
 open System.IO
@@ -7,7 +7,7 @@ open Microsoft.FSharp.Compiler.SourceCodeServices
 let private fsChecker = FSharpChecker.Create()
 let private changeExtention extention path = Path.ChangeExtension (path, extention)
 
-let private getMethodInfo code =
+let private compile' code =
     //let code = code + """nopen MBrace.FsPickler.Combinators
     //let pickler = Pickler.auto<ZFStar.Contract>
     //let pickled = Binary.pickle pickler mainFunction"""
@@ -50,10 +50,9 @@ let private getMethodInfo code =
             |> String.concat " "
             |> Error
     with _ as ex ->
-        Error ("compile exception: " + ex.Message)
+        Error ("compile ex: " + ex.Message)
 
-let private extract moduleName code =
-    let code = sprintf "module %s\n%s" moduleName code
+let private extract code moduleName =
     let (/) a b = Path.Combine (a,b)
     let oDir = Platform.normalizeNameToFileSystem (Path.GetTempPath()) / Path.GetRandomFileName()
     try
@@ -66,28 +65,24 @@ let private extract moduleName code =
                 |> changeExtention ".fst"
             //let fn'elabed = changeExtention fn ".fst"
             let fn'extracted = changeExtention ".fs" fn
-            File.WriteAllText(fn'original, code)
+            File.WriteAllText(fn'original, sprintf "module %s\n%s" moduleName code)
             //IOUtils.elaborate fn'orig fn'elabed
-            let (+/) = (/) Platform.workingDirectory
-            let (>=>) a b = Result.bind b a
-            Platform.run ((+/) "fstar.exe")
-                ["--lax"; //"--smt"; Platform.z3;
-                 "--codegen"; "FSharp";
-                 "--prims"; (+/) "zulib" / "prims.fst";
-                 "--extract_module"; moduleName;
-                 "--include"; (+/) "zulib";
-                 "--no_default_includes"; fn'original //fn'elabed;               
+            Platform.run "fstar.exe"
+                ["--smt"; Platform.getExeSuffix "z3"
+                 "--codegen"; "FSharp"
+                 "--prims"; "zulib" / "prims.fst"
+                 "--extract_module"; moduleName
+                 "--include"; "zulib"
+                 "--no_default_includes"; fn'original //fn'elabed;
                  "--odir"; oDir ]
-            >=> 
-            fun _ -> File.ReadAllText fn'extracted |> Ok
+            |> Result.bind (fun _ -> File.ReadAllText fn'extracted |> Ok)
         with _ as ex ->
-            Error ("extract: " + ex.Message)
+            Error ("extract ex: " + ex.Message)
     finally
         Directory.Delete (oDir, true)
 
-let compile moduleName code = 
+let compile code moduleName = 
     let (>=>) a b = Result.bind b a
 
-    extract moduleName code
-    >=>
-    getMethodInfo
+    extract code ("Z" + moduleName)
+    >=> compile'
