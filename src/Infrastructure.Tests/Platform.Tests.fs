@@ -11,13 +11,8 @@ let fsc_exe =
 
 [<Test>]
 let ``Should get output from process``() =
-    printfn "%s" fsc_exe
-    (Platform.run fsc_exe [ "--help" ]) |> should equal (Ok (): Result<unit, string>)
+    (Infrastructure.Platform.run fsc_exe [ "--help" ]) |> should equal (Ok (): Result<unit, string>)
 
 [<Test>]
 let ``Should get error from process``() =
-    let result = Platform.run fsc_exe [] 
-
-    printfn "%A" result
-
-    result |> should equal (Error "run: error FS0207: No inputs specified": Result<unit, string>)
+    (Infrastructure.Platform.run fsc_exe []) |> should equal (Error "error FS0207: No inputs specified": Result<unit, string>)
