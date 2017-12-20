@@ -7,5 +7,5 @@ seeds:
   - 127.0.0.1:29555
 
 api:
-  enabled: true
+  enabled: false
   bind: 127.0.0.1:31567

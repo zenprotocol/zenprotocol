@@ -68,6 +68,7 @@ let main argv =
             config.chain <- "local"
             config.listen <- true
             config.seeds.Clear ()  
+            config.api.enabled <- true
             root <- true 
         | Local1 ->
             config.chain <- "local"

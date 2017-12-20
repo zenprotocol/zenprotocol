@@ -188,8 +188,14 @@ let handleActiveState socket next peer msg =
             peer
         | Message.Address address ->
             next (InProcMessage.Address address)
-            peer         
-        | msg -> 
+            peer     
+        | Message.GetAddresses ->
+            next (InProcMessage.GetAddresses (RoutingId.toBytes peer.routingId))
+            peer
+        | Message.Addresses addresses ->
+            next (InProcMessage.Addresses addresses)    
+            peer        
+        | msg ->
             // TODO: unexpected msg, close peer          
             
             peer

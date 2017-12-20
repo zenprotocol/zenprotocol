@@ -37,4 +37,17 @@
     <message name="Address" id="12">
         <field name="address" type="longstr">Address</field>
     </message>
+    
+    <message name="Get Addresses" id="13">
+        <field name="peerId" type="octets" size="4">Peer Id</field>
+    </message>
+
+    <message name="Addresses" id="14">
+        <field name="addresses" type="strings"/>
+    </message>
+
+    <message name="Send Addresses" id="15">
+        <field name="peerId" type="octets" size="4">Peer Id</field>
+        <field name="addresses" type="strings"/>
+    </message>
 </class>

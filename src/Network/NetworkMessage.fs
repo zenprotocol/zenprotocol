@@ -19,6 +19,10 @@ let TransactionMessageId = 5uy
 [<LiteralAttribute>]
 let AddressMessageId = 6uy
 [<LiteralAttribute>]
+let GetAddressesMessageId = 7uy
+[<LiteralAttribute>]
+let AddressesMessageId = 8uy
+[<LiteralAttribute>]
 let UnknownPeerMessageId = 100uy
 [<LiteralAttribute>]
 let UnknownMessageMessageId = 101uy
@@ -46,6 +50,10 @@ type Address =
         string
 
 
+type Addresses =
+        string list
+
+
 type UnknownMessage =
         byte
 
@@ -56,6 +64,8 @@ type T =
     | Pong of Pong
     | Transaction of Transaction
     | Address of Address
+    | GetAddresses
+    | Addresses of Addresses
     | UnknownPeer
     | UnknownMessage of UnknownMessage
 
@@ -169,6 +179,21 @@ module Address =
             return msg
         }
 
+module Addresses =
+    let getMessageSize (msg:Addresses) =
+            List.fold (fun state (value:string) -> state + 4 + Encoding.UTF8.GetByteCount (value)) 4 msg
+
+    let write (msg:Addresses) stream =
+        stream
+        |> Stream.writeStrings msg
+
+    let read =
+        reader {
+            let! msg = Stream.readStrings
+
+            return msg
+        }
+
 module UnknownMessage =
     let getMessageSize (msg:UnknownMessage) =
             1
@@ -212,6 +237,12 @@ let private decode stream =
             match Address.read stream with
             | None,stream -> None,stream
             | Some msg, stream -> Some (Address msg), stream
+        | GetAddressesMessageId ->
+            Some GetAddresses, stream
+        | AddressesMessageId ->
+            match Addresses.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (Addresses msg), stream
         | UnknownPeerMessageId ->
             Some UnknownPeer, stream
         | UnknownMessageMessageId ->
@@ -255,6 +286,8 @@ let send socket msg =
         | Pong msg -> Pong.write msg
         | Transaction msg -> Transaction.write msg
         | Address msg -> Address.write msg
+        | GetAddresses -> id
+        | Addresses msg -> Addresses.write msg
         | UnknownPeer -> id
         | UnknownMessage msg -> UnknownMessage.write msg
 
@@ -266,6 +299,8 @@ let send socket msg =
         | Pong _ -> PongMessageId
         | Transaction _ -> TransactionMessageId
         | Address _ -> AddressMessageId
+        | GetAddresses _ -> GetAddressesMessageId
+        | Addresses _ -> AddressesMessageId
         | UnknownPeer _ -> UnknownPeerMessageId
         | UnknownMessage _ -> UnknownMessageMessageId
 
@@ -277,6 +312,8 @@ let send socket msg =
         | Pong msg -> Pong.getMessageSize msg
         | Transaction msg -> Transaction.getMessageSize msg
         | Address msg -> Address.getMessageSize msg
+        | GetAddresses -> 0
+        | Addresses msg -> Addresses.getMessageSize msg
         | UnknownPeer -> 0
         | UnknownMessage msg -> UnknownMessage.getMessageSize msg
 

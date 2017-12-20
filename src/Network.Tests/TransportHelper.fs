@@ -16,26 +16,26 @@ let startPeer () =
     let transport = Transport.create false address                
     Transport.connect transport address
         
-    transport                               
-    
-//let startListeningPeer port = 
-        
+    transport    
     
 let stopPeer peer = 
     (peer :> System.IDisposable).Dispose()   
     
-let rec waitForConnectedMessage peer timeout = 
+let recvConnectedMessage peer timeout = 
     match Transport.tryRecv peer timeout with 
-    | Some (InProcMessage.Connected _) ->
-        ()
+    | Some (InProcMessage.Connected {peerId=peerId}) ->
+        peerId
     | Some (InProcMessage.Disconnected _) ->
         failwithf "connect failed, disconnect"
     | Some x ->                 
         failwithf "connect failed, unexpected %A" x
     | None ->                
-        failwith "connect failed"
+        failwith "connect failed"       
     
-let rec waitForDisconnectedMessage peer timeout = 
+let waitForConnectedMessage peer timeout = 
+    recvConnectedMessage peer timeout |> ignore             
+    
+let waitForDisconnectedMessage peer timeout = 
     match Transport.tryRecv peer timeout with 
     | Some (InProcMessage.Disconnected _) ->
         ()
@@ -43,17 +43,33 @@ let rec waitForDisconnectedMessage peer timeout =
     | None ->                
         failwith "no disconnect message"        
         
-let rec waitForAcceptedMessage peer timeout = 
+let waitForAcceptedMessage peer timeout = 
     match Transport.tryRecv peer timeout with 
     | Some (InProcMessage.Accepted _) ->
         ()
     | Some _                 
     | None ->                
-        failwith "accepted failed"        
+        failwith "waitForAcceptedMessage failed"        
                 
-let tryWaitForAddress peer timeout =     
+let tryRecvAddress peer timeout =     
     match Transport.tryRecv peer timeout with 
         | Some (InProcMessage.Address address) -> Some address            
         | Some _                 
         | None ->                
-            None        
+            None
+            
+let recvGetAddresses peer timeout = 
+    match Transport.tryRecv peer timeout with 
+    | Some (InProcMessage.GetAddresses peerId) ->
+        peerId
+    | Some _                 
+    | None ->                
+        failwith "recvGetAddresses failed"  
+
+let recvAddresses peer timeout =               
+    match Transport.tryRecv peer timeout with 
+    | Some (InProcMessage.Addresses addresses) ->
+        addresses
+    | Some _                 
+    | None ->                
+        failwith "recvAddresses failed"      

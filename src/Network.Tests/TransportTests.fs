@@ -73,13 +73,35 @@ let ``relay address relay only to two peers``() =
     
     Transport.publishAddress host "127.0.0.1:5555"
     
-    let a1 = tryWaitForAddress peer1 100<milliseconds>
-    let a2 = tryWaitForAddress peer2 100<milliseconds>
-    let a3 = tryWaitForAddress peer2 100<milliseconds>
+    let a1 = tryRecvAddress peer1 100<milliseconds>
+    let a2 = tryRecvAddress peer2 100<milliseconds>
+    let a3 = tryRecvAddress peer3 100<milliseconds>
     
     let addresses = 
         seq {yield a1;yield a2;yield a3}
         |> Seq.choose id
+        |> List.ofSeq
         
-    addresses |> should equal (Seq.init 2 (fun _ -> "127.0.0.1:5555"))       
+    addresses |> should equal ["127.0.0.1:5555";"127.0.0.1:5555"]       
+
+[<Test>]
+let ``sending and receiving address book``() =
+    let addresses = [ "127.0.0.1:6666"; "127.0.0.1:6667"]
+
+    use host = startHost ()
+    use peer = startPeer ()    
+    
+    waitForAcceptedMessage host 100<milliseconds>
+    
+    let hostId = recvConnectedMessage peer 100<milliseconds>     
+    Transport.getAddresses peer hostId
+    
+    let peerId = recvGetAddresses host 100<milliseconds>    
+    Transport.sendAddresses host peerId addresses
+    
+    let addresses' = recvAddresses peer 100<milliseconds>
+    
+    addresses' |> should equal addresses
+    
+    
     

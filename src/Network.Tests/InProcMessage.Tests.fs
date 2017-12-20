@@ -234,6 +234,104 @@ let ``Address size fits stream ``() =
     messageSize |> should equal offset
 
 [<Test>]
+let ``send and recv GetAddresses``() =
+    let msg = GetAddresses (Array.create 4 123uy)
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://GetAddresses.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://GetAddresses.test"
+
+    Network.Transport.InProcMessage.send server msg
+
+    let msg' = Network.Transport.InProcMessage.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``GetAddresses size fits stream ``() =
+    let getaddresses:GetAddresses =
+        Array.create 4 123uy
+
+    let messageSize = GetAddresses.getMessageSize getaddresses
+
+    let stream =
+        Stream.create messageSize
+        |> GetAddresses.write getaddresses
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
+let ``send and recv Addresses``() =
+    let msg = Addresses ["Name: Brutus";"Age: 43"]
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://Addresses.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://Addresses.test"
+
+    Network.Transport.InProcMessage.send server msg
+
+    let msg' = Network.Transport.InProcMessage.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``Addresses size fits stream ``() =
+    let addresses:Addresses =
+        ["Name: Brutus";"Age: 43"]
+
+    let messageSize = Addresses.getMessageSize addresses
+
+    let stream =
+        Stream.create messageSize
+        |> Addresses.write addresses
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
+let ``send and recv SendAddresses``() =
+    let msg = SendAddresses {
+        peerId = Array.create 4 123uy;
+        addresses = ["Name: Brutus";"Age: 43"];
+    }
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://SendAddresses.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://SendAddresses.test"
+
+    Network.Transport.InProcMessage.send server msg
+
+    let msg' = Network.Transport.InProcMessage.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``SendAddresses size fits stream ``() =
+    let sendaddresses:SendAddresses = {
+        peerId = Array.create 4 123uy;
+        addresses = ["Name: Brutus";"Age: 43"];
+    }
+
+    let messageSize = SendAddresses.getMessageSize sendaddresses
+
+    let stream =
+        Stream.create messageSize
+        |> SendAddresses.write sendaddresses
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
 let ``malformed message return None``() =
     use server = Socket.dealer ()
     Socket.bind server "inproc://InProcMessage.test"

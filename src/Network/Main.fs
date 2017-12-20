@@ -26,7 +26,11 @@ let eventHandler transport event (connector,addressBook) =
         connector,addressBook
     | _ -> connector,addressBook
 
-let transportHandler transport client ownAddress msg (connector,addressBook) = 
+let transportHandler transport client ownAddress msg (connector,addressBook) =
+    let requestAddresses peerId = 
+         if not (AddressBook.haveEnoughAddresses addressBook) then
+            Transport.getAddresses transport peerId             
+ 
     match msg with 
     | InProcMessage.Transaction msg ->
         match Transaction.deserialize msg with
@@ -42,8 +46,16 @@ let transportHandler transport client ownAddress msg (connector,addressBook) =
         Option.iter (fun address -> 
             Transport.sendAddress transport peerId address) ownAddress
             
-        (Connector.connected connector address),addressBook                    
-                            
+        // Send getAddress request to the peer            
+        requestAddresses peerId 
+            
+        (Connector.connected connector address),addressBook        
+    | InProcMessage.Accepted peerId ->
+        
+        // Send getAddress request to the peer
+        requestAddresses peerId
+            
+        connector,addressBook                                               
     | InProcMessage.Disconnected address ->
         let connector = Connector.disconnected connector address  
         (Connector.connect transport addressBook connector),addressBook
@@ -66,7 +78,21 @@ let transportHandler transport client ownAddress msg (connector,addressBook) =
         | _ -> 
             // Own address, do nothing
             connector, addressBook   
-                                          
+    | InProcMessage.GetAddresses peerId ->
+        Transport.sendAddresses transport peerId (AddressBook.getValidAddresses addressBook)
+        connector, addressBook
+    | InProcMessage.Addresses addresses ->
+        // Filter own address
+        let addresses = 
+            match ownAddress with
+            | Some ownAddress -> List.filter (fun a -> a <> ownAddress) addresses
+            | None -> addresses
+            
+        let addressBook = AddressBook.addList addressBook addresses
+        let connector = Connector.connect transport addressBook connector
+        
+        connector, addressBook
+                            
     | _ -> 
         // TODO: log unknown message
         connector, addressBook

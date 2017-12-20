@@ -99,13 +99,19 @@ let private handleInprocMessage socket inproc msg (peers:Peers) =
                 |> Seq.map (fun (key,_)-> key,hash (key, today, random))
                 |> Seq.sortBy (fun (_, h) -> h)
                 |> Seq.take 2
-                |> Seq.map fst                
+                |> Seq.map fst
         
-            publishMessage socket inproc peers (Message.Address address)
+            sendToPeers socket inproc peers selectedPeers (Message.Address address)
         | InProcMessage.SendAddress {address=address;peerId=peerId} ->
             let routingId = RoutingId.fromBytes peerId
-            sendToPeer socket inproc peers routingId (Message.Address address)                        
-        | msg -> failwithf "unexpected inproc msg %A" msg        
+            sendToPeer socket inproc peers routingId (Message.Address address)  
+        | InProcMessage.GetAddresses peerId ->
+            let routingId = RoutingId.fromBytes peerId
+            sendToPeer socket inproc peers routingId Message.GetAddresses
+        | InProcMessage.SendAddresses {addresses=addresses;peerId=peerId} ->       
+            let routingId = RoutingId.fromBytes peerId
+            sendToPeer socket inproc peers routingId (Message.Addresses addresses)
+        | msg -> failwithf "unexpected inproc msg %A" msg
                 
 let private onError error = 
     Log.error "Unhandled exception from peer actor %A" error
@@ -119,6 +125,12 @@ let publishTransaction transport tx =
     
 let sendAddress transport peerId address = 
     InProcMessage.send transport.inproc (InProcMessage.SendAddress {address=address;peerId=peerId})
+    
+let getAddresses transport peerId = 
+    InProcMessage.send transport.inproc (InProcMessage.GetAddresses peerId)
+    
+let sendAddresses transport peerId addresses= 
+    InProcMessage.send transport.inproc (InProcMessage.SendAddresses {addresses=addresses;peerId=peerId})        
     
 let publishAddress transport address = 
     InProcMessage.send transport.inproc (InProcMessage.Address address)        

@@ -20,6 +20,12 @@ let TransactionMessageId = 10uy
 let SendAddressMessageId = 11uy
 [<LiteralAttribute>]
 let AddressMessageId = 12uy
+[<LiteralAttribute>]
+let GetAddressesMessageId = 13uy
+[<LiteralAttribute>]
+let AddressesMessageId = 14uy
+[<LiteralAttribute>]
+let SendAddressesMessageId = 15uy
 
 type Connect =
         string
@@ -46,6 +52,17 @@ type SendAddress = {
 type Address =
         string
 
+type GetAddresses =
+        byte[]
+
+type Addresses =
+        string list
+
+type SendAddresses = {
+        peerId : byte[]
+        addresses : string list
+    }
+
 type T =
     | Connect of Connect
     | Connected of Connected
@@ -54,6 +71,9 @@ type T =
     | Transaction of Transaction
     | SendAddress of SendAddress
     | Address of Address
+    | GetAddresses of GetAddresses
+    | Addresses of Addresses
+    | SendAddresses of SendAddresses
 
 module Connect =
     let getMessageSize (msg:Connect) =
@@ -183,6 +203,62 @@ module Address =
             return msg
         }
 
+module GetAddresses =
+    let peerIdSize = 4
+    let getMessageSize (msg:GetAddresses) =
+            4
+
+    let write (msg:GetAddresses) stream =
+        stream
+        |> Stream.writeBytes msg 4
+
+    let read =
+        reader {
+            let! msg = Stream.readBytes 4
+
+            return msg
+        }
+
+module Addresses =
+    let getMessageSize (msg:Addresses) =
+            List.fold (fun state (value:string) -> state + 4 + Encoding.UTF8.GetByteCount (value)) 4 msg
+
+    let write (msg:Addresses) stream =
+        stream
+        |> Stream.writeStrings msg
+
+    let read =
+        reader {
+            let! msg = Stream.readStrings
+
+            return msg
+        }
+
+
+module SendAddresses =
+    let peerIdSize = 4
+    let getMessageSize (msg:SendAddresses) =
+        0 +
+            4 +
+            List.fold (fun state (value:string) -> state + 4 + Encoding.UTF8.GetByteCount (value)) 4 msg.addresses +
+            0
+
+    let write (msg:SendAddresses) stream =
+        stream
+        |> Stream.writeBytes msg.peerId 4
+        |> Stream.writeStrings msg.addresses
+
+    let read =
+        reader {
+            let! peerId = Stream.readBytes 4
+            let! addresses = Stream.readStrings
+
+            return ({
+                        peerId = peerId;
+                        addresses = addresses;
+                    }: SendAddresses)
+        }
+
 
 let private decode stream =
     let readMessage messageId stream =
@@ -215,6 +291,18 @@ let private decode stream =
             match Address.read stream with
             | None,stream -> None,stream
             | Some msg, stream -> Some (Address msg), stream
+        | GetAddressesMessageId ->
+            match GetAddresses.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (GetAddresses msg), stream
+        | AddressesMessageId ->
+            match Addresses.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (Addresses msg), stream
+        | SendAddressesMessageId ->
+            match SendAddresses.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (SendAddresses msg), stream
         | _ -> None, stream
 
     let r = reader {
@@ -253,6 +341,9 @@ let send socket msg =
         | Transaction msg -> Transaction.write msg
         | SendAddress msg -> SendAddress.write msg
         | Address msg -> Address.write msg
+        | GetAddresses msg -> GetAddresses.write msg
+        | Addresses msg -> Addresses.write msg
+        | SendAddresses msg -> SendAddresses.write msg
 
     let messageId =
         match msg with
@@ -263,6 +354,9 @@ let send socket msg =
         | Transaction _ -> TransactionMessageId
         | SendAddress _ -> SendAddressMessageId
         | Address _ -> AddressMessageId
+        | GetAddresses _ -> GetAddressesMessageId
+        | Addresses _ -> AddressesMessageId
+        | SendAddresses _ -> SendAddressesMessageId
 
     let messageSize =
         match msg with
@@ -273,6 +367,9 @@ let send socket msg =
         | Transaction msg -> Transaction.getMessageSize msg
         | SendAddress msg -> SendAddress.getMessageSize msg
         | Address msg -> Address.getMessageSize msg
+        | GetAddresses msg -> GetAddresses.getMessageSize msg
+        | Addresses msg -> Addresses.getMessageSize msg
+        | SendAddresses msg -> SendAddresses.getMessageSize msg
 
     //  Signature + message ID + message size
     let frameSize = 2 + 1 + messageSize
