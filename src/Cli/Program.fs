@@ -20,6 +20,8 @@ type NoArgs =
             
 type Arguments =
     | [<UniqueAttribute>] Port of port:uint16
+    | [<AltCommandLine("-l1")>] Local1 
+    | [<AltCommandLine("-l2")>] Local2    
     | [<CliPrefix(CliPrefix.None)>] Balance of ParseResults<NoArgs>
     | [<CliPrefix(CliPrefix.None)>] Address of ParseResults<NoArgs>
     | [<CliPrefix(CliPrefix.None)>] Send of ParseResults<SendArgs>
@@ -27,11 +29,14 @@ type Arguments =
     interface IArgParserTemplate with
         member arg.Usage =
             match arg with
-            | Port _ -> "port of zen-node API" 
+            | Port _ -> "port of zen-node API"
+            | Local1 -> "use port of local1 testing node" 
+            | Local2 -> "use port of local2 testing node"
             | Balance _ -> "get wallet balance"
             | Address _ -> "get wallet address"
             | Send _ -> "send asset to an address" 
             | Activate _ -> "activate contract"
+            
 
 [<EntryPoint>]
 let main argv = 
@@ -40,12 +45,17 @@ let main argv =
                 
     let results = parser.ParseCommandLine argv
     
-    let port = 
-        match results.TryGetResult <@ Port @> with
-        | Some port -> port
-        | None -> 31567us                                               
+    let mutable port = 31567us
+        
+    List.iter (fun arg -> 
+        match arg with
+        | Port p -> port <- p
+        | Local1 -> port <- 36000us
+        | Local2 -> port <- 36001us
+        | _ -> ()
+        ) (results.GetAllResults())                                                       
        
-    printfn ""   
+    printfn ""
        
     match results.TryGetSubCommand() with
     | Some (Send args) ->        

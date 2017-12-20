@@ -12,9 +12,9 @@ type Argument =
     | Api of string
     | Bind of string
     | Ip of string
-    | Localhost
-    | Local1
-    | Local2
+    | [<AltCommandLine("-lr")>] Localhost
+    | [<AltCommandLine("-l1")>] Local1
+    | [<AltCommandLine("-l2")>] Local2
     with
         interface IArgParserTemplate with
             member s.Usage =
