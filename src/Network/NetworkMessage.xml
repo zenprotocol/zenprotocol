@@ -30,6 +30,10 @@
     <message name="Transaction" id="5">
         <field name="tx" type="chunk">Tx</field>
     </message>
+
+    <message name="Address" id="6">
+        <field name="address" type="longstr">Address</field>
+    </message>
     
     <message name="Unknown Peer" id="100">
     </message>

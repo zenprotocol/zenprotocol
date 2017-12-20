@@ -172,6 +172,37 @@ let ``Transaction size fits stream ``() =
     messageSize |> should equal offset
 
 [<Test>]
+let ``send and recv Address``() =
+    let msg = Address "Life is short but Now lasts for ever"
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://Address.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://Address.test"
+
+    Network.Message.send server msg
+
+    let msg' = Network.Message.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``Address size fits stream ``() =
+    let address:Address =
+        "Life is short but Now lasts for ever"
+
+    let messageSize = Address.getMessageSize address
+
+    let stream =
+        Stream.create messageSize
+        |> Address.write address
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
 let ``send and recv UnknownPeer``() =
     let msg = UnknownPeer
 

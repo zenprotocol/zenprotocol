@@ -39,7 +39,10 @@ let ``Connect size fits stream ``() =
 
 [<Test>]
 let ``send and recv Connected``() =
-    let msg = Connected "Life is short but Now lasts for ever"
+    let msg = Connected {
+        address = "Life is short but Now lasts for ever";
+        peerId = Array.create 4 123uy;
+    }
 
     use server = Socket.dealer ()
     Socket.bind server "inproc://Connected.test"
@@ -55,8 +58,10 @@ let ``send and recv Connected``() =
 
 [<Test>]
 let ``Connected size fits stream ``() =
-    let connected:Connected =
-        "Life is short but Now lasts for ever"
+    let connected:Connected = {
+        address = "Life is short but Now lasts for ever";
+        peerId = Array.create 4 123uy;
+    }
 
     let messageSize = Connected.getMessageSize connected
 
@@ -70,7 +75,7 @@ let ``Connected size fits stream ``() =
 
 [<Test>]
 let ``send and recv Accepted``() =
-    let msg = Accepted
+    let msg = Accepted (Array.create 4 123uy)
 
     use server = Socket.dealer ()
     Socket.bind server "inproc://Accepted.test"
@@ -84,6 +89,20 @@ let ``send and recv Accepted``() =
 
     msg' |> should equal (Some msg)
 
+[<Test>]
+let ``Accepted size fits stream ``() =
+    let accepted:Accepted =
+        Array.create 4 123uy
+
+    let messageSize = Accepted.getMessageSize accepted
+
+    let stream =
+        Stream.create messageSize
+        |> Accepted.write accepted
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
 
 [<Test>]
 let ``send and recv Disconnected``() =
@@ -142,6 +161,73 @@ let ``Transaction size fits stream ``() =
     let stream =
         Stream.create messageSize
         |> Transaction.write transaction
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
+let ``send and recv SendAddress``() =
+    let msg = SendAddress {
+        peerId = Array.create 4 123uy;
+        address = "Life is short but Now lasts for ever";
+    }
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://SendAddress.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://SendAddress.test"
+
+    Network.Transport.InProcMessage.send server msg
+
+    let msg' = Network.Transport.InProcMessage.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``SendAddress size fits stream ``() =
+    let sendaddress:SendAddress = {
+        peerId = Array.create 4 123uy;
+        address = "Life is short but Now lasts for ever";
+    }
+
+    let messageSize = SendAddress.getMessageSize sendaddress
+
+    let stream =
+        Stream.create messageSize
+        |> SendAddress.write sendaddress
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
+let ``send and recv Address``() =
+    let msg = Address "Life is short but Now lasts for ever"
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://Address.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://Address.test"
+
+    Network.Transport.InProcMessage.send server msg
+
+    let msg' = Network.Transport.InProcMessage.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``Address size fits stream ``() =
+    let address:Address =
+        "Life is short but Now lasts for ever"
+
+    let messageSize = Address.getMessageSize address
+
+    let stream =
+        Stream.create messageSize
+        |> Address.write address
 
     let offset = Stream.getOffset stream
 

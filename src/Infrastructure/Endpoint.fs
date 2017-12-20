@@ -1,6 +1,8 @@
-module Infrastructure.IpAddress
+module Infrastructure.Endpoint
 
-open System.Net
+open System
 
-let getPort address = 
+let getPort address =     
+    let uri = new Uri(sprintf "tcp://%s" address)
     
+    uri.Port

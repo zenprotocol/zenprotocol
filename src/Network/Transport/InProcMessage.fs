@@ -16,13 +16,21 @@ let AcceptedMessageId = 3uy
 let DisconnectedMessageId = 4uy
 [<LiteralAttribute>]
 let TransactionMessageId = 10uy
+[<LiteralAttribute>]
+let SendAddressMessageId = 11uy
+[<LiteralAttribute>]
+let AddressMessageId = 12uy
 
 type Connect =
         string
 
-type Connected =
-        string
+type Connected = {
+        address : string
+        peerId : byte[]
+    }
 
+type Accepted =
+        byte[]
 
 type Disconnected =
         string
@@ -30,12 +38,22 @@ type Disconnected =
 type Transaction =
         byte[]
 
+type SendAddress = {
+        peerId : byte[]
+        address : string
+    }
+
+type Address =
+        string
+
 type T =
     | Connect of Connect
     | Connected of Connected
-    | Accepted
+    | Accepted of Accepted
     | Disconnected of Disconnected
     | Transaction of Transaction
+    | SendAddress of SendAddress
+    | Address of Address
 
 module Connect =
     let getMessageSize (msg:Connect) =
@@ -52,17 +70,43 @@ module Connect =
             return msg
         }
 
+
 module Connected =
+    let peerIdSize = 4
     let getMessageSize (msg:Connected) =
-            4 + String.length msg
+        0 +
+            4 + String.length msg.address +
+            4 +
+            0
 
     let write (msg:Connected) stream =
         stream
-        |> Stream.writeLongString msg
+        |> Stream.writeLongString msg.address
+        |> Stream.writeBytes msg.peerId 4
 
     let read =
         reader {
-            let! msg = Stream.readLongString
+            let! address = Stream.readLongString
+            let! peerId = Stream.readBytes 4
+
+            return ({
+                        address = address;
+                        peerId = peerId;
+                    }: Connected)
+        }
+
+module Accepted =
+    let peerIdSize = 4
+    let getMessageSize (msg:Accepted) =
+            4
+
+    let write (msg:Accepted) stream =
+        stream
+        |> Stream.writeBytes msg 4
+
+    let read =
+        reader {
+            let! msg = Stream.readBytes 4
 
             return msg
         }
@@ -100,6 +144,46 @@ module Transaction =
         }
 
 
+module SendAddress =
+    let peerIdSize = 4
+    let getMessageSize (msg:SendAddress) =
+        0 +
+            4 +
+            4 + String.length msg.address +
+            0
+
+    let write (msg:SendAddress) stream =
+        stream
+        |> Stream.writeBytes msg.peerId 4
+        |> Stream.writeLongString msg.address
+
+    let read =
+        reader {
+            let! peerId = Stream.readBytes 4
+            let! address = Stream.readLongString
+
+            return ({
+                        peerId = peerId;
+                        address = address;
+                    }: SendAddress)
+        }
+
+module Address =
+    let getMessageSize (msg:Address) =
+            4 + String.length msg
+
+    let write (msg:Address) stream =
+        stream
+        |> Stream.writeLongString msg
+
+    let read =
+        reader {
+            let! msg = Stream.readLongString
+
+            return msg
+        }
+
+
 let private decode stream =
     let readMessage messageId stream =
             match messageId with
@@ -112,7 +196,9 @@ let private decode stream =
             | None,stream -> None,stream
             | Some msg, stream -> Some (Connected msg), stream
         | AcceptedMessageId ->
-            Some Accepted, stream
+            match Accepted.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (Accepted msg), stream
         | DisconnectedMessageId ->
             match Disconnected.read stream with
             | None,stream -> None,stream
@@ -121,6 +207,14 @@ let private decode stream =
             match Transaction.read stream with
             | None,stream -> None,stream
             | Some msg, stream -> Some (Transaction msg), stream
+        | SendAddressMessageId ->
+            match SendAddress.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (SendAddress msg), stream
+        | AddressMessageId ->
+            match Address.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (Address msg), stream
         | _ -> None, stream
 
     let r = reader {
@@ -154,9 +248,11 @@ let send socket msg =
     let writeMessage = function
         | Connect msg -> Connect.write msg
         | Connected msg -> Connected.write msg
-        | Accepted -> id
+        | Accepted msg -> Accepted.write msg
         | Disconnected msg -> Disconnected.write msg
         | Transaction msg -> Transaction.write msg
+        | SendAddress msg -> SendAddress.write msg
+        | Address msg -> Address.write msg
 
     let messageId =
         match msg with
@@ -165,14 +261,18 @@ let send socket msg =
         | Accepted _ -> AcceptedMessageId
         | Disconnected _ -> DisconnectedMessageId
         | Transaction _ -> TransactionMessageId
+        | SendAddress _ -> SendAddressMessageId
+        | Address _ -> AddressMessageId
 
     let messageSize =
         match msg with
         | Connect msg -> Connect.getMessageSize msg
         | Connected msg -> Connected.getMessageSize msg
-        | Accepted -> 0
+        | Accepted msg -> Accepted.getMessageSize msg
         | Disconnected msg -> Disconnected.getMessageSize msg
         | Transaction msg -> Transaction.getMessageSize msg
+        | SendAddress msg -> SendAddress.getMessageSize msg
+        | Address msg -> Address.getMessageSize msg
 
     //  Signature + message ID + message size
     let frameSize = 2 + 1 + messageSize

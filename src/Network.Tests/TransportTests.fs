@@ -3,36 +3,37 @@
 open NUnit.Framework
 open FsUnit
 open FsNetMQ
-open Network   
+open Network
+open Network.Transport      
 open Network.Tests
 
 open TransportHelper        
 
 [<Test>]
 let ``Two peers connect to each other``() =                    
-    use host = startPeer true
-    use peer = startPeer false
+    use host = startHost ()
+    use peer = startPeer ()
               
     waitForAcceptedMessage host 100<milliseconds>
     waitForConnectedMessage peer 100<milliseconds>         
     
 [<Test>]
 let ``multiple peers connecting to host`` () =
-    use host = startPeer true
-    use peer = startPeer false
+    use host = startHost ()
+    use peer = startPeer ()
     
     waitForAcceptedMessage host 100<milliseconds>
     waitForConnectedMessage peer 100<milliseconds>
     
-    let peer2 = startPeer false
+    let peer2 = startPeer ()
     
     waitForAcceptedMessage host 100<milliseconds>
     waitForConnectedMessage peer2 100<milliseconds>
         
 [<Test>]    
 let ``peer reconnect when other peer is down``()=
-    let host = startPeer true
-    use peer = startPeer false
+    let host = startHost ()
+    use peer = startPeer ()
     let connector = Connector.create 1    
                            
     System.Threading.Thread.Sleep (100)
@@ -46,11 +47,39 @@ let ``peer reconnect when other peer is down``()=
     waitForDisconnectedMessage peer 4000<milliseconds>
                     
     // Starting a new host
-    use host2 = startPeer true
+    use host2 = startHost ()
         
     Connector.disconnected connector address
     |> Connector.connect peer addressBook
     |> ignore
     
     // We have to wait 2 seconds for the hello timeout
-    waitForConnectedMessage peer 4000<milliseconds>     
+    waitForConnectedMessage peer 4000<milliseconds>   
+    
+[<Test>]    
+let ``relay address relay only to two peers``() =
+    use host = startHost ()
+    use peer1 = startPeer ()  
+    use peer2 = startPeer ()
+    use peer3 = startPeer ()
+    
+    waitForAcceptedMessage host 100<milliseconds>
+    waitForAcceptedMessage host 100<milliseconds>
+    waitForAcceptedMessage host 100<milliseconds>
+    
+    waitForConnectedMessage peer1 100<milliseconds>
+    waitForConnectedMessage peer2 100<milliseconds>
+    waitForConnectedMessage peer3 100<milliseconds>
+    
+    Transport.publishAddress host "127.0.0.1:5555"
+    
+    let a1 = tryWaitForAddress peer1 100<milliseconds>
+    let a2 = tryWaitForAddress peer2 100<milliseconds>
+    let a3 = tryWaitForAddress peer2 100<milliseconds>
+    
+    let addresses = 
+        seq {yield a1;yield a2;yield a3}
+        |> Seq.choose id
+        
+    addresses |> should equal (Seq.init 2 (fun _ -> "127.0.0.1:5555"))       
+    

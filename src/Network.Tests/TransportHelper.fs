@@ -7,13 +7,19 @@ open FsNetMQ
 let address = "127.0.0.1:5556"
 let addressBook = AddressBook.create (seq {yield address})
 
-let startPeer listener = 
-    let transport = Transport.create listener address
+let startHost () = 
+    let transport = Transport.create true address
     
-    if not listener then
-        Transport.connect transport address
-        
     transport
+    
+let startPeer () =     
+    let transport = Transport.create false address                
+    Transport.connect transport address
+        
+    transport                               
+    
+//let startListeningPeer port = 
+        
     
 let stopPeer peer = 
     (peer :> System.IDisposable).Dispose()   
@@ -39,10 +45,15 @@ let rec waitForDisconnectedMessage peer timeout =
         
 let rec waitForAcceptedMessage peer timeout = 
     match Transport.tryRecv peer timeout with 
-    | Some (InProcMessage.Accepted) ->
+    | Some (InProcMessage.Accepted _) ->
         ()
     | Some _                 
     | None ->                
         failwith "accepted failed"        
                 
-        
+let tryWaitForAddress peer timeout =     
+    match Transport.tryRecv peer timeout with 
+        | Some (InProcMessage.Address address) -> Some address            
+        | Some _                 
+        | None ->                
+            None        

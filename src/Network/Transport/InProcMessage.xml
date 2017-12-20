@@ -14,10 +14,11 @@
     
     <message name="Connected" id="2">
         <field name="address" type="longstr">Address</field>
+        <field name="peerId" type="octets" size="4">Peer Id</field>
     </message>
 
     <message name="Accepted" id="3">
-        
+        <field name="peerId" type="octets" size="4">Peer Id</field>
     </message>
 
     <message name="Disconnected" id="4">
@@ -26,5 +27,14 @@
     
     <message name="Transaction" id="10">
         <field name="tx" type="chunk">Tx</field>
+    </message>
+    
+    <message name="Send Address" id="11">
+        <field name="peerId" type="octets" size="4">Peer Id</field>
+        <field name="address" type="longstr">Address</field>
+    </message>
+    
+    <message name="Address" id="12">
+        <field name="address" type="longstr">Address</field>
     </message>
 </class>

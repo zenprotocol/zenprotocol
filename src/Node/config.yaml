@@ -1,26 +1,11 @@
 chain: local
-
 externalIp: null
 
-api:
-  enabled: false
-  bind: 127.0.0.1:31567
+listen: false
+bind: 127.0.0.1:29555
+seeds: 
+  - 127.0.0.1:29555
 
-networks:  
-  local:    
-    listen: false
-    bind: 127.0.0.1:29555
-    seeds: 
-      - 127.0.0.1:29555
-    
-  test:
-    listen: true
-    bind: "*:19555"
-    seeds:
-      - test.zenprotocol.com:19555
-  
-  main:
-    listen: true
-    bind: "*:9555"
-    seeds:
-      - main.zenprotocol.com:9555
+api:
+  enabled: true
+  bind: 127.0.0.1:31567
