@@ -60,38 +60,48 @@ let transportHandler transport client ownAddress msg (connector,addressBook) =
         let connector = Connector.disconnected connector address  
         (Connector.connect transport addressBook connector),addressBook
     | InProcMessage.Address address ->
-        let handleAddress () =                                 
-            if not (AddressBook.contains addressBook address) then
-                                
-                // TODO: don't publish to the sender?
-                Transport.publishAddress transport address
-                
-                let addressBook = AddressBook.add addressBook address
-                
-                // We might need more peers so lets try to connect to the new peer
-                (Connector.connect transport addressBook connector), addressBook
-            else connector,addressBook
-                 
-        match ownAddress with
-        | None -> handleAddress ()
-        | Some ownAddress when ownAddress <> address -> handleAddress ()
-        | _ -> 
-            // Own address, do nothing
-            connector, addressBook   
+        match Endpoint.isValid address with
+        | false ->
+            Log.warning "Received invalid address from peer %s" address 
+            connector, addressBook // TODO: we should punish the sending node
+        | true ->
+            let handleAddress () =                                 
+                if not (AddressBook.contains addressBook address) then
+                                    
+                    // TODO: don't publish to the sender?
+                    Transport.publishAddress transport address
+                    
+                    let addressBook = AddressBook.add addressBook address
+                    
+                    // We might need more peers so lets try to connect to the new peer
+                    (Connector.connect transport addressBook connector), addressBook
+                else connector,addressBook
+                     
+            match ownAddress with
+            | None -> handleAddress ()
+            | Some ownAddress when ownAddress <> address -> handleAddress ()
+            | _ -> 
+                // Own address, do nothing
+                connector, addressBook   
     | InProcMessage.GetAddresses peerId ->
         Transport.sendAddresses transport peerId (AddressBook.getValidAddresses addressBook)
         connector, addressBook
     | InProcMessage.Addresses addresses ->
-        // Filter own address
-        let addresses = 
-            match ownAddress with
-            | Some ownAddress -> List.filter (fun a -> a <> ownAddress) addresses
-            | None -> addresses
+        match List.forall Endpoint.isValid addresses with
+        | false -> 
+            Log.warning "Received invalid addresses from peer"
+            connector, addressBook // TODO: we should punish the sending node
+        | true ->
+            // Filter own address
+            let addresses = 
+                match ownAddress with
+                | Some ownAddress -> List.filter (fun a -> a <> ownAddress) addresses
+                | None -> addresses
+                
+            let addressBook = AddressBook.addList addressBook addresses
+            let connector = Connector.connect transport addressBook connector
             
-        let addressBook = AddressBook.addList addressBook addresses
-        let connector = Connector.connect transport addressBook connector
-        
-        connector, addressBook
+            connector, addressBook
                             
     | _ -> 
         // TODO: log unknown message

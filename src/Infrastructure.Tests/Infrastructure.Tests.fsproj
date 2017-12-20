@@ -41,6 +41,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="EndpointTests.fs" />
     <Compile Include="EventBus.Tests.fs" />
     <Compile Include="HttpAgentTests.fs" />
     <Compile Include="ServiceBus.Tests.fs" />
