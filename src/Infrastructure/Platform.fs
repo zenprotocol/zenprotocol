@@ -1,4 +1,4 @@
-﻿module Platform
+﻿module Infrastructure.Platform
 
 open System
 open System.IO
@@ -40,7 +40,7 @@ let normalizeNameToFileSystem =
             GetShortPathName(fileName, shortNameBuffer, bufferSize) |> ignore
             shortNameBuffer.ToString()
 
-let workingDirectory = 
+let private workingDirectory = 
     Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
     |> normalizeNameToFileSystem
 
@@ -62,32 +62,50 @@ let private monoM =
 let private mono = 
     match monoM with
         | Some mono -> mono
-        | _ -> 
-            "Cannot find mono"
-            |> Exception
-            |> raise
+        | _ -> failwith "Cannot find mono"
 
-let z3 =
-    "z3" + if isUnix then "" else ".exe"
+let getExeSuffix =
+    (+) (if isUnix then "" else ".exe")
 
 let run exe args =
     let exe, args = if isUnix then mono, exe :: args else exe, args
-    let pinfo = new ProcessStartInfo(exe, String.concat " " args) 
-    pinfo.UseShellExecute <- false
-    pinfo.RedirectStandardOutput <- true
-    pinfo.RedirectStandardError <- true
-    //let output = new StringBuilder()
+    let p = new Process();
+    p.StartInfo <- 
+        new ProcessStartInfo(
+            FileName = exe, 
+            Arguments = String.concat " " args,
+            WorkingDirectory = workingDirectory,
+            //RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false)
+    let appender (sb : StringBuilder) = 
+        let (+) (sb : StringBuilder) (s : string) = sb.Append s |> ignore
+        fun (args : DataReceivedEventArgs) ->
+            let data = args.Data
+            if not (String.IsNullOrWhiteSpace data) then
+                if sb.Length <> 0 then
+                    sb + Environment.NewLine
+                sb + data
     let error = new StringBuilder()
-    let p = Process.Start(pinfo) 
-    //p.OutputDataReceived.Add(fun args -> output.Append(args.Data) |> ignore)
-    p.ErrorDataReceived.Add(fun args -> error.Append(args.Data) |> ignore)
-    if not (p.Start()) then
-        Error ""
-    else
-        p.BeginOutputReadLine()
-        p.BeginErrorReadLine()
-        p.WaitForExit()
-        if p.ExitCode = 0 then
-            Ok ()
+    p.ErrorDataReceived.Add(appender error)
+    //let output = new StringBuilder()
+    //p.OutputDataReceived.Add(appender output)
+    try
+        if p.Start() then
+            p.BeginErrorReadLine()
+            //p.BeginOutputReadLine()
+            p.WaitForExit()
+            let error = error.ToString()
+            if error.Length > 0 then
+                Log.info "%A" error
+            //let output = output.ToString()
+            //if output.Length > 0 then
+            //    Log.info "%A" output
+            if p.ExitCode = 0 
+            then Ok ()
+            else Error error
         else
-            Error ("run: " + error.ToString())
+            Error "failed to start process"
+    with _ as ex ->
+        "run ex: " + ex.Message
+        |> Error
