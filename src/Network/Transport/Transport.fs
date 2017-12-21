@@ -5,7 +5,10 @@ open FsNetMQ
 open Network
 open Infrastructure
 open Network.Transport
+open Network.Transport.Peer
 
+// Random number for sending addresses
+let random = (new System.Random()).Next()
 let timerInterval = 1 * 1000<milliseconds> // 10 seconds  
 
 type T = 
@@ -29,7 +32,34 @@ let cleanDeadPeers inproc (peers:Peers) =
                 InProcMessage.send inproc (InProcMessage.Disconnected address)
             | None -> ())
             
-    Map.filter (fun _ -> Peer.isDead >> not) peers            
+    Map.filter (fun _ -> Peer.isDead >> not) peers  
+    
+let private publishMessage socket inproc peers msg = 
+    let peers = Map.map (fun _ peer -> 
+        match Peer.isActive peer with
+        | true ->  Peer.send socket peer msg 
+        | false -> peer) peers
+    
+    cleanDeadPeers inproc peers     
+    
+let private sendToPeer socket inproc peers routingId msg =
+    let peers = 
+        match Map.tryFind routingId peers with
+        | Some peer ->
+            let peer = Peer.send socket peer msg
+            Map.add routingId peer peers
+        | None -> peers
+        
+    cleanDeadPeers inproc peers                  
+
+let private sendToPeers socket inproc peers routingIds msg =
+    let peers = 
+        Map.map (fun routingId peer ->
+            if Seq.contains routingId routingIds then            
+                Peer.send socket peer msg                
+            else peer) peers
+        
+    cleanDeadPeers inproc peers 
 
 let private handleTimer socket inproc (peers:Peers) = 
     let peers = Map.map (fun _ peer -> Peer.handleTick socket peer) peers
@@ -57,25 +87,53 @@ let private handleInprocMessage socket inproc msg (peers:Peers) =
             let peer = Peer.connect socket address
             let routingId = Peer.routingId peer
             
-            Map.add routingId peer peers
-        | InProcMessage.Transaction tx ->
-            let peers = Map.map (fun _ peer -> 
-                match Peer.isActive peer with
-                | true ->  Peer.send socket peer (Message.Transaction tx) 
-                | false -> peer) peers
+            Map.add routingId peer peers        
+        | InProcMessage.Transaction tx -> 
+            publishMessage socket inproc peers (Message.Transaction tx)
+        | InProcMessage.Address address ->
+            // we only want to publish to 2 peers and want to pick them randomly
+            let today = System.DateTime.Now.Day
             
-            cleanDeadPeers inproc peers
-        | msg -> failwithf "unexpected inproc msg %A" msg        
+            let selectedPeers = 
+                Map.toSeq peers
+                |> Seq.map (fun (key,_)-> key,hash (key, today, random))
+                |> Seq.sortBy (fun (_, h) -> h)
+                |> Seq.take 2
+                |> Seq.map fst
+        
+            sendToPeers socket inproc peers selectedPeers (Message.Address address)
+        | InProcMessage.SendAddress {address=address;peerId=peerId} ->
+            let routingId = RoutingId.fromBytes peerId
+            sendToPeer socket inproc peers routingId (Message.Address address)  
+        | InProcMessage.GetAddresses peerId ->
+            let routingId = RoutingId.fromBytes peerId
+            sendToPeer socket inproc peers routingId Message.GetAddresses
+        | InProcMessage.SendAddresses {addresses=addresses;peerId=peerId} ->       
+            let routingId = RoutingId.fromBytes peerId
+            sendToPeer socket inproc peers routingId (Message.Addresses addresses)
+        | msg -> failwithf "unexpected inproc msg %A" msg
                 
 let private onError error = 
     Log.error "Unhandled exception from peer actor %A" error
     System.Environment.FailFast(sprintf "Unhandled exception peer actor" , error)
 
-let connect transport address  = 
+let connect transport address  =      
     InProcMessage.send transport.inproc (InProcMessage.Connect address)
 
 let publishTransaction transport tx = 
     InProcMessage.send transport.inproc (InProcMessage.Transaction tx)
+    
+let sendAddress transport peerId address = 
+    InProcMessage.send transport.inproc (InProcMessage.SendAddress {address=address;peerId=peerId})
+    
+let getAddresses transport peerId = 
+    InProcMessage.send transport.inproc (InProcMessage.GetAddresses peerId)
+    
+let sendAddresses transport peerId addresses= 
+    InProcMessage.send transport.inproc (InProcMessage.SendAddresses {addresses=addresses;peerId=peerId})        
+    
+let publishAddress transport address = 
+    InProcMessage.send transport.inproc (InProcMessage.Address address)        
     
 let recv transport =
     match InProcMessage.recv transport.inproc with

@@ -7,29 +7,35 @@ open FsNetMQ
 let address = "127.0.0.1:5556"
 let addressBook = AddressBook.create (seq {yield address})
 
-let startPeer listener = 
-    let transport = Transport.create listener address
+let startHost () = 
+    let transport = Transport.create true address
     
-    if not listener then
-        Transport.connect transport address
-        
     transport
+    
+let startPeer () =     
+    let transport = Transport.create false address                
+    Transport.connect transport address
+        
+    transport    
     
 let stopPeer peer = 
     (peer :> System.IDisposable).Dispose()   
     
-let rec waitForConnectedMessage peer timeout = 
+let recvConnectedMessage peer timeout = 
     match Transport.tryRecv peer timeout with 
-    | Some (InProcMessage.Connected _) ->
-        ()
+    | Some (InProcMessage.Connected {peerId=peerId}) ->
+        peerId
     | Some (InProcMessage.Disconnected _) ->
         failwithf "connect failed, disconnect"
     | Some x ->                 
         failwithf "connect failed, unexpected %A" x
     | None ->                
-        failwith "connect failed"
+        failwith "connect failed"       
     
-let rec waitForDisconnectedMessage peer timeout = 
+let waitForConnectedMessage peer timeout = 
+    recvConnectedMessage peer timeout |> ignore             
+    
+let waitForDisconnectedMessage peer timeout = 
     match Transport.tryRecv peer timeout with 
     | Some (InProcMessage.Disconnected _) ->
         ()
@@ -37,12 +43,33 @@ let rec waitForDisconnectedMessage peer timeout =
     | None ->                
         failwith "no disconnect message"        
         
-let rec waitForAcceptedMessage peer timeout = 
+let waitForAcceptedMessage peer timeout = 
     match Transport.tryRecv peer timeout with 
-    | Some (InProcMessage.Accepted) ->
+    | Some (InProcMessage.Accepted _) ->
         ()
     | Some _                 
     | None ->                
-        failwith "accepted failed"        
+        failwith "waitForAcceptedMessage failed"        
                 
-        
+let tryRecvAddress peer timeout =     
+    match Transport.tryRecv peer timeout with 
+        | Some (InProcMessage.Address address) -> Some address            
+        | Some _                 
+        | None ->                
+            None
+            
+let recvGetAddresses peer timeout = 
+    match Transport.tryRecv peer timeout with 
+    | Some (InProcMessage.GetAddresses peerId) ->
+        peerId
+    | Some _                 
+    | None ->                
+        failwith "recvGetAddresses failed"  
+
+let recvAddresses peer timeout =               
+    match Transport.tryRecv peer timeout with 
+    | Some (InProcMessage.Addresses addresses) ->
+        addresses
+    | Some _                 
+    | None ->                
+        failwith "recvAddresses failed"      

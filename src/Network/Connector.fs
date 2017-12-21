@@ -1,39 +1,45 @@
 module Network.Connector
 
+open Network
 open Network;
 open Network.Transport;
 
 type T = {
     maxConnections: int;
-    connected: int;
-    connecting: Set<string>;
+    connections: Set<string>;   
+    failed: Set<string>;
 }
 
-let create maxConnection = {maxConnections=maxConnection;connected=0;connecting=Set.empty}
+let create maxConnection = {maxConnections=maxConnection; connections = Set.empty; failed=Set.empty}
 
-let connected connector address = 
-    let connecting = Set.remove address connector.connecting
-    let connected = connector.connected + 1
-    
-    {connector with connecting=connecting;connected=connected}
-
-let disconnected connector address = 
-    let connecting,connected = 
-        if Set.contains address connector.connecting then
-            (Set.remove address connector.connecting), connector.connected
-        else connector.connecting, (connector.connected - 1)
+let connected connector address =
+    let failed = Set.remove address connector.failed     
+     
+    {connector with failed = failed}
         
-    {connector with connecting=connecting;connected=connected}
+let disconnected connector address =
+    // TODO: add the address to fail, in order to try last 
+ 
+    let connections = Set.remove address connector.connections
+    let failed = Set.add address connector.failed
     
-let connect transport addressBook connector = 
-    let connectionsToOpen = connector.maxConnections - connector.connected - (Set.count connector.connecting)
-
-    let addresses = AddressBook.take addressBook connector.connecting connectionsToOpen
+    {connector with connections = connections}
     
-    // Connect to new addresses
-    Seq.iter (Transport.connect transport) addresses
-    
-    // Add the new addresses to the connecting set
-    let connecting = Seq.fold (fun set address -> Set.add address set) connector.connecting addresses
-    
-    {connector with connecting = connecting}
+let connect transport addressBook connector =
+        
+    let connectInternal transport addressBook connector exclude  =
+        let connectionsToOpen = connector.maxConnections - (Set.count connector.connections)
+            
+        let addresses = AddressBook.take addressBook exclude connectionsToOpen
+        
+        // Connect to new addresses
+        Seq.iter (Transport.connect transport) addresses
+        
+        // Add the new addresses to the connecting set
+        let connections = Seq.fold (fun set address -> Set.add address set) connector.connections addresses
+        
+        {connector with connections = connections}     
+        
+    // Try first without failed one
+    let connector = connectInternal transport addressBook connector (Set.union connector.connections connector.failed) 
+    connectInternal transport addressBook connector connector.connections 

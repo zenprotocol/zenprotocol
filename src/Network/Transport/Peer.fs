@@ -4,6 +4,10 @@ open FsNetMQ
 open Network
 open Infrastructure
 
+module RoutingId = 
+    let toBytes (FsNetMQ.RoutingId.RoutingId bytes) = bytes
+    let fromBytes bytes = FsNetMQ.RoutingId.RoutingId bytes 
+
 let networkId = 0ul;
 let version = 0ul;
 
@@ -122,7 +126,7 @@ let newPeer socket next routingId msg =
             
             let peer = createPeer Active
             
-            next InProcMessage.Accepted
+            next (InProcMessage.Accepted (RoutingId.toBytes peer.routingId))
             
             send socket peer (Message.HelloAck {version=0ul; network = networkId;})                                                 
         | _ ->
@@ -145,7 +149,9 @@ let handleConnectingState socket next peer msg =
             Log.info "Connected to peer"
             
             match peer.mode with 
-            | Connector address -> next (InProcMessage.Connected address)
+            | Connector address -> 
+                let peerId = RoutingId.toBytes peer.routingId
+                next (InProcMessage.Connected {address=address;peerId=peerId})
             | _ -> ()
             
             {peer with state=Active; ping=NoPing (getNow ())}            
@@ -180,7 +186,16 @@ let handleActiveState socket next peer msg =
         | Message.Transaction tx ->
             next (InProcMessage.Transaction tx)
             peer
-        | msg -> 
+        | Message.Address address ->
+            next (InProcMessage.Address address)
+            peer     
+        | Message.GetAddresses ->
+            next (InProcMessage.GetAddresses (RoutingId.toBytes peer.routingId))
+            peer
+        | Message.Addresses addresses ->
+            next (InProcMessage.Addresses addresses)    
+            peer        
+        | msg ->
             // TODO: unexpected msg, close peer          
             
             peer

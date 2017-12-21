@@ -17,6 +17,12 @@ let PongMessageId = 4uy
 [<LiteralAttribute>]
 let TransactionMessageId = 5uy
 [<LiteralAttribute>]
+let AddressMessageId = 6uy
+[<LiteralAttribute>]
+let GetAddressesMessageId = 7uy
+[<LiteralAttribute>]
+let AddressesMessageId = 8uy
+[<LiteralAttribute>]
 let UnknownPeerMessageId = 100uy
 [<LiteralAttribute>]
 let UnknownMessageMessageId = 101uy
@@ -40,6 +46,13 @@ type Pong =
 type Transaction =
         byte[]
 
+type Address =
+        string
+
+
+type Addresses =
+        string list
+
 
 type UnknownMessage =
         byte
@@ -50,6 +63,9 @@ type T =
     | Ping of Ping
     | Pong of Pong
     | Transaction of Transaction
+    | Address of Address
+    | GetAddresses
+    | Addresses of Addresses
     | UnknownPeer
     | UnknownMessage of UnknownMessage
 
@@ -148,6 +164,36 @@ module Transaction =
             return msg
         }
 
+module Address =
+    let getMessageSize (msg:Address) =
+            4 + String.length msg
+
+    let write (msg:Address) stream =
+        stream
+        |> Stream.writeLongString msg
+
+    let read =
+        reader {
+            let! msg = Stream.readLongString
+
+            return msg
+        }
+
+module Addresses =
+    let getMessageSize (msg:Addresses) =
+            List.fold (fun state (value:string) -> state + 4 + Encoding.UTF8.GetByteCount (value)) 4 msg
+
+    let write (msg:Addresses) stream =
+        stream
+        |> Stream.writeStrings msg
+
+    let read =
+        reader {
+            let! msg = Stream.readStrings
+
+            return msg
+        }
+
 module UnknownMessage =
     let getMessageSize (msg:UnknownMessage) =
             1
@@ -164,14 +210,9 @@ module UnknownMessage =
         }
 
 
-let recv socket =
-    let stream, more = Stream.recv socket
-
-    // Drop the rest if any
-    if more then Multipart.skip socket
-
+let private decode stream =
     let readMessage messageId stream =
-        match messageId with
+            match messageId with
         | HelloMessageId ->
             match Hello.read stream with
             | None,stream -> None,stream
@@ -192,6 +233,16 @@ let recv socket =
             match Transaction.read stream with
             | None,stream -> None,stream
             | Some msg, stream -> Some (Transaction msg), stream
+        | AddressMessageId ->
+            match Address.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (Address msg), stream
+        | GetAddressesMessageId ->
+            Some GetAddresses, stream
+        | AddressesMessageId ->
+            match Addresses.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (Addresses msg), stream
         | UnknownPeerMessageId ->
             Some UnknownPeer, stream
         | UnknownMessageMessageId ->
@@ -210,6 +261,23 @@ let recv socket =
 
     run r stream
 
+let recv socket =
+    let stream, more = Stream.recv socket
+
+    // Drop the rest if any
+    if more then Multipart.skip socket
+
+    decode stream
+
+let tryRecv socket timeout =
+    match Stream.tryRecv socket timeout with
+    | None -> None
+    | Some (stream, more) ->
+        // Drop the rest if any
+        if more then Multipart.skip socket
+
+        decode stream
+
 let send socket msg =
     let writeMessage = function
         | Hello msg -> Hello.write msg
@@ -217,6 +285,9 @@ let send socket msg =
         | Ping msg -> Ping.write msg
         | Pong msg -> Pong.write msg
         | Transaction msg -> Transaction.write msg
+        | Address msg -> Address.write msg
+        | GetAddresses -> id
+        | Addresses msg -> Addresses.write msg
         | UnknownPeer -> id
         | UnknownMessage msg -> UnknownMessage.write msg
 
@@ -227,6 +298,9 @@ let send socket msg =
         | Ping _ -> PingMessageId
         | Pong _ -> PongMessageId
         | Transaction _ -> TransactionMessageId
+        | Address _ -> AddressMessageId
+        | GetAddresses _ -> GetAddressesMessageId
+        | Addresses _ -> AddressesMessageId
         | UnknownPeer _ -> UnknownPeerMessageId
         | UnknownMessage _ -> UnknownMessageMessageId
 
@@ -237,6 +311,9 @@ let send socket msg =
         | Ping msg -> Ping.getMessageSize msg
         | Pong msg -> Pong.getMessageSize msg
         | Transaction msg -> Transaction.getMessageSize msg
+        | Address msg -> Address.getMessageSize msg
+        | GetAddresses -> 0
+        | Addresses msg -> Addresses.getMessageSize msg
         | UnknownPeer -> 0
         | UnknownMessage msg -> UnknownMessage.getMessageSize msg
 

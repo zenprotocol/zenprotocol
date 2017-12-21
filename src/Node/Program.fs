@@ -10,14 +10,23 @@ module Actor = FsNetMQ.Actor
 type Argument = 
     | Chain of string
     | Api of string
-    | Localhost    
+    | Bind of string
+    | Ip of string
+    | [<AltCommandLine("-lr")>] Localhost
+    | [<AltCommandLine("-l1")>] Local1
+    | [<AltCommandLine("-l2")>] Local2
     with
         interface IArgParserTemplate with
             member s.Usage =
                 match s with
                 | Api _ -> "Enable api and set bind address"
-                | Chain _ -> "specify chain (local,test or main)."
-                | Localhost -> "specify if the node should local chain host"                              
+                | Bind _ -> "Set the address the node should listen on"
+                | Chain _ -> "specify chain (local,test or main)."                
+                | Ip _ -> "specify the IP the node should relay to other peers"
+                | Localhost -> "specify if the node should local chain host"
+                | Local1 -> "run node with local1 settings, use for tests"
+                | Local2 -> "run node with local1 settings, use for tests"
+                                              
 
 type Config = YamlConfig<"config.yaml">
 
@@ -34,13 +43,6 @@ let createBroker () =
         Actor.signal shim
         Poller.run poller           
 )
-
-let getNetworkParameters (config:Config) = 
-    match config.chain with
-    | "local" -> config.networks.local.listen,config.networks.local.bind,config.networks.local.seeds
-    | "test" -> config.networks.test.listen,config.networks.test.bind,config.networks.test.seeds
-    | "main" -> config.networks.main.listen,config.networks.main.bind,config.networks.main.seeds
-    | c -> failwithf "unkown chain %s" c 
 
 let getChain (config:Config) = 
     match config.chain with
@@ -62,22 +64,42 @@ let main argv =
     List.iter (fun arg -> 
         match arg with 
         | Chain chain -> config.chain <- chain            
-        | Localhost ->                        
+        | Localhost -> 
             config.chain <- "local"
-            config.networks.local.listen <- true
-            config.networks.local.seeds.Clear ()  
+            config.listen <- true
+            config.seeds.Clear ()  
+            config.api.enabled <- true
             root <- true 
+        | Local1 ->
+            config.chain <- "local"
+            config.listen <- true
+            config.bind <- "127.0.0.1:37000"
+            config.externalIp <- "127.0.0.1"
+            config.api.enabled <- true
+            config.api.bind <- "127.0.0.1:36000"
+        | Local2 ->
+            config.chain <- "local"
+            config.listen <- true
+            config.bind <- "127.0.0.1:37001"
+            config.externalIp <- "127.0.0.1"
+            config.api.enabled <- true
+            config.api.bind <- "127.0.0.1:36001"
         | Api address -> 
             config.api.enabled <- true
             config.api.bind <- address
-                       
+        | Bind address ->
+            config.bind <- address
+            config.listen <- true
+        | Ip ip ->
+            config.externalIp <- ip                
+                                       
     ) (results.GetAllResults())
                               
     use brokerActor = createBroker ()    
     use blockchainActor = Blockchain.Main.main busName
-    
-    let listen,bind,seeds = getNetworkParameters config
-    use networkActor = Network.Main.main busName config.externalIp listen bind seeds
+        
+    use networkActor = 
+        Network.Main.main busName config.externalIp config.listen config.bind config.seeds
     
     let chain = getChain config
     use walletActor = Wallet.Main.main busName chain root
