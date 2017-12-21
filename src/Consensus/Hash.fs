@@ -3,6 +3,9 @@ module Consensus.Hash
 open Org.BouncyCastle.Crypto.Digests
 open FsBech32
 
+[<Literal>]
+let Length = 32
+
 type Hash = Hash of byte[]
 
 let zero = 

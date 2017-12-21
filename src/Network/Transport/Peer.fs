@@ -195,6 +195,15 @@ let handleActiveState socket next peer msg =
         | Message.Addresses addresses ->
             next (InProcMessage.Addresses addresses)    
             peer        
+        | Message.GetMemPool ->              
+            next (InProcMessage.GetMemPool (RoutingId.toBytes peer.routingId))
+            peer
+        | Message.MemPool txs ->
+            next (InProcMessage.MemPool {peerId=(RoutingId.toBytes peer.routingId);txs=txs})
+            peer
+        | Message.GetTransaction txHash ->
+            next (InProcMessage.GetTransaction {peerId=(RoutingId.toBytes peer.routingId); txHash=txHash})
+            peer
         | msg ->
             // TODO: unexpected msg, close peer          
             

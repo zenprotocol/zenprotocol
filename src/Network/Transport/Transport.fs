@@ -111,6 +111,18 @@ let private handleInprocMessage socket inproc msg (peers:Peers) =
         | InProcMessage.SendAddresses {addresses=addresses;peerId=peerId} ->       
             let routingId = RoutingId.fromBytes peerId
             sendToPeer socket inproc peers routingId (Message.Addresses addresses)
+        | InProcMessage.GetMemPool peerId ->                    
+            let routingId = RoutingId.fromBytes peerId
+            sendToPeer socket inproc peers routingId Message.GetMemPool
+        | InProcMessage.MemPool {peerId=peerId;txs=txs} ->
+            let routingId = RoutingId.fromBytes peerId
+            sendToPeer socket inproc peers routingId (Message.MemPool txs)
+        | InProcMessage.GetTransaction {peerId=peerId; txHash=txHash} ->  
+            let routingId = RoutingId.fromBytes peerId
+            sendToPeer socket inproc peers routingId (Message.GetTransaction txHash)
+        | InProcMessage.SendTransaction {peerId=peerId;tx=tx} ->
+            let routingId = RoutingId.fromBytes peerId
+            sendToPeer socket inproc peers routingId (Message.Transaction tx)                              
         | msg -> failwithf "unexpected inproc msg %A" msg
                 
 let private onError error = 
@@ -133,8 +145,20 @@ let sendAddresses transport peerId addresses=
     InProcMessage.send transport.inproc (InProcMessage.SendAddresses {addresses=addresses;peerId=peerId})        
     
 let publishAddress transport address = 
-    InProcMessage.send transport.inproc (InProcMessage.Address address)        
+    InProcMessage.send transport.inproc (InProcMessage.Address address)
     
+let getMemPool transport peerId =
+    InProcMessage.send transport.inproc (InProcMessage.GetMemPool peerId)
+    
+let sendMemPool transport peerId txHashes =    
+    InProcMessage.send transport.inproc (InProcMessage.MemPool {peerId=peerId;txs = txHashes})
+    
+let getTransaction transport peerId txHash  =                
+    InProcMessage.send transport.inproc (InProcMessage.GetTransaction {peerId=peerId;txHash=txHash})
+    
+let sendTransaction transport peerId tx = 
+    InProcMessage.send transport.inproc (InProcMessage.SendTransaction {peerId=peerId;tx=tx})    
+                            
 let recv transport =
     match InProcMessage.recv transport.inproc with
     | Some msg -> msg

@@ -10,3 +10,10 @@ let create () = Map.empty
 let containsTransaction = Map.containsKey 
 
 let add = Map.add
+
+let getTxHashes (mempool:T) = 
+    Map.toSeq mempool
+    |> Seq.map fst
+    |> Seq.toList
+    
+let getTransaction = Map.tryFind

@@ -23,6 +23,12 @@ let GetAddressesMessageId = 7uy
 [<LiteralAttribute>]
 let AddressesMessageId = 8uy
 [<LiteralAttribute>]
+let GetMemPoolMessageId = 9uy
+[<LiteralAttribute>]
+let MemPoolMessageId = 10uy
+[<LiteralAttribute>]
+let GetTransactionMessageId = 11uy
+[<LiteralAttribute>]
 let UnknownPeerMessageId = 100uy
 [<LiteralAttribute>]
 let UnknownMessageMessageId = 101uy
@@ -54,6 +60,13 @@ type Addresses =
         string list
 
 
+type MemPool =
+        byte[]
+
+type GetTransaction =
+        byte[]
+
+
 type UnknownMessage =
         byte
 
@@ -66,6 +79,9 @@ type T =
     | Address of Address
     | GetAddresses
     | Addresses of Addresses
+    | GetMemPool
+    | MemPool of MemPool
+    | GetTransaction of GetTransaction
     | UnknownPeer
     | UnknownMessage of UnknownMessage
 
@@ -194,6 +210,39 @@ module Addresses =
             return msg
         }
 
+module MemPool =
+    let getMessageSize (msg:MemPool) =
+            4 + Array.length msg
+
+    let write (msg:MemPool) stream =
+        stream
+        |> Stream.writeNumber4 (uint32 (Array.length msg))
+        |> Stream.writeBytes msg (Array.length msg)
+
+    let read =
+        reader {
+            let! msgLength = Stream.readNumber4
+            let! msg = Stream.readBytes (int msgLength)
+
+            return msg
+        }
+
+module GetTransaction =
+    let txHashSize = 32
+    let getMessageSize (msg:GetTransaction) =
+            32
+
+    let write (msg:GetTransaction) stream =
+        stream
+        |> Stream.writeBytes msg 32
+
+    let read =
+        reader {
+            let! msg = Stream.readBytes 32
+
+            return msg
+        }
+
 module UnknownMessage =
     let getMessageSize (msg:UnknownMessage) =
             1
@@ -243,6 +292,16 @@ let private decode stream =
             match Addresses.read stream with
             | None,stream -> None,stream
             | Some msg, stream -> Some (Addresses msg), stream
+        | GetMemPoolMessageId ->
+            Some GetMemPool, stream
+        | MemPoolMessageId ->
+            match MemPool.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (MemPool msg), stream
+        | GetTransactionMessageId ->
+            match GetTransaction.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (GetTransaction msg), stream
         | UnknownPeerMessageId ->
             Some UnknownPeer, stream
         | UnknownMessageMessageId ->
@@ -288,6 +347,9 @@ let send socket msg =
         | Address msg -> Address.write msg
         | GetAddresses -> id
         | Addresses msg -> Addresses.write msg
+        | GetMemPool -> id
+        | MemPool msg -> MemPool.write msg
+        | GetTransaction msg -> GetTransaction.write msg
         | UnknownPeer -> id
         | UnknownMessage msg -> UnknownMessage.write msg
 
@@ -301,6 +363,9 @@ let send socket msg =
         | Address _ -> AddressMessageId
         | GetAddresses _ -> GetAddressesMessageId
         | Addresses _ -> AddressesMessageId
+        | GetMemPool _ -> GetMemPoolMessageId
+        | MemPool _ -> MemPoolMessageId
+        | GetTransaction _ -> GetTransactionMessageId
         | UnknownPeer _ -> UnknownPeerMessageId
         | UnknownMessage _ -> UnknownMessageMessageId
 
@@ -314,6 +379,9 @@ let send socket msg =
         | Address msg -> Address.getMessageSize msg
         | GetAddresses -> 0
         | Addresses msg -> Addresses.getMessageSize msg
+        | GetMemPool -> 0
+        | MemPool msg -> MemPool.getMessageSize msg
+        | GetTransaction msg -> GetTransaction.getMessageSize msg
         | UnknownPeer -> 0
         | UnknownMessage msg -> UnknownMessage.getMessageSize msg
 

@@ -26,6 +26,14 @@ let GetAddressesMessageId = 13uy
 let AddressesMessageId = 14uy
 [<LiteralAttribute>]
 let SendAddressesMessageId = 15uy
+[<LiteralAttribute>]
+let GetMemPoolMessageId = 16uy
+[<LiteralAttribute>]
+let MemPoolMessageId = 17uy
+[<LiteralAttribute>]
+let GetTransactionMessageId = 18uy
+[<LiteralAttribute>]
+let SendTransactionMessageId = 19uy
 
 type Connect =
         string
@@ -63,6 +71,24 @@ type SendAddresses = {
         addresses : string list
     }
 
+type GetMemPool =
+        byte[]
+
+type MemPool = {
+        peerId : byte[]
+        txs : byte[]
+    }
+
+type GetTransaction = {
+        peerId : byte[]
+        txHash : byte[]
+    }
+
+type SendTransaction = {
+        peerId : byte[]
+        tx : byte[]
+    }
+
 type T =
     | Connect of Connect
     | Connected of Connected
@@ -74,6 +100,10 @@ type T =
     | GetAddresses of GetAddresses
     | Addresses of Addresses
     | SendAddresses of SendAddresses
+    | GetMemPool of GetMemPool
+    | MemPool of MemPool
+    | GetTransaction of GetTransaction
+    | SendTransaction of SendTransaction
 
 module Connect =
     let getMessageSize (msg:Connect) =
@@ -259,6 +289,102 @@ module SendAddresses =
                     }: SendAddresses)
         }
 
+module GetMemPool =
+    let peerIdSize = 4
+    let getMessageSize (msg:GetMemPool) =
+            4
+
+    let write (msg:GetMemPool) stream =
+        stream
+        |> Stream.writeBytes msg 4
+
+    let read =
+        reader {
+            let! msg = Stream.readBytes 4
+
+            return msg
+        }
+
+
+module MemPool =
+    let peerIdSize = 4
+    let getMessageSize (msg:MemPool) =
+        0 +
+            4 +
+            4 + Array.length msg.txs +
+            0
+
+    let write (msg:MemPool) stream =
+        stream
+        |> Stream.writeBytes msg.peerId 4
+        |> Stream.writeNumber4 (uint32 (Array.length msg.txs))
+        |> Stream.writeBytes msg.txs (Array.length msg.txs)
+
+    let read =
+        reader {
+            let! peerId = Stream.readBytes 4
+            let! txsLength = Stream.readNumber4
+            let! txs = Stream.readBytes (int txsLength)
+
+            return ({
+                        peerId = peerId;
+                        txs = txs;
+                    }: MemPool)
+        }
+
+
+module GetTransaction =
+    let peerIdSize = 4
+    let txHashSize = 32
+    let getMessageSize (msg:GetTransaction) =
+        0 +
+            4 +
+            32 +
+            0
+
+    let write (msg:GetTransaction) stream =
+        stream
+        |> Stream.writeBytes msg.peerId 4
+        |> Stream.writeBytes msg.txHash 32
+
+    let read =
+        reader {
+            let! peerId = Stream.readBytes 4
+            let! txHash = Stream.readBytes 32
+
+            return ({
+                        peerId = peerId;
+                        txHash = txHash;
+                    }: GetTransaction)
+        }
+
+
+module SendTransaction =
+    let peerIdSize = 4
+    let getMessageSize (msg:SendTransaction) =
+        0 +
+            4 +
+            4 + Array.length msg.tx +
+            0
+
+    let write (msg:SendTransaction) stream =
+        stream
+        |> Stream.writeBytes msg.peerId 4
+        |> Stream.writeNumber4 (uint32 (Array.length msg.tx))
+        |> Stream.writeBytes msg.tx (Array.length msg.tx)
+
+    let read =
+        reader {
+            let! peerId = Stream.readBytes 4
+            let! txLength = Stream.readNumber4
+            let! tx = Stream.readBytes (int txLength)
+
+            return ({
+                        peerId = peerId;
+                        tx = tx;
+                    }: SendTransaction)
+        }
+
 
 let private decode stream =
     let readMessage messageId stream =
@@ -303,6 +429,22 @@ let private decode stream =
             match SendAddresses.read stream with
             | None,stream -> None,stream
             | Some msg, stream -> Some (SendAddresses msg), stream
+        | GetMemPoolMessageId ->
+            match GetMemPool.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (GetMemPool msg), stream
+        | MemPoolMessageId ->
+            match MemPool.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (MemPool msg), stream
+        | GetTransactionMessageId ->
+            match GetTransaction.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (GetTransaction msg), stream
+        | SendTransactionMessageId ->
+            match SendTransaction.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (SendTransaction msg), stream
         | _ -> None, stream
 
     let r = reader {
@@ -344,6 +486,10 @@ let send socket msg =
         | GetAddresses msg -> GetAddresses.write msg
         | Addresses msg -> Addresses.write msg
         | SendAddresses msg -> SendAddresses.write msg
+        | GetMemPool msg -> GetMemPool.write msg
+        | MemPool msg -> MemPool.write msg
+        | GetTransaction msg -> GetTransaction.write msg
+        | SendTransaction msg -> SendTransaction.write msg
 
     let messageId =
         match msg with
@@ -357,6 +503,10 @@ let send socket msg =
         | GetAddresses _ -> GetAddressesMessageId
         | Addresses _ -> AddressesMessageId
         | SendAddresses _ -> SendAddressesMessageId
+        | GetMemPool _ -> GetMemPoolMessageId
+        | MemPool _ -> MemPoolMessageId
+        | GetTransaction _ -> GetTransactionMessageId
+        | SendTransaction _ -> SendTransactionMessageId
 
     let messageSize =
         match msg with
@@ -370,6 +520,10 @@ let send socket msg =
         | GetAddresses msg -> GetAddresses.getMessageSize msg
         | Addresses msg -> Addresses.getMessageSize msg
         | SendAddresses msg -> SendAddresses.getMessageSize msg
+        | GetMemPool msg -> GetMemPool.getMessageSize msg
+        | MemPool msg -> MemPool.getMessageSize msg
+        | GetTransaction msg -> GetTransaction.getMessageSize msg
+        | SendTransaction msg -> SendTransaction.getMessageSize msg
 
     //  Signature + message ID + message size
     let frameSize = 2 + 1 + messageSize

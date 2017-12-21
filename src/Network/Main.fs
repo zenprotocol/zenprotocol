@@ -9,6 +9,7 @@ open Messaging.Services.Network
 open Messaging.Events
 open Consensus
 open Messaging
+open Messaging.Services
 open Network
 open Network.Message
 open Network.Transport
@@ -31,6 +32,8 @@ let transportHandler transport client ownAddress msg (connector,addressBook) =
          if not (AddressBook.haveEnoughAddresses addressBook) then
             Transport.getAddresses transport peerId             
  
+    let requestMemPool = Transport.getMemPool transport
+ 
     match msg with 
     | InProcMessage.Transaction msg ->
         match Transaction.deserialize msg with
@@ -46,14 +49,16 @@ let transportHandler transport client ownAddress msg (connector,addressBook) =
         Option.iter (fun address -> 
             Transport.sendAddress transport peerId address) ownAddress
             
-        // Send getAddress request to the peer            
+        // Request addresses and mempool            
         requestAddresses peerId 
+        requestMemPool peerId
             
         (Connector.connected connector address),addressBook        
     | InProcMessage.Accepted peerId ->
         
-        // Send getAddress request to the peer
-        requestAddresses peerId
+        // Request addresses and mempool            
+        requestAddresses peerId 
+        requestMemPool peerId
             
         connector,addressBook                                               
     | InProcMessage.Disconnected address ->
@@ -102,13 +107,54 @@ let transportHandler transport client ownAddress msg (connector,addressBook) =
             let connector = Connector.connect transport addressBook connector
             
             connector, addressBook
-                            
+    | InProcMessage.GetMemPool peerId ->            
+        Blockchain.getMemPool client peerId
+    
+        connector, addressBook      
+    | InProcMessage.MemPool {peerId=peerId;txs=bytes} ->            
+        // Check if valid hashses array
+        // TODO: punish sending node if not        
+        if (Array.length bytes) % Hash.Length = 0 then    
+            let txHashes = 
+                Array.chunkBySize Hash.Length bytes
+                |> Seq.ofArray 
+                |> Seq.map Hash.fromBytes
+                |> Seq.choose id // We know all should pass as we already checked the size
+                |> Seq.toList
+                
+            Blockchain.handleMemPool client peerId txHashes
+                                            
+        connector, addressBook
+    | InProcMessage.GetTransaction {peerId=peerId;txHash=txHash} ->
+        match Hash.fromBytes txHash with
+        | Some txHash -> 
+            Blockchain.getTransaction client peerId txHash
+        | None -> 
+            // TODO: we might want to punish the sending node
+            ()
+                     
+        connector, addressBook                
+                                      
     | _ -> 
         // TODO: log unknown message
         connector, addressBook
 
-let commandHandler command (state:State) = state
-
+let commandHandler transport command (state:State) = 
+    match command with 
+    | Command.SendMemPool (peerId, txHashes) ->            
+        let bytes =
+            List.map Hash.bytes txHashes
+            |> Array.concat
+        Transport.sendMemPool transport peerId bytes
+        state
+    | Command.GetTransaction (peerId, txHash) ->
+        Transport.getTransaction transport peerId (Hash.bytes txHash)
+        state          
+    | Command.SendTransaction (peerId, tx) ->
+        let bytes = Transaction.serialize Transaction.Full tx
+        Transport.sendTransaction transport peerId bytes         
+        state
+        
 let requestHandler request reply (state:State) = state
 
 let main busName externalIp listen bind seeds =
@@ -135,7 +181,7 @@ let main busName externalIp listen bind seeds =
             sbObservable
             |> Observable.map (fun message ->
                 match message with 
-                | ServiceBus.Agent.Command c -> commandHandler c 
+                | ServiceBus.Agent.Command c -> commandHandler transport c 
                 | ServiceBus.Agent.Request (r, reply) -> requestHandler r reply)                
         
         let ebObservable = 

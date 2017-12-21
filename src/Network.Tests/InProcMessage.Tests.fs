@@ -332,6 +332,145 @@ let ``SendAddresses size fits stream ``() =
     messageSize |> should equal offset
 
 [<Test>]
+let ``send and recv GetMemPool``() =
+    let msg = GetMemPool (Array.create 4 123uy)
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://GetMemPool.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://GetMemPool.test"
+
+    Network.Transport.InProcMessage.send server msg
+
+    let msg' = Network.Transport.InProcMessage.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``GetMemPool size fits stream ``() =
+    let getmempool:GetMemPool =
+        Array.create 4 123uy
+
+    let messageSize = GetMemPool.getMessageSize getmempool
+
+    let stream =
+        Stream.create messageSize
+        |> GetMemPool.write getmempool
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
+let ``send and recv MemPool``() =
+    let msg = MemPool {
+        peerId = Array.create 4 123uy;
+        txs = "Captcha Diem"B;
+    }
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://MemPool.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://MemPool.test"
+
+    Network.Transport.InProcMessage.send server msg
+
+    let msg' = Network.Transport.InProcMessage.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``MemPool size fits stream ``() =
+    let mempool:MemPool = {
+        peerId = Array.create 4 123uy;
+        txs = "Captcha Diem"B;
+    }
+
+    let messageSize = MemPool.getMessageSize mempool
+
+    let stream =
+        Stream.create messageSize
+        |> MemPool.write mempool
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
+let ``send and recv GetTransaction``() =
+    let msg = GetTransaction {
+        peerId = Array.create 4 123uy;
+        txHash = Array.create 32 123uy;
+    }
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://GetTransaction.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://GetTransaction.test"
+
+    Network.Transport.InProcMessage.send server msg
+
+    let msg' = Network.Transport.InProcMessage.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``GetTransaction size fits stream ``() =
+    let gettransaction:GetTransaction = {
+        peerId = Array.create 4 123uy;
+        txHash = Array.create 32 123uy;
+    }
+
+    let messageSize = GetTransaction.getMessageSize gettransaction
+
+    let stream =
+        Stream.create messageSize
+        |> GetTransaction.write gettransaction
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
+let ``send and recv SendTransaction``() =
+    let msg = SendTransaction {
+        peerId = Array.create 4 123uy;
+        tx = "Captcha Diem"B;
+    }
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://SendTransaction.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://SendTransaction.test"
+
+    Network.Transport.InProcMessage.send server msg
+
+    let msg' = Network.Transport.InProcMessage.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``SendTransaction size fits stream ``() =
+    let sendtransaction:SendTransaction = {
+        peerId = Array.create 4 123uy;
+        tx = "Captcha Diem"B;
+    }
+
+    let messageSize = SendTransaction.getMessageSize sendtransaction
+
+    let stream =
+        Stream.create messageSize
+        |> SendTransaction.write sendtransaction
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
 let ``malformed message return None``() =
     use server = Socket.dealer ()
     Socket.bind server "inproc://InProcMessage.test"

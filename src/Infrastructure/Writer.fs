@@ -11,7 +11,7 @@ let bind (Writer (events,x)) f =
     let events', x' = unwrap (f x)        
     let events'' = List.append events events'
     
-    Writer (events'', x')                 
+    Writer (events'', x')                        
     
 let ret x = 
     Writer ([],x)         
