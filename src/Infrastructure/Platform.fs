@@ -40,7 +40,7 @@ let normalizeNameToFileSystem =
             GetShortPathName(fileName, shortNameBuffer, bufferSize) |> ignore
             shortNameBuffer.ToString()
 
-let private workingDirectory = 
+let workingDirectory = 
     Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
     |> normalizeNameToFileSystem
 

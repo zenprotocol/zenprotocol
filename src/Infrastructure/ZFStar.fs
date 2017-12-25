@@ -68,7 +68,7 @@ let private extract code moduleName =
             File.WriteAllText(fn'original, sprintf "module %s\n%s" moduleName code)
             //IOUtils.elaborate fn'orig fn'elabed
             Platform.run "fstar.exe"
-                ["--smt"; Platform.getExeSuffix "z3"
+                ["--smt"; Platform.workingDirectory / (Platform.getExeSuffix "z3")
                  "--codegen"; "FSharp"
                  "--prims"; "zulib" / "prims.fst"
                  "--extract_module"; moduleName
