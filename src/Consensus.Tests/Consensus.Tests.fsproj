@@ -42,6 +42,7 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="CryptoTests.fs" />
+    <Compile Include="SparseMerkleTreeTests.fs" />
     <Compile Include="TransactionTests.fs" />
     <Compile Include="UtxoSetTests.fs" />
     <Content Include="paket.references" />

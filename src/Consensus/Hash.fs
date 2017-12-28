@@ -17,6 +17,14 @@ let compute bytes =
     sha3.BlockUpdate(bytes,0,Array.length bytes)
     sha3.DoFinal(hash, 0) |> ignore
     Hash hash
+    
+let computeMultiple (bytes: byte array seq) = 
+    let hash = Array.zeroCreate 32
+    let sha3 = new Sha3Digest(256)
+    
+    Seq.iter (fun bytes -> sha3.BlockUpdate(bytes,0,Array.length bytes)) bytes
+    sha3.DoFinal(hash, 0) |> ignore
+    Hash hash
 
 let bytes (Hash hash) = hash
 

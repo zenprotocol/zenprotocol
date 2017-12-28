@@ -43,6 +43,7 @@
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Hash.fs" />
     <Compile Include="Crypto.fs" />
+    <Compile Include="SparseMerkleTree.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="UtxoSet.fs" />
     <Compile Include="Transaction.fs" />
