@@ -222,3 +222,10 @@ let verifyEmpty tree root auditPath key =
     let root' = verifyAuditPath tree key Empty auditPath N initialBase
     
     root' = root
+    
+let addToRoot tree auditPath key value root = 
+    verifyAuditPath tree key (Value value) auditPath N initialBase
+    
+let removeFromRoot tree auditPath key root =    
+    verifyAuditPath tree key Empty auditPath N initialBase
+        

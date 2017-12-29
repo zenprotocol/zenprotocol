@@ -101,3 +101,23 @@ let ``creating a lot of keys``() =
        
         SparseMerkleTree.verifyValue tree' tree'.root auditPath key value |> should equal false 
         SparseMerkleTree.verifyEmpty tree' tree'.root auditPath key |> should equal true)    
+
+[<Test>]
+let ``update root with auditpath only``() = 
+    let tree = SparseMerkleTree.create cwt serializer
+        
+    let key = Hash.compute "0"B
+    
+    let auditPath = SparseMerkleTree.createAuditPath key tree
+    
+    SparseMerkleTree.verifyEmpty tree tree.root auditPath key |> should equal true
+    
+    let root = SparseMerkleTree.addToRoot tree auditPath key 0 tree.root
+    
+    SparseMerkleTree.verifyValue tree root auditPath key 0 |> should equal true
+                
+    let tree' = SparseMerkleTree.add key 0 tree            
+            
+    tree'.root |> should equal root        
+            
+            
