@@ -47,7 +47,7 @@ let ``valid transaction raise events and update state``() =
     let events, (utxoSet', mempool', _, _) = Writer.unwrap result
         
     // Checking that the event raised
-    events |> should contain (TransactionAddedToMemPool (txHash, tx))    
+    events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (txHash, tx)))    
     
     // Checking only 1 event raised
     events |> should haveLength 1
@@ -142,8 +142,8 @@ let ``origin tx hit mempool, orphan tx should be added to mempool``() =
     
     // Checking that both transaction added to mempool and published
     events' |> should haveLength 2 
-    events' |> should contain (TransactionAddedToMemPool (tx1Hash,tx1))    
-    events' |> should contain (TransactionAddedToMemPool (tx2Hash,tx2))
+    events' |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (tx1Hash,tx1)))    
+    events' |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (tx2Hash,tx2)))
     MemPool.containsTransaction tx1Hash mempool'' |> should equal true     
     MemPool.containsTransaction tx2Hash mempool'' |> should equal true
     UtxoSet.getUtxos (getTxOutpints tx1Hash tx1) utxoSet'' |> should equal None // Was already spent by tx2
@@ -188,7 +188,7 @@ let ``orphan transaction is eventually invalid``() =
     
     // Checking that the origin tx is published and orphan removed as invalid
     events' |> should haveLength 1
-    events' |> should contain (TransactionAddedToMemPool (tx1Hash,tx1))        
+    events' |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (tx1Hash,tx1)))        
     MemPool.containsTransaction tx1Hash mempool'' |> should equal true     
     MemPool.containsTransaction tx2Hash mempool'' |> should equal false
     UtxoSet.getUtxos (getTxOutpints tx1Hash tx1) utxoSet'' |> should equal (Some tx1.outputs) 
@@ -241,7 +241,7 @@ let ``two orphan transaction spending same input``() =
     
     // Checking that both transaction added to mempool and published
     events' |> should haveLength 2
-    events' |> should contain (TransactionAddedToMemPool (tx1Hash,tx1))
+    events' |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (tx1Hash,tx1)))
     MemPool.containsTransaction tx1Hash mempool'' |> should equal true
     MemPool.containsTransaction tx2Hash mempool'' <> MemPool.containsTransaction tx3Hash mempool''
     |> should equal true
@@ -279,7 +279,7 @@ let ``Valid contract should be added to ActiveContractSet``() =
 
     // Checking that TransactionAddedToMemPool was published
     events |> should haveLength 1
-    events |> should contain (TransactionAddedToMemPool (txHash, tx))
+    events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (txHash, tx)))
 
     // Checking that the transaction was added to mempool 
     MemPool.containsTransaction txHash mempool |> should equal true
@@ -313,10 +313,10 @@ let ``Invalid contract should not be added to ActiveContractSet``() =
     // Checking that TransactionAddedToMemPool was published
 
     events |> should haveLength 1
-    events |> should contain (TransactionAddedToMemPool (txHash, tx))
+    events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (txHash, tx)))
 
-    // Checking that the transaction was not added to mempool 
+    // Checking that the transaction was added to mempool 
     MemPool.containsTransaction txHash mempool |> should equal true
 
-    // Checking that the transaction was added to orphans 
+    // Checking that the transaction was not added to orphans 
     OrphanPool.containsTransaction txHash orphanPool |> should equal false
