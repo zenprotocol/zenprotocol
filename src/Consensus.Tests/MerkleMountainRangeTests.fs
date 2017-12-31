@@ -7,51 +7,49 @@ open NUnit.Framework
 open FsCheck
 open FsCheck.NUnit
 
-[<Property(StartSize=1000,EndSize=10000,MaxTest=1000, Arbitrary=[| typeof<ConsensusGenerator> |])>]
-let ``different transactions yield different mrr root`` (NonEmptyTransactions txs1) (NonEmptyTransactions txs2) =
-    (txs1 <> txs2) ==> lazy(
+[<Property(StartSize=1000,EndSize=10000,MaxTest=100, Arbitrary=[| typeof<ConsensusGenerator> |])>]
+let ``different sets yield different mrr root`` (UniqueHashes xs1) (UniqueHashes xs2) =
+    (xs1 <> xs2) ==> lazy(
         let mmr1 = 
-            let mmr = MerkleMountainRange.create<Transaction,Transaction> (fun _ -> Transaction.hash)
-            List.fold (fun mmr tx -> MerkleMountainRange.add tx tx mmr) mmr txs1 
+            let mmr = MerkleMountainRange.create<Hash.Hash,Hash.Hash> (fun _ -> id)
+            List.fold (fun mmr tx -> MerkleMountainRange.add tx tx mmr) mmr xs1 
 
         let mmr2 = 
-            let mmr = MerkleMountainRange.create<Transaction,Transaction> (fun _ -> Transaction.hash)
-            List.fold (fun mmr tx -> MerkleMountainRange.add tx tx mmr) mmr txs2
+            let mmr = MerkleMountainRange.create<Hash.Hash,Hash.Hash> (fun _ -> id)
+            List.fold (fun mmr tx -> MerkleMountainRange.add tx tx mmr) mmr xs2
             
         MerkleMountainRange.root mmr1 <> MerkleMountainRange.root mmr2)
 
-[<Property(StartSize=1000,EndSize=10000,MaxTest=1000, Arbitrary=[| typeof<ConsensusGenerator> |])>]
-let ``mmr and merkle tree should yield same hash``(NonEmptyTransactions txs) =     
+[<Property(StartSize=1000,EndSize=10000,MaxTest=100, Arbitrary=[| typeof<ConsensusGenerator> |])>]
+let ``mmr and merkle tree should yield same hash``(UniqueHashes xs) =     
     let mmr = 
-        let mmr = MerkleMountainRange.create<Transaction,Transaction> (fun _ -> Transaction.hash)
-        List.fold (fun mmr tx -> MerkleMountainRange.add tx tx mmr) mmr txs 
+        let mmr = MerkleMountainRange.create<Hash.Hash,Hash.Hash> (fun _ -> id)
+        List.fold (fun mmr tx -> MerkleMountainRange.add tx tx mmr) mmr xs 
 
-    let merkleRoot =
-        List.map Transaction.hash txs
-        |> MerkleTree.computeRoot
+    let merkleRoot = MerkleTree.computeRoot xs
 
     merkleRoot = MerkleMountainRange.root mmr
 
-[<Property(StartSize=1000,EndSize=10000,MaxTest=1000, Arbitrary=[| typeof<ConsensusGenerator> |])>]
-let ``mmr and merkle root should yield same audit path``(NonEmptyTransactions txs) (index:uint32) =
-    let index = (int index) % (List.length txs)
-    let tx = txs.[index]
+[<Property(StartSize=1000,EndSize=10000,MaxTest=100, Arbitrary=[| typeof<ConsensusGenerator> |])>]
+let ``mmr and merkle root should yield same audit path``(UniqueHashes xs) (index:uint32) =
+    let index = (int index) % (List.length xs)
+    let tx = xs.[index]
     let mmr = 
-        let mmr = MerkleMountainRange.create<Transaction,Transaction> (fun _ -> Transaction.hash)
-        List.fold (fun mmr tx -> MerkleMountainRange.add tx tx mmr) mmr txs
+        let mmr = MerkleMountainRange.create<Hash.Hash,Hash.Hash> (fun _ -> id)
+        List.fold (fun mmr tx -> MerkleMountainRange.add tx tx mmr) mmr xs
         
     let auditPath,_ = MerkleMountainRange.createAuditPath mmr tx
-    let auditPath' = MerkleTree.createAuditPath (List.map Transaction.hash txs) index
+    let auditPath' = MerkleTree.createAuditPath xs index
     
     auditPath = auditPath'
                      
-[<Property(StartSize=1000,EndSize=10000,MaxTest=1000, Arbitrary=[| typeof<ConsensusGenerator> |])>]
-let ``can create audit path and verify with root only`` (NonEmptyTransactions txs) (index:uint32) =
-    let index = (int index) % (List.length txs)
-    let tx = txs.[index]
+[<Property(StartSize=1000,EndSize=10000,MaxTest=100, Arbitrary=[| typeof<ConsensusGenerator> |])>]
+let ``can create audit path and verify with root only`` (UniqueHashes xs) (index:uint32) =
+    let index = (int index) % (List.length xs)
+    let tx = xs.[index]
     let mmr = 
-        let mmr = MerkleMountainRange.create<Transaction,Transaction> (fun _ -> Transaction.hash)
-        List.fold (fun mmr tx -> MerkleMountainRange.add tx tx mmr) mmr txs                                                                                
+        let mmr = MerkleMountainRange.create<Hash.Hash,Hash.Hash> (fun _ -> id)
+        List.fold (fun mmr tx -> MerkleMountainRange.add tx tx mmr) mmr xs                                                                                
                                         
     let root = MerkleMountainRange.root mmr
     
@@ -59,7 +57,7 @@ let ``can create audit path and verify with root only`` (NonEmptyTransactions tx
     
     index' = index && MerkleMountainRange.verify mmr root auditPath index tx tx
 
-[<Property(StartSize=1000,EndSize=10000,MaxTest=1000)>]
+[<Property(StartSize=1000,EndSize=10000,MaxTest=100)>]
 let ``updating a record yield same root as merkle tree``(NonEmptySet set: NonEmptySet<NonEmptyString>) (index:uint32) (NonEmptyString value) =
     let index = (int index) % (Set.count set)
     

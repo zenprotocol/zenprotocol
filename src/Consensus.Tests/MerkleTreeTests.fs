@@ -7,24 +7,20 @@ open FsCheck
 open FsCheck.NUnit
 open FsUnit
 
-[< Property(Arbitrary=[| typeof<ConsensusGenerator> |]) >]
-let ``different transactions yield different merkle root`` (NonEmptyTransactions txs1) (NonEmptyTransactions txs2) =
-    (txs1 <> txs2) ==> lazy(
-        let txs1 = List.map Transaction.hash txs1
-        let txs2 = List.map Transaction.hash txs2
-        
-        MerkleTree.computeRoot txs1 <> MerkleTree.computeRoot txs2)
+[<Property(StartSize=1000,EndSize=10000,MaxTest=100, Arbitrary=[| typeof<ConsensusGenerator> |])>]
+let ``different sets yield different merkle root`` (UniqueHashes xs1) (UniqueHashes xs2) =
+    (xs1 <> xs2) ==> lazy(                
+        MerkleTree.computeRoot xs1 <> MerkleTree.computeRoot xs2)
 
-[<Property(StartSize=1000,EndSize=10000,MaxTest=1000, Arbitrary=[| typeof<ConsensusGenerator> |])>]
-let ``can create audit path and verify with root only`` (NonEmptyTransactions txs) (index:uint32) =
-    let index = (int index) % (List.length txs)
-    let txs = List.map Transaction.hash txs
-    let tx = txs.[index]         
+[<Property(StartSize=1000,EndSize=10000,MaxTest=100, Arbitrary=[| typeof<ConsensusGenerator> |])>]
+let ``can create audit path and verify with root only`` (UniqueHashes xs) (index:uint32) =
+    let index = (int index) % (List.length xs)    
+    let x = xs.[index]         
     
-    let root = MerkleTree.computeRoot txs
-    let auditPath = MerkleTree.createAuditPath txs index
+    let root = MerkleTree.computeRoot xs
+    let auditPath = MerkleTree.createAuditPath xs index
     
-    MerkleTree.verify root auditPath index tx 
+    MerkleTree.verify root auditPath index x 
         
         
        
