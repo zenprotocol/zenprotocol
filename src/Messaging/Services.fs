@@ -9,21 +9,31 @@ module Blockchain =
 
     type Command = 
         | ValidateTransaction of Consensus.Types.Transaction
+        | GetMemPool of peerId:byte[]
+        | GetTransaction of peerId:byte[] * txHash:Hash.Hash
+        | HandleMemPool of peerId:byte[] * Hash.Hash list
         
-    type Request = 
-        | GetMemPool
+    type Request = unit
         
-    type Response = 
-        | MemPool
+    type Response = unit
         
     let validateTransaction client tx = 
         Command.send client serviceName (ValidateTransaction tx)
     
-    let getMemPool client = 
-        Request.send client serviceName GetMemPool        
+    let getMemPool client peerId = 
+        Command.send client serviceName (GetMemPool peerId)
+        
+    let getTransaction client peerId txHash = 
+        Command.send client serviceName (GetTransaction (peerId,txHash))
+    
+    let handleMemPool client peerId txHashes =
+        Command.send client serviceName (HandleMemPool (peerId,txHashes))                                
 
 module Network =
-    type Command = unit 
+    type Command = 
+        | SendMemPool of peerId:byte[] * Hash.Hash list
+        | SendTransaction of peerId:byte[] * Transaction 
+        | GetTransaction of peerId:byte[] * Hash.Hash
                    
     type Request = unit
                 

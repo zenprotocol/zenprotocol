@@ -50,4 +50,24 @@
         <field name="peerId" type="octets" size="4">Peer Id</field>
         <field name="addresses" type="strings"/>
     </message>
+
+    <message name="Get Mem Pool" id="16">
+        <field name="peerId" type="octets" size="4">Peer Id</field>
+    </message>
+    
+    <message name="Mem Pool" id="17">
+        <field name="peerId" type="octets" size="4">Peer Id</field>
+        <field name="txs" type="chunk">Transactions</field>
+    </message>
+    
+    <message name="Get Transaction" id="18">
+        <field name="peerId" type="octets" size="4">Peer Id</field>
+        <field name="txHash" type="octets" size="32">TransactionHash</field>
+    </message>
+
+    <message name="Send Transaction" id="19">
+        <field name="peerId" type="octets" size="4">Peer Id</field>
+        <field name="tx" type="chunk">Tx</field>
+    </message>
+    
 </class>

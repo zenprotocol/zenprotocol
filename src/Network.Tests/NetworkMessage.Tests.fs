@@ -251,6 +251,85 @@ let ``Addresses size fits stream ``() =
     messageSize |> should equal offset
 
 [<Test>]
+let ``send and recv GetMemPool``() =
+    let msg = GetMemPool
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://GetMemPool.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://GetMemPool.test"
+
+    Network.Message.send server msg
+
+    let msg' = Network.Message.recv client
+
+    msg' |> should equal (Some msg)
+
+
+[<Test>]
+let ``send and recv MemPool``() =
+    let msg = MemPool ("Captcha Diem"B)
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://MemPool.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://MemPool.test"
+
+    Network.Message.send server msg
+
+    let msg' = Network.Message.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``MemPool size fits stream ``() =
+    let mempool:MemPool =
+        "Captcha Diem"B
+
+    let messageSize = MemPool.getMessageSize mempool
+
+    let stream =
+        Stream.create messageSize
+        |> MemPool.write mempool
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
+let ``send and recv GetTransaction``() =
+    let msg = GetTransaction (Array.create 32 123uy)
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://GetTransaction.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://GetTransaction.test"
+
+    Network.Message.send server msg
+
+    let msg' = Network.Message.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``GetTransaction size fits stream ``() =
+    let gettransaction:GetTransaction =
+        Array.create 32 123uy
+
+    let messageSize = GetTransaction.getMessageSize gettransaction
+
+    let stream =
+        Stream.create messageSize
+        |> GetTransaction.write gettransaction
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
 let ``send and recv UnknownPeer``() =
     let msg = UnknownPeer
 

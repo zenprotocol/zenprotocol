@@ -3,6 +3,9 @@ module Consensus.Hash
 open Org.BouncyCastle.Crypto.Digests
 open FsBech32
 
+[<Literal>]
+let Length = 32
+
 type Hash = Hash of byte[]
 
 let zero = 
@@ -12,6 +15,14 @@ let compute bytes =
     let hash = Array.zeroCreate 32
     let sha3 = new Sha3Digest(256)
     sha3.BlockUpdate(bytes,0,Array.length bytes)
+    sha3.DoFinal(hash, 0) |> ignore
+    Hash hash
+    
+let computeMultiple (bytes: byte array seq) = 
+    let hash = Array.zeroCreate 32
+    let sha3 = new Sha3Digest(256)
+    
+    Seq.iter (fun bytes -> sha3.BlockUpdate(bytes,0,Array.length bytes)) bytes
     sha3.DoFinal(hash, 0) |> ignore
     Hash hash
 
