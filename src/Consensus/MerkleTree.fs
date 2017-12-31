@@ -1,5 +1,4 @@
 module Consensus.MerkleTree
-open Consensus.Hash
 
 let private findSplitIndex length = 
     Seq.initInfinite (fun i -> pown 2 i)
@@ -12,6 +11,7 @@ let rec computeRoot (xs:Hash.Hash list) =
         let splitIndex = findSplitIndex (List.length xs)
         
         let left,right = List.splitAt splitIndex xs
+        
         let leftHash = computeRoot left
         let rightHash = computeRoot right
         
@@ -36,20 +36,25 @@ let rec createAuditPath xs hashIndex =
             
             leftHash :: path
             
-let rec verify auditPath hashIndex hash = 
-    match auditPath with
-    | [] -> hash
-    | head :: tail ->
-        let length = pown 2 (List.length auditPath)
-        let splitIndex = findSplitIndex length
-        
-        let leftHash,rightHash = 
-            match hashIndex < splitIndex with
-            | true -> 
-                let leftHash = verify tail hashIndex hash
-                leftHash, head
-            | false ->
-                let rightHash = verify tail (hashIndex - splitIndex) hash
-                head,rightHash
+let verify root auditPath index hash = 
+    let rec verify' auditPath index =
+        match auditPath with
+        | [] -> hash
+        | head :: tail ->
+            let length = max (pown 2 (List.length auditPath)) (index + 1)                
+            let splitIndex = findSplitIndex length
+            
+            let leftHash,rightHash = 
+                match index < splitIndex with
+                | true -> 
+                    let leftHash = verify' tail index
+                    leftHash, head
+                | false ->
+                    let rightHash = verify' tail (index - splitIndex)
+                    head,rightHash
                 
-        Hash.computeMultiple (seq {yield (Hash.bytes leftHash); yield (Hash.bytes rightHash)})
+            Hash.computeMultiple (seq {yield (Hash.bytes leftHash); yield (Hash.bytes rightHash)})
+            
+    let root' = verify' auditPath index
+    
+    root' = root
