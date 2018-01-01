@@ -6,7 +6,12 @@ open FsBech32
 [<Literal>]
 let Length = 32
 
-type Hash = Hash of byte[]
+[<StructuredFormatDisplay("{AsString}")>]
+type Hash = Hash of byte[] with
+    override x.ToString() = 
+        let (Hash bytes) = x
+        Base16.encode bytes 
+    member x.AsString = x.ToString() 
 
 let zero = 
     Hash (Array.create 32 0uy)
@@ -33,8 +38,8 @@ let fromBytes bytes =
     | 32 -> Some (Hash bytes)
     | _ -> None
     
-let toString (Hash hash) =        
-    Base16.encode hash
+let toString h =        
+    h.ToString()
     
 let fromString encoded = 
     match Base16.decode encoded with
