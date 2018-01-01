@@ -6,6 +6,10 @@ open Consensus.Types
 
 type UniqueHashes = UniqueHashes of list<Hash.Hash>
 
+type ThreeBytesHash = ThreeBytesHash of Hash.Hash
+
+type LeadingZerosHash = LeadingZerosHash of Hash.Hash 
+
 type NonEmptyTransactions = NonEmptyTransactions of list<Transaction> with
     static member op_Explicit(NonEmptyTransactions txs) = txs
 
@@ -25,6 +29,24 @@ type ConsensusGenerator =
              let! hash = Gen.arrayOfLength Hash.Length Arb.generate<byte>
              return (Hash.Hash hash)
         })        
+        
+    static member ThreeBytesHashGenerator() = 
+         Arb.fromGen (gen {
+                     let! size = Gen.choose (1,3)                      
+                     let! hash = Gen.arrayOfLength size Arb.generate<byte>
+                                                              
+                     return ThreeBytesHash (Hash.Hash (Array.append (Array.zeroCreate (Hash.Length - size)) hash))
+                })       
+                
+    static member LeadingZerosHashGenerator() = 
+        Arb.fromGen (gen {
+            let! leadingZerosLength = Gen.choose (0,28)           
+            let leadingZeros = Array.zeroCreate leadingZerosLength
+            
+            let! rest = Gen.arrayOfLength (Hash.Length - leadingZerosLength) Arb.generate<byte>
+            
+            return LeadingZerosHash (Hash.Hash (Array.append leadingZeros rest))
+        })                       
         
     static member Transaction() =
         let inputGenerator = 

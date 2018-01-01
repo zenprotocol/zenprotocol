@@ -42,6 +42,7 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="ConsensusGenerator.fs" />
+    <Compile Include="BlockTests.fs" />
     <Compile Include="CryptoTests.fs" />
     <Compile Include="MerkleMountainRangeTests.fs" />
     <Compile Include="MerkleTreeTests.fs" />
