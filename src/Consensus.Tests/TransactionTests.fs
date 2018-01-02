@@ -9,13 +9,23 @@ open FsCheck
 open FsCheck.NUnit
 open FsUnit
 open Crypto
+open TransactionValidation
+
+let shouldEqual expected found =
+    try 
+        should equal expected found
+    with _ as ex ->
+        printfn "expected: %A" expected
+        printfn "   found: %A" found
+        raise ex
 
 let txInMode mode tx =
     match mode with
     | Transaction.Full -> tx
     | Transaction.WithoutWitness -> {tx with witnesses=[]}
 
-type ValidationError = Transaction.ValidationError
+let acs c =
+    Map.tryFind c Map.empty
 
 [<Property>]
 let ``Transaction serialization round trip produces same result``(mode:Transaction.SerializationMode) (tx:Transaction) =
@@ -25,7 +35,7 @@ let ``Transaction serialization round trip produces same result``(mode:Transacti
 
 [<Property>]
 let ``Different transactions don't produce same serialization result``(mode:Transaction.SerializationMode) (tx1:Transaction) (tx2:Transaction) =
-    (txInMode mode tx1 <> txInMode mode tx2) ==> (Transaction.serialize mode tx1 <> Transaction.serialize mode tx2)
+    (txInMode mode tx1 <> txInMode mode tx2) ==> lazy (Transaction.serialize mode tx1 <> Transaction.serialize mode tx2)
     
 [<Property>]
 let ``Hash size should be 32``(tx:Transaction) =
@@ -55,7 +65,7 @@ let ``Transaction should be orphan``() =
     }
     let utxos = Map.ofSeq [ input, Unspent output ]
     let txHash = Transaction.hash tx
-    Transaction.validateInputs utxos txHash tx |> should equal (Error (ValidationError.Orphan tx) : Result<Transaction, ValidationError>)
+    validateInputs acs utxos txHash tx |> shouldEqual (Error (Orphan tx) : Result<Transaction, ValidationError>)
 
 [<Test>]
 let ``Transaction basic validation should be Ok``() = 
@@ -70,22 +80,24 @@ let ``Transaction basic validation should be Ok``() =
         outputs = [ output ]
         contract = None
     }
-    Transaction.validateBasic tx |> should equal (Ok tx : Result<Transaction, ValidationError>)
-        
+    validateBasic tx |> shouldEqual (Ok tx : Result<Transaction, ValidationError>)
+
 [<Property>]
 let ``Transaction should have invalid amounts``(utxos:Map<Outpoint, Output>) =
-    let utxos'  = Map.map (fun _ value -> Unspent value) utxos
     let fst = Map.toList >> List.map fst
     let snd = Map.toList >> List.map snd
-    (utxos |> fst |> List.distinct |> List.length = Map.count utxos && Map.count utxos > 0) ==>
-    let mutate output = { output with spend = {output.spend with amount = output.spend.amount - 1UL }}
-    let tx = { inputs = fst utxos; outputs = (snd >> List.map mutate) utxos; witnesses = []; contract = None }
-    let txHash = Transaction.hash tx
-    (Transaction.validateInputs utxos' txHash tx = Error (ValidationError.General "invalid amounts"))
+    (utxos |> fst |> List.distinct |> List.length = Map.count utxos && Map.isEmpty utxos |> not) ==> lazy (
+        let mutate output = { output with spend = {output.spend with amount = output.spend.amount - 1UL }}
+        let tx = { inputs = fst utxos; outputs = (snd >> List.map mutate) utxos; witnesses = []; contract = None }
+        let txHash = Transaction.hash tx
+
+        let utxos' = Map.map (fun _ value -> Unspent value) utxos
+        validateInputs acs utxos' txHash tx = Error (General "invalid amounts")
+    )
 
 [<Property>]
 let ``Transaction validation should fail with inputs empty error``(tx:Transaction) =
-    Transaction.validateBasic {tx with inputs = List.empty} = Error (ValidationError.General "inputs empty")
+    validateBasic {tx with inputs = List.empty} = Error (General "inputs empty")
 
 [<Test>]
 let ``Transaction validation should fail with outputs invalid error``() =
@@ -95,18 +107,18 @@ let ``Transaction validation should fail with outputs invalid error``() =
                 txHash = Hash.zero; 
                 index = 0ul 
             }];
-        witnesses = [];
+        witnesses = []
         outputs = 
             [
                 { lock = (PK Hash.zero); spend = {asset = Hash.zero; amount = 0UL } }
             ]
         contract = None
     }    
-    Transaction.validateBasic tx |> should equal (Error (ValidationError.General "outputs invalid") : Result<Transaction, ValidationError>)
+    validateBasic tx |> shouldEqual (Error (General "outputs invalid") : Result<Transaction, ValidationError>)
 
 [<Property>]
 let ``Transaction validation should fail with outputs empty error``(tx:Transaction) =
-    (tx.inputs.Length <> 0) ==> (Transaction.validateBasic {tx with outputs = List.empty} = Error (ValidationError.General "outputs empty"))
+    (tx.inputs.Length <> 0) ==> lazy (validateBasic {tx with outputs = List.empty} = Error (General "outputs empty"))
 
 [<Test>]
 let ``Transaction validation should fail with outputs overflow error``() =
@@ -124,7 +136,7 @@ let ``Transaction validation should fail with outputs overflow error``() =
             ]
         contract = None
     }    
-    Transaction.validateBasic tx |> should equal (Error (ValidationError.General "outputs overflow") : Result<Transaction, ValidationError>)
+    validateBasic tx |> shouldEqual (Error (General "outputs overflow") : Result<Transaction, ValidationError>)
 
 [<Test>]
 let ``Transaction validation should fail with duplicate inputs error``() =
@@ -138,7 +150,7 @@ let ``Transaction validation should fail with duplicate inputs error``() =
         outputs = [ { lock = (PK Hash.zero); spend = {asset = Hash.zero; amount = 1UL } } ]
         contract = None
     }    
-    Transaction.validateBasic tx |> should equal (Error (ValidationError.General "inputs duplicated") : Result<Transaction, ValidationError>)
+    validateBasic tx |> shouldEqual (Error (General "inputs duplicated") : Result<Transaction, ValidationError>)
 
 [<Test>]
 let ``Transaction validation should fail with inputs structurally invalid error``() =
@@ -152,7 +164,7 @@ let ``Transaction validation should fail with inputs structurally invalid error`
         outputs = [ { lock = (PK Hash.zero); spend = {asset = Hash.zero; amount = 1UL } } ]
         contract = None
     }    
-    Transaction.validateBasic tx |> should equal (Error (ValidationError.General "inputs structurally invalid") : Result<Transaction, ValidationError>)
+    validateBasic tx |> shouldEqual (Error (General "inputs structurally invalid") : Result<Transaction, ValidationError>)
 
 [<Test>]
 let ``Signed transaction should be valid``() =
@@ -173,7 +185,7 @@ let ``Signed transaction should be valid``() =
     let signedTx = Transaction.sign tx [keyPair]
     let utxos = Map.ofSeq [ input, Unspent output ]
     let txHash = Transaction.hash signedTx
-    Transaction.validateInputs utxos txHash signedTx |> should equal (Ok signedTx : Result<Transaction, ValidationError>)
+    validateInputs acs utxos txHash signedTx |> shouldEqual (Ok signedTx : Result<Transaction, ValidationError>)
 
 [<Test>]
 let ``Signed transaction validation result should be invalid witness``() =
@@ -193,4 +205,4 @@ let ``Signed transaction validation result should be invalid witness``() =
     let signedTx = Transaction.sign tx [keyPair]
     let utxos = Map.ofSeq [ input, Unspent output ]
     let txHash = Transaction.hash signedTx
-    Transaction.validateInputs utxos txHash signedTx |> should equal (Error (ValidationError.General "invalid witness") : Result<Transaction, ValidationError>)
+    validateInputs acs utxos txHash signedTx |> shouldEqual (Error (General "invalid witness(es)") : Result<Transaction, ValidationError>)
