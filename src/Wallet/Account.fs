@@ -90,7 +90,7 @@ let createRoot () =
         {
             outpoints = Map.empty
             keyPair = KeyPair.fromSecretKey rootSecretKey
-            publicKeyHash = ChainParameters.rootPKHash
+            publicKeyHash = Transaction.rootPKHash
         }
         
-    handleTransaction ChainParameters.rootTxHash ChainParameters.rootTx account             
+    handleTransaction Transaction.rootTxHash Transaction.rootTx account             

@@ -12,6 +12,8 @@ type LeadingZerosHash = LeadingZerosHash of Hash.Hash
 
 type NonEmptyTransactions = NonEmptyTransactions of list<Transaction> with
     static member op_Explicit(NonEmptyTransactions txs) = txs
+    
+type ValidBlockHeader = ValidBlockHeader of BlockHeader     
 
 type ConsensusGenerator = 
     static member Transactions() = 
@@ -46,7 +48,7 @@ type ConsensusGenerator =
             let! rest = Gen.arrayOfLength (Hash.Length - leadingZerosLength) Arb.generate<byte>
             
             return LeadingZerosHash (Hash.Hash (Array.append leadingZeros rest))
-        })                       
+        })        
         
     static member Transaction() =
         let inputGenerator = 
