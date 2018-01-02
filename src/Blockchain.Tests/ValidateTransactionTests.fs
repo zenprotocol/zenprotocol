@@ -15,10 +15,11 @@ open Messaging.Services.Blockchain
 open Messaging.Events
 open Infrastructure
 
+let chain = ChainParameters.Test
 // Helper functions for the tests
 let getAddress a = Account.getAddress a ChainParameters.Test
 let createTransaction address amount account = 
-    match Account.createTransaction account address Hash.zero amount with
+    match Account.createTransaction chain account address Hash.zero amount with
     | Ok tx -> tx
     | Error error -> failwith error
 let getTxOutpints txHash tx = List.mapi (fun i _ -> {txHash=txHash;index= uint32 i}) tx.outputs    
@@ -237,7 +238,7 @@ let ``two orphan transaction spending same input``() =
 
     // Sending origin, which should pick one of the transactions (we cannot know which one, for now at least)
     let result' = Handler.handleCommand (ValidateTransaction tx1) (utxoSet', mempool', orphanPool', acs')
-    let events', (utxoSet'', mempool'', orphanPool'', acs'') = Writer.unwrap result'
+    let events', (utxoSet'', mempool'', orphanPool'', _) = Writer.unwrap result'
     
     // Checking that both transaction added to mempool and published
     events' |> should haveLength 2
@@ -252,7 +253,6 @@ let ``two orphan transaction spending same input``() =
 
     OrphanPool.containsTransaction tx3Hash orphanPool'' |> should equal false
     OrphanPool.containsTransaction tx2Hash orphanPool'' |> should equal false
-    OrphanPool.containsTransaction tx1Hash orphanPool'' |> should equal false
 
 [<Test>]
 let ``Valid contract should be added to ActiveContractSet``() =
@@ -320,3 +320,4 @@ let ``Invalid contract should not be added to ActiveContractSet``() =
 
     // Checking that the transaction was not added to orphans 
     OrphanPool.containsTransaction txHash orphanPool |> should equal false
+    OrphanPool.containsTransaction tx1Hash orphanPool'' |> should equal false

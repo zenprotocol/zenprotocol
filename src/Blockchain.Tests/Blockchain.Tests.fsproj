@@ -40,7 +40,6 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="ValidateTransactionTests.fs" />
-    <Content Include="paket.references" />
     <ProjectReference Include="..\Blockchain\Blockchain.fsproj">
       <Project>{16b10d81-c99e-4562-810c-9b637234c72d}</Project>
       <Name>Blockchain</Name>
@@ -60,6 +59,12 @@
     <ProjectReference Include="..\Wallet\Wallet.fsproj">
       <Project>{289a59eb-d1d4-499f-87b9-f75b799829c0}</Project>
       <Name>Wallet</Name>
+    </ProjectReference>
+    <Compile Include="ValidateContractTests.fs" />
+    <Content Include="paket.references" />
+    <ProjectReference Include="..\Consensus.Tests\Consensus.Tests.fsproj">
+      <Project>{B5E951FC-AE90-4EF1-9365-3E2B5A56B510}</Project>
+      <Name>Consensus.Tests</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(FSharpTargetsPath)" />
