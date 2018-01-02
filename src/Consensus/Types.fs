@@ -15,6 +15,7 @@ type Spend = {
 
 type Lock =
     | PK of Hash
+    | Contract of Hash * array<byte>
 
 type Output = {
     lock: Lock
@@ -22,7 +23,8 @@ type Output = {
 }
 
 type Witness = 
-    PKWitness of array<byte> * Signature
+    | PKWitness of array<byte> * Signature
+    | ContractWitness of Hash
 
 type Transaction = {
     inputs: Outpoint list

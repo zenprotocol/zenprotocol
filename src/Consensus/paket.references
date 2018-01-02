@@ -3,4 +3,4 @@ FsPickler
 BouncyCastle
 FsBech32
 FSharp.Compiler.Tools
-FsNetMQ
+FSharp.Compatibility.OCaml
