@@ -1,4 +1,4 @@
-module Consensus.Tests.BlockTests
+module Consensus.Tests.DifficultyTests
 
 open Consensus
 open Consensus.Types
@@ -9,35 +9,35 @@ open FsCheck.NUnit
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``uncompressed is smaller or equal original``(original:Hash.Hash) = 
-    let compressed = Block.Difficulty.compress original    
-    let uncompressed = Block.Difficulty.uncompress compressed
+    let compressed = Difficulty.compress original    
+    let uncompressed = Difficulty.uncompress compressed
     
     original >= uncompressed
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``uncompressed value of two different hashes keep the comparison result``(h1:Hash.Hash) (h2:Hash.Hash) =
     (h1 <> h2) ==>
-        let c1 = Block.Difficulty.compress h1
-        let u1 = Block.Difficulty.uncompress c1
-        let c2 = Block.Difficulty.compress h2 
-        let u2 = Block.Difficulty.uncompress c2
+        let c1 = Difficulty.compress h1
+        let u1 = Difficulty.uncompress c1
+        let c2 = Difficulty.compress h2 
+        let u2 = Difficulty.uncompress c2
          
         (u1 >= u2 && h1 > h2) || (u2 >= u1 && h2 > h1) 
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]       
 let ``3bytes hash equal same value after compressing``(ThreeBytesHash hash) = 
     let uncompressed = 
-        Block.Difficulty.compress hash
-        |> Block.Difficulty.uncompress
+        Difficulty.compress hash
+        |> Difficulty.uncompress
                 
     uncompressed = hash
                             
 [<Property(MaxTest=1000, Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``uncompressed is larger when third MSB is lower``(LeadingZerosHash original) =
-    let compressed = Block.Difficulty.compress original    
-    let uncompressed = Block.Difficulty.uncompress compressed
+    let compressed = Difficulty.compress original    
+    let uncompressed = Difficulty.uncompress compressed
     
-    let bytes = Hash.bytes original 
+    let bytes = Hash.bytes original     
     
     let index = 
         bytes

@@ -42,7 +42,8 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="ConsensusGenerator.fs" />
-    <Compile Include="BlockTests.fs" />
+    <Compile Include="BlockHeaderTests.fs" />
+    <Compile Include="DifficultyTests.fs" />
     <Compile Include="CryptoTests.fs" />
     <Compile Include="MerkleMountainRangeTests.fs" />
     <Compile Include="MerkleTreeTests.fs" />
@@ -81,6 +82,7 @@
       </PropertyGroup>
     </When>
   </Choose>
+  <Import Project="..\CopyZulib.targets" />
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6.2'">
       <ItemGroup>
@@ -141,5 +143,4 @@
   <Import Project="..\..\packages\zen_z3_linux\build\zen_z3_linux.targets" Condition="Exists('..\..\packages\zen_z3_linux\build\zen_z3_linux.targets')" Label="Paket" />
   <Import Project="..\..\packages\zen_z3_osx\build\$(__paket__zen_z3_osx_targets).targets" Condition="Exists('..\..\packages\zen_z3_osx\build\$(__paket__zen_z3_osx_targets).targets')" Label="Paket" />
   <Import Project="..\..\packages\ZFStar\build\ZFStar.targets" Condition="Exists('..\..\packages\ZFStar\build\ZFStar.targets')" Label="Paket" />
-  <Import Project="..\CopyZulib.targets" />
 </Project>

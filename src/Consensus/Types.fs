@@ -30,3 +30,15 @@ type Transaction = {
     witnesses: Witness list
     contract: string Option
 }
+
+type Nonce = uint64 * uint64
+
+type BlockHeader = {
+    version: uint32;
+    parent: Hash.Hash;
+    blockNumber: uint32;
+    commitments: Hash.Hash;
+    timestamp: uint64;
+    difficulty: uint32;
+    nonce: Nonce;
+}

@@ -35,8 +35,8 @@ let txHash = Transaction.hash tx
 let txOutpoints = getTxOutpints txHash tx     
     
 // Default initial state of mempool and utxoset    
-let utxoSet = UtxoSet.create() |> UtxoSet.handleTransaction ChainParameters.rootTxHash ChainParameters.rootTx                
-let mempool = MemPool.create () |> MemPool.add ChainParameters.rootTxHash ChainParameters.rootTx
+let utxoSet = UtxoSet.create() |> UtxoSet.handleTransaction Transaction.rootTxHash Transaction.rootTx                
+let mempool = MemPool.create () |> MemPool.add Transaction.rootTxHash Transaction.rootTx
 let orphanPool = OrphanPool.create()       
 let acs = ActiveContractSet.create()       
 
@@ -80,7 +80,7 @@ let ``Invalid tx doesn't raise events or update state``() =
     
 [<Test>]
 let ``tx already in mempool nothing happen`` () =                       
-    let result = Handler.handleCommand (ValidateTransaction ChainParameters.rootTx) (utxoSet, mempool, OrphanPool.create(), ActiveContractSet.create())
+    let result = Handler.handleCommand (ValidateTransaction Transaction.rootTx) (utxoSet, mempool, OrphanPool.create(), ActiveContractSet.create())
     
     let events, (utxoSet', mempool', _, _) = Writer.unwrap result
     

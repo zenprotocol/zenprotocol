@@ -26,11 +26,11 @@ let main busName =
 
         let utxoSet = 
             UtxoSet.create() 
-            |> UtxoSet.handleTransaction ChainParameters.rootTxHash ChainParameters.rootTx
+            |> UtxoSet.handleTransaction Transaction.rootTxHash Transaction.rootTx
             
         let mempool = 
             MemPool.create ()
-            |> MemPool.add ChainParameters.rootTxHash ChainParameters.rootTx            
+            |> MemPool.add Transaction.rootTxHash Transaction.rootTx            
                    
         let orphanPool = 
             OrphanPool.create ()                   
