@@ -40,10 +40,13 @@ let handleCommand command (utxoSet, mempool, orphanPool, acs) =
             |> List.fold (fun state writer -> Writer.bind state (fun () -> writer)) (Writer.ret ())
             
         Writer.bind writer (fun () -> Writer.ret (utxoSet, mempool, orphanPool, acs))            
-                   
                                                      
-let handleRequest request reply (utxoSet, mempool, orphanPool, acs) = 
-    ret (utxoSet,mempool, orphanPool, acs)
+let handleRequest reply request (utxoSet, mempool, orphanPool, acs) = 
+    match request with
+    | ExecuteContract (txSkeleton, cHash) ->
+        TransactionHandler.executeContract txSkeleton cHash reply (utxoSet, mempool, orphanPool, acs)
+    | _ -> 
+        ret (utxoSet,mempool, orphanPool, acs)
     
 let handleEvent event (utxoSet, mempool, orphanPool, acs) = 
     ret (utxoSet,mempool, orphanPool, acs)

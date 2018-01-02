@@ -19,7 +19,9 @@ let main busName =
             |> Observable.map (fun message ->                
                 match message with 
                 | ServiceBus.Agent.Command c -> Handler.handleCommand c 
-                | ServiceBus.Agent.Request (r, reply) -> Handler.handleRequest r reply) 
+                | ServiceBus.Agent.Request (requestId, request) -> 
+                    Handler.handleRequest requestId.reply request)                
+        
         let ebObservable = 
             ebObservable
             |> Observable.map Handler.handleEvent

@@ -2,19 +2,21 @@ module Messaging.Services
 
 open Consensus
 open Consensus.Types
+open Consensus.TxSkeleton
 open Infrastructure.ServiceBus.Client
 
 module Blockchain = 
     let serviceName = "blockchain"
 
     type Command = 
-        | ValidateTransaction of Consensus.Types.Transaction
+        | ValidateTransaction of Types.Transaction
         | GetMemPool of peerId:byte[]
         | GetTransaction of peerId:byte[] * txHash:Hash.Hash
         | HandleMemPool of peerId:byte[] * Hash.Hash list
-        
-    type Request = unit
-        
+
+    type Request = 
+        | ExecuteContract of (TxSkeleton * Hash.Hash)
+
     type Response = unit
         
     let validateTransaction client tx = 
@@ -28,6 +30,10 @@ module Blockchain =
     
     let handleMemPool client peerId txHashes =
         Command.send client serviceName (HandleMemPool (peerId,txHashes))                                
+
+    let executeContract client cHash txSkeleton = 
+        ExecuteContract (txSkeleton, cHash)
+        |> Request.send<Request, Result<TxSkeleton, string>> client serviceName
 
 module Network =
     type Command = 
