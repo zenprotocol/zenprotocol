@@ -3,9 +3,12 @@
 open System
 open System.IO
 open Microsoft.FSharp.Compiler.SourceCodeServices
+open Exception
 
 let private fsChecker = FSharpChecker.Create()
 let private changeExtention extention path = Path.ChangeExtension (path, extention)
+
+let private (/) a b = Path.Combine (a,b)
 
 let private compile' code =
     //let code = code + """nopen MBrace.FsPickler.Combinators
@@ -16,7 +19,6 @@ let private compile' code =
         let fni = changeExtention ".fs" fn
         let fno = changeExtention ".dll" fn
         File.WriteAllText(fni, code)
-        let (/) a b = Path.Combine (a,b)
         let (+/) = (/) Platform.getFrameworkPath
         let errors, exitCode, dynamicAssembly =
             Async.RunSynchronously 
@@ -35,14 +37,10 @@ let private compile' code =
                 "-r"; "FSharp.Compatibility.OCaml.dll"|], None) //Some (stdout, stderr))
         if exitCode = 0 then
             match dynamicAssembly with
-                | None -> 
-                    Error ""
-                | Some assembly ->
-                    Ok assembly
-                    //.GetModules().[0]
-                    //.GetTypes().[0]
-                    //.GetProperty("pickled")
-                    //.GetValue(null) :?> byte[]
+            | None -> 
+                Error ""
+            | Some assembly ->
+                Ok assembly
         else
             errors
             |> Array.map (fun e -> e.ToString()) 
@@ -50,10 +48,9 @@ let private compile' code =
             |> String.concat " "
             |> Error
     with _ as ex ->
-        Error ("compile ex: " + ex.Message)
+        Exception.toError "compile" ex
 
 let private extract code moduleName =
-    let (/) a b = Path.Combine (a,b)
     let oDir = Platform.normalizeNameToFileSystem (Path.GetTempPath()) / Path.GetRandomFileName()
     try
         try
@@ -77,12 +74,10 @@ let private extract code moduleName =
                  "--odir"; oDir ]
             |> Result.bind (fun _ -> File.ReadAllText fn'extracted |> Ok)
         with _ as ex ->
-            Error ("extract ex: " + ex.Message)
+            Exception.toError "extract" ex
     finally
         Directory.Delete (oDir, true)
 
 let compile code moduleName = 
-    let (>=>) a b = Result.bind b a
-
     extract code ("Z" + moduleName)
-    >=> compile'
+    |> Result.bind compile'
