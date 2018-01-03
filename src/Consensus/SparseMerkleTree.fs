@@ -12,10 +12,11 @@ type Data<'v> = Map<Hash.Hash, 'v>
 
 type Value<'v> = 
     | Value of 'v
-    | Empty 
+    | Empty
     
 type Location = UInt64 * byte array    
 
+[<ReferenceEquality>]
 type T<'v> = {
     data: Data<'v>;
     cache: Map<Location, Hash.Hash>
@@ -228,4 +229,8 @@ let addToRoot tree auditPath key value root =
     
 let removeFromRoot tree auditPath key root =    
     verifyAuditPath tree key Empty auditPath N initialBase
-        
+
+let tryFind key tree = 
+    Map.tryFind key tree.data  
+    
+let containsKey key tree = Map.containsKey key tree.data          

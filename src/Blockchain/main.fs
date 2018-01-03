@@ -37,7 +37,7 @@ let main busName =
         let orphanPool = 
             OrphanPool.create ()                   
 
-        let acs = ActiveContractSet.create ()
+        let acs = ActiveContractSet.empty
                      
         let observable =                      
             Observable.merge sbObservable ebObservable

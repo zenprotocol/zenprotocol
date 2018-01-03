@@ -46,7 +46,6 @@
     <Compile Include="EffectsWriter.fs" />
     <Compile Include="OrphanPool.fs" />
     <Compile Include="MemPool.fs" />
-    <Compile Include="ActiveContractSet.fs" />
     <Compile Include="TransactionHandler.fs" />
     <Compile Include="Handler.fs" />
     <Compile Include="main.fs" />

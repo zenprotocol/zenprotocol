@@ -50,7 +50,7 @@ let private checkWitness acs txHash =
             else false
         | _ -> false
     | (ContractWitness cHash, {lock=Contract (pkHash, _)}) ->
-        match acs cHash with
+        match SparseMerkleTree.tryFind cHash acs with
         | Some contract ->
             //TODO: get original txSkeleton from mask
             match Contract.run contract TxSkeleton.empty with 
