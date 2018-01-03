@@ -50,9 +50,9 @@ let getBalance account =
         | None -> Map.add output.spend.asset output.spend.amount balance) Map.empty account.outpoints
      
 let getAddress account chain = 
-    Address.getPublicKeyAddress account.publicKeyHash chain
+    Address.encode (Address.PK account.publicKeyHash) chain
      
-let createTransaction account address asset amount =
+let createTransaction chain account address asset amount =
     let collectInputs ((inputs, keys), collectedAmount) outpoint output =
         if amount > collectedAmount && asset = output.spend.asset then
             ((outpoint :: inputs, account.keyPair :: keys), output.spend.amount + collectedAmount)
@@ -61,9 +61,8 @@ let createTransaction account address asset amount =
                               
     // TODO: should the address be validated at a higher level + checking the HRP
     // match the chain
-    match Address.getPublicKeyHash address with
-    | None -> Error "Invalid address"
-    | Some pkHash -> 
+    Address.decodePK address chain
+    |> Result.bind (fun pkHash ->
         let (inputs, keys), collectedAmount = Map.fold collectInputs (([],[]),0UL) account.outpoints
         
         match collectedAmount >= amount with
@@ -77,12 +76,11 @@ let createTransaction account address asset amount =
                         []
                     | false -> 
                         [{spend={asset=asset;amount=(collectedAmount - amount)};lock=PK account.publicKeyHash}]
-            Ok (Transaction.sign {inputs=inputs; outputs=outputs; witnesses=[]; contract = None} keys)
+            Ok (Transaction.sign {inputs=inputs; outputs=outputs; witnesses=[]; contract = None} keys))
             
 let createContractActivationTransaction account code =
     let input, output = Map.toSeq account.outpoints |> Seq.head
     let output' = {output with lock=PK account.publicKeyHash}
-    printfn "%A" code
     Ok (Transaction.sign {inputs=[ input ]; outputs=[ output' ]; witnesses=[]; contract = Some code} [ account.keyPair ])
 
 let createRoot () =                
@@ -94,3 +92,13 @@ let createRoot () =
         }
         
     handleTransaction Transaction.rootTxHash Transaction.rootTx account             
+
+let createSendMessageTranscation client address chain = // data, (asset, amount) option
+    Address.decodeContract address chain
+    |> Result.map (fun cHash -> 
+        Messaging.Services.Blockchain.executeContract client cHash TxSkeleton.empty
+        ////TODO: use contract lock instread
+        ////todo: create origin txskeleton
+        |> Result.map (Transaction.fromTxSkeleton >> Transaction.addWitness (ContractWitness cHash)))
+        ////todo: sign the transaction
+        ////todo: make sure the tx is a subset of the origin

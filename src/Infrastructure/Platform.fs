@@ -5,6 +5,7 @@ open System.IO
 open System.Text
 open System.Diagnostics
 open System.Runtime.InteropServices
+open Exception
 
 [<DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true )>]
 extern uint16 GetShortPathName(
@@ -24,11 +25,11 @@ let private getPlatform =
 
 let private isUnix =
     match getPlatform with
-        | PlatformID.Unix
-        | PlatformID.MacOSX ->
-            true
-        | _ ->
-            false
+    | PlatformID.Unix
+    | PlatformID.MacOSX ->
+        true
+    | _ ->
+        false
 
 let normalizeNameToFileSystem = 
     if isUnix then
@@ -40,15 +41,15 @@ let normalizeNameToFileSystem =
             GetShortPathName(fileName, shortNameBuffer, bufferSize) |> ignore
             shortNameBuffer.ToString()
 
-let private workingDirectory = 
+let workingDirectory = 
     Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
     |> normalizeNameToFileSystem
 
 let getFrameworkPath =
     match getPlatform with
-        | PlatformID.Unix -> "/usr/lib/mono/4.6.2-api/"
-        | PlatformID.MacOSX -> "/Library/Frameworks/Mono.framework/Versions/Current/lib/mono/4.6.2-api/"
-        | _ -> @"C:\Windows\Microsoft.NET\Framework\v4.0.30319\"
+    | PlatformID.Unix -> "/usr/lib/mono/4.6.2-api/"
+    | PlatformID.MacOSX -> "/Library/Frameworks/Mono.framework/Versions/Current/lib/mono/4.6.2-api/"
+    | _ -> @"C:\Windows\Microsoft.NET\Framework\v4.0.30319\"
 
 let private monoM =
     if isUnix then 
@@ -61,8 +62,8 @@ let private monoM =
 
 let private mono = 
     match monoM with
-        | Some mono -> mono
-        | _ -> failwith "Cannot find mono"
+    | Some mono -> mono
+    | _ -> failwith "Cannot find mono"
 
 let getExeSuffix =
     (+) (if isUnix then "" else ".exe")
@@ -107,5 +108,4 @@ let run exe args =
         else
             Error "failed to start process"
     with _ as ex ->
-        "run ex: " + ex.Message
-        |> Error
+        Exception.toError "run" ex

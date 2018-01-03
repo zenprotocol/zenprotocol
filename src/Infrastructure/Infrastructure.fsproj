@@ -52,6 +52,7 @@
     <Compile Include="Subject.fs" />
     <Content Include="ServiceBusMessage.xml" />
     <Content Include="paket.references" />
+    <Compile Include="Exception.fs" />
     <Compile Include="Platform.fs" />
     <Compile Include="ZFStar.fs" />
   </ItemGroup>

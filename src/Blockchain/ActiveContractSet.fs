@@ -9,3 +9,5 @@ let create () = Map.empty
 let containsContract = Map.containsKey 
 
 let add = Map.add
+
+let tryFind = Map.tryFind

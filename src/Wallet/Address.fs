@@ -1,43 +1,80 @@
 module Address 
 
-open Consensus
-open Consensus.Crypto
+open Consensus.Hash
 open Consensus.ChainParameters
 open FsBech32
 
 [<Literal>]
 let AddressVersion = 0uy
 
-let getPublicKeyAddress pkHash chain =         
-    let bytes = Hash.bytes pkHash
-    
-    let hrp = 
-        match chain with 
-        | Main -> "zp"
-        | Test -> "tz"
+type Address =
+    | PK of Hash
+    | Contract of Hash
 
-    // TODO: when we have serialization in place we should encode
-    // the lock type into the address as well        
-    
-    let words = Bech32.toWords (Hash.bytes pkHash)
-    
+let private getHash =
+    function
+    | PK hash -> hash
+    | Contract hash -> hash
+
+let private getChainType =
+    function
+    | Main -> 'z'
+    | Test -> 't'
+
+let private getAddressType =
+    function
+    | PK _ -> 'p'
+    | Contract _ -> 'c'
+
+let private getAddress hash =
+    function 
+    | 'p' -> Ok (PK hash)
+    | 'c' -> Ok (Contract hash)
+    | _ -> Error "invaid address type discriminator"
+
+let encode address chain =
+    let (Hash.Hash bytes) = getHash address
+    let hrp = System.String.Concat(Array.ofList([ getChainType chain; getAddressType address ]))
+    let words = Bech32.toWords bytes
     let data = Array.append [|AddressVersion|] words
-    
-    Bech32.encode hrp data                
+    Bech32.encode hrp data
  
-let getPublicKeyHash (address:string) =
+let private decode address chain =
     match Bech32.decode address with 
-    | None -> None
-    | Some (hrp, words) ->         
-        if Array.length words = 0 then
-            None
-        else                 
-            let version = words.[0]
-            
-            if version <> AddressVersion then 
-                None
-            else 
-                match Bech32.fromWords words.[1..] with
-                | None -> None 
-                | Some data -> 
-                    if Array.length data = 32 then Some (Hash.Hash data) else None
+    | None -> 
+        Error "could not decode address"
+    | Some (hrp, words) ->
+        let hrp = Seq.toArray hrp
+        if Seq.length hrp <> 2 then 
+            Error "invalid HRP"
+        else if hrp.[0] <> getChainType chain then
+            Error "invalid chain"
+        else if Array.isEmpty words then
+            Error "missing address data"
+        else if words.[0] <> AddressVersion then 
+            Error "address version mismatch"
+        else 
+            match Bech32.fromWords words.[1..] with
+            | None -> 
+                Error "invalid address"
+            | Some data -> 
+                if Array.length data = 32 then 
+                    getAddress (Hash data) hrp.[1]
+                else 
+                    Error "invalid address data"
+
+let decodeContract address chain =
+    decode address chain
+    |> Result.bind (function 
+        | Contract hash ->
+            Ok hash
+        | _ ->
+            Error "address type discriminator mismatch, Contract expected")
+
+let decodePK address chain =
+    decode address chain
+    |> Result.bind (function 
+        | PK hash ->
+            Ok hash
+        | _ ->
+            Error "address type discriminator mismatch, Public Key expected")

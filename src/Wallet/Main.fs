@@ -25,7 +25,7 @@ let requestHandler chain (requestId:ServiceBus.Agent.RequestId) request wallet =
         requestId.reply address
         wallet
     | CreateTransaction (address, asset, amount) ->            
-        match Account.createTransaction wallet address asset amount with
+        match Account.createTransaction chain wallet address asset amount with
         | Ok tx -> 
             requestId.reply (Created tx)
             

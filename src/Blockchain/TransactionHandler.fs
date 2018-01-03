@@ -5,22 +5,24 @@ open Messaging.Events
 open Infrastructure
 open Consensus
 open Consensus.Transaction
+open Consensus.TransactionValidation
 
 let private handleContractActivationTransaction acs (tx : Types.Transaction) =
     match tx.contract with
-        | Some code ->
-            match Contract.compile code with
-                | Ok (cHash, contract) -> 
-                    ActiveContractSet.add cHash contract acs
-                | Error err ->
-                    Log.info "handle contract error: %A" err
-                    acs
-        | None -> 
+    | Some code ->
+        match Contract.compile code with
+        | Ok contract -> 
+            Log.warning "activating contract: %A" (Hash.bytes contract.hash)
+            ActiveContractSet.add contract.hash contract acs
+        | Error err ->
+            Log.info "handle contract error: %A" err
             acs
+    | None -> 
+        acs
 
-let validateOrphanTransaction (utxoSet, mempool, orphanPool, acs) txHash tx  =                                 
+let validateOrphanTransaction (utxoSet, mempool, orphanPool, acs: ActiveContractSet.T) txHash tx  =                                 
     effectsWriter {            
-        match Transaction.validateInputs utxoSet txHash tx with
+        match TransactionValidation.validateInputs acs.TryFind utxoSet txHash tx with
         | Ok tx ->
             let utxoSet = UtxoSet.handleTransaction txHash tx utxoSet
             let mempool = MemPool.add txHash tx mempool
@@ -43,20 +45,20 @@ let validateOrphanTransaction (utxoSet, mempool, orphanPool, acs) txHash tx  =
                      
     }
         
-let validateTransaction tx (utxoSet, mempool, orphanPool, acs) =
+let validateTransaction tx (utxoSet: Map<Types.Outpoint, UtxoSet.InputStatus>, mempool, orphanPool, acs:ActiveContractSet.T) =
     effectsWriter {
         let txHash = Transaction.hash tx
                             
         if MemPool.containsTransaction txHash mempool || OrphanPool.containsTransaction txHash orphanPool then                
             return (utxoSet,mempool, orphanPool, acs) // Nothing to do, already in mempool
         else 
-            match Transaction.validateBasic tx with
+            match TransactionValidation.validateBasic tx with
             | Error error ->                        
                 Log.info "Transacation %s failed basic validation: %A" (Hash.toString txHash) error
                 
                 return (utxoSet, mempool, orphanPool, acs)
             | Ok tx ->
-                match Transaction.validateInputs utxoSet txHash tx with   
+                match TransactionValidation.validateInputs acs.TryFind utxoSet txHash tx with   
                 | Error (Orphan tx) ->                                                                                                         
                     let orphanPool = OrphanPool.add txHash tx orphanPool
                     
@@ -80,3 +82,14 @@ let validateTransaction tx (utxoSet, mempool, orphanPool, acs) =
                     
                     return! OrphanPool.foldWriter validateOrphanTransaction (utxoSet, mempool, orphanPool, acs) orphanPool
     }
+
+let executeContract txSkeleton cHash reply (utxoSet, mempool, orphanPool, acs) =
+    reply (
+        match ActiveContractSet.tryFind cHash acs with
+        | Some contract ->
+            Contract.run contract txSkeleton  
+        | None -> 
+            Error "Contract not active"
+    )
+
+    Writer.ret (utxoSet, mempool, orphanPool, acs)

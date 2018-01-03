@@ -4,11 +4,20 @@ open System.Reflection
 open System.Text
 open FsBech32
 open Hash
-open Infrastructure.ZFStar
+open Consensus.TxSkeleton
+open Consensus.ZFStar
+open Infrastructure
+open Zen.Types.Extracted
+open Exception
 
-type T = System.Numerics.BigInteger -> Result<System.Numerics.BigInteger,string>
+type ContractFn = Hash -> TxSkeleton -> Result<TxSkeleton,string>
 
-let private getMethodInfo (assembly : Assembly) =
+type T = {
+    hash: Hash
+    fn:   ContractFn
+}
+
+let private findMethod (assembly : Assembly) =
     try
         assembly
             .GetModules().[0]
@@ -16,32 +25,35 @@ let private getMethodInfo (assembly : Assembly) =
             .GetMethods().[0]
             |> Ok
     with _ as ex ->
-        "get method ex: " + ex.Message
-        |> Error
+        Exception.toError "get method" ex
 
-let private wrap (methodInfo : MethodInfo) : T =
-    fun (input : System.Numerics.BigInteger) -> 
+let private wrap (methodInfo : MethodInfo) : ContractFn =
+    fun (Hash.Hash cHash) txSkeleton -> 
         try
-            methodInfo.Invoke (null, [| input |])
-            :?> System.Numerics.BigInteger
+            methodInfo.Invoke (null, [| convertInput txSkeleton; cHash |])
+            :?> transactionSkeleton
+            |> convertResult
             |> Ok
         with _ as ex ->
-            "run contract ex: " + ex.Message
-            |> Error
+            Exception.toError "run contract" ex
 
-let hash (code:string) = 
-    code
-    |> Encoding.ASCII.GetBytes
-    |> Hash.compute
+let compile (code : string) : Result<T, string> =
+    let hash =
+        code
+        |> Encoding.UTF8.GetBytes
+        |> Hash.compute
 
-let compile code : Result<Hash * T, string> =
-    let hash' = hash code
-    hash' 
+    hash 
     |> Hash.bytes
     |> Base16.encode
-    |> compile code
-    |> Result.bind getMethodInfo 
+    |> ZFStar.compile code
+    |> Result.bind findMethod 
     |> Result.map wrap
-    |> Result.map (fun f -> (hash', f))
+    |> Result.map (fun fn ->
+        {
+            hash = hash
+            fn = fn
+        })
 
-let run contract = contract
+let run (contract : T) input = 
+    contract.fn contract.hash input
