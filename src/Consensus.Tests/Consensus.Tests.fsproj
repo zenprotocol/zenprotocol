@@ -45,6 +45,7 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="ConsensusGenerator.fs" />
+    <Compile Include="BlockTests.fs" />
     <Compile Include="BlockHeaderTests.fs" />
     <Compile Include="DifficultyTests.fs" />
     <Compile Include="CryptoTests.fs" />
@@ -59,6 +60,10 @@
       <Name>Consensus</Name>
     </ProjectReference>
     <Compile Include="ContractTests.fs" />
+    <ProjectReference Include="..\Wallet\Wallet.fsproj">
+      <Project>{289a59eb-d1d4-499f-87b9-f75b799829c0}</Project>
+      <Name>Wallet</Name>
+    </ProjectReference>
   </ItemGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>

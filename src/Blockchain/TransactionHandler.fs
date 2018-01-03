@@ -22,7 +22,7 @@ let private handleContractActivationTransaction acs (tx : Types.Transaction) =
 
 let validateOrphanTransaction (utxoSet, mempool, orphanPool, acs: ActiveContractSet.T) txHash tx  =                                 
     effectsWriter {            
-        match TransactionValidation.validateInputs acs.TryFind utxoSet txHash tx with
+        match TransactionValidation.validateInputs acs utxoSet txHash tx with
         | Ok tx ->
             let utxoSet = UtxoSet.handleTransaction txHash tx utxoSet
             let mempool = MemPool.add txHash tx mempool
@@ -58,7 +58,7 @@ let validateTransaction tx (utxoSet: Map<Types.Outpoint, UtxoSet.InputStatus>, m
                 
                 return (utxoSet, mempool, orphanPool, acs)
             | Ok tx ->
-                match TransactionValidation.validateInputs acs.TryFind utxoSet txHash tx with   
+                match TransactionValidation.validateInputs acs utxoSet txHash tx with   
                 | Error (Orphan tx) ->                                                                                                         
                     let orphanPool = OrphanPool.add txHash tx orphanPool
                     

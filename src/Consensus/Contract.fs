@@ -37,6 +37,8 @@ let private wrap (methodInfo : MethodInfo) : ContractFn =
         with _ as ex ->
             Exception.toError "run contract" ex
 
+let hash contract = contract.hash
+
 let compile (code : string) : Result<T, string> =
     let hash =
         code

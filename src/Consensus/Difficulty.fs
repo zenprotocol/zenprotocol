@@ -22,6 +22,6 @@ let uncompress (target:uint32) =
 
     let length = if exp < 3 then 0 else exp - 3;
 
-    Hash.Hash <| Array.concat [Array.create (Hash.Length - length - 3) 0uy; mantissa; Array.create length 0uy;]
+    Hash.Hash <| Array.concat [Array.create (Hash.Length - length - 3) 0uy; mantissa; Array.create length 0uy;]    
     
-    
+        

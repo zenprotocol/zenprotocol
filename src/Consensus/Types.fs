@@ -44,3 +44,8 @@ type BlockHeader = {
     difficulty: uint32;
     nonce: Nonce;
 }
+
+type Block = {
+    header:BlockHeader;
+    transactions:Transaction list;
+}

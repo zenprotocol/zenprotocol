@@ -42,11 +42,11 @@ let txOutpoints = getTxOutpints txHash tx
 let utxoSet = UtxoSet.create() |> UtxoSet.handleTransaction Transaction.rootTxHash Transaction.rootTx                
 let mempool = MemPool.create () |> MemPool.add Transaction.rootTxHash Transaction.rootTx
 let orphanPool = OrphanPool.create()       
-let acs = ActiveContractSet.create()       
+let acs = ActiveContractSet.empty       
 
 [<Test>]
 let ``valid transaction raise events and update state``() =                                          
-    let result = Handler.handleCommand (ValidateTransaction tx) (utxoSet, mempool, OrphanPool.create(), ActiveContractSet.create())
+    let result = Handler.handleCommand (ValidateTransaction tx) (utxoSet, mempool, OrphanPool.create(), ActiveContractSet.empty)
     
     let events, (utxoSet', mempool', _, _) = Writer.unwrap result
         
@@ -66,7 +66,7 @@ let ``valid transaction raise events and update state``() =
 let ``Invalid tx doesn't raise events or update state``() = 
     let invalidTx = {inputs=[];outputs=[];witnesses=[];contract=None}
                    
-    let result = Handler.handleCommand (ValidateTransaction invalidTx) (utxoSet, mempool, OrphanPool.create(), ActiveContractSet.create())
+    let result = Handler.handleCommand (ValidateTransaction invalidTx) (utxoSet, mempool, OrphanPool.create(), ActiveContractSet.empty)
     
     let events, (utxoSet', mempool', orphanPool', acs') = Writer.unwrap result
     
@@ -84,7 +84,7 @@ let ``Invalid tx doesn't raise events or update state``() =
     
 [<Test>]
 let ``tx already in mempool nothing happen`` () =                       
-    let result = Handler.handleCommand (ValidateTransaction Transaction.rootTx) (utxoSet, mempool, OrphanPool.create(), ActiveContractSet.create())
+    let result = Handler.handleCommand (ValidateTransaction Transaction.rootTx) (utxoSet, mempool, OrphanPool.create(), ActiveContractSet.empty)
     
     let events, (utxoSet', mempool', _, _) = Writer.unwrap result
     
@@ -99,7 +99,7 @@ let ``tx already in mempool nothing happen`` () =
 let ``orphan tx added to orphan list``() =
     let utxoSet = UtxoSet.create()
     let mempool = MemPool.create ()
-    let acs = MemPool.create ()
+    let acs = ActiveContractSet.empty
                    
     let result = Handler.handleCommand (ValidateTransaction tx) (utxoSet, mempool, orphanPool, acs)
     

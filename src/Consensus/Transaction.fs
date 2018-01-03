@@ -18,7 +18,7 @@ let serialize mode tx =
         | Full -> tx
         | WithoutWitness -> {tx with witnesses=[]}
 
-    Binary.pickle pickler tx
+    Binary.pickle pickler tx     
 
 let deserialize tx =
     try
@@ -28,6 +28,10 @@ let deserialize tx =
 let hash =
     serialize WithoutWitness >> Hash.compute
 
+let witnessHash = 
+    //TODO: only serialize witness
+    serialize Full >> Hash.compute    
+        
 let sign tx keyPairs =
     let txHash = hash tx
 

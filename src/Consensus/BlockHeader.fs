@@ -75,7 +75,7 @@ let deserialize header =
                   
 let hash = serialize >> Hash.compute 
 
-let validate chain header  =
+let validate chain header  =                 
     let h = hash header
     
     let difficulty = Difficulty.uncompress header.difficulty

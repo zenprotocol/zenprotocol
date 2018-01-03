@@ -24,8 +24,7 @@ let txInMode mode tx =
     | Transaction.Full -> tx
     | Transaction.WithoutWitness -> {tx with witnesses=[]}
 
-let acs c =
-    Map.tryFind c Map.empty
+let acs = ActiveContractSet.empty
 
 [<Property>]
 let ``Transaction serialization round trip produces same result``(mode:Transaction.SerializationMode) (tx:Transaction) =

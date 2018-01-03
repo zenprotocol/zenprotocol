@@ -11,9 +11,7 @@ type ThreeBytesHash = ThreeBytesHash of Hash.Hash
 type LeadingZerosHash = LeadingZerosHash of Hash.Hash 
 
 type NonEmptyTransactions = NonEmptyTransactions of list<Transaction> with
-    static member op_Explicit(NonEmptyTransactions txs) = txs
-    
-type ValidBlockHeader = ValidBlockHeader of BlockHeader     
+    static member op_Explicit(NonEmptyTransactions txs) = txs   
 
 type ConsensusGenerator = 
     static member Transactions() = 
@@ -35,7 +33,7 @@ type ConsensusGenerator =
     static member ThreeBytesHashGenerator() = 
          Arb.fromGen (gen {
                      let! size = Gen.choose (1,3)                      
-                     let! hash = Gen.arrayOfLength size Arb.generate<byte>
+                     let! hash = Gen.arrayOfLength size Arb.generate<byte> |> Gen.filter (fun h -> h <> [|0uy;0uy;0uy;|])
                                                               
                      return ThreeBytesHash (Hash.Hash (Array.append (Array.zeroCreate (Hash.Length - size)) hash))
                 })       
@@ -66,30 +64,30 @@ type ConsensusGenerator =
                 let! lock = Arb.generate<Lock>
                 let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
                 let asset = Hash.Hash asset
-                let! amount = Arb.generate<uint64>
+                let! amount = Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
                 
                 return {lock=lock;spend={asset=asset;amount=amount}}
             }
             
-        let contractGenerator =
-            gen {
-                let! shouldHaveContract = Gen.choose (1,10)
-                let! NonEmptyString contract = Arb.generate<NonEmptyString>
-                                
-                let contract =
-                    if shouldHaveContract = 1 then                                 
-                        Some contract
-                    else 
-                        None
-                        
-                return contract                                    
-            }
+//        let contractGenerator =
+//            gen {
+//                let! shouldHaveContract = Gen.choose (1,10)
+//                let! NonEmptyString contract = Arb.generate<NonEmptyString>
+//                                
+//                let contract =
+//                    if shouldHaveContract = 1 then                                 
+//                        Some contract
+//                    else 
+//                        None
+//                        
+//                return contract                                    
+//            }
                                                                      
         Arb.fromGen (gen {                                
                 let! inputs = Gen.nonEmptyListOf inputGenerator
                 let! outputs = Gen.nonEmptyListOf outputGenerator
-                let! contract = contractGenerator
+//                let! contract = contractGenerator
                 
-                return {inputs=inputs;outputs=outputs;contract=contract;witnesses=[]}                                                                            
+                return {inputs=inputs;outputs=outputs;contract=None;witnesses=[]}                                                                            
             })            
                     
