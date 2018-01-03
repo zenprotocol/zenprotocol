@@ -8,7 +8,7 @@ open Consensus.TxSkeleton
 open Consensus.ZFStar
 open Infrastructure
 open Zen.Types.Extracted
-open Infrastructure.Utils
+open Exception
 
 type ContractFn = Hash -> TxSkeleton -> Result<TxSkeleton,string>
 
@@ -25,7 +25,7 @@ let private findMethod (assembly : Assembly) =
             .GetMethods().[0]
             |> Ok
     with _ as ex ->
-        errorFromException "get method" ex
+        Exception.toError "get method" ex
 
 let private wrap (methodInfo : MethodInfo) : ContractFn =
     fun (Hash.Hash cHash) txSkeleton -> 
@@ -35,12 +35,12 @@ let private wrap (methodInfo : MethodInfo) : ContractFn =
             |> convertResult
             |> Ok
         with _ as ex ->
-            errorFromException "run contract" ex
+            Exception.toError "run contract" ex
 
 let compile (code : string) : Result<T, string> =
     let hash =
         code
-        |> Encoding.ASCII.GetBytes
+        |> Encoding.UTF8.GetBytes
         |> Hash.compute
 
     hash 

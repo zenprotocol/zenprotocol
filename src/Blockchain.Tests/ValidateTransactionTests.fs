@@ -14,9 +14,12 @@ open Wallet
 open Messaging.Services.Blockchain
 open Messaging.Events
 open Infrastructure
+open Consensus.Tests.ContractTests
 
 let chain = ChainParameters.Test
 // Helper functions for the tests
+let getStringBytes (str : string) = System.Text.Encoding.UTF8.GetBytes str
+let getStringHash = getStringBytes >> Hash.compute
 let getAddress a = Account.getAddress a ChainParameters.Test
 let createTransaction address amount account = 
     match Account.createTransaction chain account address Hash.zero amount with
@@ -258,7 +261,7 @@ let ``two orphan transaction spending same input``() =
 let ``Valid contract should be added to ActiveContractSet``() =
     let rootAccount = Account.createRoot ()
     let contractCode = "val test: nat -> nat\nlet test i = i + 1"
-    let cHash = Contract.hash contractCode
+    let cHash = getStringHash contractCode
 
     let tx = 
         match Account.createContractActivationTransaction rootAccount contractCode with 
@@ -291,7 +294,7 @@ let ``Valid contract should be added to ActiveContractSet``() =
 let ``Invalid contract should not be added to ActiveContractSet``() =
     let rootAccount = Account.createRoot ()
     let contractCode = "x"
-    let cHash = Contract.hash contractCode
+    let cHash = getStringHash contractCode
 
     let tx = 
         match Account.createContractActivationTransaction rootAccount contractCode with 
@@ -320,4 +323,19 @@ let ``Invalid contract should not be added to ActiveContractSet``() =
 
     // Checking that the transaction was not added to orphans 
     OrphanPool.containsTransaction txHash orphanPool |> should equal false
-    OrphanPool.containsTransaction tx1Hash orphanPool'' |> should equal false
+
+[<Test>]
+let ``Valid contract should be executed``() =
+    let account = Account.createRoot ()
+    Account.createContractActivationTransaction account sampleContractCode
+    |> Result.map (fun tx -> 
+        Handler.handleCommand (ValidateTransaction tx) (utxoSet, mempool, orphanPool, acs)        
+        |> Writer.unwrap)
+    |> Result.map (fun (_, (utxoSet, mempool, orphanPool, acs)) -> 
+        ActiveContractSet.containsContract sampleContractHash acs
+        |> should equal true
+        Handler.handleRequest 
+            (should equal sampleContractExpectedResult) 
+            (ExecuteContract (sampleTxSkeleton, sampleContractHash)) (utxoSet, mempool, orphanPool, acs))
+    |> Result.mapError failwith
+    |> ignore

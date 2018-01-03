@@ -27,7 +27,7 @@ let test (Tx inputs outputs data) hash =
 
 let sampleContractHash = 
     sampleContractCode
-    |> Encoding.ASCII.GetBytes
+    |> Encoding.UTF8.GetBytes
     |> Hash.compute
 
 let private sampleContractTester txSkeleton hash =
