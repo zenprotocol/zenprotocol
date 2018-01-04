@@ -96,9 +96,21 @@ let createRoot () =
 let createSendMessageTranscation client address chain = // data, (asset, amount) option
     Address.decodeContract address chain
     |> Result.map (fun cHash -> 
-        Messaging.Services.Blockchain.executeContract client cHash TxSkeleton.empty
-        ////TODO: use contract lock instread
-        ////todo: create origin txskeleton
-        |> Result.map (Transaction.fromTxSkeleton >> Transaction.addWitness (ContractWitness cHash)))
-        ////todo: sign the transaction
-        ////todo: make sure the tx is a subset of the origin
+        //TODO: create origin txskeleton
+        let input = TxSkeleton.empty
+        input
+        |> Messaging.Services.Blockchain.executeContract client cHash 
+        //TODO: use contract lock instead
+        |> Result.map Transaction.fromTxSkeleton
+        //TODO: sign the transaction
+        |> Result.map (fun tx ->
+            Transaction.addWitness (
+                ContractWitness (
+                    cHash, 
+                    List.length input.inputs,
+                    List.length input.outputs,
+                    List.length tx.inputs,
+                    List.length tx.outputs)) tx
+        )
+        //TODO: send publish command
+    )
