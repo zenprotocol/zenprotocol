@@ -1,6 +1,7 @@
 ﻿module Consensus.Tests.TransactionTests
 
 open Consensus
+open Consensus.TxSkeleton
 open Consensus.Types
 open Consensus.Hash
 open Consensus.UtxoSet
@@ -205,3 +206,42 @@ let ``Signed transaction validation result should be invalid witness``() =
     let utxos = Map.ofSeq [ input, Unspent output ]
     let txHash = Transaction.hash signedTx
     validateInputs acs utxos txHash signedTx |> shouldEqual (Error (General "invalid witness(es)") : Result<Transaction, ValidationError>)
+
+[<Property>]
+let ``Transaction with less inputs or outputs should not be a prefix of another`` (tx1:TxSkeleton) (tx2:TxSkeleton) =
+    (
+        List.length tx1.inputs > List.length tx2.inputs || 
+        List.length tx1.outputs > List.length tx2.outputs
+    ) ==> lazy (
+        TxSkeleton.checkPrefix tx1 tx2 = Error "invalid prefix"
+    )
+
+[<Property>]
+let ``Transaction with additional single output should be a prefix of another`` (tx:TxSkeleton) =
+    let output = {
+        lock = Types.Lock.PK (Hash.zero)
+        spend = {asset = Hash.zero; amount = 1UL } 
+    }
+    let tx' = { tx with outputs = output :: tx.outputs }
+    TxSkeleton.checkPrefix tx tx' = Ok tx'
+
+[<Property>]
+let ``Transaction with additional single input should be a prefix of another`` (tx:TxSkeleton) =
+    let input = { 
+        txHash = Hash.zero
+        index = 0ul 
+    }
+    let tx' = { tx with inputs = input :: tx.inputs }
+    TxSkeleton.checkPrefix tx tx' = Ok tx'
+
+[<Property>]
+let ``Transactions with different leading first input should not be a prefix of one another`` (tx:TxSkeleton) =
+    (List.length tx.inputs > 0) ==> lazy (
+        let input = tx.inputs.[0]
+        let input = { input with index = input.index + 1ul }
+        let inputs = tx.inputs.[1..List.length tx.inputs - 1]
+        let tx' = { tx with inputs = input :: inputs }
+
+        TxSkeleton.checkPrefix tx tx' = Error "invalid prefix" &&
+        TxSkeleton.checkPrefix tx tx' = Error "invalid prefix"
+    )
