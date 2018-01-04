@@ -20,7 +20,7 @@ let private handleContractActivationTransaction acs (tx : Types.Transaction) =
     | None -> 
         acs
 
-let validateOrphanTransaction (utxoSet, mempool, orphanPool, acs: ActiveContractSet.T) txHash tx  =                                 
+let private validateOrphanTransaction (utxoSet, mempool, orphanPool, acs: ActiveContractSet.T) txHash tx  =                                 
     effectsWriter {            
         match TransactionValidation.validateInputs acs utxoSet txHash tx with
         | Ok tx ->
@@ -87,7 +87,8 @@ let executeContract txSkeleton cHash reply (utxoSet, mempool, orphanPool, acs) =
     reply (
         match ActiveContractSet.tryFind cHash acs with
         | Some contract ->
-            Contract.run contract txSkeleton  
+            Contract.run contract txSkeleton
+            |> Result.bind (TxSkeleton.checkPrefix txSkeleton)
         | None -> 
             Error "Contract not active"
     )
