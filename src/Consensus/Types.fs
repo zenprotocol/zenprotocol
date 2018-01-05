@@ -24,7 +24,12 @@ type Output = {
 
 type Witness = 
     | PKWitness of array<byte> * Signature
-    | ContractWitness of Hash
+    | ContractWitness of 
+        Hash * 
+        beginInputs:int * 
+        beginOutputs:int * 
+        endInputs:int * 
+        endOutputs:int
 
 type Transaction = {
     inputs: Outpoint list

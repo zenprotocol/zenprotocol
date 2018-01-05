@@ -1,9 +1,8 @@
 module Consensus.Transaction
 
+open Consensus.TxSkeleton
 open Consensus.Types
-open Consensus.UtxoSet
 open Consensus.Crypto
-
 open MBrace.FsPickler.Combinators
 
 let pickler = Pickler.auto<Transaction>
@@ -45,10 +44,10 @@ let sign tx keyPairs =
 let addWitness witness tx =
     { tx with witnesses = List.append tx.witnesses [ witness ] }
 
-let fromTxSkeleton txSkeleton =
+let fromTxSkeleton (txSkeleton:TxSkeleton) =
     {
-        inputs = []
-        outputs = []
+        inputs = txSkeleton.inputs
+        outputs = txSkeleton.outputs
         witnesses = []
         contract = None
     }
