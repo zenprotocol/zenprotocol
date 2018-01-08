@@ -8,6 +8,8 @@ type T  = {
     chain: ChainParameters.Chain
 }
 
+let clamp lower upper x = min upper (max lower x)
+
 let create chain =
     let difficulty = Difficulty.compress (ChainParameters.proofOfWorkLimit chain)
     {difficulty = difficulty; interval=ChainParameters.blockInterval chain; delayed=[];chain=chain}
@@ -28,7 +30,7 @@ let add header ema =
     let oldDelayed = ema.delayed
     let newDelayed = push header ema.delayed
     let alpha = ChainParameters.smoothingFactor ema.chain
-    let currentInterval = median newDelayed - median oldDelayed
+    let currentInterval = clamp (ema.interval / 10UL) (ema.interval * 10UL) (median newDelayed - median oldDelayed)
     let nextEstimatedInterval = float ema.interval * (1.0 - alpha) + float currentInterval * alpha |> uint64
     let currentTarget = Hash.toBigInt <| Difficulty.uncompress ema.difficulty
     let nextTarget = currentTarget * bigint nextEstimatedInterval / bigint ema.interval
