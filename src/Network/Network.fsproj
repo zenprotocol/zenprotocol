@@ -45,14 +45,12 @@
     <Compile Include="Transport\InProcMessage.fs" />
     <Compile Include="Transport\Peer.fs" />
     <Compile Include="Transport\Transport.fs" />
+    <Content Include="Transport\InProcMessage.xml" />
     <Compile Include="AddressBook.fs" />
     <Compile Include="Connector.fs" />
     <Compile Include="Main.fs" />
     <Content Include="paket.references" />
     <Content Include="NetworkMessage.xml" />
-    <Content Include="Transport\InProcMessage.xml" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\Consensus\Consensus.fsproj">
       <Project>{5ec4457b-615a-4bbd-b3d5-d0e311b9d5e9}</Project>
       <Name>Consensus</Name>
