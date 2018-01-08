@@ -20,7 +20,7 @@ let push newTimestamp (timestamps:uint64 list) =
 
 let median timestamps =
     if List.isEmpty timestamps then
-        (System.DateTime.Parse "2018-01-01T00:00:0.0000000").Ticks |> uint64     // Alter to approximate true genesis timestamp
+        (System.DateTime.Parse "2018-01-01T00:00:00.000000").Ticks |> uint64     // Alter to approximate true genesis timestamp
     else
         List.item (List.length timestamps / 2) (List.sort timestamps)
 
