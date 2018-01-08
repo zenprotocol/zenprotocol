@@ -84,9 +84,8 @@ let connect parent acs set ema =
         else Ok block 
 
     let checkDifficulty (block:Block) =
-        let ema = EMA.add block.header ema 
-        let next = EMA.get ema
-        if block.header.difficulty = next then Ok (block,ema) else Error "incorrect proof of work"               
+        let nextEma = EMA.add block.header.timestamp ema 
+        if block.header.difficulty = ema.difficulty then Ok (block,nextEma) else Error "incorrect proof of work"               
         
     let checkCommitments ((block:Block),ema) =
         let acs =

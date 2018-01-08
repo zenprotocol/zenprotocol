@@ -3,15 +3,32 @@ open Consensus.Types
 
 type T  = {
     difficulty: uint32;
-    delayed: BlockHeader list;
+    interval: uint64;
+    delayed: uint64 list;
+    chain: ChainParameters.Chain
 }
 
-let create chain = 
-    let difficulty = Difficulty.compress (ChainParameters.proofOfWorkLimit chain)     
-    {difficulty = difficulty; delayed=[]}
+let create chain =
+    let difficulty = Difficulty.compress (ChainParameters.proofOfWorkLimit chain)
+    {difficulty = difficulty; interval=ChainParameters.blockInterval chain; delayed=[];chain=chain}
+
+let push newTimestamp (timestamps:uint64 list) =
+    if List.length timestamps < 11 then
+        timestamps @ [newTimestamp]
+    else
+        (List.tail timestamps) @ [newTimestamp]
+
+let median timestamps = List.item (List.length timestamps / 2) (List.sort timestamps)
 
 let add header ema =
-    ema
-    
-let get ema = ema.difficulty 
-                    
+    let oldDelayed = ema.delayed
+    let newDelayed = push header ema.delayed
+    let alpha = ChainParameters.smoothingFactor ema.chain
+    let currentInterval = median newDelayed - median oldDelayed
+    let nextEstimatedInterval = float ema.interval * (1.0 - alpha) + float currentInterval * alpha |> uint64
+    let currentTarget = Hash.toBigInt <| Difficulty.uncompress ema.difficulty
+    let nextTarget = currentTarget * bigint nextEstimatedInterval / bigint ema.interval
+    let nextDifficulty = Difficulty.compress <| Hash.fromBigInt nextTarget
+    {ema with delayed = newDelayed; interval = nextEstimatedInterval; difficulty = nextDifficulty}
+
+let get ema = ema.difficulty
