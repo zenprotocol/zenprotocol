@@ -38,3 +38,7 @@ let add header ema =
     {ema with delayed = newDelayed; interval = nextEstimatedInterval; difficulty = nextDifficulty}
 
 let get ema = ema.difficulty
+
+let undoBlock (getHeader:Hash.Hash->BlockHeader) block ema = ema                    
+
+

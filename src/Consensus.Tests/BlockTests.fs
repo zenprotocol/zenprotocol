@@ -52,7 +52,7 @@ let ``connecting block failed when block number is not successive``(parent:Block
     let utxoSet = UtxoSet.create ()
     let ema = EMA.create Chain.Test
  
-    parent.blockNumber + 1ul <> block.header.blockNumber ==> (Block.connect parent acs utxoSet ema block = Error "blockNumber mismatch")  
+    parent.blockNumber + 1ul <> block.header.blockNumber ==> (Block.connect Chain.Test parent utxoSet acs ema block = Error "blockNumber mismatch")  
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``connecting block should fail when commitments are wrong``(parent:BlockHeader) (NonEmptyTransactions transactions) = 
@@ -72,7 +72,7 @@ let ``connecting block should fail when commitments are wrong``(parent:BlockHead
     
     let block = {header=header;transactions=transactions}
     
-    Block.connect parent acs utxoSet ema block = Error "commitments mismatch"
+    Block.connect Chain.Test parent utxoSet acs ema block = Error "commitments mismatch"
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]    
 let ``connecting block should fail when transaction inputs are invalid``(parent:BlockHeader) (NonEmptyTransactions transactions) =
@@ -82,7 +82,7 @@ let ``connecting block should fail when transaction inputs are invalid``(parent:
  
     let block = Block.createTemplate parent 0UL ema acs transactions
         
-    Block.connect parent acs utxoSet ema block = Error "transactions failed inputs validation"
+    Block.connect Chain.Test parent utxoSet acs ema block = Error "transactions failed inputs validation due to Orphan"
 
 [<Test>]    
 let ``can connect valid block``() = 
@@ -99,7 +99,7 @@ let ``can connect valid block``() =
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=0UL;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate parent 0UL ema acs [tx]
     
-    let result = Block.connect parent acs utxoSet ema block
+    let result = Block.connect Chain.Test parent utxoSet acs ema block
     
     match result with 
     | Ok _ -> ()

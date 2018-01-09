@@ -6,13 +6,13 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{5EC4457B-615A-4BBD-B3D5-D0E311B9D5E9}</ProjectGuid>
+    <ProjectGuid>{26EE7861-DF8C-46EA-889B-0A585B687209}</ProjectGuid>
     <OutputType>Library</OutputType>
-    <RootNamespace>Consensus</RootNamespace>
-    <AssemblyName>Consensus</AssemblyName>
+    <RootNamespace>Miner</RootNamespace>
+    <AssemblyName>Miner</AssemblyName>
     <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <Name>Consensus</Name>
+    <Name>Miner</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -38,34 +38,26 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
-    <Reference Include="Zulib">
-      <HintPath>..\Zulib\bin\Zulib.dll</HintPath>
-    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="Hash.fs" />
-    <Compile Include="Crypto.fs" />
-    <Compile Include="MerkleMountainRange.fs" />
-    <Compile Include="MerkleTree.fs" />
-    <Compile Include="SparseMerkleTree.fs" />
-    <Compile Include="Types.fs" />
-    <Compile Include="Difficulty.fs" />
-    <Compile Include="ChainParameters.fs" />
-    <Compile Include="EMA.fs" />
-    <Compile Include="TxSkeleton.fs" />
-    <Compile Include="ZFStar.fs" />
-    <Compile Include="Transaction.fs" />
-    <Compile Include="UtxoSet.fs" />
-    <Compile Include="Contract.fs" />
-    <Compile Include="ActiveContractSet.fs" />
-    <Compile Include="TransactionValidation.fs" />
-    <Compile Include="BlockHeader.fs" />
-    <Compile Include="Block.fs" />
+    <Compile Include="Main.fs" />
+  </ItemGroup>
+  <ItemGroup>
     <Content Include="paket.references" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Consensus\Consensus.fsproj">
+      <Project>{5ec4457b-615a-4bbd-b3d5-d0e311b9d5e9}</Project>
+      <Name>Consensus</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Infrastructure\Infrastructure.fsproj">
-      <Project>{81161F64-D019-422C-A3CF-321CDE6CA209}</Project>
+      <Project>{81161f64-d019-422c-a3cf-321cde6ca209}</Project>
       <Name>Infrastructure</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Messaging\Messaging.fsproj">
+      <Project>{44277422-32e3-4f1b-bd6d-153b7a621444}</Project>
+      <Name>Messaging</Name>
     </ProjectReference>
   </ItemGroup>
   <PropertyGroup>
@@ -89,39 +81,6 @@
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6.2'">
       <ItemGroup>
-        <Reference Include="BouncyCastle.Crypto">
-          <HintPath>..\..\packages\BouncyCastle\lib\BouncyCastle.Crypto.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6.2'">
-      <ItemGroup>
-        <Reference Include="FsBech32">
-          <HintPath>..\..\packages\FsBech32\lib\net45\FsBech32.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6.2'">
-      <ItemGroup>
-        <Reference Include="FSharp.Compatibility.OCaml">
-          <HintPath>..\..\packages\FSharp.Compatibility.OCaml\lib\net40\FSharp.Compatibility.OCaml.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6.2'">
-      <ItemGroup>
         <Reference Include="FSharp.Core">
           <HintPath>..\..\packages\FSharp.Core\lib\net45\FSharp.Core.dll</HintPath>
           <Private>True</Private>
@@ -135,23 +94,6 @@
       <ItemGroup>
         <Reference Include="FsNetMQ">
           <HintPath>..\..\packages\FsNetMQ\lib\net452\FsNetMQ.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6.2'">
-      <ItemGroup>
-        <Reference Include="System.Runtime.Serialization">
-          <Paket>True</Paket>
-        </Reference>
-        <Reference Include="System.Xml">
-          <Paket>True</Paket>
-        </Reference>
-        <Reference Include="FsPickler">
-          <HintPath>..\..\packages\FsPickler\lib\net45\FsPickler.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>

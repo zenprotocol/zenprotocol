@@ -33,7 +33,11 @@ type ConsensusGenerator =
     static member ThreeBytesHashGenerator() = 
          Arb.fromGen (gen {
                      let! size = Gen.choose (1,3)                      
-                     let! hash = Gen.arrayOfLength size Arb.generate<byte> |> Gen.filter (fun h -> h <> [|0uy;0uy;0uy;|])
+                     let! hash = 
+                        Gen.arrayOfLength size Arb.generate<byte> 
+                        |> Gen.filter (fun h -> h <> [|0uy;0uy;0uy;|])
+                        |> Gen.filter (fun h -> h <> [|0uy;0uy;|])
+                        |> Gen.filter (fun h -> h <> [|0uy;|])
                                                               
                      return ThreeBytesHash (Hash.Hash (Array.append (Array.zeroCreate (Hash.Length - size)) hash))
                 })       

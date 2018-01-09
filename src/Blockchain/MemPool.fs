@@ -5,7 +5,7 @@ open Consensus.Types
 
 type T = Map<Hash.Hash, Transaction>
 
-let create () = Map.empty
+let empty = Map.empty
 
 let containsTransaction = Map.containsKey 
 
@@ -17,3 +17,15 @@ let getTxHashes (mempool:T) =
     |> Seq.toList
     
 let getTransaction = Map.tryFind
+
+let handleBlock block (mempool:T) = 
+
+    // removing all transaction in the block from the mempool    
+    List.map Transaction.hash block.transactions
+    |> List.fold (fun mempool txHash -> Map.remove txHash mempool) mempool
+
+let undoBlock block (mempool:T) =
+
+    // readd all transaction in the block to the mempool 
+    List.map (fun tx -> Transaction.hash tx, tx) block.transactions
+    |> List.fold (fun mempool (txHash,tx) -> Map.add txHash tx mempool) mempool

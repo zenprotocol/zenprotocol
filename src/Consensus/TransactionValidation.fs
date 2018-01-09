@@ -7,8 +7,8 @@ open Consensus.Crypto
 let private (>=>) f1 f2 x = Result.bind f2 (f1 x)
 
 type ValidationError =
-    | Orphan of Transaction
-    | DoubleSpend of Transaction
+    | Orphan
+    | DoubleSpend
     | General of string
 
 //type ACS = Hash.Hash -> Contract.T option
@@ -108,8 +108,8 @@ let private checkOrphan set txHash tx =
     | None -> 
         Error <| 
             match UtxoSet.isSomeSpent tx.inputs set with
-            | true -> DoubleSpend tx
-            | false -> Orphan tx
+            | true -> DoubleSpend
+            | false -> Orphan
 
 let validateBasic = 
     checkInputsNotEmpty

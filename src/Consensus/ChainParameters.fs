@@ -28,3 +28,9 @@ let blockInterval chain =
 let smoothingFactor chain =
     let p = getChainParameters chain
     p.smoothingFactor
+    
+let getGenesisHash = 
+    function
+    | Main -> Hash.zero
+    | Test -> (Hash.fromString "b4e0c5b932cc6c1886988c76add3c60a1236a5af6d52616fb5df6b9521965274").Value        
+    

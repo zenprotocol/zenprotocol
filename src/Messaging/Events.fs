@@ -5,4 +5,8 @@ open Consensus
 open Consensus.Types
 
 type Event = 
-    | TransactionAddedToMemPool of txHash:Hash.Hash * Transaction   
+    | TransactionAddedToMemPool of txHash:Hash.Hash * Transaction
+    | BlockAdded of Block
+    | BlockRemoved of Block
+    | ContractActivated of Hash.Hash
+   

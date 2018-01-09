@@ -60,6 +60,15 @@ let private sendToPeers socket inproc peers routingIds msg =
             else peer) peers
         
     cleanDeadPeers inproc peers 
+    
+let private sendToNextPeer socket inproc peers msg = 
+    // TODO: load balance peers
+    let random = 
+        ((new System.Random()).Next()) % (Map.count peers)
+    
+    let routingId = Seq.item random (Map.toSeq peers) |> fst
+    
+    sendToPeer socket inproc peers routingId msg 
 
 let private handleTimer socket inproc (peers:Peers) = 
     let peers = Map.map (fun _ peer -> Peer.handleTick socket peer) peers
@@ -122,7 +131,21 @@ let private handleInprocMessage socket inproc msg (peers:Peers) =
             sendToPeer socket inproc peers routingId (Message.GetTransaction txHash)
         | InProcMessage.SendTransaction {peerId=peerId;tx=tx} ->
             let routingId = RoutingId.fromBytes peerId
-            sendToPeer socket inproc peers routingId (Message.Transaction tx)                              
+            sendToPeer socket inproc peers routingId (Message.Transaction tx)   
+        | InProcMessage.BlockHeader blockHeader ->
+            publishMessage socket inproc peers (Message.BlockHeader blockHeader)
+        | InProcMessage.GetTip peerId ->              
+            let routingId = RoutingId.fromBytes peerId
+            sendToPeer socket inproc peers routingId Message.GetTip
+        | InProcMessage.SendBlock {peerId=peerId; block=block} ->
+            let routingId = RoutingId.fromBytes peerId
+            sendToPeer socket inproc peers routingId (Message.Block block)   
+        | InProcMessage.GetBlock blockHash ->
+            sendToNextPeer socket inproc peers (Message.GetBlock blockHash)
+        | InProcMessage.SendTip {peerId=peerId; blockHeader=blockHeader} ->
+            let routingId = RoutingId.fromBytes peerId        
+            sendToPeer socket inproc peers routingId (Message.BlockHeader blockHeader)   
+
         | msg -> failwithf "unexpected inproc msg %A" msg
                 
 let private onError error = 
@@ -158,7 +181,22 @@ let getTransaction transport peerId txHash  =
     
 let sendTransaction transport peerId tx = 
     InProcMessage.send transport.inproc (InProcMessage.SendTransaction {peerId=peerId;tx=tx})    
-                            
+             
+let sendBlock transport peerId block = 
+    InProcMessage.send transport.inproc (InProcMessage.SendBlock {peerId=peerId;block=block})
+    
+let getTip transport peerId = 
+    InProcMessage.send transport.inproc (InProcMessage.GetTip peerId)
+    
+let publishBlockHeader transport blockHeader = 
+    InProcMessage.send transport.inproc (InProcMessage.BlockHeader blockHeader)
+    
+let sendTip transport peerId blockHeader = 
+    InProcMessage.send transport.inproc (InProcMessage.SendTip {peerId=peerId;blockHeader=blockHeader})                         
+                    
+let getBlock transport blockHash =                    
+    InProcMessage.send transport.inproc (InProcMessage.GetBlock blockHash)
+                                
 let recv transport =
     match InProcMessage.recv transport.inproc with
     | Some msg -> msg

@@ -43,10 +43,14 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="PersistentBlock.fs" />
+    <Compile Include="BlockRepository.fs" />
     <Compile Include="EffectsWriter.fs" />
     <Compile Include="OrphanPool.fs" />
     <Compile Include="MemPool.fs" />
+    <Compile Include="State.fs" />
     <Compile Include="TransactionHandler.fs" />
+    <Compile Include="BlockHandler.fs" />
     <Compile Include="Handler.fs" />
     <Compile Include="main.fs" />
     <None Include="Script.fsx" />

@@ -12,7 +12,11 @@ module Blockchain =
         | ValidateTransaction of Types.Transaction
         | GetMemPool of peerId:byte[]
         | GetTransaction of peerId:byte[] * txHash:Hash.Hash
+        | GetBlock of peerId:byte[] * blockHash:Hash.Hash
+        | GetTip of peerId:byte[]
         | HandleMemPool of peerId:byte[] * Hash.Hash list
+        | HandleBlockHeader of Types.BlockHeader
+        | ValidateBlock of Types.Block
 
     type Request = 
         | ExecuteContract of (TxSkeleton * Hash.Hash)
@@ -29,17 +33,36 @@ module Blockchain =
         Command.send client serviceName (GetTransaction (peerId,txHash))
     
     let handleMemPool client peerId txHashes =
-        Command.send client serviceName (HandleMemPool (peerId,txHashes))                                
+        Command.send client serviceName (HandleMemPool (peerId,txHashes))                                                
 
     let executeContract client cHash txSkeleton = 
         ExecuteContract (txSkeleton, cHash)
         |> Request.send<Request, Result<TxSkeleton, string>> client serviceName
-
+        
+    let validateBlock client block = 
+        ValidateBlock block 
+        |> Command.send client serviceName
+        
+    let handleBlockHeader client header = 
+        HandleBlockHeader header 
+        |> Command.send client serviceName 
+                
+    let getBlock client peerId blockHash = 
+        GetBlock (peerId,blockHash)
+        |> Command.send client serviceName
+        
+    let getTip client peerId =
+        GetTip peerId         
+        |> Command.send client serviceName
+        
 module Network =
     type Command = 
         | SendMemPool of peerId:byte[] * Hash.Hash list
         | SendTransaction of peerId:byte[] * Transaction 
+        | SendTip of peerId:byte[] * BlockHeader
+        | SendBlock of peerId:byte[] * Block
         | GetTransaction of peerId:byte[] * Hash.Hash
+        | GetBlock of Hash.Hash 
                    
     type Request = unit
                 

@@ -330,6 +330,116 @@ let ``GetTransaction size fits stream ``() =
     messageSize |> should equal offset
 
 [<Test>]
+let ``send and recv GetBlock``() =
+    let msg = GetBlock (Array.create 32 123uy)
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://GetBlock.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://GetBlock.test"
+
+    Network.Message.send server msg
+
+    let msg' = Network.Message.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``GetBlock size fits stream ``() =
+    let getblock:GetBlock =
+        Array.create 32 123uy
+
+    let messageSize = GetBlock.getMessageSize getblock
+
+    let stream =
+        Stream.create messageSize
+        |> GetBlock.write getblock
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
+let ``send and recv Block``() =
+    let msg = Block ("Captcha Diem"B)
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://Block.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://Block.test"
+
+    Network.Message.send server msg
+
+    let msg' = Network.Message.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``Block size fits stream ``() =
+    let block:Block =
+        "Captcha Diem"B
+
+    let messageSize = Block.getMessageSize block
+
+    let stream =
+        Stream.create messageSize
+        |> Block.write block
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
+let ``send and recv GetTip``() =
+    let msg = GetTip
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://GetTip.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://GetTip.test"
+
+    Network.Message.send server msg
+
+    let msg' = Network.Message.recv client
+
+    msg' |> should equal (Some msg)
+
+
+[<Test>]
+let ``send and recv BlockHeader``() =
+    let msg = BlockHeader (Array.create 100 123uy)
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://BlockHeader.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://BlockHeader.test"
+
+    Network.Message.send server msg
+
+    let msg' = Network.Message.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``BlockHeader size fits stream ``() =
+    let blockheader:BlockHeader =
+        Array.create 100 123uy
+
+    let messageSize = BlockHeader.getMessageSize blockheader
+
+    let stream =
+        Stream.create messageSize
+        |> BlockHeader.write blockheader
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
 let ``send and recv UnknownPeer``() =
     let msg = UnknownPeer
 
