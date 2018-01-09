@@ -15,6 +15,7 @@ type Spend = {
 
 type Lock =
     | PK of Hash
+    | Contract of Hash * array<byte>
 
 type Output = {
     lock: Lock
@@ -22,10 +23,34 @@ type Output = {
 }
 
 type Witness = 
-    PKWitness of array<byte> * Signature
+    | PKWitness of array<byte> * Signature
+    | ContractWitness of 
+        Hash * 
+        beginInputs:int * 
+        beginOutputs:int * 
+        endInputs:int * 
+        endOutputs:int
 
 type Transaction = {
-    inputs: Outpoint list;
-    outputs: Output list;
+    inputs: Outpoint list
+    outputs: Output list
     witnesses: Witness list
+    contract: string Option
+}
+
+type Nonce = uint64 * uint64
+
+type BlockHeader = {
+    version: uint32;
+    parent: Hash.Hash;
+    blockNumber: uint32;
+    commitments: Hash.Hash;
+    timestamp: uint64;
+    difficulty: uint32;
+    nonce: Nonce;
+}
+
+type Block = {
+    header:BlockHeader;
+    transactions:Transaction list;
 }

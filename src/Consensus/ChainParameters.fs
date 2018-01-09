@@ -2,20 +2,29 @@ module Consensus.ChainParameters
 
 open Consensus.Types
 
-type Chain = 
+type Chain =
     | Main
     | Test
 
-let rootPKHash = Hash.compute [| 3uy; 235uy; 227uy; 69uy; 160uy; 193uy; 130uy; 94uy; 110uy; 75uy; 201uy;
-                                 131uy; 186uy; 13uy; 173uy; 220uy; 244uy; 192uy; 5uy; 17uy; 204uy; 211uy;
-                                 80uy; 60uy; 34uy; 149uy; 101uy; 37uy; 19uy; 1uy; 22uy; 53uy; 147uy|]
-    
-// Temporary transaction until we will have blocks and test genesis block    
-let rootTx= 
+type ChainParameters = 
     {
-        inputs=[];
-        outputs=[{lock = PK rootPKHash; spend= {asset = Hash.zero;amount=100000000UL}}]; 
-        witnesses=[]
+        proofOfWorkLimit:Hash.Hash;
+        blockInterval:uint64;
+        smoothingFactor:float
     }
-    
-let rootTxHash = Transaction.hash rootTx
+
+let getChainParameters = function
+    | Main -> {proofOfWorkLimit=Difficulty.uncompress 0x1d00fffful;blockInterval=1000UL;smoothingFactor=0.0055}
+    | Test -> {proofOfWorkLimit=Difficulty.uncompress 0x20fffffful;blockInterval=1000UL;smoothingFactor=0.05}
+
+let proofOfWorkLimit chain =
+    let p = getChainParameters chain
+    p.proofOfWorkLimit
+
+let blockInterval chain =
+    let p = getChainParameters chain
+    p.blockInterval
+
+let smoothingFactor chain =
+    let p = getChainParameters chain
+    p.smoothingFactor

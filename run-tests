@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -u
+set -e
 
 mono packages/NUnit.ConsoleRunner/tools/nunit3-console.exe --labels=Before --stoponerror src/Consensus.Tests/bin/Debug/Consensus.Tests.dll
 mono packages/NUnit.ConsoleRunner/tools/nunit3-console.exe --labels=Before --stoponerror --workers=1 src/Infrastructure.Tests/bin/Debug/Infrastructure.Tests.dll

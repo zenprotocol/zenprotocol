@@ -17,6 +17,18 @@ let PongMessageId = 4uy
 [<LiteralAttribute>]
 let TransactionMessageId = 5uy
 [<LiteralAttribute>]
+let AddressMessageId = 6uy
+[<LiteralAttribute>]
+let GetAddressesMessageId = 7uy
+[<LiteralAttribute>]
+let AddressesMessageId = 8uy
+[<LiteralAttribute>]
+let GetMemPoolMessageId = 9uy
+[<LiteralAttribute>]
+let MemPoolMessageId = 10uy
+[<LiteralAttribute>]
+let GetTransactionMessageId = 11uy
+[<LiteralAttribute>]
 let UnknownPeerMessageId = 100uy
 [<LiteralAttribute>]
 let UnknownMessageMessageId = 101uy
@@ -31,25 +43,32 @@ type HelloAck = {
         version : uint32
     }
 
-type Ping = {
-        nonce : uint32
-    }
+type Ping =
+        uint32
 
-type Pong = {
-        nonce : uint32
-    }
+type Pong =
+        uint32
 
-type Transaction = {
-        tx : byte[]
-    }
+type Transaction =
+        byte[]
 
-type UnknownPeer = {
-        dummy : byte
-    }
+type Address =
+        string
 
-type UnknownMessage = {
-        messageId : byte
-    }
+
+type Addresses =
+        string list
+
+
+type MemPool =
+        byte[]
+
+type GetTransaction =
+        byte[]
+
+
+type UnknownMessage =
+        byte
 
 type T =
     | Hello of Hello
@@ -57,8 +76,15 @@ type T =
     | Ping of Ping
     | Pong of Pong
     | Transaction of Transaction
-    | UnknownPeer of UnknownPeer
+    | Address of Address
+    | GetAddresses
+    | Addresses of Addresses
+    | GetMemPool
+    | MemPool of MemPool
+    | GetTransaction of GetTransaction
+    | UnknownPeer
     | UnknownMessage of UnknownMessage
+
 
 module Hello =
     let getMessageSize (msg:Hello) =
@@ -82,6 +108,7 @@ module Hello =
                         version = version;
                     }: Hello)
         }
+
 
 module HelloAck =
     let getMessageSize (msg:HelloAck) =
@@ -108,110 +135,133 @@ module HelloAck =
 
 module Ping =
     let getMessageSize (msg:Ping) =
-        0 +
-            4 +
-            0
+            4
 
     let write (msg:Ping) stream =
         stream
-        |> Stream.writeNumber4 msg.nonce
+        |> Stream.writeNumber4 msg
 
     let read =
         reader {
-            let! nonce = Stream.readNumber4
+            let! msg = Stream.readNumber4
 
-            return ({
-                        nonce = nonce;
-                    }: Ping)
+            return msg
         }
 
 module Pong =
     let getMessageSize (msg:Pong) =
-        0 +
-            4 +
-            0
+            4
 
     let write (msg:Pong) stream =
         stream
-        |> Stream.writeNumber4 msg.nonce
+        |> Stream.writeNumber4 msg
 
     let read =
         reader {
-            let! nonce = Stream.readNumber4
+            let! msg = Stream.readNumber4
 
-            return ({
-                        nonce = nonce;
-                    }: Pong)
+            return msg
         }
 
 module Transaction =
     let getMessageSize (msg:Transaction) =
-        0 +
-            4 + Array.length msg.tx +
-            0
+            4 + Array.length msg
 
     let write (msg:Transaction) stream =
         stream
-        |> Stream.writeNumber4 (uint32 (Array.length msg.tx))
-        |> Stream.writeBytes msg.tx (Array.length msg.tx)
+        |> Stream.writeNumber4 (uint32 (Array.length msg))
+        |> Stream.writeBytes msg (Array.length msg)
 
     let read =
         reader {
-            let! txLength = Stream.readNumber4
-            let! tx = Stream.readBytes (int txLength)
+            let! msgLength = Stream.readNumber4
+            let! msg = Stream.readBytes (int msgLength)
 
-            return ({
-                        tx = tx;
-                    }: Transaction)
+            return msg
         }
 
-module UnknownPeer =
-    let getMessageSize (msg:UnknownPeer) =
-        0 +
-            1 +
-            0
+module Address =
+    let getMessageSize (msg:Address) =
+            4 + String.length msg
 
-    let write (msg:UnknownPeer) stream =
+    let write (msg:Address) stream =
         stream
-        |> Stream.writeNumber1 msg.dummy
+        |> Stream.writeLongString msg
 
     let read =
         reader {
-            let! dummy = Stream.readNumber1
+            let! msg = Stream.readLongString
 
-            return ({
-                        dummy = dummy;
-                    }: UnknownPeer)
+            return msg
+        }
+
+module Addresses =
+    let getMessageSize (msg:Addresses) =
+            List.fold (fun state (value:string) -> state + 4 + Encoding.UTF8.GetByteCount (value)) 4 msg
+
+    let write (msg:Addresses) stream =
+        stream
+        |> Stream.writeStrings msg
+
+    let read =
+        reader {
+            let! msg = Stream.readStrings
+
+            return msg
+        }
+
+module MemPool =
+    let getMessageSize (msg:MemPool) =
+            4 + Array.length msg
+
+    let write (msg:MemPool) stream =
+        stream
+        |> Stream.writeNumber4 (uint32 (Array.length msg))
+        |> Stream.writeBytes msg (Array.length msg)
+
+    let read =
+        reader {
+            let! msgLength = Stream.readNumber4
+            let! msg = Stream.readBytes (int msgLength)
+
+            return msg
+        }
+
+module GetTransaction =
+    let txHashSize = 32
+    let getMessageSize (msg:GetTransaction) =
+            32
+
+    let write (msg:GetTransaction) stream =
+        stream
+        |> Stream.writeBytes msg 32
+
+    let read =
+        reader {
+            let! msg = Stream.readBytes 32
+
+            return msg
         }
 
 module UnknownMessage =
     let getMessageSize (msg:UnknownMessage) =
-        0 +
-            1 +
-            0
+            1
 
     let write (msg:UnknownMessage) stream =
         stream
-        |> Stream.writeNumber1 msg.messageId
+        |> Stream.writeNumber1 msg
 
     let read =
         reader {
-            let! messageId = Stream.readNumber1
+            let! msg = Stream.readNumber1
 
-            return ({
-                        messageId = messageId;
-                    }: UnknownMessage)
+            return msg
         }
 
 
-let recv socket =
-    let stream, more = Stream.recv socket
-
-    // Drop the rest if any
-    if more then Multipart.skip socket
-
+let private decode stream =
     let readMessage messageId stream =
-        match messageId with
+            match messageId with
         | HelloMessageId ->
             match Hello.read stream with
             | None,stream -> None,stream
@@ -232,10 +282,28 @@ let recv socket =
             match Transaction.read stream with
             | None,stream -> None,stream
             | Some msg, stream -> Some (Transaction msg), stream
-        | UnknownPeerMessageId ->
-            match UnknownPeer.read stream with
+        | AddressMessageId ->
+            match Address.read stream with
             | None,stream -> None,stream
-            | Some msg, stream -> Some (UnknownPeer msg), stream
+            | Some msg, stream -> Some (Address msg), stream
+        | GetAddressesMessageId ->
+            Some GetAddresses, stream
+        | AddressesMessageId ->
+            match Addresses.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (Addresses msg), stream
+        | GetMemPoolMessageId ->
+            Some GetMemPool, stream
+        | MemPoolMessageId ->
+            match MemPool.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (MemPool msg), stream
+        | GetTransactionMessageId ->
+            match GetTransaction.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (GetTransaction msg), stream
+        | UnknownPeerMessageId ->
+            Some UnknownPeer, stream
         | UnknownMessageMessageId ->
             match UnknownMessage.read stream with
             | None,stream -> None,stream
@@ -252,6 +320,23 @@ let recv socket =
 
     run r stream
 
+let recv socket =
+    let stream, more = Stream.recv socket
+
+    // Drop the rest if any
+    if more then Multipart.skip socket
+
+    decode stream
+
+let tryRecv socket timeout =
+    match Stream.tryRecv socket timeout with
+    | None -> None
+    | Some (stream, more) ->
+        // Drop the rest if any
+        if more then Multipart.skip socket
+
+        decode stream
+
 let send socket msg =
     let writeMessage = function
         | Hello msg -> Hello.write msg
@@ -259,7 +344,13 @@ let send socket msg =
         | Ping msg -> Ping.write msg
         | Pong msg -> Pong.write msg
         | Transaction msg -> Transaction.write msg
-        | UnknownPeer msg -> UnknownPeer.write msg
+        | Address msg -> Address.write msg
+        | GetAddresses -> id
+        | Addresses msg -> Addresses.write msg
+        | GetMemPool -> id
+        | MemPool msg -> MemPool.write msg
+        | GetTransaction msg -> GetTransaction.write msg
+        | UnknownPeer -> id
         | UnknownMessage msg -> UnknownMessage.write msg
 
     let messageId =
@@ -269,6 +360,12 @@ let send socket msg =
         | Ping _ -> PingMessageId
         | Pong _ -> PongMessageId
         | Transaction _ -> TransactionMessageId
+        | Address _ -> AddressMessageId
+        | GetAddresses _ -> GetAddressesMessageId
+        | Addresses _ -> AddressesMessageId
+        | GetMemPool _ -> GetMemPoolMessageId
+        | MemPool _ -> MemPoolMessageId
+        | GetTransaction _ -> GetTransactionMessageId
         | UnknownPeer _ -> UnknownPeerMessageId
         | UnknownMessage _ -> UnknownMessageMessageId
 
@@ -279,7 +376,13 @@ let send socket msg =
         | Ping msg -> Ping.getMessageSize msg
         | Pong msg -> Pong.getMessageSize msg
         | Transaction msg -> Transaction.getMessageSize msg
-        | UnknownPeer msg -> UnknownPeer.getMessageSize msg
+        | Address msg -> Address.getMessageSize msg
+        | GetAddresses -> 0
+        | Addresses msg -> Addresses.getMessageSize msg
+        | GetMemPool -> 0
+        | MemPool msg -> MemPool.getMessageSize msg
+        | GetTransaction msg -> GetTransaction.getMessageSize msg
+        | UnknownPeer -> 0
         | UnknownMessage msg -> UnknownMessage.getMessageSize msg
 
     //  Signature + message ID + message size

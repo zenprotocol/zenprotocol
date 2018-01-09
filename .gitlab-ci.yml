@@ -2,12 +2,14 @@ image: mono:5.4
 
 before_script:
  - apt-get update
- - apt-get install -y -qq libsodium-dev fsharp
+ - apt-get install -y -qq fsharp libgomp1 libstdc++6
 
 build:
  stage: build
  script:
  - mono .paket/paket.exe restore
+ - chmod +x packages/zen_z3_linux/output/z3
+ - pushd src/Zulib && ./build.sh && popd
  - msbuild src/zenprotocol.sln
  - cp packages/zen_secp256k1_linux/output/libsecp256k1.so /usr/lib 
  - ./run-tests

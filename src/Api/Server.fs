@@ -55,6 +55,17 @@ let handleRequest client (request,reply) =
             | Created tx ->
                 Blockchain.validateTransaction client tx
                 reply StatusCode.OK NoContent
+    | Post ("/wallet/contract/activate", Some body) ->
+        let activateContract = ContractActivationJson.Parse (body)        
+        
+        if String.length activateContract.Code = 0 then
+            reply StatusCode.BadRequest (TextContent "code cannot be empty")
+        else
+            match Wallet.createContractActivationTransaction client activateContract.Code with
+            | Error error -> reply StatusCode.BadRequest (TextContent error)
+            | Created tx ->
+                Blockchain.validateTransaction client tx
+                reply StatusCode.OK NoContent
     | _ ->
         reply StatusCode.NotFound NoContent    
 

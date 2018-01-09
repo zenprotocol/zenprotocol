@@ -41,10 +41,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="PeersManagerHelper.fs" />
+    <Compile Include="InProcMessage.Tests.fs" />
     <Compile Include="NetworkMessage.Tests.fs" />
-    <Compile Include="PeersManagerTests.fs" />
     <Compile Include="PeerTests.fs" />
+    <Compile Include="TransportHelper.fs" />
+    <Compile Include="TransportTests.fs" />
     <Content Include="paket.references" />
     <ProjectReference Include="..\Network\Network.fsproj">
       <Project>{8471efe5-4b38-4969-ac2a-0bf64a031eba}</Project>

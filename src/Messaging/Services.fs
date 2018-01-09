@@ -2,28 +2,44 @@ module Messaging.Services
 
 open Consensus
 open Consensus.Types
+open Consensus.TxSkeleton
 open Infrastructure.ServiceBus.Client
 
 module Blockchain = 
     let serviceName = "blockchain"
 
     type Command = 
-        | ValidateTransaction of Consensus.Types.Transaction
-        
+        | ValidateTransaction of Types.Transaction
+        | GetMemPool of peerId:byte[]
+        | GetTransaction of peerId:byte[] * txHash:Hash.Hash
+        | HandleMemPool of peerId:byte[] * Hash.Hash list
+
     type Request = 
-        | GetMemPool
-        
-    type Response = 
-        | MemPool
+        | ExecuteContract of (TxSkeleton * Hash.Hash)
+
+    type Response = unit
         
     let validateTransaction client tx = 
         Command.send client serviceName (ValidateTransaction tx)
     
-    let getMemPool client = 
-        Request.send client serviceName GetMemPool        
+    let getMemPool client peerId = 
+        Command.send client serviceName (GetMemPool peerId)
+        
+    let getTransaction client peerId txHash = 
+        Command.send client serviceName (GetTransaction (peerId,txHash))
+    
+    let handleMemPool client peerId txHashes =
+        Command.send client serviceName (HandleMemPool (peerId,txHashes))                                
+
+    let executeContract client cHash txSkeleton = 
+        ExecuteContract (txSkeleton, cHash)
+        |> Request.send<Request, Result<TxSkeleton, string>> client serviceName
 
 module Network =
-    type Command = unit 
+    type Command = 
+        | SendMemPool of peerId:byte[] * Hash.Hash list
+        | SendTransaction of peerId:byte[] * Transaction 
+        | GetTransaction of peerId:byte[] * Hash.Hash
                    
     type Request = unit
                 
@@ -38,6 +54,7 @@ module Wallet =
         | GetAddress
         | GetBalance
         | CreateTransaction of address:string * asset:Hash.Hash * amount:uint64
+        | CreateContractActivationTransaction of code:string
                               
     type CreateTransactionResult =
         | Created of Transaction
@@ -51,7 +68,8 @@ module Wallet =
     let getAddress client =
         Request.send<Request, string> client serviceName GetAddress
         
-    let createTransaction client address asset amount =     
+    let createTransaction client address asset amount =
         Request.send<Request, CreateTransactionResult> client serviceName (CreateTransaction (address,asset,amount))
-    
-            
+
+    let createContractActivationTransaction client code =
+        Request.send<Request, CreateTransactionResult> client serviceName (CreateContractActivationTransaction (code))

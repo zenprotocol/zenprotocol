@@ -1,0 +1,73 @@
+<class
+        name = "InProcMessage"
+        signature = "19634"
+        title = "Inproc Message"
+        script = "zproto_codec_fs"
+        source_dir = "./"
+        test_dir ="../../Network.Tests/"
+        module ="Network.Transport.InProcMessage"
+        test_module="Network.Tests.InProcMessageTests"
+>
+    <message name="Connect" id="1">
+        <field name="address" type="longstr">Address</field>
+    </message>
+    
+    <message name="Connected" id="2">
+        <field name="address" type="longstr">Address</field>
+        <field name="peerId" type="octets" size="4">Peer Id</field>
+    </message>
+
+    <message name="Accepted" id="3">
+        <field name="peerId" type="octets" size="4">Peer Id</field>
+    </message>
+
+    <message name="Disconnected" id="4">
+        <field name="address" type="longstr">Address</field>
+    </message>
+    
+    <message name="Transaction" id="10">
+        <field name="tx" type="chunk">Tx</field>
+    </message>
+    
+    <message name="Send Address" id="11">
+        <field name="peerId" type="octets" size="4">Peer Id</field>
+        <field name="address" type="longstr">Address</field>
+    </message>
+    
+    <message name="Address" id="12">
+        <field name="address" type="longstr">Address</field>
+    </message>
+    
+    <message name="Get Addresses" id="13">
+        <field name="peerId" type="octets" size="4">Peer Id</field>
+    </message>
+
+    <message name="Addresses" id="14">
+        <field name="addresses" type="strings"/>
+    </message>
+
+    <message name="Send Addresses" id="15">
+        <field name="peerId" type="octets" size="4">Peer Id</field>
+        <field name="addresses" type="strings"/>
+    </message>
+
+    <message name="Get Mem Pool" id="16">
+        <field name="peerId" type="octets" size="4">Peer Id</field>
+    </message>
+    
+    <message name="Mem Pool" id="17">
+        <field name="peerId" type="octets" size="4">Peer Id</field>
+        <field name="txs" type="chunk">Transactions</field>
+    </message>
+    
+    <message name="Get Transaction" id="18">
+        <field name="peerId" type="octets" size="4">Peer Id</field>
+        <field name="txHash" type="octets" size="32">TransactionHash</field>
+    </message>
+
+    <message name="Send Transaction" id="19">
+        <field name="peerId" type="octets" size="4">Peer Id</field>
+        <field name="tx" type="chunk">Tx</field>
+    </message>
+    
+</class>

@@ -1,4 +1,4 @@
-﻿module Network.Tests.MessageTests
+module Network.Tests.MessageTests
 
 open NUnit.Framework
 open FsUnit
@@ -80,9 +80,7 @@ let ``HelloAck size fits stream ``() =
 
 [<Test>]
 let ``send and recv Ping``() =
-    let msg = Ping {
-        nonce = 123ul;
-    }
+    let msg = Ping 123ul
 
     use server = Socket.dealer ()
     Socket.bind server "inproc://Ping.test"
@@ -98,9 +96,8 @@ let ``send and recv Ping``() =
 
 [<Test>]
 let ``Ping size fits stream ``() =
-    let ping:Ping = {
-        nonce = 123ul;
-    }
+    let ping:Ping =
+        123ul
 
     let messageSize = Ping.getMessageSize ping
 
@@ -114,9 +111,7 @@ let ``Ping size fits stream ``() =
 
 [<Test>]
 let ``send and recv Pong``() =
-    let msg = Pong {
-        nonce = 123ul;
-    }
+    let msg = Pong 123ul
 
     use server = Socket.dealer ()
     Socket.bind server "inproc://Pong.test"
@@ -132,9 +127,8 @@ let ``send and recv Pong``() =
 
 [<Test>]
 let ``Pong size fits stream ``() =
-    let pong:Pong = {
-        nonce = 123ul;
-    }
+    let pong:Pong =
+        123ul
 
     let messageSize = Pong.getMessageSize pong
 
@@ -148,9 +142,7 @@ let ``Pong size fits stream ``() =
 
 [<Test>]
 let ``send and recv Transaction``() =
-    let msg = Transaction {
-        tx = "Captcha Diem"B;
-    }
+    let msg = Transaction ("Captcha Diem"B)
 
     use server = Socket.dealer ()
     Socket.bind server "inproc://Transaction.test"
@@ -166,9 +158,8 @@ let ``send and recv Transaction``() =
 
 [<Test>]
 let ``Transaction size fits stream ``() =
-    let transaction:Transaction = {
-        tx = "Captcha Diem"B;
-    }
+    let transaction:Transaction =
+        "Captcha Diem"B
 
     let messageSize = Transaction.getMessageSize transaction
 
@@ -181,10 +172,166 @@ let ``Transaction size fits stream ``() =
     messageSize |> should equal offset
 
 [<Test>]
+let ``send and recv Address``() =
+    let msg = Address "Life is short but Now lasts for ever"
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://Address.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://Address.test"
+
+    Network.Message.send server msg
+
+    let msg' = Network.Message.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``Address size fits stream ``() =
+    let address:Address =
+        "Life is short but Now lasts for ever"
+
+    let messageSize = Address.getMessageSize address
+
+    let stream =
+        Stream.create messageSize
+        |> Address.write address
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
+let ``send and recv GetAddresses``() =
+    let msg = GetAddresses
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://GetAddresses.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://GetAddresses.test"
+
+    Network.Message.send server msg
+
+    let msg' = Network.Message.recv client
+
+    msg' |> should equal (Some msg)
+
+
+[<Test>]
+let ``send and recv Addresses``() =
+    let msg = Addresses ["Name: Brutus";"Age: 43"]
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://Addresses.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://Addresses.test"
+
+    Network.Message.send server msg
+
+    let msg' = Network.Message.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``Addresses size fits stream ``() =
+    let addresses:Addresses =
+        ["Name: Brutus";"Age: 43"]
+
+    let messageSize = Addresses.getMessageSize addresses
+
+    let stream =
+        Stream.create messageSize
+        |> Addresses.write addresses
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
+let ``send and recv GetMemPool``() =
+    let msg = GetMemPool
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://GetMemPool.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://GetMemPool.test"
+
+    Network.Message.send server msg
+
+    let msg' = Network.Message.recv client
+
+    msg' |> should equal (Some msg)
+
+
+[<Test>]
+let ``send and recv MemPool``() =
+    let msg = MemPool ("Captcha Diem"B)
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://MemPool.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://MemPool.test"
+
+    Network.Message.send server msg
+
+    let msg' = Network.Message.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``MemPool size fits stream ``() =
+    let mempool:MemPool =
+        "Captcha Diem"B
+
+    let messageSize = MemPool.getMessageSize mempool
+
+    let stream =
+        Stream.create messageSize
+        |> MemPool.write mempool
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
+let ``send and recv GetTransaction``() =
+    let msg = GetTransaction (Array.create 32 123uy)
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://GetTransaction.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://GetTransaction.test"
+
+    Network.Message.send server msg
+
+    let msg' = Network.Message.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``GetTransaction size fits stream ``() =
+    let gettransaction:GetTransaction =
+        Array.create 32 123uy
+
+    let messageSize = GetTransaction.getMessageSize gettransaction
+
+    let stream =
+        Stream.create messageSize
+        |> GetTransaction.write gettransaction
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
 let ``send and recv UnknownPeer``() =
-    let msg = UnknownPeer {
-        dummy = 123uy;
-    }
+    let msg = UnknownPeer
 
     use server = Socket.dealer ()
     Socket.bind server "inproc://UnknownPeer.test"
@@ -198,27 +345,10 @@ let ``send and recv UnknownPeer``() =
 
     msg' |> should equal (Some msg)
 
-[<Test>]
-let ``UnknownPeer size fits stream ``() =
-    let unknownpeer:UnknownPeer = {
-        dummy = 123uy;
-    }
-
-    let messageSize = UnknownPeer.getMessageSize unknownpeer
-
-    let stream =
-        Stream.create messageSize
-        |> UnknownPeer.write unknownpeer
-
-    let offset = Stream.getOffset stream
-
-    messageSize |> should equal offset
 
 [<Test>]
 let ``send and recv UnknownMessage``() =
-    let msg = UnknownMessage {
-        messageId = 123uy;
-    }
+    let msg = UnknownMessage 123uy
 
     use server = Socket.dealer ()
     Socket.bind server "inproc://UnknownMessage.test"
@@ -234,9 +364,8 @@ let ``send and recv UnknownMessage``() =
 
 [<Test>]
 let ``UnknownMessage size fits stream ``() =
-    let unknownmessage:UnknownMessage = {
-        messageId = 123uy;
-    }
+    let unknownmessage:UnknownMessage =
+        123uy
 
     let messageSize = UnknownMessage.getMessageSize unknownmessage
 

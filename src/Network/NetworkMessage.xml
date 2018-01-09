@@ -30,9 +30,31 @@
     <message name="Transaction" id="5">
         <field name="tx" type="chunk">Tx</field>
     </message>
+
+    <message name="Address" id="6">
+        <field name="address" type="longstr">Address</field>
+    </message>
+    
+    <message name="Get Addresses" id="7">
+    </message>
+    
+    <message name="Addresses" id="8">
+        <field name="addresses" type="strings"/>
+    </message>
+    
+    <message name="Get Mem Pool" id="9">
+        
+    </message>
+    
+    <message name="Mem Pool" id="10">
+        <field name="txs" type="chunk">Transactions</field>
+    </message>
+    
+    <message name="Get Transaction" id="11">
+        <field name="txHash" type="octets" size="32">TransactionHash</field>
+    </message>
     
     <message name="Unknown Peer" id="100">
-        <field name="dummy" type="number" size="1" />
     </message>
 
     <message name="Unknown Message" id="101">

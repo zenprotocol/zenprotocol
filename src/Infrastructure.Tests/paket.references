@@ -6,3 +6,6 @@ FSharp.Control.Reactive
 System.Reactive.Linq
 FSharp.Data
 FSharp.Compiler.Tools
+zen_z3_linux
+zen_z3_osx
+ZFStar

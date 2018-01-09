@@ -1,5 +1,7 @@
+FsNetMQ
 FSharp.Core
 FsPickler
 BouncyCastle
 FsBech32
 FSharp.Compiler.Tools
+FSharp.Compatibility.OCaml
