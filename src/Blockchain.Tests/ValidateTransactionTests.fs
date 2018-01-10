@@ -17,33 +17,35 @@ open Infrastructure
 open Consensus.Tests.ContractTests
 open Blockchain.State
 
+open TestsInfrastructure.Nunit
+
 let chain = ChainParameters.Test
 // Helper functions for the tests
 let getStringBytes (str : string) = System.Text.Encoding.UTF8.GetBytes str
 let getStringHash = getStringBytes >> Hash.compute
 let getAddress a = Account.getAddress a ChainParameters.Test
-let createTransaction address amount account = 
+let createTransaction address amount account =
     match Account.createTransaction chain account address Hash.zero amount with
     | Ok tx -> tx
     | Error error -> failwith error
-let getTxOutpints txHash tx = List.mapi (fun i _ -> {txHash=txHash;index= uint32 i}) tx.outputs    
-let areOutpointsInSet outpoints set = 
+let getTxOutpints txHash tx = List.mapi (fun i _ -> {txHash=txHash;index= uint32 i}) tx.outputs
+let areOutpointsInSet outpoints set =
     match UtxoSet.getUtxos outpoints set with
     | Some _ -> true
     | None -> false
- 
+
 // Some default transaction to work with during the tests
-let tx = 
-    let account = Account.createRoot ()    
-    createTransaction (getAddress account) 1UL account    
-let txHash = Transaction.hash tx    
-let txOutpoints = getTxOutpints txHash tx     
-    
-// Default initial state of mempool and utxoset    
-let utxoSet = UtxoSet.create() |> UtxoSet.handleTransaction Transaction.rootTxHash Transaction.rootTx                
+let tx =
+    let account = Account.createRoot ()
+    createTransaction (getAddress account) 1UL account
+let txHash = Transaction.hash tx
+let txOutpoints = getTxOutpints txHash tx
+
+// Default initial state of mempool and utxoset
+let utxoSet = UtxoSet.create() |> UtxoSet.handleTransaction Transaction.rootTxHash Transaction.rootTx
 let mempool = MemPool.empty |> MemPool.add Transaction.rootTxHash Transaction.rootTx
-let orphanPool = OrphanPool.create()       
-let acs = ActiveContractSet.empty 
+let orphanPool = OrphanPool.create()
+let acs = ActiveContractSet.empty
 
 let state = {
     memoryState = {
@@ -56,133 +58,133 @@ let state = {
        tip = PersistentBlock.empty
        utxoSet=utxoSet
        activeContractSet=acs
-       ema=EMA.create chain 
+       ema=EMA.create chain
     }
     blockRepository = BlockRepository.create ()
     blockRequests= Set.empty
-}      
+}
 
 [<Test>]
-let ``valid transaction raise events and update state``() =                                          
+let ``valid transaction raise events and update state``() =
     let result = Handler.handleCommand chain (ValidateTransaction tx) state
-    
+
     let events, state' = Writer.unwrap result
-        
+
     // Checking that the event raised
-    events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (txHash, tx)))    
-    
+    events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (txHash, tx)))
+
     // Checking only 1 event raised
     events |> should haveLength 1
-    
+
     // Checking the tx is in the mempool
-    MemPool.containsTransaction txHash state'.memoryState.mempool |> should equal true 
-    
+    MemPool.containsTransaction txHash state'.memoryState.mempool |> should equal true
+
     // Checking the tx is in the utxoset
-    UtxoSet.getUtxos txOutpoints state'.memoryState.utxoSet |> should equal (Some tx.outputs) 
+    UtxoSet.getUtxos txOutpoints state'.memoryState.utxoSet |> should equal (Some tx.outputs)
 
 [<Test>]
-let ``Invalid tx doesn't raise events or update state``() = 
+let ``Invalid tx doesn't raise events or update state``() =
     let invalidTx = {inputs=[];outputs=[];witnesses=[];contract=None}
-                   
+
     let result = Handler.handleCommand chain (ValidateTransaction invalidTx) state
-    
+
     let events, state' = Writer.unwrap result
-    
+
     // Checking no events raised
     events |> should haveLength 0
-    
+
     // Checking the tx is not in the mempool
-    MemPool.containsTransaction txHash state'.memoryState.mempool |> should equal false 
-    
+    MemPool.containsTransaction txHash state'.memoryState.mempool |> should equal false
+
     // Checking the tx is not in the utxoset
     UtxoSet.getUtxos txOutpoints state'.memoryState.utxoSet |> should equal None
-    
+
     // Orphan should be empty
-    Map.isEmpty state'.memoryState.orphanPool |> should equal true 
-    
+    Map.isEmpty state'.memoryState.orphanPool |> should equal true
+
 [<Test>]
-let ``tx already in mempool nothing happen`` () =                       
+let ``tx already in mempool nothing happen`` () =
     let result = Handler.handleCommand chain (ValidateTransaction Transaction.rootTx) state
-    
+
     let events, state' = Writer.unwrap result
-    
+
     // Checking no events raised
     events |> should haveLength 0
-    
+
     // Checking that state didn't change
-    state'.memoryState.utxoSet |> should equal utxoSet    
-    state'.memoryState.mempool |> should equal mempool 
+    state'.memoryState.utxoSet |> should equal utxoSet
+    state'.memoryState.mempool |> should equal mempool
 
 [<Test>]
 let ``orphan tx added to orphan list``() =
     let utxoSet = UtxoSet.create()
     let state = {state with memoryState={state.memoryState with utxoSet=utxoSet}}
-                   
+
     let result = Handler.handleCommand chain (ValidateTransaction tx) state
-    
+
     let events, state' = Writer.unwrap result
-    
+
     // Checking no events raised
     events |> should haveLength 0
-   
+
     // Checking the tx is not in the mempool
-    MemPool.containsTransaction txHash state'.memoryState.mempool |> should equal false 
-    
+    MemPool.containsTransaction txHash state'.memoryState.mempool |> should equal false
+
     // Checking the tx is not in the utxoset
-    UtxoSet.getUtxos txOutpoints state'.memoryState.utxoSet |> should equal None 
-    
+    UtxoSet.getUtxos txOutpoints state'.memoryState.utxoSet |> should equal None
+
     OrphanPool.containsTransaction txHash state'.memoryState.orphanPool |> should equal true
-    
+
 [<Test>]
-let ``origin tx hit mempool, orphan tx should be added to mempool``() =                                                       
+let ``origin tx hit mempool, orphan tx should be added to mempool``() =
     let rootAccount = Account.createRoot ()
     let account1 = Account.create ()
     let account2 = Account.create ()
-        
+
     let tx1 = createTransaction (getAddress account1) 1UL rootAccount
     let tx1Hash = Transaction.hash tx1
-    
-    let tx2 = 
+
+    let tx2 =
         Account.handleTransaction tx1Hash tx1 account1
-        |> createTransaction (getAddress account2) 1UL 
-    let tx2Hash = Transaction.hash tx2             
-    
+        |> createTransaction (getAddress account2) 1UL
+    let tx2Hash = Transaction.hash tx2
+
     // Sending orphan transaction first, which should be added to orphan list
-    let result = Handler.handleCommand chain (ValidateTransaction tx2) state   
+    let result = Handler.handleCommand chain (ValidateTransaction tx2) state
     let events, state' = Writer.unwrap result
-    
+
     // Checking that the transaction is only in the mempool and no event were raised
     events |> should haveLength 0
-    MemPool.containsTransaction tx2Hash state'.memoryState.mempool |> should equal false     
+    MemPool.containsTransaction tx2Hash state'.memoryState.mempool |> should equal false
     UtxoSet.getUtxos (getTxOutpints tx2Hash tx2) state'.memoryState.utxoSet |> should equal None
     OrphanPool.containsTransaction tx2Hash state'.memoryState.orphanPool |> should equal true
 
     // Sending origin, which should cause both transaction to be added to the mempool
-    let result' = Handler.handleCommand chain (ValidateTransaction tx1) state'    
+    let result' = Handler.handleCommand chain (ValidateTransaction tx1) state'
     let events', state'' = Writer.unwrap result'
-    
+
     // Checking that both transaction added to mempool and published
-    events' |> should haveLength 2 
-    events' |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (tx1Hash,tx1)))    
+    events' |> should haveLength 2
+    events' |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (tx1Hash,tx1)))
     events' |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (tx2Hash,tx2)))
-    MemPool.containsTransaction tx1Hash state''.memoryState.mempool |> should equal true     
+    MemPool.containsTransaction tx1Hash state''.memoryState.mempool |> should equal true
     MemPool.containsTransaction tx2Hash state''.memoryState.mempool |> should equal true
     UtxoSet.getUtxos (getTxOutpints tx1Hash tx1) state''.memoryState.utxoSet |> should equal None // Was already spent by tx2
     UtxoSet.getUtxos (getTxOutpints tx2Hash tx2) state''.memoryState.utxoSet |> should equal (Some tx2.outputs)
     OrphanPool.containsTransaction tx2Hash state''.memoryState.orphanPool |> should equal false
     OrphanPool.containsTransaction tx1Hash state''.memoryState.orphanPool |> should equal false
-    
-[<Test>]    
+
+[<Test>]
 let ``orphan transaction is eventually invalid``() =
     let rootAccount = Account.createRoot ()
     let account1 = Account.create ()
     let account2 = Account.create ()
-           
+
     let tx1 = createTransaction (getAddress account1) 2UL rootAccount
     let tx1Hash = Transaction.hash tx1
-    
-    let tx2 = 
-        let tx = 
+
+    let tx2 =
+        let tx =
             Account.handleTransaction tx1Hash tx1 account1
             |> createTransaction (getAddress account2) 2UL
         // let's change one of the outputs value and reassign to make invalid tx
@@ -190,66 +192,66 @@ let ``orphan transaction is eventually invalid``() =
         let output' = {output with spend = {amount = output.spend.amount - 1UL; asset = output.spend.asset}}
         let outputs = output' :: List.tail tx.outputs
         let tx' = { tx with outputs = outputs}
-        Transaction.sign tx' [account1.keyPair]                              
+        Transaction.sign tx' [account1.keyPair]
     let tx2Hash = Transaction.hash tx2
-    
+
     // Sending orphan transaction first, which should be added to orphan list
-    let result = Handler.handleCommand chain (ValidateTransaction tx2) state    
+    let result = Handler.handleCommand chain (ValidateTransaction tx2) state
     let events, state' = Writer.unwrap result
-    
+
     // Checking that the transaction is only in the mempool and no event were raised
     events |> should haveLength 0
-    MemPool.containsTransaction tx2Hash state'.memoryState.mempool |> should equal false     
+    MemPool.containsTransaction tx2Hash state'.memoryState.mempool |> should equal false
     UtxoSet.getUtxos (getTxOutpints tx2Hash tx2) state'.memoryState.utxoSet |> should equal None
     OrphanPool.containsTransaction tx2Hash state'.memoryState.orphanPool |> should equal true
-    
+
      // Sending origin, which should cause orphan transaction to be rejected and removed from orphan list
-    let result' = Handler.handleCommand chain (ValidateTransaction tx1) state'  
+    let result' = Handler.handleCommand chain (ValidateTransaction tx1) state'
     let events', state'' = Writer.unwrap result'
-    
+
     // Checking that the origin tx is published and orphan removed as invalid
     events' |> should haveLength 1
-    events' |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (tx1Hash,tx1)))        
-    MemPool.containsTransaction tx1Hash state''.memoryState.mempool |> should equal true     
+    events' |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (tx1Hash,tx1)))
+    MemPool.containsTransaction tx1Hash state''.memoryState.mempool |> should equal true
     MemPool.containsTransaction tx2Hash state''.memoryState.mempool |> should equal false
-    UtxoSet.getUtxos (getTxOutpints tx1Hash tx1) state''.memoryState.utxoSet |> should equal (Some tx1.outputs) 
+    UtxoSet.getUtxos (getTxOutpints tx1Hash tx1) state''.memoryState.utxoSet |> should equal (Some tx1.outputs)
     UtxoSet.getUtxos (getTxOutpints tx2Hash tx2) state''.memoryState.utxoSet |> should equal None
     OrphanPool.containsTransaction tx2Hash state''.memoryState.orphanPool |> should equal false
     OrphanPool.containsTransaction tx1Hash state''.memoryState.orphanPool |> should equal false
-    
+
 [<Test>]
 let ``two orphan transaction spending same input``() =
     let rootAccount = Account.createRoot ()
     let account1 = Account.create ()
     let account2 = Account.create ()
     let account3 = Account.create ()
-        
+
     let tx1 = createTransaction (getAddress account1) 1UL rootAccount
     let tx1Hash = Transaction.hash tx1
-    
-    let tx2 = 
+
+    let tx2 =
         Account.handleTransaction tx1Hash tx1 account1
-        |> createTransaction (getAddress account2) 1UL 
+        |> createTransaction (getAddress account2) 1UL
     let tx2Hash = Transaction.hash tx2
-    
-    let tx3 = 
+
+    let tx3 =
         Account.handleTransaction tx1Hash tx1 account1
         |> createTransaction (getAddress account3) 1UL
-    let tx3Hash = Transaction.hash tx3              
-    
+    let tx3Hash = Transaction.hash tx3
+
     let (>>=) = Writer.bind
-    
+
     // Sending both tx2 and tx3, both should be added to orphan pool
-    let result = 
-        Handler.handleCommand chain (ValidateTransaction tx2) state        
-        >>= 
+    let result =
+        Handler.handleCommand chain (ValidateTransaction tx2) state
+        >>=
         Handler.handleCommand chain (ValidateTransaction tx3)
-                    
+
     let events, state' = Writer.unwrap result
-    
+
     // Checking that the transaction is only in the mempool and no event were raised
     events |> should haveLength 0
-    MemPool.containsTransaction tx2Hash state'.memoryState.mempool |> should equal false     
+    MemPool.containsTransaction tx2Hash state'.memoryState.mempool |> should equal false
     MemPool.containsTransaction tx3Hash state'.memoryState.mempool |> should equal false
     UtxoSet.getUtxos (getTxOutpints tx2Hash tx2) state'.memoryState.utxoSet |> should equal None
     UtxoSet.getUtxos (getTxOutpints tx3Hash tx3) utxoSet |> should equal None
@@ -259,7 +261,7 @@ let ``two orphan transaction spending same input``() =
     // Sending origin, which should pick one of the transactions (we cannot know which one, for now at least)
     let result' = Handler.handleCommand chain (ValidateTransaction tx1) state'
     let events', state'' = Writer.unwrap result'
-    
+
     // Checking that both transaction added to mempool and published
     events' |> should haveLength 2
     events' |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (tx1Hash,tx1)))
@@ -280,8 +282,8 @@ let ``Valid contract should be added to ActiveContractSet``() =
     let contractCode = "val test: nat -> nat\nlet test i = i + 1"
     let cHash = getStringHash contractCode
 
-    let tx = 
-        match Account.createContractActivationTransaction rootAccount contractCode with 
+    let tx =
+        match Account.createContractActivationTransaction rootAccount contractCode with
             | Ok tx ->
                 tx
             | _ ->
@@ -289,11 +291,11 @@ let ``Valid contract should be added to ActiveContractSet``() =
 
     let txHash = Transaction.hash tx
 
-    let result = 
-        Handler.handleCommand chain (ValidateTransaction tx) state        
-                    
+    let result =
+        Handler.handleCommand chain (ValidateTransaction tx) state
+
     let events, state' = Writer.unwrap result
-    
+
     // Checking that the contract is in the ACS
     ActiveContractSet.containsContract cHash state'.memoryState.activeContractSet |> should equal true
 
@@ -302,10 +304,10 @@ let ``Valid contract should be added to ActiveContractSet``() =
     events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (txHash, tx)))
     events |> should contain (EffectsWriter.EventEffect (ContractActivated (Contract.computeHash contractCode)))
 
-    // Checking that the transaction was added to mempool 
+    // Checking that the transaction was added to mempool
     MemPool.containsTransaction txHash state'.memoryState.mempool |> should equal true
 
-    // Checking that the transaction was not added to orphans 
+    // Checking that the transaction was not added to orphans
     OrphanPool.containsTransaction txHash state'.memoryState.orphanPool |> should equal false
 
 [<Test>]
@@ -314,16 +316,16 @@ let ``Invalid contract should not be added to ActiveContractSet``() =
     let contractCode = "x"
     let cHash = getStringHash contractCode
 
-    let tx = 
-        match Account.createContractActivationTransaction rootAccount contractCode with 
+    let tx =
+        match Account.createContractActivationTransaction rootAccount contractCode with
             | Ok tx -> tx
             | _ -> failwith "couldn't get tx"
 
     let txHash = Transaction.hash tx
 
-    let result = 
+    let result =
         Handler.handleCommand chain (ValidateTransaction tx) state
-                    
+
     let events, state' = Writer.unwrap result
     
     // Checking that the contract is in not the ACS
@@ -336,24 +338,25 @@ let ``Invalid contract should not be added to ActiveContractSet``() =
     events |> should haveLength 1
     events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (txHash, tx)))
 
-    // Checking that the transaction was added to mempool 
+    // Checking that the transaction was added to mempool
     MemPool.containsTransaction txHash state'.memoryState.mempool |> should equal true
 
-    // Checking that the transaction was not added to orphans 
+    // Checking that the transaction was not added to orphans
     OrphanPool.containsTransaction txHash state'.memoryState.orphanPool |> should equal false
 
 [<Test>]
-let ``Valid contract should be executed``() =
+let ``Valid contract should execute``() =
     let account = Account.createRoot ()
+    let state = { state with memoryState = { state.memoryState with utxoSet = getSampleUtxoset utxoSet } }
     Account.createContractActivationTransaction account sampleContractCode
-    |> Result.map (fun tx -> 
+    |> Result.map (fun tx ->
         Handler.handleCommand chain (ValidateTransaction tx) state
         |> Writer.unwrap)
-    |> Result.map (fun (_, state) -> 
+    |> Result.map (fun (_, state) ->
         ActiveContractSet.containsContract sampleContractHash state.memoryState.activeContractSet
         |> should equal true
-        Handler.handleRequest 
-            (should equal sampleContractExpectedResult) 
+        Handler.handleRequest
+            (fun result -> shouldEqual (result, sampleContractExpectedResult))
             (ExecuteContract (sampleTxSkeleton, sampleContractHash)) state)
     |> Result.mapError failwith
     |> ignore

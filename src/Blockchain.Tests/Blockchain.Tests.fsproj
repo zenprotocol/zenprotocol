@@ -65,6 +65,10 @@
       <Project>{B5E951FC-AE90-4EF1-9365-3E2B5A56B510}</Project>
       <Name>Consensus.Tests</Name>
     </ProjectReference>
+    <ProjectReference Include="..\TestsInfrastructure\TestsInfrastructure.fsproj">
+      <Project>{9DF227BB-E98D-49D7-A33B-C0D5B170F430}</Project>
+      <Name>TestsInfrastructure</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(FSharpTargetsPath)" />
   <Choose>

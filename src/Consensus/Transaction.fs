@@ -46,7 +46,10 @@ let addWitness witness tx =
 
 let fromTxSkeleton (txSkeleton:TxSkeleton) =
     {
-        inputs = txSkeleton.inputs
+        inputs = 
+            txSkeleton.pInputs
+            |> List.filter (fun (input, _) -> input.txHash = Hash.zero && input.index = 0ul |> not)
+            |> List.map fst
         outputs = txSkeleton.outputs
         witnesses = []
         contract = None

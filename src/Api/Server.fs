@@ -66,6 +66,14 @@ let handleRequest client (request,reply) =
             | Created tx ->
                 Blockchain.validateTransaction client tx
                 reply StatusCode.OK NoContent
+    | Post ("/wallet/contract/send", Some body) ->
+        let contractMessageSend = ContractMessageSendJson.Parse (body)
+        
+        match Wallet.createSendMessageTranscation client contractMessageSend.To Hash.zero (uint64 contractMessageSend.Amount) with
+        | Error error -> reply StatusCode.BadRequest (TextContent error)
+        | Created tx ->
+            Blockchain.validateTransaction client tx
+            reply StatusCode.OK NoContent
     | _ ->
         reply StatusCode.NotFound NoContent    
 

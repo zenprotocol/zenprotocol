@@ -16,7 +16,7 @@ let eventHandler event account =
 
 let commandHandler command wallet = wallet
 
-let requestHandler chain (requestId:ServiceBus.Agent.RequestId) request wallet = 
+let requestHandler chain client (requestId:ServiceBus.Agent.RequestId) request wallet = 
     match request with 
     | GetBalance -> 
         let balance = Account.getBalance wallet
@@ -44,19 +44,29 @@ let requestHandler chain (requestId:ServiceBus.Agent.RequestId) request wallet =
             requestId.reply (Error tx)
         
         wallet
+    | CreateSendMessageTranscation (address, asset, amount) ->            
+        match Account.createSendMessageTranscation client chain address with
+        | Ok tx -> 
+            requestId.reply (Created tx)
+            
+        | Result.Error tx -> 
+            requestId.reply (Error tx)
+        
+        wallet
     | _ ->
         wallet
 
 let main busName chain root =
     Actor.create<Command,Request,Event, Account.T> busName serviceName (fun poller sbObservable ebObservable ->                       
         let wallet = if root then Account.createRoot () else Account.create ()
-        
+        let client = ServiceBus.Client.create busName
+
         let sbObservable = 
             sbObservable
             |> Observable.map (fun message ->
                 match message with 
                 | ServiceBus.Agent.Command c -> commandHandler c 
-                | ServiceBus.Agent.Request (requestId, r) -> requestHandler chain requestId r)                
+                | ServiceBus.Agent.Request (requestId, r) -> requestHandler chain client requestId r)                
         
         let ebObservable = 
             ebObservable
