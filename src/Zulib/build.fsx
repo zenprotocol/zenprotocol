@@ -137,12 +137,12 @@ Target "Build" (fun _ ->
 
   let checker = FSharpChecker.Create()
 
-  let frameworkDirectory = 
+  let frameworkDirectory =
     if EnvironmentHelper.isLinux then ("/usr/lib/mono/4.6.2-api/")
     elif EnvironmentHelper.isMacOS then ("/Library/Frameworks/Mono.framework/Versions/Current/lib/mono/4.6.2-api/")
     else ("C:\\Program Files (x86)\\Reference Assemblies\\Microsoft\\Framework\\.NETFramework\\v4.6.2\\")
-  
-  let fw = sprintf "%s%s" frameworkDirectory 
+
+  let fw = sprintf "%s%s" frameworkDirectory
 
   let compileParams =
     [|
@@ -167,12 +167,19 @@ Target "Build" (fun _ ->
     failwith "building Zulib failed"
     )
 
-Target "Default" ignore
+Target "Default" ( fun _ ->
+    Run "Clean"
+    Run "Verify"
+    Run "Extract"
+    Run "Build"
+    )
 
+(*
 "Clean"
   ==> "Verify"
   ==> "Extract"
   ==> "Build"
   ==> "Default"
+*)
 
 RunTargetOrDefault "Default"

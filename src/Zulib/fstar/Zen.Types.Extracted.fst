@@ -97,8 +97,10 @@ and outputLock =
 and output = {lock: outputLock; spend: spend}
 type inputData (n:nat) = data n
 
-unopteq type transactionSkeleton = | Tx: #l1:nat -> outpoints:V.t outpoint l1
-                                      -> #l2:nat -> outputs:  V.t output l2
+type pointedOutput = outpoint * output
+
+unopteq type transactionSkeleton = | Tx: #l1:nat -> inputs : V.t outpoint l1
+                                      -> #l2:nat -> outputs: V.t output l2
                                       -> option (l3:nat & data l3)
                                       -> transactionSkeleton
 
@@ -115,11 +117,14 @@ unopteq type inputMsg = {
 val maxCost: nat
 let maxCost = 200
 
-noeq type costFunction = | CostFunc: #n:nat{n<=maxCost} -> f:(inputMsg -> Zen.Cost.t nat n) -> costFunction
+noeq type costFunction = | CostFunc: #n:nat{n<=maxCost} -> f:(transactionSkeleton -> Zen.Cost.t nat n) -> costFunction
 
 noeq type mainFunction =
   | MainFunc: cf:costFunction
-           -> mf:(imsg:inputMsg -> Zen.Cost.t (result transactionSkeleton) (Zen.Cost.force ((CostFunc?.f cf) imsg)))
+           -> mf: ( inTxSkel:transactionSkeleton
+                    -> Zen.Cost.t (result transactionSkeleton)
+                                  (Zen.Cost.force ((CostFunc?.f cf) inTxSkel))
+                  )
            -> mainFunction
 
 //val contractVersion : extendedContract -> U32.t
