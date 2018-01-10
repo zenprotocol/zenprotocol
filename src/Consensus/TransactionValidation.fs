@@ -12,6 +12,9 @@ type ValidationError =
     | DoubleSpend
     | General of string
 
+let private GeneralError msg =
+    msg |> General |> Error
+
 let private addSpend s m =
     let (+) a b =
         try 
@@ -33,11 +36,11 @@ let private checkAmounts (tx, inputs) =
     let outputs', inputs' = foldSpends tx.outputs, foldSpends inputs
 
     if not <| checkSpends outputs' then
-        "outputs overflow" |> General |> Error
+        GeneralError "outputs overflow"
     else if not <| checkSpends inputs' then
-        "inputs overflow" |> General |> Error
+        GeneralError "inputs overflow"
     else if outputs' <> inputs' then
-        "invalid amounts" |> General |> Error
+        GeneralError "invalid amounts"
     else
         Ok tx
 
@@ -66,10 +69,8 @@ let private checkWitnesses acs set (Hash.Hash txHash, tx, inputs) =
                 output.lock = Destroy && output.spend.asset = witness.cHash)
 
     let checkPKWitness tx pInputs serializedPublicKey signature =
-        let toError err =
-            sprintf "PK witness: %s" err |> General |> Error
         match pInputs with
-        | [] -> toError "missing input" 
+        | [] -> GeneralError "missing PK witness input" 
         | (_, {lock=PK pkHash}) :: tail -> 
             match PublicKey.deserialize serializedPublicKey with
             | Some publicKey ->
@@ -77,10 +78,10 @@ let private checkWitnesses acs set (Hash.Hash txHash, tx, inputs) =
                     match verify publicKey signature txHash with
                     | Valid ->
                         Ok (tx, tail)
-                    | _ -> toError "invalid signature"
-                else toError "mismatch"
-            | _ -> toError "invalid"
-        | _ -> toError "unexpected lock type"
+                    | _ -> GeneralError "invalid PK witness signature"
+                else GeneralError "PK witness mismatch"
+            | _ -> GeneralError "invalid PK witness"
+        | _ -> GeneralError "unexpected PK witness lock type"
 
     let checkContractWitness tx acs set witness pInputs =
         match ActiveContractSet.tryFind witness.cHash acs with
@@ -93,12 +94,12 @@ let private checkWitnesses acs set (Hash.Hash txHash, tx, inputs) =
                        List.length tx'.outputs - List.length tx.outputs = witness.outputsLength then
                         Ok (tx', pInputs)
                     else
-                        "input/output length mismatch" |> General |> Error
+                        GeneralError "input/output length mismatch"
                 else
-                    "illegal creation/destruction of tokens" |> General |> Error
+                    GeneralError "illegal creation/destruction of tokens"
 
-            | Error err -> err |> General |> Error
-        | None -> "contract is not active" |> General |> Error
+            | Error err -> GeneralError err
+        | None -> GeneralError "contract is not active"
 
     //TODO: check the contract witness is single and last
     let firstContractWitness = 
@@ -130,43 +131,41 @@ let private checkWitnesses acs set (Hash.Hash txHash, tx, inputs) =
     |> Result.bind (
         fun (tx'', pInputs) ->
             if not <| List.isEmpty pInputs then
-                "missing witness(s)" |> General |> Error
+                GeneralError "missing witness(s)"
             else if not <| TxSkeleton.isSkeletonOf tx'' tx then
-                "contract validation failed" |> General |> Error
+                GeneralError "contract validation failed"
             else 
                 Ok (tx, inputs) //, tx'') 
     )
 
 let private checkInputsNotEmpty tx = 
-    match List.isEmpty tx.inputs with
-        | true -> General "inputs empty" |> Error
-        | false -> Ok tx
+    if List.isEmpty tx.inputs then GeneralError "inputs empty"
+    else Ok tx
 
 let private checkOutputsNotEmpty tx =
-    match List.isEmpty tx.outputs with
-    | true -> General "outputs empty" |> Error
-    | false -> 
-        match List.exists (fun output -> output.spend.amount = 0UL) tx.outputs with
-        | true -> General "outputs invalid" |> Error
-        | false -> Ok tx
+    if List.isEmpty tx.outputs then
+        GeneralError "outputs empty"
+    else if List.exists (fun output -> output.spend.amount = 0UL) tx.outputs then
+        GeneralError "outputs invalid"
+    else
+        Ok tx
 
 let private checkOutputsOverflow tx =
-    match tx.outputs 
+    if tx.outputs 
           |> foldSpends
-          |> checkSpends with
-    | true -> Ok tx
-    | false -> General "outputs overflow" |> Error
+          |> checkSpends then Ok tx
+    else GeneralError "outputs overflow"
 
 let private checkDuplicateInputs tx =
     let (==) a b = List.length a = List.length b
-    match List.distinct tx.inputs == tx.inputs with
-    | true -> Ok tx
-    | false -> General "inputs duplicated" |> Error
+    if List.distinct tx.inputs == tx.inputs then Ok tx
+    else GeneralError "inputs duplicated"
 
 let private checkInputsStructure tx =
-    match tx.inputs |> List.exists (fun i -> not (Hash.isValid i.txHash)) with
-    | true -> General "inputs structurally invalid" |> Error
-    | false -> Ok tx
+    if tx.inputs |> List.exists (fun input -> not (Hash.isValid input.txHash)) then
+        GeneralError "inputs structurally invalid"
+    else
+        Ok tx
 
 let private checkOrphan set txHash tx =
     match getUtxos tx.inputs set with
