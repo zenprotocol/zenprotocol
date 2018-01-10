@@ -78,6 +78,7 @@ module Wallet =
         | GetBalance
         | CreateTransaction of address:string * asset:Hash.Hash * amount:uint64
         | CreateContractActivationTransaction of code:string
+        | CreateSendMessageTranscation of address:string * asset:Hash.Hash * amount:uint64
                               
     type CreateTransactionResult =
         | Created of Transaction
@@ -96,3 +97,6 @@ module Wallet =
 
     let createContractActivationTransaction client code =
         Request.send<Request, CreateTransactionResult> client serviceName (CreateContractActivationTransaction (code))
+
+    let createSendMessageTranscation client address asset amount =
+        Request.send<Request, CreateTransactionResult> client serviceName (CreateSendMessageTranscation (address,asset,amount))

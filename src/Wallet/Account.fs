@@ -100,9 +100,9 @@ let createRoot () =
         
     handleTransaction Transaction.rootTxHash Transaction.rootTx account             
 
-let createSendMessageTranscation client address chain = // data, (asset, amount) option
-    Address.decodeContract address chain
-    |> Result.map (fun cHash -> 
+let createSendMessageTranscation client chain address = // data, (asset, amount) option
+    match Address.decodeContract address chain with 
+    | Ok cHash ->
         //TODO: create origin txskeleton
         let input = TxSkeleton.empty
         input
@@ -112,12 +112,13 @@ let createSendMessageTranscation client address chain = // data, (asset, amount)
         //TODO: sign the transaction
         |> Result.map (fun tx ->
             Transaction.addWitness (
-                ContractWitness (
-                    cHash, 
-                    List.length input.inputs,
-                    List.length input.outputs,
-                    List.length tx.inputs,
-                    List.length tx.outputs)) tx
+                ContractWitness {
+                    cHash = cHash 
+                    beginInputs = List.length input.pInputs
+                    beginOutputs = List.length input.outputs
+                    inputsLength = List.length tx.inputs
+                    outputsLength = List.length tx.outputs }
+                ) tx
         )
         //TODO: send publish command
-    )
+    | Error msg -> Error msg
