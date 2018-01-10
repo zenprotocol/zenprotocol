@@ -54,6 +54,10 @@
       <Name>Wallet</Name>
     </ProjectReference>
     <Compile Include="AddressTests.fs" />
+    <ProjectReference Include="..\TestsInfrastructure\TestsInfrastructure.fsproj">
+      <Project>{9DF227BB-E98D-49D7-A33B-C0D5B170F430}</Project>
+      <Name>TestsInfrastructure</Name>
+    </ProjectReference>
   </ItemGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>

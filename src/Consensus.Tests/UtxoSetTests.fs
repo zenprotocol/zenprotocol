@@ -14,7 +14,7 @@ let ``handling transaction add outputs to set``() =
     let tx1 = {
         inputs = []
         witnesses = []
-        outputs = [{lock = (PK Hash.zero); spend = {asset=Hash.zero; amount=1UL}}]
+        outputs = [{lock = PK Hash.zero; spend = {asset=Hash.zero; amount=1UL}}]
         contract = None
     }    
     let tx1Hash = Transaction.hash tx1
@@ -38,7 +38,7 @@ let ``handling transaction mark inputs as spent``() =
     let tx1 = {
         inputs = []
         witnesses = []
-        outputs = [{lock = (PK Hash.zero); spend = {asset=Hash.zero; amount=1UL}}]
+        outputs = [{lock = PK Hash.zero; spend = {asset=Hash.zero; amount=1UL}}]
         contract = None
     }    
     let tx1Hash = Transaction.hash tx1
@@ -69,7 +69,7 @@ let ``Should find Utxo``() =
     let outputResult = UtxoSet.getUtxos [ outpoint ] utxos
     
     match outputResult with 
-    | None -> failwith ""
+    | None -> failwith "could not find utxo"
     | Some utxos -> Assert.AreEqual (utxos.[0], output)
     
 [<Property>]

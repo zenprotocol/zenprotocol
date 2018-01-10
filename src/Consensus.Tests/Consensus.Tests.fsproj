@@ -1,5 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\..\packages\FSharp.Compiler.Tools\build\FSharp.Compiler.Tools.props" Condition="Exists('..\..\packages\FSharp.Compiler.Tools\build\FSharp.Compiler.Tools.props')" Label="Paket" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -44,15 +43,19 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="TransactionHelpers.fs" />
+    <Compile Include="TransactionNunitHelpers.fs" />
+    <Compile Include="TransactionFsCheckHelpers.fs" />
     <Compile Include="ConsensusGenerator.fs" />
-    <Compile Include="BlockTests.fs" />
     <Compile Include="BlockHeaderTests.fs" />
     <Compile Include="DifficultyTests.fs" />
     <Compile Include="CryptoTests.fs" />
+    <Compile Include="BlockTests.fs" />
     <Compile Include="MerkleMountainRangeTests.fs" />
     <Compile Include="MerkleTreeTests.fs" />
     <Compile Include="SparseMerkleTreeTests.fs" />
     <Compile Include="TransactionTests.fs" />
+    <Compile Include="TransactionPropertyTests.fs" />
     <Compile Include="UtxoSetTests.fs" />
     <Content Include="paket.references" />
     <ProjectReference Include="..\Consensus\Consensus.fsproj">
@@ -63,6 +66,13 @@
     <ProjectReference Include="..\Wallet\Wallet.fsproj">
       <Project>{289a59eb-d1d4-499f-87b9-f75b799829c0}</Project>
       <Name>Wallet</Name>
+    </ProjectReference>
+    <Compile Include="TransactionSerializationTests.fs" />
+    <Compile Include="TxSkeletonTests.fs" />
+    <Compile Include="TransactionOverflowTests.fs" />
+    <ProjectReference Include="..\TestsInfrastructure\TestsInfrastructure.fsproj">
+      <Project>{9DF227BB-E98D-49D7-A33B-C0D5B170F430}</Project>
+      <Name>TestsInfrastructure</Name>
     </ProjectReference>
   </ItemGroup>
   <PropertyGroup>
