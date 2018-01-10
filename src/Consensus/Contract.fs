@@ -39,11 +39,13 @@ let private wrap (methodInfo : MethodInfo) : ContractFn =
 
 let hash contract = contract.hash
 
+let computeHash (code:string) =    
+    code
+    |> Encoding.UTF8.GetBytes
+    |> Hash.compute
+
 let compile (code : string) : Result<T, string> =
-    let hash =
-        code
-        |> Encoding.UTF8.GetBytes
-        |> Hash.compute
+    let hash = computeHash code
 
     hash 
     |> Hash.bytes
@@ -55,7 +57,7 @@ let compile (code : string) : Result<T, string> =
         {
             hash = hash
             fn = fn
-        })
+        })                
 
 let run (contract : T) input = 
     contract.fn contract.hash input

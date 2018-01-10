@@ -43,6 +43,11 @@ let handleTransaction txHash (tx:Transaction) account =
         
     {account with outpoints = outpoints'}
     
+let handleBlock block account = 
+    List.fold (fun account tx ->
+        let txHash = Transaction.hash tx
+        handleTransaction txHash tx account) account block.transactions
+           
 let getBalance account =
     Map.fold (fun balance _ output -> 
         match Map.tryFind output.spend.asset balance with
@@ -90,6 +95,8 @@ let createRoot () =
             keyPair = KeyPair.fromSecretKey rootSecretKey
             publicKeyHash = Transaction.rootPKHash
         }
+        
+    account
         
     handleTransaction Transaction.rootTxHash Transaction.rootTx account             
 

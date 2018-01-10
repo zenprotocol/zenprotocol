@@ -10,6 +10,8 @@ let eventHandler event account =
     match event with 
     | TransactionAddedToMemPool (txHash,tx) ->
         Account.handleTransaction txHash tx account
+    | BlockAdded block ->
+        Account.handleBlock block account
     | _ -> account 
 
 let commandHandler command wallet = wallet

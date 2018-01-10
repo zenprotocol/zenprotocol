@@ -65,7 +65,7 @@ let ``Transaction should be orphan``() =
     }
     let utxos = Map.ofSeq [ input, Unspent output ]
     let txHash = Transaction.hash tx
-    validateInputs acs utxos txHash tx |> shouldEqual (Error (Orphan tx) : Result<Transaction, ValidationError>)
+    validateInputs acs utxos txHash tx |> shouldEqual (Error Orphan : Result<Transaction, ValidationError>)
 
 [<Test>]
 let ``Transaction basic validation should be Ok``() = 

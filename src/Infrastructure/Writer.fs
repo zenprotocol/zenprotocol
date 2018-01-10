@@ -21,3 +21,7 @@ type WriterBuilder<'effect>() =
         bind mx f
     member this.Return<'a> (x) : Writer<'effect, 'a> = ret x
     member this.ReturnFrom<'a> (mx: Writer<'effect, 'a>) = mx
+    member this.Zero() = Writer([],())
+    member this.Combine(m,f) = bind m f        
+    member this.Delay f = f
+    member this.Run  f = f()
