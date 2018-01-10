@@ -97,8 +97,8 @@ and outputLock =
 and output = {lock: outputLock; spend: spend}
 type inputData (n:nat) = data n
 
-unopteq type transactionSkeleton = | Tx: #l1:nat -> outpoints:V.t outpoint l1
-                                      -> #l2:nat -> outputs:  V.t output l2
+unopteq type transactionSkeleton = | Tx: #l1:nat -> inputs : V.t outpoint l1
+                                      -> #l2:nat -> outputs: V.t output l2
                                       -> option (l3:nat & data l3)
                                       -> transactionSkeleton
 
@@ -117,7 +117,7 @@ let maxCost = 200
 
 noeq type costFunction = | CostFunc: #n:nat{n<=maxCost} -> f:(transactionSkeleton -> Zen.Cost.t nat n) -> costFunction
 
-noeq type mainFunction =
+noeq type mainFuncgitltion =
   | MainFunc: cf:costFunction
            -> mf: ( inTxSkel:transactionSkeleton
                           -> Zen.Cost.t (result transactionSkeleton)

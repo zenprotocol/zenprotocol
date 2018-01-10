@@ -167,7 +167,12 @@ Target "Build" (fun _ ->
     failwith "building Zulib failed"
     )
 
-Target "Default" ignore
+Target "Default" ( fun _ ->
+    Run "Clean"
+    Run "Verify"
+    Run "Extract"
+    Run "Build"
+    )
 
 (*
 "Clean"
