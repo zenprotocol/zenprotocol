@@ -63,7 +63,7 @@ let fromBigInt (b:bigint) =
             let ar = Array.zeroCreate (32 - n)
             Array.rev (Array.append ar bs)
         | 33 ->
-            if bs.[0] <> 0uy then failwith "Negative difficulty target"
-            else Array.rev bs.[1..]
+            if bs.[32] <> 0uy then failwith "Negative difficulty target"
+            else Array.rev bs.[..31]
         | _ -> failwith "Difficulty target out of range"
     Hash h

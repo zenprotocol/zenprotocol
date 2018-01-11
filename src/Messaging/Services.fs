@@ -15,8 +15,10 @@ module Blockchain =
         | GetBlock of peerId:byte[] * blockHash:Hash.Hash
         | GetTip of peerId:byte[]
         | HandleMemPool of peerId:byte[] * Hash.Hash list
-        | HandleBlockHeader of Types.BlockHeader
+        | HandleTip of Types.BlockHeader
+        | ValidateNewBlockHeader of peerId:byte[] * Types.BlockHeader
         | ValidateBlock of Types.Block
+        | ValidateMinedBlock of Types.Block
 
     type Request = 
         | ExecuteContract of (TxSkeleton * Hash.Hash)
@@ -42,9 +44,17 @@ module Blockchain =
     let validateBlock client block = 
         ValidateBlock block 
         |> Command.send client serviceName
+    
+    let validateMinedBlock client block = 
+        ValidateMinedBlock block 
+        |> Command.send client serviceName
+    
+    let handleTip client header = 
+        HandleTip header 
+        |> Command.send client serviceName
         
-    let handleBlockHeader client header = 
-        HandleBlockHeader header 
+    let validateNewBlockHeader client peerId header = 
+        ValidateNewBlockHeader (peerId,header)
         |> Command.send client serviceName 
                 
     let getBlock client peerId blockHash = 
@@ -63,6 +73,8 @@ module Network =
         | SendBlock of peerId:byte[] * Block
         | GetTransaction of peerId:byte[] * Hash.Hash
         | GetBlock of Hash.Hash 
+        | GetNewBlock of peerId:byte[] * Hash.Hash
+        | PublishBlock of BlockHeader
                    
     type Request = unit
                 

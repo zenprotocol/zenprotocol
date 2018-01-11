@@ -3,6 +3,11 @@ module Blockchain.State
 open Consensus
 open Consensus.Types
 
+type BlockRequest = 
+    | ParentBlock 
+    | Tip
+    | NewBlock
+
 type BlockState = 
     {
         tip: PersistentBlock.T
@@ -24,5 +29,5 @@ type State =
         blockRepository:BlockRepository.T        
         tipState: BlockState
         memoryState: MemoryState
-        blockRequests: Set<Hash.Hash>             
+        blockRequests: Map<Hash.Hash, BlockRequest>             
     }

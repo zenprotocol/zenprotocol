@@ -502,14 +502,14 @@ let ``Block size fits stream ``() =
     messageSize |> should equal offset
 
 [<Test>]
-let ``send and recv BlockHeader``() =
-    let msg = BlockHeader (Array.create 100 123uy)
+let ``send and recv Tip``() =
+    let msg = Tip (Array.create 100 123uy)
 
     use server = Socket.dealer ()
-    Socket.bind server "inproc://BlockHeader.test"
+    Socket.bind server "inproc://Tip.test"
 
     use client = Socket.dealer ()
-    Socket.connect client "inproc://BlockHeader.test"
+    Socket.connect client "inproc://Tip.test"
 
     Network.Transport.InProcMessage.send server msg
 
@@ -518,15 +518,82 @@ let ``send and recv BlockHeader``() =
     msg' |> should equal (Some msg)
 
 [<Test>]
-let ``BlockHeader size fits stream ``() =
-    let blockheader:BlockHeader =
+let ``Tip size fits stream ``() =
+    let tip:Tip =
         Array.create 100 123uy
 
-    let messageSize = BlockHeader.getMessageSize blockheader
+    let messageSize = Tip.getMessageSize tip
 
     let stream =
         Stream.create messageSize
-        |> BlockHeader.write blockheader
+        |> Tip.write tip
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
+let ``send and recv PublishBlock``() =
+    let msg = PublishBlock (Array.create 100 123uy)
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://PublishBlock.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://PublishBlock.test"
+
+    Network.Transport.InProcMessage.send server msg
+
+    let msg' = Network.Transport.InProcMessage.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``PublishBlock size fits stream ``() =
+    let publishblock:PublishBlock =
+        Array.create 100 123uy
+
+    let messageSize = PublishBlock.getMessageSize publishblock
+
+    let stream =
+        Stream.create messageSize
+        |> PublishBlock.write publishblock
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
+let ``send and recv NewBlock``() =
+    let msg = NewBlock {
+        blockHeader = Array.create 100 123uy;
+        peerId = Array.create 4 123uy;
+    }
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://NewBlock.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://NewBlock.test"
+
+    Network.Transport.InProcMessage.send server msg
+
+    let msg' = Network.Transport.InProcMessage.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``NewBlock size fits stream ``() =
+    let newblock:NewBlock = {
+        blockHeader = Array.create 100 123uy;
+        peerId = Array.create 4 123uy;
+    }
+
+    let messageSize = NewBlock.getMessageSize newblock
+
+    let stream =
+        Stream.create messageSize
+        |> NewBlock.write newblock
 
     let offset = Stream.getOffset stream
 
@@ -558,6 +625,42 @@ let ``GetBlock size fits stream ``() =
     let stream =
         Stream.create messageSize
         |> GetBlock.write getblock
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
+let ``send and recv GetNewBlock``() =
+    let msg = GetNewBlock {
+        peerId = Array.create 4 123uy;
+        blockHash = Array.create 32 123uy;
+    }
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://GetNewBlock.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://GetNewBlock.test"
+
+    Network.Transport.InProcMessage.send server msg
+
+    let msg' = Network.Transport.InProcMessage.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``GetNewBlock size fits stream ``() =
+    let getnewblock:GetNewBlock = {
+        peerId = Array.create 4 123uy;
+        blockHash = Array.create 32 123uy;
+    }
+
+    let messageSize = GetNewBlock.getMessageSize getnewblock
+
+    let stream =
+        Stream.create messageSize
+        |> GetNewBlock.write getnewblock
 
     let offset = Stream.getOffset stream
 

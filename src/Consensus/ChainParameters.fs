@@ -32,5 +32,10 @@ let smoothingFactor chain =
 let getGenesisHash = 
     function
     | Main -> Hash.zero
-    | Test -> (Hash.fromString "b4e0c5b932cc6c1886988c76add3c60a1236a5af6d52616fb5df6b9521965274").Value        
+    | Test -> (Hash.fromString "53daa9610424738861298485486067be18c4f03358f3ee41e676d7f07ef4497e").Value        
+    
+let getGenesisTime = 
+    function 
+    | Main -> 0UL
+    | Test -> 1515594186383UL
     

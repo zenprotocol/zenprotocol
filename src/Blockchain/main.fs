@@ -46,13 +46,13 @@ let main chain busName =
                 memoryState = memoryState;
                 tipState = tipState;
                 blockRepository = BlockRepository.create ()
-                blockRequests= Set.empty
+                blockRequests= Map.empty
             }            
                      
         let observable =                      
             Observable.merge sbObservable ebObservable
             |> Observable.scan (fun state handler -> 
-                let effectWriter = handler state
+                let effectWriter = handler (Timestamp.now ()) state
                 EffectsWriter.run effectWriter publisher client
                 ) state  
                                                                                       
