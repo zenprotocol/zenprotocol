@@ -65,7 +65,11 @@
     <message name="Get Tip" id="14">
     </message>
     
-    <message name="Block Header" id="15">
+    <message name="Tip" id="15">
+        <field name="block header" type="octets" size="100">block header</field>
+    </message>
+    
+    <message name="New Block" id="16">
         <field name="block header" type="octets" size="100">block header</field>
     </message>
 

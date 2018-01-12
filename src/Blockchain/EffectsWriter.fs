@@ -30,7 +30,11 @@ let getTransaction peerId txHash =
 let getBlock blockHash = 
     let command = Network.GetBlock blockHash
     Writer([NetworkCommand command],())
-    
+
+let getNewBlock peerId blockHash = 
+    let command = Network.GetNewBlock (peerId, blockHash)
+    Writer([NetworkCommand command],())
+ 
 let sendTip peerId blockHeader = 
     let command = Network.SendTip (peerId, blockHeader)
     Writer([NetworkCommand command],())     
@@ -38,6 +42,11 @@ let sendTip peerId blockHeader =
 let sendBlock peerId block = 
     let command = Network.SendBlock (peerId, block)
     Writer([NetworkCommand command],())             
+
+let publishBlock blockHeader =
+    let command = Network.PublishBlock blockHeader
+    Writer([NetworkCommand command],())             
+
 
 let run (Writer (effects, x)) publisher client = 
     List.iter (function

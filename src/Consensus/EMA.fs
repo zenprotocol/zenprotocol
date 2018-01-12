@@ -1,18 +1,18 @@
 module Consensus.EMA
+open Consensus.ChainParameters
 open Consensus.Types
 
 type T  = {
     difficulty: uint32;
     interval: uint64;
     delayed: uint64 list;
-    chain: ChainParameters.Chain
 }
 
 let clamp lower upper x = min upper (max lower x)
 
 let create chain =
     let difficulty = Difficulty.compress (ChainParameters.proofOfWorkLimit chain)
-    {difficulty = difficulty; interval=ChainParameters.blockInterval chain; delayed=[];chain=chain}
+    {difficulty = difficulty; interval=ChainParameters.blockInterval chain; delayed=[]}
 
 let push newTimestamp (timestamps:uint64 list) =
     if List.length timestamps < 11 then
@@ -20,25 +20,29 @@ let push newTimestamp (timestamps:uint64 list) =
     else
         (List.tail timestamps) @ [newTimestamp]
 
-let median timestamps =
+let median chain timestamps =
     if List.isEmpty timestamps then
-        (System.DateTime.Parse "2018-01-01T00:00:00.000000").Ticks |> uint64     // Alter to approximate true genesis timestamp
+        ChainParameters.getGenesisTime chain
     else
         List.item (List.length timestamps / 2) (List.sort timestamps)
 
-let add header ema =
+let add chain timestamp ema =
+    let median = median chain
+
     let oldDelayed = ema.delayed
-    let newDelayed = push header ema.delayed
-    let alpha = ChainParameters.smoothingFactor ema.chain
+    let newDelayed = push timestamp ema.delayed
+    let alpha = ChainParameters.smoothingFactor chain
     let currentInterval = clamp (ema.interval / 10UL) (ema.interval * 10UL) (median newDelayed - median oldDelayed)
     let nextEstimatedInterval = float ema.interval * (1.0 - alpha) + float currentInterval * alpha |> uint64
     let currentTarget = Hash.toBigInt <| Difficulty.uncompress ema.difficulty
-    let nextTarget = currentTarget * bigint nextEstimatedInterval / bigint ema.interval
-    let nextDifficulty = Difficulty.compress <| Hash.fromBigInt nextTarget
+    let nextDifficulty = 
+        try 
+            currentTarget * bigint nextEstimatedInterval / bigint (ChainParameters.blockInterval chain)
+            |> Hash.fromBigInt
+            |> Difficulty.compress
+        with 
+        | _ -> 
+            ChainParameters.proofOfWorkLimit chain
+            |> Difficulty.compress
+      
     {ema with delayed = newDelayed; interval = nextEstimatedInterval; difficulty = nextDifficulty}
-
-let get ema = ema.difficulty
-
-let undoBlock (getHeader:Hash.Hash->BlockHeader) block ema = ema                    
-
-

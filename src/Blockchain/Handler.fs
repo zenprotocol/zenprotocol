@@ -9,7 +9,7 @@ open Blockchain
 open Blockchain.EffectsWriter
 open State
 
-let handleCommand chain command (state:State) =   
+let handleCommand chain command timestamp (state:State) =   
     match command with
     | ValidateTransaction tx -> 
         effectsWriter {            
@@ -48,9 +48,13 @@ let handleCommand chain command (state:State) =
             
         Writer.bind writer (fun () -> Writer.ret state)    
     | ValidateBlock block ->
-        BlockHandler.validateBlock chain block state 
-    | HandleBlockHeader header ->
-        BlockHandler.handleBlockHeader header state
+        BlockHandler.validateBlock chain timestamp block false state
+    | ValidateMinedBlock block -> 
+        BlockHandler.validateBlock chain timestamp block true state 
+    | HandleTip header ->
+        BlockHandler.handleTip chain header state
+    | ValidateNewBlockHeader (peerId, header) ->
+        BlockHandler.handleNewBlockHeader chain peerId header state
     | GetTip peerId ->
         effectsWriter {
             if state.tipState.tip <> PersistentBlock.empty then
@@ -69,7 +73,7 @@ let handleCommand chain command (state:State) =
                 return state          
         }   
                                                      
-let handleRequest reply request state = 
+let handleRequest reply request timestamp state = 
     match request with
     | ExecuteContract (txSkeleton, cHash) ->
         TransactionHandler.executeContract txSkeleton cHash reply state.memoryState.activeContractSet
@@ -77,6 +81,6 @@ let handleRequest reply request state =
     | _ -> 
         ret state
     
-let handleEvent event state = 
+let handleEvent event timestamp state = 
     ret state
     

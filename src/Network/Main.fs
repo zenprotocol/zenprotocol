@@ -25,11 +25,6 @@ let eventHandler transport event (connector,addressBook) =
             
         Transport.publishTransaction transport bytes
         connector,addressBook
-    | Event.BlockAdded block ->
-        let bytes = BlockHeader.serialize block.header  
-                    
-        Transport.publishBlockHeader transport bytes
-        connector,addressBook
     | _ -> connector,addressBook
 
 let transportHandler transport client ownAddress msg (connector,addressBook) =
@@ -160,15 +155,22 @@ let transportHandler transport client ownAddress msg (connector,addressBook) =
         | None ->
             //TODO: log non-deserializable block
             connector,addressBook
-    | InProcMessage.BlockHeader blockHeader ->
+    | InProcMessage.Tip blockHeader ->
         match BlockHeader.deserialize blockHeader with
         | Some blockHeader ->
-            Blockchain.handleBlockHeader client blockHeader
+            Blockchain.handleTip client blockHeader
             connector,addressBook
         | None ->
             //TODO: log non-deserializable blockheader
             connector,addressBook
-        
+    | InProcMessage.NewBlock {peerId=peerId;blockHeader=blockHeader} ->
+        match BlockHeader.deserialize blockHeader with
+        | Some blockHeader ->
+            Blockchain.validateNewBlockHeader client peerId blockHeader
+            connector,addressBook
+        | None ->
+            //TODO: log non-deserializable blockheader
+            connector,addressBook    
     | _ -> 
         // TODO: log unknown message
         connector, addressBook
@@ -199,6 +201,14 @@ let commandHandler transport command (state:State) =
     | Command.GetBlock blockHash ->
         Transport.getBlock transport (Hash.bytes blockHash)
         state
+    | Command.PublishBlock blockHeader ->
+        let bytes = BlockHeader.serialize blockHeader
+        Transport.publisNewBlock transport bytes
+
+        state
+    | Command.GetNewBlock (peerId,blockHash) ->
+        Transport.getNewBlock transport peerId (Hash.bytes blockHash)
+        state 
         
 let requestHandler request reply (state:State) = state
 

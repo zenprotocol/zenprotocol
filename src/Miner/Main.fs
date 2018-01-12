@@ -44,7 +44,7 @@ let minerTask chain busName (collection:Queue) =
             Log.info "new block mined"
         
             // We found a block            
-            Blockchain.validateBlock client block
+            Blockchain.validateMinedBlock client block
             ()
         | Error _ ->
             // lets continue looking for a block, but first check if there is any message
@@ -75,13 +75,15 @@ type State =
         ema:EMA.T
     } 
                                                    
-let handleEvent (collection:Queue) event state =
+let handleEvent chain (collection:Queue) event state =
     let createBlock parent transactions =
+        Log.info "New block to mine"
+    
         // as we don't have difficulty yet we sleep for random time to simulate difficulty
         // TODO: remove
         System.Threading.Thread.Sleep (random.Next (1000,10000))
     
-        let block = Block.createTemplate parent 0UL state.ema state.activeContractSet transactions
+        let block = Block.createTemplate parent (Timestamp.now ()) state.ema state.activeContractSet transactions
         let header = {block.header with nonce=getRandomNonce(),0UL}
         {block with header=header} 
  
@@ -98,8 +100,7 @@ let handleEvent (collection:Queue) event state =
         match state.parent with 
         | Some parent ->
             let block = createBlock parent transactions
-                        
-            Log.info "New block to mine"                          
+                                    
             collection.Add (NewBlockTemplate block)
         | None -> ()
         
@@ -107,12 +108,11 @@ let handleEvent (collection:Queue) event state =
     | BlockAdded block ->
         let parent = block.header
         let transactions = List.filter (fun tx -> not <| List.contains tx block.transactions) state.transactions
-        let ema = EMA.add parent.timestamp state.ema
+        let ema = EMA.add chain parent.timestamp state.ema
         
         match transactions with 
         | [] -> collection.Add (Stop)
-        | _ ->
-            Log.info "New block to mine" 
+        | _ ->             
             let block = createBlock parent transactions              
             collection.Add (NewBlockTemplate block)
         
@@ -139,7 +139,7 @@ let main busName chain =
         
         let ebObservable = 
             ebObservable
-            |> Observable.map (handleEvent collection) 
+            |> Observable.map (handleEvent chain collection) 
             
         let observable =                      
             ebObservable

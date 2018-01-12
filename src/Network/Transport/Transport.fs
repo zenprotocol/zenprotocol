@@ -132,8 +132,8 @@ let private handleInprocMessage socket inproc msg (peers:Peers) =
         | InProcMessage.SendTransaction {peerId=peerId;tx=tx} ->
             let routingId = RoutingId.fromBytes peerId
             sendToPeer socket inproc peers routingId (Message.Transaction tx)   
-        | InProcMessage.BlockHeader blockHeader ->
-            publishMessage socket inproc peers (Message.BlockHeader blockHeader)
+        | InProcMessage.PublishBlock blockHeader ->
+            publishMessage socket inproc peers (Message.NewBlock blockHeader)
         | InProcMessage.GetTip peerId ->              
             let routingId = RoutingId.fromBytes peerId
             sendToPeer socket inproc peers routingId Message.GetTip
@@ -142,9 +142,12 @@ let private handleInprocMessage socket inproc msg (peers:Peers) =
             sendToPeer socket inproc peers routingId (Message.Block block)   
         | InProcMessage.GetBlock blockHash ->
             sendToNextPeer socket inproc peers (Message.GetBlock blockHash)
+        | InProcMessage.GetNewBlock {peerId=peerId; blockHash=blockHash} ->
+            let routingId = RoutingId.fromBytes peerId        
+            sendToPeer socket inproc peers routingId (Message.GetBlock blockHash)   
         | InProcMessage.SendTip {peerId=peerId; blockHeader=blockHeader} ->
             let routingId = RoutingId.fromBytes peerId        
-            sendToPeer socket inproc peers routingId (Message.BlockHeader blockHeader)   
+            sendToPeer socket inproc peers routingId (Message.Tip blockHeader)   
 
         | msg -> failwithf "unexpected inproc msg %A" msg
                 
@@ -188,8 +191,11 @@ let sendBlock transport peerId block =
 let getTip transport peerId = 
     InProcMessage.send transport.inproc (InProcMessage.GetTip peerId)
     
-let publishBlockHeader transport blockHeader = 
-    InProcMessage.send transport.inproc (InProcMessage.BlockHeader blockHeader)
+let publisNewBlock transport blockHeader = 
+    InProcMessage.send transport.inproc (InProcMessage.PublishBlock blockHeader)
+    
+let getNewBlock transport peerId blockHash = 
+    InProcMessage.send transport.inproc (InProcMessage.GetNewBlock {peerId=peerId;blockHash=blockHash})
     
 let sendTip transport peerId blockHeader = 
     InProcMessage.send transport.inproc (InProcMessage.SendTip {peerId=peerId;blockHeader=blockHeader})                         

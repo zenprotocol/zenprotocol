@@ -74,30 +74,44 @@
         <field name="block" type="chunk">Block</field>
     </message>
 
-    <message name="Block Header" id="21">
+    <message name="Tip" id="21">
         <field name="block header" type="octets" size="100">Block Header</field>
     </message>
     
-    <message name="Get Block" id="22">
+    <message name="Publish Block" id="22">
+        <field name="block header" type="octets" size="100">Block Header</field>
+    </message>
+    
+    <message name="New Block" id="23">
+        <field name="block header" type="octets" size="100">Block Header</field>
+        <field name="peerId" type="octets" size="4">Peer Id</field>
+    </message>
+    
+    <message name="Get Block" id="24">
         <field name="blockHash" type="octets" size="32">BlockHash</field>
     </message>
     
-    <message name="Block Request" id="23">
+    <message name="Get New Block" id="25">
         <field name="peerId" type="octets" size="4">Peer Id</field>
         <field name="blockHash" type="octets" size="32">BlockHash</field>
     </message>
     
-    <message name="Send Block" id="24">
+    <message name="Block Request" id="26">
+        <field name="peerId" type="octets" size="4">Peer Id</field>
+        <field name="blockHash" type="octets" size="32">BlockHash</field>
+    </message>
+    
+    <message name="Send Block" id="27">
         <field name="peerId" type="octets" size="4">Peer Id</field>
         <field name="block" type="chunk">Block</field>
     </message>
     
-    <message name="Send Tip" id="25">
+    <message name="Send Tip" id="28">
         <field name="peerId" type="octets" size="4">Peer Id</field>
         <field name="block header" type="octets" size="100">Block Header</field>
     </message>
     
-    <message name="Get Tip" id="26">
+    <message name="Get Tip" id="29">
         <field name="peerId" type="octets" size="4">Peer Id</field>
     </message>
     

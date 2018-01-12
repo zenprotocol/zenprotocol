@@ -20,8 +20,9 @@ type T = {
     header: BlockHeader
     status: BlockStatus    
     chainWork: bigint option
-    commitments: Block.Commitments option
+    commitments: Hash.Hash list
     transactions: Transaction list
+    ema: EMA.T option
 }
 
 let status block = block.status
@@ -37,8 +38,9 @@ let empty =
        header = Block.genesisParent
        status = Orphan        
        chainWork = None
-       commitments = None
+       commitments = []
        transactions = []
+       ema=None
    } 
 
 let createOrphan blockHash (block:Block) = 
@@ -47,22 +49,24 @@ let createOrphan blockHash (block:Block) =
         header = block.header
         status = Orphan        
         chainWork = None
-        commitments = None
+        commitments = block.commitments
         transactions = block.transactions
+        ema=None
     }
    
-let createGenesis blockHash (block:Block) commitments = 
-    let chainWork = getChainWork 0I block.header              
+let createGenesis chain blockHash (block:Block) ema = 
+    let chainWork = getChainWork 0I block.header 
     {     
         hash = blockHash
         header = block.header
         status = Tip            
         chainWork = Some chainWork   
-        commitments = Some commitments
-        transactions = block.transactions              
+        commitments = block.commitments
+        transactions = block.transactions
+        ema=Some ema
     }     
    
-let createTip prevBlock blockHash (block:Block) commitments =
+let createTip prevBlock blockHash (block:Block) ema =
     match prevBlock.chainWork with
     | None -> failwith "prevBlock doesn't have chainWork"
     | Some prevChainWork -> 
@@ -73,8 +77,9 @@ let createTip prevBlock blockHash (block:Block) commitments =
             header = block.header
             status = Tip            
             chainWork = Some chainWork   
-            commitments = Some commitments
-            transactions = block.transactions              
+            commitments = block.commitments
+            transactions = block.transactions   
+            ema=Some ema           
         }
         
 let createConnected prevBlock blockHash (block:Block) =
@@ -87,10 +92,16 @@ let createConnected prevBlock blockHash (block:Block) =
                 header = block.header
                 status = Connected                
                 chainWork = Some chainWork
-                commitments = None   
-                transactions = block.transactions              
+                commitments = block.commitments   
+                transactions = block.transactions
+                ema=None
             }
 
+let ema block = Option.get block.ema
+
+let addEMA block ema = 
+    {block with ema = Some ema}
+     
 let untipBlock block = 
     { block with status = Connected }
     
@@ -101,8 +112,6 @@ let unorphanBlock block chainWork =
     { block with status = Connected;chainWork= Some chainWork }        
     
 let setChainWork chainWork block = {block with chainWork=Some chainWork}
-
-let addCommitments (block:T) commitments = {block with commitments=Some commitments} 
 
 let header (block:T) = block.header
 
@@ -116,6 +125,6 @@ let isValid block =
     | _ -> true
 
 let fetchBlock (block:T) = 
-    {header=block.header;transactions=block.transactions}
+    {header=block.header;transactions=block.transactions;commitments=block.commitments}
     
     

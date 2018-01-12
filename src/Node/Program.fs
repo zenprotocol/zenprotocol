@@ -123,15 +123,15 @@ let main argv =
                        
     printfn "running..."
        
-    if root then
-        let block = Block.createGenesis chain 0UL [Transaction.rootTx] (0UL,0UL)
-                
+    if root then    
+        let block = Block.createGenesis chain [Transaction.rootTx] (0UL,0UL)
+        
         use client = ServiceBus.Client.create busName  
         
         Messaging.Services.Blockchain.validateBlock client block
                 
     printfn "Press enter to exit"
     
-    System.Console.ReadLine () |> ignore        
+    System.Console.ReadLine () |> ignore
     
     0 // return an integer exit code

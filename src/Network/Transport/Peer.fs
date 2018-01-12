@@ -210,8 +210,11 @@ let handleActiveState socket next peer msg =
         | Message.Block block ->
             next (InProcMessage.Block block)
             peer
-        | Message.BlockHeader blockHeader ->
-            next (InProcMessage.BlockHeader blockHeader)
+        | Message.Tip blockHeader ->
+            next (InProcMessage.Tip blockHeader)
+            peer
+        | Message.NewBlock blockHeader ->
+            next (InProcMessage.NewBlock {peerId=(RoutingId.toBytes peer.routingId); blockHeader=blockHeader})
             peer
         | Message.GetTip ->
             next (InProcMessage.GetTip (RoutingId.toBytes peer.routingId))
