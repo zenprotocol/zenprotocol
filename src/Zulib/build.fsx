@@ -52,7 +52,8 @@ Target "RecordHints" (fun _ ->
   let args =
     [| //"--z3refresh";
        //"--verify_all";
-       "--record_hints" |]
+       "--record_hints"
+       "--cache_checked_modules" |]
 
   let exitCodes = Array.Parallel.map (fun file -> runFStar args [|file|]) zulibFiles
   if not (Array.forall (fun exitCode -> exitCode = 0) exitCodes)

@@ -99,7 +99,7 @@ type inputData (n:nat) = data n
 
 type pointedOutput = outpoint * output
 
-unopteq type transactionSkeleton = | Tx: #l1:nat -> inputs : V.t outpoint l1
+unopteq type transactionSkeleton = | Tx: #l1:nat -> inputs : V.t pointedOutput l1
                                       -> #l2:nat -> outputs: V.t output l2
                                       -> option (l3:nat & data l3)
                                       -> transactionSkeleton
