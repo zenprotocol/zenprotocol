@@ -89,6 +89,50 @@ let ``connecting block should fail when transaction inputs are invalid``(parent:
     Block.connect Chain.Test parent (timestamp + 1UL) utxoSet acs ema block = Error "transactions failed inputs validation due to Orphan"
 
 [<Test>]    
+let ``block timestamp too early``() =
+    let ema = {
+        (EMA.create Chain.Test) with delayed = [timestamp-1UL;timestamp; timestamp+1UL]
+    }
+        
+    let rootAccount = Account.createRoot ()
+    let account1 = Account.create ()
+    let tx = 
+        Account.createTransaction Chain.Test rootAccount (Account.getAddress account1 Chain.Test) Hash.zero 1UL
+        |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation") 
+    
+    let acs = ActiveContractSet.empty
+    let utxoSet = UtxoSet.create () |> UtxoSet.handleTransaction Transaction.rootTxHash Transaction.rootTx    
+    
+    let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
+    let block = Block.createTemplate parent timestamp ema acs [tx]
+    
+    let expected : Result<(UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "block's timestamp is too early"
+
+    Block.connect Chain.Test parent timestamp utxoSet acs ema block |> should equal expected
+    
+[<Test>]    
+let ``block timestamp in the future``() =
+    let ema = {
+        (EMA.create Chain.Test) with delayed = [timestamp-1UL;timestamp; timestamp+1UL]
+    }
+        
+    let rootAccount = Account.createRoot ()
+    let account1 = Account.create ()
+    let tx = 
+        Account.createTransaction Chain.Test rootAccount (Account.getAddress account1 Chain.Test) Hash.zero 1UL
+        |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation") 
+    
+    let acs = ActiveContractSet.empty
+    let utxoSet = UtxoSet.create () |> UtxoSet.handleTransaction Transaction.rootTxHash Transaction.rootTx    
+    
+    let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
+    let block = Block.createTemplate parent (timestamp + Block.MaxTimeInFuture + 1UL) ema acs [tx]
+    
+    let expected : Result<(UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "block timestamp too far in the future"
+   
+    Block.connect Chain.Test parent timestamp utxoSet acs ema block |> should equal expected
+
+[<Test>]    
 let ``block with mismatch commitments fail connecting``() = 
     let rootAccount = Account.createRoot ()
     let account1 = Account.create ()
@@ -105,8 +149,6 @@ let ``block with mismatch commitments fail connecting``() =
     let block = {block with commitments=[]}
     
     let expected : Result<(UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "commitments mismatch"
-    
-    printfn "%A" <| Block.connect Chain.Test parent 1UL utxoSet acs ema block
     
     Block.connect Chain.Test parent timestamp utxoSet acs ema block |> should equal expected
     
