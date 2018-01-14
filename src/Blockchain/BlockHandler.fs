@@ -61,18 +61,19 @@ let rec private connectChain chain timestamp blockRepository (origin:PersistentB
                                                     
                 return validTip,(utxoSet,acs,ema, mempool)                
             else 
-                let consensusBlock = (PersistentBlock.fetchBlock tip)
+                let block = (PersistentBlock.fetchBlock tip)
             
-                match Block.connect chain (PersistentBlock.header parent) timestamp utxoSet acs ema consensusBlock with
+                match Block.connect chain (PersistentBlock.header parent) timestamp utxoSet acs ema block with
                 | Error error ->
                     do! BlockRepository.update blockRepository (PersistentBlock.invalid tip)
                 
                     Log.info "Failed connecting block %A due to %A" (PersistentBlock.hash tip) error
                     return validTip,(utxoSet,acs,ema, mempool)
-                | Ok (utxoSet,acs,ema) ->   
-                    do! BlockRepository.update blockRepository (PersistentBlock.addEMA tip ema)         
+                | Ok (block,utxoSet,acs,ema) ->   
+                    
+                    do! BlockRepository.update blockRepository (PersistentBlock.connect tip block ema)         
                                                                                          
-                    let mempool = MemPool.handleBlock consensusBlock mempool
+                    let mempool = MemPool.handleBlock block mempool
                     
                     return tip,(utxoSet,acs,ema, mempool)
     }
@@ -220,7 +221,7 @@ let private handleGenesisBlock chain timestamp (state:State) blockHash block =
         | Error error ->
             Log.info "Failed connecting genesis block %A due to %A" (Block.hash block) error
             return state
-        | Ok (utxoSet,acs,ema) ->
+        | Ok (block,utxoSet,acs,ema) ->
             Log.info "Genesis block received" 
           
             let persistentBlock = 
@@ -243,7 +244,7 @@ let private handleMainChain chain timestamp (state:State) parent blockHash block
         | Error error ->
             Log.info "Failed connecting block %A due to %A" (Block.hash block) error
             return state
-        | Ok (utxoSet,acs,ema) ->  
+        | Ok (block,utxoSet,acs,ema) ->  
             Log.info "New block #%d %A" block.header.blockNumber blockHash 
                                      
             let persistentBlock = PersistentBlock.createTip parent blockHash block ema

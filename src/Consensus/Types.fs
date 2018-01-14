@@ -3,16 +3,6 @@ module Consensus.Types
 open Consensus.Hash
 open Consensus.Crypto
 
-
-[<Literal>]
-let TxCommitmentIndex = 0
-
-[<Literal>]
-let WitnessCommitmentIndex = 1
-
-[<Literal>]
-let ActiveContractSetCommitmentIndex = 2
-
 type Outpoint = {
     txHash: Hash
     index: uint32
@@ -66,6 +56,9 @@ type BlockHeader = {
 
 type Block = {
     header:BlockHeader;
+    txMerkleRoot:Hash.Hash;
+    witnessMerkleRoot:Hash.Hash;
+    activeContractSetMerkleRoot:Hash.Hash;
     commitments: Hash.Hash list;
     transactions:Transaction list;
 }

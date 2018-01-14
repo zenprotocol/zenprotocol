@@ -18,8 +18,8 @@ let pickler = Pickler.auto<Block>
 
 let private (>=>) f1 f2 x = Result.bind f2 (f1 x)
 
-let private createCommitments txMerkleRoot acsMerkleRoot witnessMerkleRoot =
-    [ txMerkleRoot; witnessMerkleRoot; acsMerkleRoot ]
+let private createCommitments txMerkleRoot witnessMerkleRoot acsMerkleRoot rest =
+    [ txMerkleRoot; witnessMerkleRoot; acsMerkleRoot; ] @ rest
     
 let private computeCommitmentsRoot = MerkleTree.computeRoot  
     
@@ -61,20 +61,22 @@ let createGenesis chain transactions nonce =
         
     let acsMerkleRoot = SparseMerkleTree.root ActiveContractSet.empty
     
-    let commitments = createCommitments txMerkleRoot acsMerkleRoot witnessMerkleRoot
+    let commitments = 
+        createCommitments txMerkleRoot witnessMerkleRoot acsMerkleRoot []
+        |> computeCommitmentsRoot
         
     let header = 
         {
             version=Version;
             parent=Hash.zero;
             blockNumber=1ul;
-            commitments=computeCommitmentsRoot commitments;
+            commitments=commitments;
             timestamp=ChainParameters.getGenesisTime chain;
             difficulty=(EMA.create chain).difficulty;
             nonce=nonce;
         }
         
-    {header=header;transactions=transactions;commitments=commitments}
+    {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot;witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot}
 
 let createTemplate (parent:BlockHeader) timestamp (ema:EMA.T) acs transactions = 
     let txMerkleRoot = 
@@ -92,20 +94,22 @@ let createTemplate (parent:BlockHeader) timestamp (ema:EMA.T) acs transactions =
     let parentHash = BlockHeader.hash parent        
                 
     // TODO: add utxo commitments   
-    let commitments = createCommitments txMerkleRoot acsMerkleRoot witnessMerkleRoot
+    let commitments = 
+        createCommitments txMerkleRoot witnessMerkleRoot acsMerkleRoot []
+        |> computeCommitmentsRoot
     
     let header = 
         {
             version=Version;
             parent=parentHash;
             blockNumber=parent.blockNumber + 1ul;
-            commitments=computeCommitmentsRoot commitments;
+            commitments=commitments;
             timestamp=timestamp;
             difficulty=ema.difficulty;
             nonce=0UL,0UL;
         }
         
-    {header=header;transactions=transactions;commitments=commitments}
+    {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot;witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot}
 
 let validate chain =     
     let checkTxNotEmpty (block:Block) =
@@ -127,10 +131,34 @@ let validate chain =
                     match TransactionValidation.validateBasic tx with
                     | Error err -> Error (sprintf "transaction %A failed validation due to %A" (Transaction.hash tx) err)
                     | _ -> ok) (Ok block) block.transactions
+                    
+    let checkCommitments (block:Block) = 
+        let txMerkleRoot = 
+            block.transactions
+            |> List.map Transaction.hash            
+            |> MerkleTree.computeRoot
+                    
+        let witnessMerkleRoot = 
+            block.transactions
+            |> List.map Transaction.witnessHash
+            |> MerkleTree.computeRoot 
+    
+        if txMerkleRoot = block.txMerkleRoot && witnessMerkleRoot = block.witnessMerkleRoot then    
+            let commitments = 
+                createCommitments block.txMerkleRoot block.witnessMerkleRoot block.activeContractSetMerkleRoot block.commitments
+                |> computeCommitmentsRoot
+            
+            if commitments = block.header.commitments then
+                Ok block
+            else
+                Error "commitments mismatch"
+        else
+            Error "commitments mismatch"
    
     checkTxNotEmpty    
     >=> checkHeader
     >=> checkTxBasic
+    >=> checkCommitments
 
 /// Apply block to UTXO and ACS, operation can fail
 let connect chain parent timestamp set acs ema =    
@@ -164,25 +192,17 @@ let connect chain parent timestamp set acs ema =
                 | Ok c -> Some c
                 | _ -> None)
             |> List.fold (fun acs contract -> SparseMerkleTree.add (Contract.hash contract) contract acs) acs
-            
-        let txRoot = 
-            block.transactions
-            |> List.map Transaction.hash            
-            |> MerkleTree.computeRoot
-            
-        let witnessMerkleRoot = 
-            block.transactions
-            |> List.map Transaction.witnessHash
-            |> MerkleTree.computeRoot                
-     
-        let acsRoot = SparseMerkleTree.root acs
+                          
+        let acsMerkleRoot = SparseMerkleTree.root acs
         
+        // we already validated txMerkleRoot and witness merkle root at the basic validation, re-calculate with acsMerkleRoot
         let commitments = 
-            createCommitments txRoot acsRoot witnessMerkleRoot                 
-        
-        let commitmentsRoot = computeCommitmentsRoot commitments                 
-        
-        if commitmentsRoot = block.header.commitments && commitments = block.commitments then
+            createCommitments block.txMerkleRoot block.witnessMerkleRoot acsMerkleRoot block.commitments 
+            |> computeCommitmentsRoot
+
+        // We ignore the known commitments in the block as we already calculated them
+        // Only check that the final commitment is correct                 
+        if commitments = block.header.commitments then                
             Ok (block,acs,ema)
         else
             Error "commitments mismatch"
@@ -192,20 +212,20 @@ let connect chain parent timestamp set acs ema =
             let set = List.fold (fun set tx ->
                 let txHash = (Transaction.hash tx)
                 UtxoSet.handleTransaction txHash tx set) set block.transactions
-            Ok (set,acs,ema) 
+            Ok (block,set,acs,ema) 
         else                       
             List.fold (fun state tx->
                 match state with
                 | Error e -> Error e
-                | Ok (set,acs,ema) -> 
+                | Ok (block,set,acs,ema) -> 
                     let txHash = (Transaction.hash tx)
                 
                     match TransactionValidation.validateInputs acs set txHash tx with
                     | Error err -> Error (sprintf "transactions failed inputs validation due to %A" err)
                     | _ -> 
                         let set = UtxoSet.handleTransaction txHash tx set
-                        Ok (set,acs,ema) 
-                    ) (Ok (set,acs,ema)) block.transactions
+                        Ok (block,set,acs,ema) 
+                    ) (Ok (block,set,acs,ema)) block.transactions
 
     checkBlockNumber
     >=> checkDifficulty
