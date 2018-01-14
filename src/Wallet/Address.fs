@@ -30,16 +30,16 @@ let private getAddress hash =
     function 
     | 'p' -> Ok (PK hash)
     | 'c' -> Ok (Contract hash)
-    | _ -> Error "invaid address type discriminator"
+    | _ -> Error "invaid address type"
 
-let encode address chain =
+let encode chain address =
     let (Hash.Hash bytes) = getHash address
     let hrp = System.String.Concat(Array.ofList([ getChainType chain; getAddressType address ]))
     let words = Bech32.toWords bytes
     let data = Array.append [|AddressVersion|] words
     Bech32.encode hrp data
  
-let private decode address chain =
+let private decode chain address =
     match Bech32.decode address with 
     | None -> 
         Error "could not decode address"
@@ -63,18 +63,18 @@ let private decode address chain =
                 else 
                     Error "invalid address data"
 
-let decodeContract address chain =
-    decode address chain
+let decodeContract chain address  =
+    decode chain address
     |> Result.bind (function 
         | Contract hash ->
             Ok hash
         | _ ->
-            Error "address type discriminator mismatch, Contract expected")
+            Error "address type mismatch, Contract expected")
 
-let decodePK address chain =
-    decode address chain
+let decodePK chain address =
+    decode chain address
     |> Result.bind (function 
         | PK hash ->
             Ok hash
         | _ ->
-            Error "address type discriminator mismatch, Public Key expected")
+            Error "address type mismatch, Public Key expected")

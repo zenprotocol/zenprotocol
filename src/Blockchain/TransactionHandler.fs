@@ -7,15 +7,16 @@ open Consensus
 open Consensus.Transaction
 open Consensus.TransactionValidation
 open State
+open Infrastructure.ServiceBus.Agent
 
-let private handleContractActivationTransaction acs (tx : Types.Transaction) shouldPublishEvents =
+let private activateContract chain acs (tx : Types.Transaction) shouldPublishEvents =
     effectsWriter
         {
             match tx.contract with
             | Some code ->
                 match Contract.compile code with
                 | Ok contract ->
-                    Log.warning "activating contract: %A" (Hash.bytes contract.hash)
+                    Log.warning "activating contract: %A" (Address.encode chain (Address.Contract contract.hash))
 
                     if shouldPublishEvents then
                         do! publish (ContractActivated (Contract.hash contract))
@@ -28,32 +29,32 @@ let private handleContractActivationTransaction acs (tx : Types.Transaction) sho
                 return acs
         }
 
-let private validateOrphanTransaction state txHash tx  =
-    effectsWriter {
-        match TransactionValidation.validateInputs state.activeContractSet state.utxoSet txHash tx with
-        | Ok tx ->
-            let utxoSet = UtxoSet.handleTransaction txHash tx state.utxoSet
-            let mempool = MemPool.add txHash tx state.mempool
+let private validateOrphanTransaction chain state txHash tx  =
+    effectsWriter 
+        {
+            match TransactionValidation.validateInputs state.activeContractSet state.utxoSet txHash tx with
+            | Ok tx ->
+                let utxoSet = UtxoSet.handleTransaction txHash tx state.utxoSet
+                let mempool = MemPool.add txHash tx state.mempool
 
-            do! publish (TransactionAddedToMemPool (txHash, tx))
-            Log.info "Orphan transaction %s added to mempool" (Hash.toString txHash)
+                do! publish (TransactionAddedToMemPool (txHash, tx))
+                Log.info "Orphan transaction %s added to mempool" (Hash.toString txHash)
 
-            let! acs = handleContractActivationTransaction state.activeContractSet tx true
+                let! acs = activateContract chain state.activeContractSet tx true
 
-            let orphanPool = OrphanPool.remove txHash state.orphanPool
-            return {state with activeContractSet=acs;mempool=mempool;utxoSet=utxoSet; orphanPool=orphanPool}
-        | Error (Orphan _) ->
-            // transacation is still orphan, nothing to do
-            return state
-        | Error error ->
-            Log.info "Orphan transacation %s failed validation: %A" (Hash.toString txHash) error
+                let orphanPool = OrphanPool.remove txHash state.orphanPool
+                return {state with activeContractSet=acs;mempool=mempool;utxoSet=utxoSet; orphanPool=orphanPool}
+            | Error (Orphan _) ->
+                // transacation is still orphan, nothing to do
+                return state
+            | Error error ->
+                Log.info "Orphan transacation %s failed validation: %A" (Hash.toString txHash) error
 
-            let orphanPool = OrphanPool.remove txHash state.orphanPool
-            return {state with orphanPool = orphanPool}
+                let orphanPool = OrphanPool.remove txHash state.orphanPool
+                return {state with orphanPool = orphanPool}
+        }
 
-    }
-
-let validateInputs txHash tx (state:MemoryState) shouldPublishEvents =
+let validateInputs chain txHash tx (state:MemoryState) shouldPublishEvents =
     effectsWriter
         {
             match TransactionValidation.validateInputs state.activeContractSet state.utxoSet txHash tx with
@@ -68,7 +69,7 @@ let validateInputs txHash tx (state:MemoryState) shouldPublishEvents =
 
                  return state
             | Ok tx ->
-                let! acs = handleContractActivationTransaction state.activeContractSet tx shouldPublishEvents
+                let! acs = activateContract chain state.activeContractSet tx shouldPublishEvents
 
                 let utxoSet = UtxoSet.handleTransaction txHash tx state.utxoSet
                 let mempool = MemPool.add txHash tx state.mempool
@@ -81,11 +82,11 @@ let validateInputs txHash tx (state:MemoryState) shouldPublishEvents =
                 let state = {state with activeContractSet=acs;mempool=mempool;utxoSet=utxoSet}
 
                 // TODO: going through the orphan pool once might be not enough if we have inter dependencies within the orphan pool
-                return! OrphanPool.foldWriter validateOrphanTransaction state state.orphanPool
+                return! OrphanPool.foldWriter (validateOrphanTransaction chain) state state.orphanPool
         }
 
 
-let validateTransaction tx (state:MemoryState) =
+let validateTransaction chain tx (state:MemoryState) =
     effectsWriter {
         let txHash = Transaction.hash tx
 
@@ -98,15 +99,12 @@ let validateTransaction tx (state:MemoryState) =
 
                 return state
             | Ok tx ->
-                return! validateInputs txHash tx state true
+                return! validateInputs chain txHash tx state true
     }
 
-let executeContract txSkeleton cHash reply acs utxoSet =
-    reply (
-        match ActiveContractSet.tryFind cHash acs with
-        | Some contract ->
-            Contract.run contract utxoSet txSkeleton
-            |> Result.bind (TxSkeleton.checkPrefix txSkeleton)
-        | None ->
-            Error "Contract not active"
-    )
+let executeContract txSkeleton cHash state =
+    match ActiveContractSet.tryFind cHash state.activeContractSet with
+    | Some contract ->
+        Contract.run contract state.utxoSet txSkeleton
+        |> Result.bind (TxSkeleton.checkPrefix txSkeleton)
+    | None -> Error "Contract not active"

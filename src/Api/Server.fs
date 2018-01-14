@@ -6,6 +6,7 @@ open Infrastructure
 open Infrastructure.ServiceBus
 open Infrastructure.Http
 open Api.Types
+open Parsing
 open Messaging.Services
 open Messaging.Services.Wallet
 
@@ -20,7 +21,18 @@ type T =
             (x.client :> System.IDisposable).Dispose()
             (x.agent :> System.IDisposable).Dispose()
 
-let handleRequest client (request,reply) =    
+let handleRequest chain client (request,reply) =
+    let replyError error = 
+        reply StatusCode.BadRequest (TextContent error)
+
+    let validateTx result =
+        match result with
+        | Error error -> 
+            replyError error
+        | Ok tx ->
+            Blockchain.validateTransaction client tx
+            reply StatusCode.OK NoContent
+
     match request with
     | Get ("/wallet/balance", _) ->            
         let balances = Wallet.getBalance client
@@ -36,48 +48,30 @@ let handleRequest client (request,reply) =
         reply StatusCode.OK (JsonContent json)
     | Get ("/wallet/address", _) ->
         let address = Wallet.getAddress client 
-    
         let json = new AddressJson.Root(address)
         reply StatusCode.OK (JsonContent json.JsonValue)
-        
-    | Post ("/wallet/transaction/send", Some body) ->
-        let transactionSend = TransactionSendJson.Parse (body)        
-        
-        match Hash.fromString transactionSend.Asset with
-        | None -> 
-            reply StatusCode.BadRequest (TextContent "asset not valid")
-        | Some assetHash ->         
-            
-            // TODO: validate address and only send the wallet the pkHash
-            
-            match Wallet.createTransaction client transactionSend.To assetHash (uint64 transactionSend.Amount) with
-            | Error error -> reply StatusCode.BadRequest (TextContent error)
-            | Created tx ->
-                Blockchain.validateTransaction client tx
-                reply StatusCode.OK NoContent
+    | Post ("/wallet/spend", Some body) ->
+        match getSpend chain body with
+        | Result.Error error -> replyError error
+        | Result.Ok (pkHash, spend) ->
+            Wallet.createTransaction client pkHash spend 
+            |> validateTx
     | Post ("/wallet/contract/activate", Some body) ->
-        let activateContract = ContractActivationJson.Parse (body)        
-        
-        if String.length activateContract.Code = 0 then
-            reply StatusCode.BadRequest (TextContent "code cannot be empty")
-        else
-            match Wallet.createContractActivationTransaction client activateContract.Code with
-            | Error error -> reply StatusCode.BadRequest (TextContent error)
-            | Created tx ->
-                Blockchain.validateTransaction client tx
-                reply StatusCode.OK NoContent
-    | Post ("/wallet/contract/send", Some body) ->
-        let contractMessageSend = ContractMessageSendJson.Parse (body)
-        
-        match Wallet.createSendMessageTranscation client contractMessageSend.To Hash.zero (uint64 contractMessageSend.Amount) with
-        | Error error -> reply StatusCode.BadRequest (TextContent error)
-        | Created tx ->
-            Blockchain.validateTransaction client tx
-            reply StatusCode.OK NoContent
+        match getContractActivate chain body with
+        | Result.Error error -> replyError error
+        | Result.Ok code ->
+            Wallet.activateContract client code
+            |> validateTx
+    | Post ("/wallet/contract/execute", Some body) ->
+        match getContractExecute chain body with
+        | Result.Error error -> replyError error
+        | Result.Ok (cHash, spends) ->
+            Wallet.executeContract client cHash spends
+            |> validateTx
     | _ ->
         reply StatusCode.NotFound NoContent    
 
-let create poller busName bind = 
+let create chain poller busName bind = 
     let httpAgent = Http.Server.create poller bind
     
     Log.info "Api running on %s" bind
@@ -88,7 +82,7 @@ let create poller busName bind =
         Http.Server.observable httpAgent 
         |> Observable.map (fun request -> 
             fun (server:T) ->
-                handleRequest client request
+                handleRequest chain client request
                 server
         )
         

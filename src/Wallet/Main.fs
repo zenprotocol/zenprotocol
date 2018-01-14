@@ -2,9 +2,10 @@
 
 open FsNetMQ
 open Infrastructure
-open Messaging.Services.Wallet
+open Messaging.Services
 open Messaging.Events
 open Wallet
+open ServiceBus.Agent
 
 let eventHandler event account = 
     match event with 
@@ -16,45 +17,37 @@ let eventHandler event account =
 
 let commandHandler command wallet = wallet
 
-let requestHandler chain client (requestId:ServiceBus.Agent.RequestId) request wallet = 
+let requestHandler chain client (requestId:RequestId) request wallet =
+    let reply =
+        requestId.reply
+    let getTransactionResult =
+        function
+        | Result.Ok tx -> 
+            TransactionResult.Ok tx
+        | Result.Error err -> 
+            TransactionResult.Error err
+
     match request with 
     | GetBalance -> 
-        let balance = Account.getBalance wallet
-        requestId.reply balance
-        wallet
+        Account.getBalance wallet
+        |> reply
     | GetAddress ->
-        let address = Account.getAddress wallet chain
-        requestId.reply address
-        wallet
-    | CreateTransaction (address, asset, amount) ->            
-        match Account.createTransaction chain wallet address asset amount with
-        | Ok tx -> 
-            requestId.reply (Created tx)
-            
-        | Result.Error tx -> 
-            requestId.reply (Error tx)
-        
-        wallet
-    | CreateContractActivationTransaction (code) ->
-        match Account.createContractActivationTransaction wallet code with
-        | Ok tx -> 
-            requestId.reply (Created tx)
-            
-        | Result.Error tx -> 
-            requestId.reply (Error tx)
-        
-        wallet
-    | CreateSendMessageTranscation (address, asset, amount) ->            
-        match Account.createSendMessageTranscation client chain address with
-        | Ok tx -> 
-            requestId.reply (Created tx)
-            
-        | Result.Error tx -> 
-            requestId.reply (Error tx)
-        
-        wallet
-    | _ ->
-        wallet
+        Account.getAddress chain wallet
+        |> reply
+    | Spend (address, spend) ->            
+        Account.createTransaction chain wallet address spend
+        |> getTransactionResult
+        |> reply
+    | ActivateContract code ->
+        Account.getActivateContractTransaction wallet code
+        |> getTransactionResult
+        |> reply
+    | ExecuteContract (cHash, spends) ->   
+        Account.getExecuteContractTransaction client chain cHash None spends
+        |> getTransactionResult
+        |> reply
+
+    wallet
 
 let main busName chain root =
     Actor.create<Command,Request,Event, Account.T> busName serviceName (fun poller sbObservable ebObservable ->                       

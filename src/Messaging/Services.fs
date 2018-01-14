@@ -1,9 +1,14 @@
 module Messaging.Services
 
 open Consensus
-open Consensus.Types
-open Consensus.TxSkeleton
+open Types
+open Hash
+open TxSkeleton
 open Infrastructure.ServiceBus.Client
+
+type TransactionResult =
+    | Ok of Transaction
+    | Error of string                             
 
 module Blockchain = 
     let serviceName = "blockchain"
@@ -21,7 +26,7 @@ module Blockchain =
         | ValidateMinedBlock of Types.Block
 
     type Request = 
-        | ExecuteContract of (TxSkeleton * Hash.Hash)
+        | ExecuteContract of TxSkeleton * Hash.Hash
 
     type Response = unit
         
@@ -39,7 +44,7 @@ module Blockchain =
 
     let executeContract client cHash txSkeleton = 
         ExecuteContract (txSkeleton, cHash)
-        |> Request.send<Request, Result<TxSkeleton, string>> client serviceName
+        |> Request.send<Request, TransactionResult> client serviceName
         
     let validateBlock client block = 
         ValidateBlock block 
@@ -88,14 +93,10 @@ module Wallet =
     type Request = 
         | GetAddress
         | GetBalance
-        | CreateTransaction of address:string * asset:Hash.Hash * amount:uint64
-        | CreateContractActivationTransaction of code:string
-        | CreateSendMessageTranscation of address:string * asset:Hash.Hash * amount:uint64
-                              
-    type CreateTransactionResult =
-        | Created of Transaction
-        | Error of string                             
-                                         
+        | Spend of Hash * Spend
+        | ActivateContract of string
+        | ExecuteContract of Hash * Map<Hash.Hash, uint64>
+
     let serviceName = "wallet"
     
     let getBalance client =
@@ -104,11 +105,11 @@ module Wallet =
     let getAddress client =
         Request.send<Request, string> client serviceName GetAddress
         
-    let createTransaction client address asset amount =
-        Request.send<Request, CreateTransactionResult> client serviceName (CreateTransaction (address,asset,amount))
+    let createTransaction client address spend =
+        Request.send<Request, TransactionResult> client serviceName (Spend (address, spend))
 
-    let createContractActivationTransaction client code =
-        Request.send<Request, CreateTransactionResult> client serviceName (CreateContractActivationTransaction (code))
+    let activateContract client code =
+        Request.send<Request, TransactionResult> client serviceName (ActivateContract (code))
 
-    let createSendMessageTranscation client address asset amount =
-        Request.send<Request, CreateTransactionResult> client serviceName (CreateSendMessageTranscation (address,asset,amount))
+    let executeContract client address spends =
+        Request.send<Request, TransactionResult> client serviceName (ExecuteContract (address, spends))

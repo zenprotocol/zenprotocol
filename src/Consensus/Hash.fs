@@ -43,8 +43,8 @@ let toString h =
 
 let fromString encoded =
     match Base16.decode encoded with
-    | None -> None
-    | Some decoded -> Hash decoded |> Some
+    | None -> Error "Could not decode hash"
+    | Some decoded -> Hash decoded |> Ok
 
 let isValid (Hash hash) =
     Array.length hash = 32

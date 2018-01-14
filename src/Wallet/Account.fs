@@ -5,6 +5,8 @@ open Consensus.Hash
 open Consensus.Crypto
 open Consensus.Types
 
+type TransactionResult = Messaging.Services.TransactionResult
+
 type T = {
     outpoints: Map<Outpoint, Output>
     keyPair: KeyPair
@@ -54,36 +56,32 @@ let getBalance account =
         | Some amount -> Map.add output.spend.asset (amount+output.spend.amount) balance
         | None -> Map.add output.spend.asset output.spend.amount balance) Map.empty account.outpoints
      
-let getAddress account chain = 
-    Address.encode (Address.PK account.publicKeyHash) chain
+let getAddress chain account = 
+    Address.encode chain (Address.PK account.publicKeyHash)
      
-let createTransaction chain account address asset amount =
+let createTransaction chain account pkHash spend =
     let collectInputs ((inputs, keys), collectedAmount) outpoint output =
-        if amount > collectedAmount && asset = output.spend.asset then
+        if spend.amount > collectedAmount && spend.asset = output.spend.asset then
             ((outpoint :: inputs, account.keyPair :: keys), output.spend.amount + collectedAmount)
         else 
-            ((inputs, keys), collectedAmount)  
-                              
-    // TODO: should the address be validated at a higher level + checking the HRP
-    // match the chain
-    Address.decodePK address chain
-    |> Result.bind (fun pkHash ->
-        let (inputs, keys), collectedAmount = Map.fold collectInputs (([],[]),0UL) account.outpoints
-        
-        match collectedAmount >= amount with
-        | false -> Error "Not enough tokens"
-        | true ->
-            let outputs = 
-                {spend={asset=asset;amount=amount};lock=PK pkHash} :: 
-                // checking if change is needed
-                match collectedAmount = amount with
-                    | true ->
-                        []
-                    | false -> 
-                        [{spend={asset=asset;amount=(collectedAmount - amount)};lock=PK account.publicKeyHash}]
-            Ok (Transaction.sign {inputs=inputs; outputs=outputs; witnesses=[]; contract = None} keys))
+            ((inputs, keys), collectedAmount)
+
+    let (inputs, keys), collectedAmount = Map.fold collectInputs (([],[]),0UL) account.outpoints
+    
+    match collectedAmount >= spend.amount with
+    | false -> Error "Not enough tokens"
+    | true ->
+        let outputs = 
+            {spend=spend;lock=PK pkHash} :: 
+            // checking if change is needed
+            match collectedAmount = spend.amount with
+                | true ->
+                    []
+                | false -> 
+                    [{spend={spend with amount=(collectedAmount - spend.amount)};lock=PK account.publicKeyHash}]
+        Ok (Transaction.sign {inputs=inputs; outputs=outputs; witnesses=[]; contract = None} keys)
             
-let createContractActivationTransaction account code =
+let getActivateContractTransaction account code =
     let input, output = Map.toSeq account.outpoints |> Seq.head
     let output' = {output with lock=PK account.publicKeyHash}
     Ok (Transaction.sign {inputs=[ input ]; outputs=[ output' ]; witnesses=[]; contract = Some code} [ account.keyPair ])
@@ -100,25 +98,23 @@ let createRoot () =
         
     handleTransaction Transaction.rootTxHash Transaction.rootTx account             
 
-let createSendMessageTranscation client chain address = // data, (asset, amount) option
-    match Address.decodeContract address chain with 
-    | Ok cHash ->
-        //TODO: create origin txskeleton
-        let input = TxSkeleton.empty
-        input
-        |> Messaging.Services.Blockchain.executeContract client cHash 
-        //TODO: use contract lock instead
-        |> Result.map Transaction.fromTxSkeleton
-        //TODO: sign the transaction
-        |> Result.map (fun tx ->
-            Transaction.addWitness (
-                ContractWitness {
-                    cHash = cHash 
-                    beginInputs = List.length input.pInputs
-                    beginOutputs = List.length input.outputs
-                    inputsLength = List.length tx.inputs
-                    outputsLength = List.length tx.outputs }
-                ) tx
-        )
-        //TODO: send publish command
-    | Error msg -> Error msg
+let getExecuteContractTransaction client chain cHash data spends =
+    let input = TxSkeleton.empty //TODO: create origin txskeleton
+    input
+    |> Messaging.Services.Blockchain.executeContract client cHash 
+    |> function
+    | TransactionResult.Ok tx -> Ok tx
+    | TransactionResult.Error e -> Error e
+    //TODO: use contract lock instead
+    //TODO: sign the transaction
+    |> Result.map (fun tx ->
+        Transaction.addWitness (
+            ContractWitness {
+                cHash = cHash 
+                beginInputs = List.length input.pInputs
+                beginOutputs = List.length input.outputs
+                inputsLength = List.length tx.inputs
+                outputsLength = List.length tx.outputs }
+            ) tx
+    )
+    //TODO: send publish command
