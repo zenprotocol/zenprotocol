@@ -30,24 +30,24 @@ let ok hash =
 
 [<Property>]
 let ``Contract address encode-decode roundtrip should produce same result``(chain:Chain) (ValidHash hash) =
-    let address = Address.encode (Contract hash) chain 
-    (Address.decodeContract address chain, ok hash)
+    let address = Address.encode chain (Contract hash) 
+    (Address.decodeContract chain address, ok hash)
     |> shouldEqual
 
 [<Property>]
 let ``PK address encode-decode roundtrip should produce same result``(chain:Chain) (ValidHash hash) =
-    let address = Address.encode (PK hash) chain 
-    (Address.decodePK address chain, ok hash)
+    let address = Address.encode chain (PK hash) 
+    (Address.decodePK chain address, ok hash)
     |> shouldEqual
 
 [<Property>]
 let ``Decoding Contract address of PK encoded address results in error``(chain:Chain) (ValidHash hash) =
-    let address = Address.encode (PK hash) chain 
-    (Address.decodeContract address chain, msg "address type discriminator mismatch, Contract expected")
+    let address = Address.encode chain (PK hash) 
+    (Address.decodeContract chain address, msg "address type mismatch, Contract expected")
     |> shouldEqual
 
 [<Property>]
 let ``Decoding PK address of Contract encoded address results in error``(chain:Chain) (ValidHash hash) =
-    let address = Address.encode (Contract hash) chain 
-    (Address.decodePK address chain, msg "address type discriminator mismatch, Public Key expected")
+    let address = Address.encode chain (Contract hash) 
+    (Address.decodePK chain address, msg "address type mismatch, Public Key expected")
     |> shouldEqual

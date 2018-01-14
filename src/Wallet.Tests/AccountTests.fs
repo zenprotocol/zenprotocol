@@ -65,7 +65,7 @@ let ``creating, not enough tokens``() =
     
     let account' = Account.handleTransaction (Transaction.hash tx) tx account 
 
-    let result = Account.createTransaction chain account (Account.getAddress account Test) Hash.zero 11UL 
+    let result = Account.createTransaction chain account account.publicKeyHash { asset = Hash.zero; amount = 11UL }
     
     let expected:Result<Transaction,string> = Error "Not enough tokens" 
     
@@ -82,7 +82,7 @@ let ``creating, no change``() =
     let bob' = Account.handleTransaction (Transaction.hash tx) tx bob
 
     // sending money to alice
-    let result = Account.createTransaction chain bob' (Account.getAddress alice Test) Hash.zero 10UL 
+    let result = Account.createTransaction chain bob' alice.publicKeyHash { asset = Hash.zero; amount = 10UL }
     
     match result with 
     | Error x -> failwithf "expected transaction %s" x
@@ -104,7 +104,7 @@ let ``creating, with change``() =
     let bob' = Account.handleTransaction (Transaction.hash tx) tx bob
 
     // sending money to alice
-    let result = Account.createTransaction chain bob' (Account.getAddress alice Test) Hash.zero 7UL 
+    let result = Account.createTransaction chain bob' alice.publicKeyHash { asset = Hash.zero; amount = 7UL }
     
     match result with 
     | Error x -> failwithf "expected transaction %s" x
@@ -131,7 +131,7 @@ let ``picking the correct asset``() =
     bob' |> balanceShouldBe anotherAsset 10UL
 
     // sending money to alice
-    let result = Account.createTransaction chain bob' (Account.getAddress alice Test) Hash.zero 7UL 
+    let result = Account.createTransaction chain bob' alice.publicKeyHash { asset = Hash.zero; amount = 7UL } 
     
     match result with 
     | Error x -> failwithf "expected transaction %s" x
@@ -160,7 +160,7 @@ let ``picking from multiple inputs``() =
     let bob' = Account.handleTransaction (Transaction.hash tx) tx bob    
 
     // sending money to alice
-    let result = Account.createTransaction chain bob' (Account.getAddress alice Test) Hash.zero 10UL 
+    let result = Account.createTransaction chain bob' alice.publicKeyHash { asset = Hash.zero; amount = 10UL }
     
     match result with 
     | Error x -> failwithf "expected transaction %s" x

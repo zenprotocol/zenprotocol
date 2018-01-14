@@ -19,15 +19,16 @@ open Blockchain.State
 
 open TestsInfrastructure.Nunit
 
+type TransactionResult = Messaging.Services.TransactionResult
+
 let chain = ChainParameters.Test
 // Helper functions for the tests
 let getStringBytes (str : string) = System.Text.Encoding.UTF8.GetBytes str
 let getStringHash = getStringBytes >> Hash.compute
-let getAddress a = Account.getAddress a ChainParameters.Test
 let createTransaction address amount account =
-    match Account.createTransaction chain account address Hash.zero amount with
-    | Ok tx -> tx
-    | Error error -> failwith error
+    match Account.createTransaction chain account address { asset = Hash.zero; amount = amount } with
+    | Result.Ok tx -> tx
+    | Result.Error error -> failwith error
 let getTxOutpints txHash tx = List.mapi (fun i _ -> {txHash=txHash;index= uint32 i}) tx.outputs
 let areOutpointsInSet outpoints set =
     match UtxoSet.getUtxos outpoints set with
@@ -37,7 +38,7 @@ let areOutpointsInSet outpoints set =
 // Some default transaction to work with during the tests
 let tx =
     let account = Account.createRoot ()
-    createTransaction (getAddress account) 1UL account
+    createTransaction account.publicKeyHash 1UL account
 let txHash = Transaction.hash tx
 let txOutpoints = getTxOutpints txHash tx
 
@@ -48,17 +49,19 @@ let orphanPool = OrphanPool.create()
 let acs = ActiveContractSet.empty
 
 let state = {
-    memoryState = {
-        utxoSet=utxoSet
-        mempool=mempool
-        orphanPool=orphanPool
-        activeContractSet=acs
-    }
-    tipState = {
-       tip = PersistentBlock.empty
-       utxoSet=utxoSet
-       activeContractSet=acs
-       ema=EMA.create chain
+    memoryState =
+        {
+            utxoSet = utxoSet
+            mempool = mempool
+            orphanPool = orphanPool
+            activeContractSet = acs
+        }
+    tipState = 
+        {
+            tip = PersistentBlock.empty
+            utxoSet = utxoSet
+            activeContractSet = acs
+            ema=EMA.create chain
     }
     blockRepository = BlockRepository.create ()
     blockRequests= Map.empty
@@ -141,12 +144,12 @@ let ``origin tx hit mempool, orphan tx should be added to mempool``() =
     let account1 = Account.create ()
     let account2 = Account.create ()
 
-    let tx1 = createTransaction (getAddress account1) 1UL rootAccount
+    let tx1 = createTransaction account1.publicKeyHash 1UL rootAccount
     let tx1Hash = Transaction.hash tx1
 
     let tx2 =
         Account.handleTransaction tx1Hash tx1 account1
-        |> createTransaction (getAddress account2) 1UL
+        |> createTransaction account2.publicKeyHash 1UL
     let tx2Hash = Transaction.hash tx2
 
     // Sending orphan transaction first, which should be added to orphan list
@@ -180,13 +183,13 @@ let ``orphan transaction is eventually invalid``() =
     let account1 = Account.create ()
     let account2 = Account.create ()
 
-    let tx1 = createTransaction (getAddress account1) 2UL rootAccount
+    let tx1 = createTransaction account1.publicKeyHash 2UL rootAccount
     let tx1Hash = Transaction.hash tx1
 
     let tx2 =
         let tx =
             Account.handleTransaction tx1Hash tx1 account1
-            |> createTransaction (getAddress account2) 2UL
+            |> createTransaction account2.publicKeyHash 2UL
         // let's change one of the outputs value and reassign to make invalid tx
         let output = tx.outputs.[0]
         let output' = {output with spend = {amount = output.spend.amount - 1UL; asset = output.spend.asset}}
@@ -226,17 +229,17 @@ let ``two orphan transaction spending same input``() =
     let account2 = Account.create ()
     let account3 = Account.create ()
 
-    let tx1 = createTransaction (getAddress account1) 1UL rootAccount
+    let tx1 = createTransaction account1.publicKeyHash 1UL rootAccount
     let tx1Hash = Transaction.hash tx1
 
     let tx2 =
         Account.handleTransaction tx1Hash tx1 account1
-        |> createTransaction (getAddress account2) 1UL
+        |> createTransaction account2.publicKeyHash 1UL
     let tx2Hash = Transaction.hash tx2
 
     let tx3 =
         Account.handleTransaction tx1Hash tx1 account1
-        |> createTransaction (getAddress account3) 1UL
+        |> createTransaction account3.publicKeyHash 1UL
     let tx3Hash = Transaction.hash tx3
 
     let (>>=) = Writer.bind
@@ -283,8 +286,8 @@ let ``Valid contract should be added to ActiveContractSet``() =
     let cHash = getStringHash contractCode
 
     let tx =
-        match Account.createContractActivationTransaction rootAccount contractCode with
-            | Ok tx ->
+        match Account.getActivateContractTransaction rootAccount contractCode with
+            | Result.Ok tx ->
                 tx
             | _ ->
                 failwith "couldn't get tx"
@@ -317,8 +320,8 @@ let ``Invalid contract should not be added to ActiveContractSet``() =
     let cHash = getStringHash contractCode
 
     let tx =
-        match Account.createContractActivationTransaction rootAccount contractCode with
-            | Ok tx -> tx
+        match Account.getActivateContractTransaction rootAccount contractCode with
+            | Result.Ok tx -> tx
             | _ -> failwith "couldn't get tx"
 
     let txHash = Transaction.hash tx
@@ -348,15 +351,22 @@ let ``Invalid contract should not be added to ActiveContractSet``() =
 let ``Valid contract should execute``() =
     let account = Account.createRoot ()
     let state = { state with memoryState = { state.memoryState with utxoSet = getSampleUtxoset utxoSet } }
-    Account.createContractActivationTransaction account sampleContractCode
+    Account.getActivateContractTransaction account sampleContractCode
     |> Result.map (fun tx ->
         Handler.handleCommand chain (ValidateTransaction tx) 1UL state
         |> Writer.unwrap)
     |> Result.map (fun (_, state) ->
         ActiveContractSet.containsContract sampleContractHash state.memoryState.activeContractSet
         |> should equal true
-        Handler.handleRequest
-            (fun result -> shouldEqual (result, sampleContractExpectedResult))
+        Handler.handleRequest (fun result -> 
+            let was = 
+                match result with
+                | TransactionResult.Ok tx -> Result.Ok tx
+                | TransactionResult.Error tx -> Result.Error tx
+            let expected = 
+                sampleContractExpectedResult
+                |> Result.map Transaction.fromTxSkeleton
+            shouldEqual (was, expected))
             (ExecuteContract (sampleTxSkeleton, sampleContractHash)) state)
     |> Result.mapError failwith
     |> ignore

@@ -93,7 +93,7 @@ let ``block with mismatch commitments fail connecting``() =
     let rootAccount = Account.createRoot ()
     let account1 = Account.create ()
     let tx = 
-        Account.createTransaction Chain.Test rootAccount (Account.getAddress account1 Chain.Test) Hash.zero 1UL
+        Account.createTransaction Chain.Test rootAccount account1.publicKeyHash { asset = Hash.zero; amount = 1UL }
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation") 
     
     let acs = ActiveContractSet.empty
@@ -115,7 +115,7 @@ let ``can connect valid block``() =
     let rootAccount = Account.createRoot ()
     let account1 = Account.create ()
     let tx = 
-        Account.createTransaction Chain.Test rootAccount (Account.getAddress account1 Chain.Test) Hash.zero 1UL
+        Account.createTransaction Chain.Test rootAccount account1.publicKeyHash { asset = Hash.zero; amount = 1UL }
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation") 
     
     let acs = ActiveContractSet.empty
