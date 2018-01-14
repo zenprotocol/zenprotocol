@@ -1,6 +1,6 @@
 module Consensus.Difficulty
 
-let compress (Hash.Hash h) =            
+let compress (Hash.Hash h) =
     // Count the number of initial zero bytes
     let zeroes = defaultArg <| Array.tryFindIndex ((<>) 0uy) h <| Hash.Length
     let length = Hash.Length - zeroes
@@ -15,8 +15,7 @@ let compress (Hash.Hash h) =
 let uncompress (target:uint32) =
     let shifted_exp = (int (target >>> 24))
     let mantissa = [|  byte ((target >>> 16) &&& 0xFFu) ; byte ((target >>> 8) &&& 0xFFu);byte (target &&& 0xFFu)|]
-
-    let length = min shifted_exp 3;
+    let length = max shifted_exp 3
 
     Hash.Hash <| Array.concat [Array.create (Hash.Length - length) 0uy; mantissa; Array.create (length - 3) 0uy;]
     
