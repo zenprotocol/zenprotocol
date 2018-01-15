@@ -116,7 +116,7 @@ let main argv =
     
     use apiActor =    
         if config.api.enabled then 
-            Api.Main.main busName config.api.bind
+            Api.Main.main chain busName config.api.bind
             |> Disposables.toDisposable
         else            
             Disposables.empty                            

@@ -32,7 +32,12 @@ let smoothingFactor chain =
 let getGenesisHash = 
     function
     | Main -> Hash.zero
-    | Test -> (Hash.fromString "53daa9610424738861298485486067be18c4f03358f3ee41e676d7f07ef4497e").Value        
+    | Test -> 
+        match Hash.fromString "53daa9610424738861298485486067be18c4f03358f3ee41e676d7f07ef4497e" with
+        | Ok value -> value
+        | Error err -> 
+            Infrastructure.Log.error "invalid genesis hash"
+            Hash.zero
     
 let getGenesisTime = 
     function 

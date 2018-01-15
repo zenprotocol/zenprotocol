@@ -2,7 +2,6 @@ module Miner.Main
 
 open Consensus
 open Messaging.Events
-open Messaging.Services
 open Infrastructure
 open Consensus.Types
 open Consensus.Difficulty
@@ -44,7 +43,7 @@ let minerTask chain busName (collection:Queue) =
             Log.info "new block mined"
         
             // We found a block            
-            Blockchain.validateMinedBlock client block
+            Messaging.Services.Blockchain.validateBlock client block
             ()
         | Error _ ->
             // lets continue looking for a block, but first check if there is any message

@@ -2,7 +2,8 @@ module Blockchain.Handler
 
 open Infrastructure
 open Infrastructure.Writer
-open Messaging.Services.Blockchain
+open Infrastructure.ServiceBus.Agent
+open Messaging.Services
 open Messaging.Events
 open Consensus
 open Blockchain
@@ -12,8 +13,8 @@ open State
 let handleCommand chain command timestamp (state:State) =   
     match command with
     | ValidateTransaction tx -> 
-        effectsWriter {            
-            let! memoryState = TransactionHandler.validateTransaction tx state.memoryState
+        effectsWriter {
+            let! memoryState = TransactionHandler.validateTransaction chain tx state.memoryState
             return {state with memoryState = memoryState}
         }
     | GetMemPool peerId ->        
@@ -71,16 +72,19 @@ let handleCommand chain command timestamp (state:State) =
                 do! sendBlock peerId block
                                 
                 return state          
-        }   
-                                                     
+        }
+                                                    
 let handleRequest reply request timestamp state = 
     match request with
     | ExecuteContract (txSkeleton, cHash) ->
-        TransactionHandler.executeContract txSkeleton cHash reply state.memoryState.activeContractSet
-        ret state             
-    | _ -> 
-        ret state
+        TransactionHandler.executeContract txSkeleton cHash state.memoryState
+        |> Result.map Transaction.fromTxSkeleton
+        |> function 
+        | Result.Ok tx -> Ok tx
+        | Result.Error err -> Error err
+        |> reply
+    | _ -> ()
+    ret state
     
 let handleEvent event timestamp state = 
     ret state
-    

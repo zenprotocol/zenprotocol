@@ -169,7 +169,7 @@ let rec private undoBlocks blockRepository (forkBlock:PersistentBlock.T) (tip:Pe
     
     
 // After applying block or blocks we must readd mempool transactions to the ACS and UTXO    
-let getMemoryState utxoSet mempool orphanPool acs =
+let getMemoryState chain utxoSet mempool orphanPool acs =
              
     // We start with an empty mempool and current orphan pool
     // We loop through existing mempool and adding it as we go to a new mempool
@@ -180,7 +180,7 @@ let getMemoryState utxoSet mempool orphanPool acs =
     Map.fold (fun writer txHash tx -> 
                       
         Writer.bind writer (fun memoryState ->
-            TransactionHandler.validateInputs txHash tx memoryState false)) (Writer.ret memoryState) mempool
+            TransactionHandler.validateInputs chain txHash tx memoryState false)) (Writer.ret memoryState) mempool
                                             
 let rollForwardChain chain timestamp state block persistentBlock utxoSet acs ema =
     effectsWriter {   
@@ -192,9 +192,9 @@ let rollForwardChain chain timestamp state block persistentBlock utxoSet acs ema
         // find all longer chain and connect the longest, chains are ordered
         let currentChainWork = PersistentBlock.chainWork persistentBlock
         let chains = findLongerChains state.blockRepository persistentBlock currentChainWork
-        let! chain = connectLongestChain chain timestamp state.blockRepository persistentBlock (utxoSet,acs,ema, mempool) chains currentChainWork                                 
+        let! chain' = connectLongestChain chain timestamp state.blockRepository persistentBlock (utxoSet,acs,ema, mempool) chains currentChainWork                                 
         
-        match chain with
+        match chain' with
         | Some (tip,(utxoSet,acs,ema,mempool)) -> 
             Log.info "Rolling forward chain to #%d %A" tip.header.blockNumber tip.hash
         
@@ -203,13 +203,13 @@ let rollForwardChain chain timestamp state block persistentBlock utxoSet acs ema
             do! BlockRepository.update state.blockRepository (PersistentBlock.markBlockAsTip tip)
                                       
             let tipState = {utxoSet=utxoSet;activeContractSet=acs;ema=ema;tip=tip}
-            let! memoryState = getMemoryState utxoSet mempool state.memoryState.orphanPool acs                                                                                           
+            let! memoryState = getMemoryState chain utxoSet mempool state.memoryState.orphanPool acs                                                                                           
                                                                                      
             do! addBlocks state.blockRepository persistentBlock tip
             return {state with tipState=tipState;memoryState=memoryState}
         | None ->
             let tipState = {utxoSet=utxoSet;activeContractSet=acs;ema=ema;tip=persistentBlock}
-            let! memoryState = getMemoryState utxoSet mempool state.memoryState.orphanPool acs       
+            let! memoryState = getMemoryState chain utxoSet mempool state.memoryState.orphanPool acs       
                                                                      
             return {state with tipState=tipState;memoryState=memoryState}
     }
@@ -286,8 +286,8 @@ let private handleForkChain chain timestamp (state:State) parent blockHash block
             let forkState = undoBlocks state.blockRepository forkBlock currentTip 
                                 (state.tipState.utxoSet,state.tipState.activeContractSet,state.tipState.ema, state.memoryState.mempool)
             
-            let! chain = connectLongestChain chain timestamp state.blockRepository forkBlock forkState chains currentChainWork
-            match chain with
+            let! chain' = connectLongestChain chain timestamp state.blockRepository forkBlock forkState chains currentChainWork
+            match chain' with
             | None ->
                 // No connectable chain is not longer than current chain
                 return state                                    
@@ -302,7 +302,7 @@ let private handleForkChain chain timestamp (state:State) parent blockHash block
                 do! addBlocks state.blockRepository forkBlock currentTip
                 
                 let tipState = {utxoSet=utxoSet;activeContractSet=acs;ema=ema;tip=tip}
-                let! memoryState = getMemoryState utxoSet mempool state.memoryState.orphanPool acs  
+                let! memoryState = getMemoryState chain utxoSet mempool state.memoryState.orphanPool acs  
                 
                 return {state with tipState=tipState;memoryState=memoryState}
     }     
