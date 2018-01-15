@@ -20,7 +20,7 @@ let push newTimestamp (timestamps:uint64 list) =
     else
         (List.tail timestamps) @ [newTimestamp]
 
-let median chain timestamps =
+let private median timestamps =
     if List.isEmpty timestamps then
         failwith "Can't find median of an empty list" // should never happen
     else
@@ -39,3 +39,12 @@ let add chain header ema =
                             currentTarget * bigint nextEstimatedInterval / bigint (ChainParameters.blockInterval chain)
     let nextDifficulty = Difficulty.compress <| Hash.fromBigInt nextTarget
     {ema with delayed = newDelayed; interval = nextEstimatedInterval; difficulty = nextDifficulty}
+
+let earliest ema =
+    //TODO: Refactor genesis block handling so the first case can raise an error.
+    if List.isEmpty ema.delayed
+        then 0UL
+    elif List.length ema.delayed < 11
+        then List.head ema.delayed
+    else
+        median ema.delayed
