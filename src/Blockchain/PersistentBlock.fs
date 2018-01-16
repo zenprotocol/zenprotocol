@@ -20,6 +20,9 @@ type T = {
     header: BlockHeader
     status: BlockStatus    
     chainWork: bigint option
+    txMerkleRoot:Hash.Hash;
+    witnessMerkleRoot:Hash.Hash;
+    activeContractSetMerkleRoot:Hash.Hash;
     commitments: Hash.Hash list
     transactions: Transaction list
     ema: EMA.T option
@@ -38,6 +41,9 @@ let empty =
        header = Block.genesisParent
        status = Orphan        
        chainWork = None
+       txMerkleRoot = Hash.zero
+       witnessMerkleRoot = Hash.zero
+       activeContractSetMerkleRoot = Hash.zero
        commitments = []
        transactions = []
        ema=None
@@ -49,6 +55,9 @@ let createOrphan blockHash (block:Block) =
         header = block.header
         status = Orphan        
         chainWork = None
+        txMerkleRoot = block.txMerkleRoot
+        witnessMerkleRoot = block.witnessMerkleRoot
+        activeContractSetMerkleRoot = block.activeContractSetMerkleRoot
         commitments = block.commitments
         transactions = block.transactions
         ema=None
@@ -60,7 +69,10 @@ let createGenesis chain blockHash (block:Block) ema =
         hash = blockHash
         header = block.header
         status = Tip            
-        chainWork = Some chainWork   
+        chainWork = Some chainWork 
+        txMerkleRoot = block.txMerkleRoot
+        witnessMerkleRoot = block.witnessMerkleRoot
+        activeContractSetMerkleRoot = block.activeContractSetMerkleRoot  
         commitments = block.commitments
         transactions = block.transactions
         ema=Some ema
@@ -76,7 +88,10 @@ let createTip prevBlock blockHash (block:Block) ema =
             hash = blockHash
             header = block.header
             status = Tip            
-            chainWork = Some chainWork   
+            chainWork = Some chainWork  
+            txMerkleRoot = block.txMerkleRoot
+            witnessMerkleRoot = block.witnessMerkleRoot
+            activeContractSetMerkleRoot = block.activeContractSetMerkleRoot 
             commitments = block.commitments
             transactions = block.transactions   
             ema=Some ema           
@@ -92,6 +107,9 @@ let createConnected prevBlock blockHash (block:Block) =
                 header = block.header
                 status = Connected                
                 chainWork = Some chainWork
+                txMerkleRoot = block.txMerkleRoot
+                witnessMerkleRoot = block.witnessMerkleRoot
+                activeContractSetMerkleRoot = block.activeContractSetMerkleRoot
                 commitments = block.commitments   
                 transactions = block.transactions
                 ema=None
@@ -99,8 +117,15 @@ let createConnected prevBlock blockHash (block:Block) =
 
 let ema block = Option.get block.ema
 
-let addEMA block ema = 
-    {block with ema = Some ema}
+// update block after connect operation
+let connect persistentBlock (block:Block) ema = 
+    {
+        persistentBlock with 
+            ema = Some ema 
+            txMerkleRoot = block.txMerkleRoot
+            witnessMerkleRoot = block.witnessMerkleRoot
+            activeContractSetMerkleRoot = block.activeContractSetMerkleRoot
+    }
      
 let untipBlock block = 
     { block with status = Connected }
@@ -125,6 +150,13 @@ let isValid block =
     | _ -> true
 
 let fetchBlock (block:T) = 
-    {header=block.header;transactions=block.transactions;commitments=block.commitments}
+    {
+        header=block.header
+        transactions=block.transactions
+        commitments=block.commitments
+        txMerkleRoot = block.txMerkleRoot
+        witnessMerkleRoot = block.witnessMerkleRoot
+        activeContractSetMerkleRoot = block.activeContractSetMerkleRoot
+    }
     
     
