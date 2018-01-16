@@ -152,36 +152,35 @@ let rec private addBlocks blockRepository (forkBlock:PersistentBlock.T) (tip:Per
         }
 
 // Undo blocks from current state in order to get the state of the forkblock            
-let rec private undoBlocks blockRepository (forkBlock:PersistentBlock.T) (tip:PersistentBlock.T) state = 
+let rec private undoBlocks blockRepository (forkBlock:PersistentBlock.T) (tip:PersistentBlock.T) (utxoSet,acs,ema,mempool) = 
     if tip.header = forkBlock.header then
-        state
+        (utxoSet,acs,ema,mempool)
     else 
         let parent = BlockRepository.findParent blockRepository tip
         let block = PersistentBlock.fetchBlock tip
-
-        let utxoSet,acs,ema,mempool = undoBlocks blockRepository forkBlock parent state  
         
-        let utxoSet = UtxoSet.undoBlock block utxoSet        
+        let utxoSet = UtxoSet.undoBlock block utxoSet
         let acs = ActiveContractSet.undoBlock block acs
         let ema = PersistentBlock.ema parent
         let mempool = MemPool.undoBlock block mempool
+
+        undoBlocks blockRepository forkBlock parent (utxoSet,acs,ema,mempool)                       
         
-        utxoSet,acs,ema,mempool
-    
-    
 // After applying block or blocks we must readd mempool transactions to the ACS and UTXO    
-let getMemoryState chain utxoSet mempool orphanPool acs =
-             
+let getMemoryState chain utxoSet mempool orphanPool acs =                                                
     // We start with an empty mempool and current orphan pool
+    // We first validate all orphan transactions according to the new state
     // We loop through existing mempool and adding it as we go to a new mempool
     // We don't publish AddedMemPool event for mempool transaction as they are already in mempool
     // We only publish add to mem pool transactions to orphan transactions
     let memoryState = {utxoSet=utxoSet;activeContractSet=acs;mempool=MemPool.empty;orphanPool=orphanPool}
+    
+    let memoryState = TransactionHandler.validateOrphanTransactions chain memoryState
 
     Map.fold (fun writer txHash tx -> 
                       
         Writer.bind writer (fun memoryState ->
-            TransactionHandler.validateInputs chain txHash tx memoryState false)) (Writer.ret memoryState) mempool
+            TransactionHandler.validateInputs chain txHash tx memoryState false)) memoryState mempool
                                             
 let rollForwardChain chain timestamp state block persistentBlock utxoSet acs ema =
     effectsWriter {   
@@ -300,7 +299,7 @@ let private handleForkChain chain timestamp (state:State) parent blockHash block
                 do! BlockRepository.update state.blockRepository (PersistentBlock.markBlockAsTip tip)
             
                 do! removeBlocks state.blockRepository forkBlock currentTip
-                do! addBlocks state.blockRepository forkBlock currentTip
+                do! addBlocks state.blockRepository forkBlock tip
                 
                 let tipState = {utxoSet=utxoSet;activeContractSet=acs;ema=ema;tip=tip}
                 let! memoryState = getMemoryState chain utxoSet mempool state.memoryState.orphanPool acs  

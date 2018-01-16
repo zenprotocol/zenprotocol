@@ -147,15 +147,18 @@ let rec private update' tree cache data keys (height:UInt64) _base =
 let root tree = tree.root                  
 
 let updateMultiple tree keys =
-    let keys = Array.sortBy fst keys
+    if Array.isEmpty keys then
+        tree
+    else     
+        let keys = Array.sortBy fst keys
+        
+        let data = Array.fold (fun data (key,value) ->
+            match value with
+            | Empty -> Map.remove key data
+            | Value value -> Map.add key value data) tree.data keys
     
-    let data = Array.fold (fun data (key,value) ->
-        match value with
-        | Empty -> Map.remove key data
-        | Value value -> Map.add key value data) tree.data keys
-
-    let root,cache = update' tree tree.cache (Map.toArray data) keys N initialBase
-    {tree with data=data;root=root;cache=cache}
+        let root,cache = update' tree tree.cache (Map.toArray data) keys N initialBase
+        {tree with data=data;root=root;cache=cache}
                   
 let add key value tree = 
     let data = Map.add key value tree.data    

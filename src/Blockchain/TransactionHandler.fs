@@ -53,7 +53,18 @@ let private validateOrphanTransaction chain state txHash tx  =
                 let orphanPool = OrphanPool.remove txHash state.orphanPool
                 return {state with orphanPool = orphanPool}
         }
-
+        
+let rec validateOrphanTransactions chain state =      
+    effectsWriter {
+        let! state' = OrphanPool.foldWriter (validateOrphanTransaction chain) state state.orphanPool
+        
+        // if orphan pool changed we run again until there is no change
+        if state.orphanPool <> state.orphanPool then
+            return! validateOrphanTransactions chain state'
+        else
+            return state'
+    }
+          
 let validateInputs chain txHash tx (state:MemoryState) shouldPublishEvents =
     effectsWriter
         {
@@ -81,8 +92,8 @@ let validateInputs chain txHash tx (state:MemoryState) shouldPublishEvents =
 
                 let state = {state with activeContractSet=acs;mempool=mempool;utxoSet=utxoSet}
 
-                // TODO: going through the orphan pool once might be not enough if we have inter dependencies within the orphan pool
-                return! OrphanPool.foldWriter (validateOrphanTransaction chain) state state.orphanPool
+                
+                return! validateOrphanTransactions chain state
         }
 
 
