@@ -136,6 +136,7 @@ Target "Build" (fun _ ->
       "fsharp/Realized/Zen.Sha3.Realized.fs";
       "fsharp/Realized/Zen.Merkle.fs";
       "fsharp/Realized/Zen.Util.fs";
+      "fsharp/Realized/Zen.Types.TxSkeleton.fs"
     |]
 
   let checker = FSharpChecker.Create()
@@ -158,6 +159,7 @@ Target "Build" (fun _ ->
       "-r"; "../../packages/FSharp.Core/lib/net45/FSharp.Core.dll"
       "-r"; "../../packages/FSharp.Compatibility.OCaml/lib/net40/FSharp.Compatibility.OCaml.dll"
       "-r"; "../../packages/libsodium-net/lib/Net40/Sodium.dll"
+      "-r"; "../../packages/FSharpx.Collections/lib/net40/FSharpx.Collections.dll"
       "-r"; "../../packages/BouncyCastle/lib/BouncyCastle.Crypto.dll"
     |]
 
