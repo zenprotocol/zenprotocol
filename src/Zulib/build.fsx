@@ -64,6 +64,7 @@ Target "Verify" (fun _ ->
   let args =
     [| "--use_hints";
        "--use_hint_hashes"
+       "--cache_checked_modules"
     |]
 
   let exitCodes = Array.Parallel.map (fun file -> runFStar args [|file|]) zulibFiles
@@ -78,7 +79,8 @@ Target "Extract" (fun _ ->
 
   let args =
     [|
-       "--lax";
+       //"--lax";
+       "--cache_checked_modules"
        //"--use_hints";
        //"--use_hint_hashes";
        "--codegen";"FSharp";
