@@ -204,6 +204,21 @@ let handleActiveState socket next peer msg =
         | Message.GetTransaction txHash ->
             next (InProcMessage.GetTransaction {peerId=(RoutingId.toBytes peer.routingId); txHash=txHash})
             peer
+        | Message.GetBlock blockHash ->
+            next (InProcMessage.BlockRequest {peerId=(RoutingId.toBytes peer.routingId); blockHash=blockHash})
+            peer
+        | Message.Block block ->
+            next (InProcMessage.Block block)
+            peer
+        | Message.Tip blockHeader ->
+            next (InProcMessage.Tip blockHeader)
+            peer
+        | Message.NewBlock blockHeader ->
+            next (InProcMessage.NewBlock {peerId=(RoutingId.toBytes peer.routingId); blockHeader=blockHeader})
+            peer
+        | Message.GetTip ->
+            next (InProcMessage.GetTip (RoutingId.toBytes peer.routingId))
+            peer
         | msg ->
             // TODO: unexpected msg, close peer          
             

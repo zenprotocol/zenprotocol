@@ -77,6 +77,14 @@
       <Project>{81161f64-d019-422c-a3cf-321cde6ca209}</Project>
       <Name>Infrastructure</Name>
     </ProjectReference>
+    <ProjectReference Include="..\Messaging\Messaging.fsproj">
+      <Project>{44277422-32e3-4f1b-bd6d-153b7a621444}</Project>
+      <Name>Messaging</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Miner\Miner.fsproj">
+      <Project>{26ee7861-df8c-46ea-889b-0a585b687209}</Project>
+      <Name>Miner</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Network\Network.fsproj">
       <Project>{8471efe5-4b38-4969-ac2a-0bf64a031eba}</Project>
       <Name>Network</Name>
@@ -265,4 +273,5 @@
   <Import Project="..\..\packages\zen_z3_linux\build\zen_z3_linux.targets" Condition="Exists('..\..\packages\zen_z3_linux\build\zen_z3_linux.targets')" Label="Paket" />
   <Import Project="..\..\packages\zen_z3_osx\build\$(__paket__zen_z3_osx_targets).targets" Condition="Exists('..\..\packages\zen_z3_osx\build\$(__paket__zen_z3_osx_targets).targets')" Label="Paket" />
   <Import Project="..\..\packages\ZFStar\build\ZFStar.targets" Condition="Exists('..\..\packages\ZFStar\build\ZFStar.targets')" Label="Paket" />
+  <Import Project="..\CopyZulib.targets" />
 </Project>

@@ -1,6 +1,8 @@
 chain: local
-externalIp: null
 
+miner: false
+
+externalIp: null
 listen: false
 bind: 127.0.0.1:29555
 seeds: 

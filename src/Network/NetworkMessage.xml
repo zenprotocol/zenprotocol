@@ -53,7 +53,26 @@
     <message name="Get Transaction" id="11">
         <field name="txHash" type="octets" size="32">TransactionHash</field>
     </message>
+
+    <message name="Get Block" id="12">
+        <field name="blockHash" type="octets" size="32">BlockHash</field>
+    </message>
+
+    <message name="Block" id="13">
+        <field name="block" type="chunk">Block</field>
+    </message>
+
+    <message name="Get Tip" id="14">
+    </message>
     
+    <message name="Tip" id="15">
+        <field name="block header" type="octets" size="100">block header</field>
+    </message>
+    
+    <message name="New Block" id="16">
+        <field name="block header" type="octets" size="100">block header</field>
+    </message>
+
     <message name="Unknown Peer" id="100">
     </message>
 

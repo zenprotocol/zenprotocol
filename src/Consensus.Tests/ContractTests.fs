@@ -8,9 +8,12 @@ open System.Text
 open Consensus.Types
 open Consensus.TxSkeleton
 
+open TestsInfrastructure.Nunit
+
 let sampleContractCode = """
 open Zen.Types
 open Zen.Vector
+open Zen.Util
 
 val test: transactionSkeleton -> hash -> transactionSkeleton
 let test (Tx inputs outputs data) hash =
@@ -22,8 +25,14 @@ let test (Tx inputs outputs data) hash =
     }
   } in
 
+  let input = {
+      txHash = hashFromBase64 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+      index = 0ul
+  } in
+
   let outputs' = VCons output outputs in
-  Tx inputs outputs' data"""
+  let inputs' = VCons input inputs in
+  Tx inputs' outputs' data"""
 
 let sampleContractHash = 
     sampleContractCode
@@ -32,7 +41,7 @@ let sampleContractHash =
 
 let private sampleContractTester txSkeleton hash =
     let output = {
-        lock = Lock.Contract (hash, [||])
+        lock = Lock.Contract hash
         spend =
         {
             asset = hash
@@ -40,19 +49,31 @@ let private sampleContractTester txSkeleton hash =
         }
     } 
 
+    let pInput = ({
+        txHash = Hash.zero
+        index = 0ul
+    }, {
+        lock = PK Hash.zero
+        spend = { asset = Hash.zero; amount = 0UL }
+    })
+
     let outputs' = output :: txSkeleton.outputs
-    { txSkeleton with outputs = outputs' }
+    let pInputs' = pInput :: txSkeleton.pInputs
+    { txSkeleton with outputs = outputs'; pInputs = pInputs' }
 
 let sampleTxSkeleton = 
     {
-        inputs =
+        pInputs =
             [{
                 txHash = Hash.zero
                 index = 1u
+            }, {
+                lock = PK Hash.zero
+                spend = { asset = Hash.zero; amount = 1UL }
             }]
         outputs =
             [{
-                lock = Lock.PK Hash.zero
+                lock = PK Hash.zero
                 spend = { asset = Hash.zero; amount = 1UL }
             }]
     }
@@ -60,16 +81,36 @@ let sampleTxSkeleton =
 let sampleContractExpectedResult = 
     Ok (sampleContractTester sampleTxSkeleton sampleContractHash) : Result<TxSkeleton, string>
 
+let getSampleUtxoset utxos =
+    utxos
+    |> Map.add {
+        txHash = Hash.zero
+        index = 1u
+    } (UtxoSet.Unspent {
+        lock = PK Hash.zero
+        spend = { asset = Hash.zero; amount = 1UL }
+    })
+    |> Map.add {
+        txHash = Hash.zero
+        index = 0u
+    } (UtxoSet.Unspent {
+        lock = PK Hash.zero
+        spend = { asset = Hash.zero; amount = 0UL }
+    })
+
 [<Test>]
 let ``Should get contract function``() = 
     match Contract.compile sampleContractCode with
-        | Ok contract ->
-            // check hash validity
-            Hash.isValid contract.hash |> should equal true 
-            contract.hash 
-            |> should equal sampleContractHash
-            //execute and check
-            Contract.run contract sampleTxSkeleton
-            |> should equal sampleContractExpectedResult
-        | Error err ->
-            failwith err
+    | Ok contract ->
+        // check hash validity
+        (Hash.isValid contract.hash, true)
+        |> shouldEqual 
+        (contract.hash, sampleContractHash)
+        |> shouldEqual 
+
+        //execute and check
+        let utxos = getSampleUtxoset (UtxoSet.create())
+        (Contract.run contract utxos sampleTxSkeleton, sampleContractExpectedResult)
+        |> shouldEqual
+    | Error err ->
+        failwith err

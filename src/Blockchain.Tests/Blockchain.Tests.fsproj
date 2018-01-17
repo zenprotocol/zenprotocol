@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\..\packages\FSharp.Compiler.Tools\build\FSharp.Compiler.Tools.props" Condition="Exists('..\..\packages\FSharp.Compiler.Tools\build\FSharp.Compiler.Tools.props')" Label="Paket" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
@@ -39,6 +39,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="OkConstraint.fs" />
+    <Compile Include="ValidateBlockTests.fs" />
     <Compile Include="ValidateTransactionTests.fs" />
     <ProjectReference Include="..\Blockchain\Blockchain.fsproj">
       <Project>{16b10d81-c99e-4562-810c-9b637234c72d}</Project>
@@ -64,6 +66,10 @@
     <ProjectReference Include="..\Consensus.Tests\Consensus.Tests.fsproj">
       <Project>{B5E951FC-AE90-4EF1-9365-3E2B5A56B510}</Project>
       <Name>Consensus.Tests</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\TestsInfrastructure\TestsInfrastructure.fsproj">
+      <Project>{9DF227BB-E98D-49D7-A33B-C0D5B170F430}</Project>
+      <Name>TestsInfrastructure</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(FSharpTargetsPath)" />

@@ -1,5 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\..\packages\FSharp.Compiler.Tools\build\FSharp.Compiler.Tools.props" Condition="Exists('..\..\packages\FSharp.Compiler.Tools\build\FSharp.Compiler.Tools.props')" Label="Paket" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -42,6 +41,7 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Types.fs" />
+    <Compile Include="Parsing.fs" />
     <Compile Include="Server.fs" />
     <Compile Include="Main.fs" />
     <Content Include="paket.references" />
@@ -56,6 +56,10 @@
     <ProjectReference Include="..\Messaging\Messaging.fsproj">
       <Project>{44277422-32e3-4f1b-bd6d-153b7a621444}</Project>
       <Name>Messaging</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Wallet\Wallet.fsproj">
+      <Project>{289A59EB-D1D4-499F-87B9-F75B799829C0}</Project>
+      <Name>Wallet</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(FSharpTargetsPath)" />

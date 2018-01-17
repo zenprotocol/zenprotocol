@@ -15,11 +15,13 @@ let private throwNotImplemented s1 s2 =
      
 let private fsToFstLock (outputLock:Types.Lock) : outputLock =
     match outputLock with 
-    | Types.Lock.PK (Hash.Hash pkHash) ->
+    | PK (Hash.Hash pkHash) ->
         PKLock pkHash
-    | Types.Lock.Contract (Hash.Hash pkHash, null) ->
-        ContractLock (pkHash, 0I, Empty)
-    | Types.Lock.Contract (Hash.Hash pkHash, [||]) ->
+    //| Types.Lock.Contract (Hash.Hash pkHash, null) ->
+    //    ContractLock (pkHash, 0I, Empty)
+    //| Types.Lock.Contract (Hash.Hash pkHash, [||]) ->
+        //ContractLock (pkHash, 0I, Empty)
+    | Contract (Hash.Hash pkHash) ->
         ContractLock (pkHash, 0I, Empty)
 
 
@@ -37,12 +39,14 @@ let private fsToFstLock (outputLock:Types.Lock) : outputLock =
 let private fstToFsLock (outputLock:outputLock) : Types.Lock =
     match outputLock with 
     | PKLock (pkHash) ->
-        Types.Lock.PK (Hash.Hash pkHash)
+        PK (Hash.Hash pkHash)
 
 
     //TODO:
     | ContractLock (pkHash, _, _) ->
-        Types.Lock.Contract (Hash.Hash pkHash, [||])
+        Contract (Hash.Hash pkHash)
+    //| ContractLock (pkHash, _, _) ->
+        //Types.Lock.Contract (Hash.Hash pkHash, [||])
     //| ContractLock (pkHash, _, data) ->
         //let serializer = context.GetSerializer<data<unit>>()
         //Types.Lock.Contract (Hash.Hash pkHash, serializer.PackSingleObject data)
@@ -75,19 +79,23 @@ let private listToVector (ls:List<'Aa>) : Zen.Vector.t<'Aa, _> =
     let lsIndexed = List.mapi (fun i elem -> bigint (len - i - 1), elem) ls // vectors are reverse-zero-indexed
     List.foldBack (fun (i,x) acc -> Zen.Vector.VCons (i, x, acc)) lsIndexed Zen.Vector.VNil
 
-let convertResult (Tx (_, outpoints, _, outputs, _)) =
+let convertResult utxoSet (Tx (_, outpoints, _, outputs, _)) =
     let vectorToList f vector = List.map f (vectorToList vector)
-    {
-        inputs = vectorToList fstToFsOutpoint outpoints
-        outputs = vectorToList fstToFsOutput outputs
-    }
+    let outpoints' = outpoints |> vectorToList fstToFsOutpoint
+    UtxoSet.getUtxos outpoints' utxoSet
+    |> Option.bind (
+        fun outputs' -> 
+            Some {
+                pInputs = List.zip outpoints' outputs'
+                outputs = vectorToList fstToFsOutput outputs
+            })
 
 let convertInput txSkeleton =
     let listToVector f list = listToVector (List.map f list)
     Tx (
-        bigint (List.length txSkeleton.inputs), 
-        listToVector fsToFstOutpoint txSkeleton.inputs, 
+        bigint (List.length txSkeleton.pInputs), 
+        txSkeleton.pInputs |> List.map fst |> listToVector fsToFstOutpoint, 
         bigint (List.length txSkeleton.outputs), 
-        listToVector fsToFstOutput txSkeleton.outputs, 
+        txSkeleton.outputs |> listToVector fsToFstOutput, 
         Native.option.None
     )

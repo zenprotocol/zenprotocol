@@ -3,6 +3,7 @@ open FSharp.Configuration
 open Argu
 open Infrastructure
 open Consensus.ChainParameters
+open Consensus
 
 module Actor = FsNetMQ.Actor
 
@@ -66,9 +67,11 @@ let main argv =
         | Chain chain -> config.chain <- chain            
         | Localhost -> 
             config.chain <- "local"
+            config.externalIp <- "127.0.0.1"
             config.listen <- true
             config.seeds.Clear ()  
             config.api.enabled <- true
+            config.miner <- true
             root <- true 
         | Local1 ->
             config.chain <- "local"
@@ -94,26 +97,41 @@ let main argv =
             config.externalIp <- ip                
                                        
     ) (results.GetAllResults())
-                              
+    
+    let chain = getChain config
     use brokerActor = createBroker ()    
-    use blockchainActor = Blockchain.Main.main busName
+    use blockchainActor = Blockchain.Main.main chain busName
         
     use networkActor = 
         Network.Main.main busName config.externalIp config.listen config.bind config.seeds
-    
-    let chain = getChain config
+        
     use walletActor = Wallet.Main.main busName chain root
+    
+    use minerActor =
+        if config.miner then        
+            Miner.Main.main busName chain
+            |> Disposables.toDisposable
+        else
+            Disposables.empty 
     
     use apiActor =    
         if config.api.enabled then 
-            (Api.Main.main busName config.api.bind) :> System.IDisposable
+            Api.Main.main chain busName config.api.bind
+            |> Disposables.toDisposable
         else            
-            { new System.IDisposable with member x.Dispose() = ()}                            
+            Disposables.empty                            
                        
     printfn "running..."
-    
+       
+    if root then    
+        let block = Block.createGenesis chain [Transaction.rootTx] (0UL,0UL)
+        
+        use client = ServiceBus.Client.create busName  
+        
+        Messaging.Services.Blockchain.validateBlock client block
+                
     printfn "Press enter to exit"
     
-    System.Console.ReadLine () |> ignore        
+    System.Console.ReadLine () |> ignore
     
     0 // return an integer exit code

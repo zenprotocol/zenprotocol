@@ -11,9 +11,9 @@ type State = Server.T
 
 let eventHandler event (state:State) = state
 
-let main busName bind =
+let main chain busName bind =
     Actor.create<unit,unit,Event,State> busName "Api" (fun poller sbObservable ebObservable ->            
-        let server = Server.create poller busName bind
+        let server = Server.create chain poller busName bind
                 
         let ebObservable = 
             ebObservable

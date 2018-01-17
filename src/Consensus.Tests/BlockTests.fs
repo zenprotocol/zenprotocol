@@ -8,11 +8,15 @@ open Wallet
 open NUnit.Framework
 open FsCheck
 open FsCheck.NUnit
+open FsUnit
+
+let timestamp = 1515594186383UL + 1UL
+let difficulty = 0x20fffffful
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``block with empty transactions failed validation``(header) =
     
-    let block = {header=header;transactions=[]} 
+    let block = {header=header;transactions=[];commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero;} 
 
     Block.validate Chain.Test block = Error "transactions is empty"
   
@@ -20,7 +24,7 @@ let ``block with empty transactions failed validation``(header) =
 let ``block with invalid header failed validation``(header:BlockHeader) (NonEmptyTransactions transactions) =
     let header = {header with difficulty = 402690497ul}
 
-    let block = {header=header;transactions=transactions}
+    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero;}
         
     Block.validate Chain.Test block = Error "proof of work failed"
     
@@ -33,7 +37,7 @@ let ``block with one invalid transaction fail validation``(header) (NonEmptyTran
     let invalidTx = {transactions.[index] with inputs = []}
     let transactions = List.mapi (fun i tx -> if i = index then invalidTx else tx) transactions
              
-    let block = {header=header;transactions=transactions}
+    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero;}
     
     let expected = Error (sprintf "transaction %A failed validation due to General \"inputs empty\"" (Transaction.hash invalidTx))
 
@@ -41,8 +45,21 @@ let ``block with one invalid transaction fail validation``(header) (NonEmptyTran
     
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]    
 let ``block with valid transactions pass validation``(header) (NonEmptyTransactions transactions) =
-    let header = {header with difficulty = 0x20fffffful }         
-    let block = {header=header;transactions=transactions}                   
+    let txMerkleRoot = 
+        transactions
+        |> List.map Transaction.hash            
+        |> MerkleTree.computeRoot
+                        
+    let witnessMerkleRoot = 
+        transactions
+        |> List.map Transaction.witnessHash
+        |> MerkleTree.computeRoot 
+
+    let commitments = MerkleTree.computeRoot [txMerkleRoot;witnessMerkleRoot;Hash.zero;]
+
+    let header = {header with difficulty = 0x20fffffful;commitments=commitments; }             
+    
+    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot; witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=Hash.zero;}                   
         
     Block.validate Chain.Test block = Ok block
     
@@ -52,7 +69,7 @@ let ``connecting block failed when block number is not successive``(parent:Block
     let utxoSet = UtxoSet.create ()
     let ema = EMA.create Chain.Test
  
-    parent.blockNumber + 1ul <> block.header.blockNumber ==> (Block.connect parent acs utxoSet ema block = Error "blockNumber mismatch")  
+    parent.blockNumber + 1ul <> block.header.blockNumber ==> (Block.connect Chain.Test parent 1UL utxoSet acs ema block = Error "blockNumber mismatch")  
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``connecting block should fail when commitments are wrong``(parent:BlockHeader) (NonEmptyTransactions transactions) = 
@@ -65,14 +82,14 @@ let ``connecting block should fail when commitments are wrong``(parent:BlockHead
         parent = BlockHeader.hash parent
         blockNumber = parent.blockNumber + 1ul
         commitments = Hash.zero
-        timestamp = 0UL
+        timestamp = timestamp
         difficulty = 0x20fffffful
         nonce = 0UL,0UL        
     }
     
-    let block = {header=header;transactions=transactions}
+    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero;}
     
-    Block.connect parent acs utxoSet ema block = Error "commitments mismatch"
+    Block.connect Chain.Test parent (timestamp + 1UL) utxoSet acs ema block = Error "commitments mismatch"
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]    
 let ``connecting block should fail when transaction inputs are invalid``(parent:BlockHeader) (NonEmptyTransactions transactions) =
@@ -80,26 +97,90 @@ let ``connecting block should fail when transaction inputs are invalid``(parent:
     let utxoSet = UtxoSet.create ()
     let ema = EMA.create Chain.Test   
  
-    let block = Block.createTemplate parent 0UL ema acs transactions
+    let block = Block.createTemplate parent timestamp ema acs transactions
         
-    Block.connect parent acs utxoSet ema block = Error "transactions failed inputs validation"
+    Block.connect Chain.Test parent (timestamp + 1UL) utxoSet acs ema block = Error "transactions failed inputs validation due to Orphan"
 
 [<Test>]    
-let ``can connect valid block``() = 
+let ``block timestamp too early``() =
+    let ema = {
+        (EMA.create Chain.Test) with delayed = [timestamp-1UL;timestamp; timestamp+1UL]
+    }
+        
     let rootAccount = Account.createRoot ()
     let account1 = Account.create ()
     let tx = 
-        Account.createTransaction Chain.Test rootAccount (Account.getAddress account1 Chain.Test) Hash.zero 1UL
+        Account.createTransaction Chain.Test rootAccount account1.publicKeyHash {asset=Hash.zero;amount=1UL}
+        |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation") 
+    
+    let acs = ActiveContractSet.empty
+    let utxoSet = UtxoSet.create () |> UtxoSet.handleTransaction Transaction.rootTxHash Transaction.rootTx    
+    
+    let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
+    let block = Block.createTemplate parent timestamp ema acs [tx]
+    
+    let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "block's timestamp is too early"
+
+    Block.connect Chain.Test parent timestamp utxoSet acs ema block |> should equal expected
+    
+[<Test>]    
+let ``block timestamp in the future``() =
+    let ema = {
+        (EMA.create Chain.Test) with delayed = [timestamp-1UL;timestamp; timestamp+1UL]
+    }
+        
+    let rootAccount = Account.createRoot ()
+    let account1 = Account.create ()
+    let tx = 
+        Account.createTransaction Chain.Test rootAccount account1.publicKeyHash {asset=Hash.zero;amount=1UL}
+        |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation") 
+    
+    let acs = ActiveContractSet.empty
+    let utxoSet = UtxoSet.create () |> UtxoSet.handleTransaction Transaction.rootTxHash Transaction.rootTx    
+    
+    let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
+    let block = Block.createTemplate parent (timestamp + Block.MaxTimeInFuture + 1UL) ema acs [tx]
+    
+    let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "block timestamp too far in the future"
+   
+    Block.connect Chain.Test parent timestamp utxoSet acs ema block |> should equal expected
+
+[<Test>]    
+let ``block with mismatch commitments fail connecting``() = 
+    let rootAccount = Account.createRoot ()
+    let account1 = Account.create ()
+    let tx = 
+        Account.createTransaction Chain.Test rootAccount account1.publicKeyHash { asset = Hash.zero; amount = 1UL }
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation") 
     
     let acs = ActiveContractSet.empty
     let utxoSet = UtxoSet.create () |> UtxoSet.handleTransaction Transaction.rootTxHash Transaction.rootTx
     let ema = EMA.create Chain.Test
     
-    let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=0UL;difficulty=0ul;nonce=0UL,0UL}
-    let block = Block.createTemplate parent 0UL ema acs [tx]
+    let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0x20fffffful;nonce=0UL,0UL}
+    let block = Block.createTemplate parent (timestamp + 1UL) ema acs [tx]
+    let block = {block with commitments=[Hash.zero]}
     
-    let result = Block.connect parent acs utxoSet ema block
+    let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "commitments mismatch"
+    
+    Block.connect Chain.Test parent timestamp utxoSet acs ema block |> should equal expected
+    
+[<Test>]    
+let ``can connect valid block``() = 
+    let rootAccount = Account.createRoot ()
+    let account1 = Account.create ()
+    let tx = 
+        Account.createTransaction Chain.Test rootAccount account1.publicKeyHash { asset = Hash.zero; amount = 1UL }
+        |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation") 
+    
+    let acs = ActiveContractSet.empty
+    let utxoSet = UtxoSet.create () |> UtxoSet.handleTransaction Transaction.rootTxHash Transaction.rootTx
+    let ema = EMA.create Chain.Test
+    
+    let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
+    let block = Block.createTemplate parent (timestamp+1UL) ema acs [tx]
+    
+    let result = Block.connect Chain.Test parent timestamp utxoSet acs ema block
     
     match result with 
     | Ok _ -> ()

@@ -15,21 +15,25 @@ type Spend = {
 
 type Lock =
     | PK of Hash
-    | Contract of Hash * array<byte>
+    | Contract of Hash
+    | Destroy
 
 type Output = {
     lock: Lock
     spend: Spend
 }
 
+type ContractWitness = {
+    cHash: Hash
+    beginInputs: int
+    beginOutputs: int
+    inputsLength: int
+    outputsLength: int
+}
+
 type Witness = 
     | PKWitness of array<byte> * Signature
-    | ContractWitness of 
-        Hash * 
-        beginInputs:int * 
-        beginOutputs:int * 
-        endInputs:int * 
-        endOutputs:int
+    | ContractWitness of ContractWitness
 
 type Transaction = {
     inputs: Outpoint list
@@ -52,5 +56,9 @@ type BlockHeader = {
 
 type Block = {
     header:BlockHeader;
+    txMerkleRoot:Hash.Hash;
+    witnessMerkleRoot:Hash.Hash;
+    activeContractSetMerkleRoot:Hash.Hash;
+    commitments: Hash.Hash list;
     transactions:Transaction list;
 }

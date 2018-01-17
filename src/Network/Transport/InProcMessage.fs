@@ -34,6 +34,26 @@ let MemPoolMessageId = 17uy
 let GetTransactionMessageId = 18uy
 [<LiteralAttribute>]
 let SendTransactionMessageId = 19uy
+[<LiteralAttribute>]
+let BlockMessageId = 20uy
+[<LiteralAttribute>]
+let TipMessageId = 21uy
+[<LiteralAttribute>]
+let PublishBlockMessageId = 22uy
+[<LiteralAttribute>]
+let NewBlockMessageId = 23uy
+[<LiteralAttribute>]
+let GetBlockMessageId = 24uy
+[<LiteralAttribute>]
+let GetNewBlockMessageId = 25uy
+[<LiteralAttribute>]
+let BlockRequestMessageId = 26uy
+[<LiteralAttribute>]
+let SendBlockMessageId = 27uy
+[<LiteralAttribute>]
+let SendTipMessageId = 28uy
+[<LiteralAttribute>]
+let GetTipMessageId = 29uy
 
 type Connect =
         string
@@ -89,6 +109,46 @@ type SendTransaction = {
         tx : byte[]
     }
 
+type Block =
+        byte[]
+
+type Tip =
+        byte[]
+
+type PublishBlock =
+        byte[]
+
+type NewBlock = {
+        blockHeader : byte[]
+        peerId : byte[]
+    }
+
+type GetBlock =
+        byte[]
+
+type GetNewBlock = {
+        peerId : byte[]
+        blockHash : byte[]
+    }
+
+type BlockRequest = {
+        peerId : byte[]
+        blockHash : byte[]
+    }
+
+type SendBlock = {
+        peerId : byte[]
+        block : byte[]
+    }
+
+type SendTip = {
+        peerId : byte[]
+        blockHeader : byte[]
+    }
+
+type GetTip =
+        byte[]
+
 type T =
     | Connect of Connect
     | Connected of Connected
@@ -104,6 +164,16 @@ type T =
     | MemPool of MemPool
     | GetTransaction of GetTransaction
     | SendTransaction of SendTransaction
+    | Block of Block
+    | Tip of Tip
+    | PublishBlock of PublishBlock
+    | NewBlock of NewBlock
+    | GetBlock of GetBlock
+    | GetNewBlock of GetNewBlock
+    | BlockRequest of BlockRequest
+    | SendBlock of SendBlock
+    | SendTip of SendTip
+    | GetTip of GetTip
 
 module Connect =
     let getMessageSize (msg:Connect) =
@@ -385,6 +455,218 @@ module SendTransaction =
                     }: SendTransaction)
         }
 
+module Block =
+    let getMessageSize (msg:Block) =
+            4 + Array.length msg
+
+    let write (msg:Block) stream =
+        stream
+        |> Stream.writeNumber4 (uint32 (Array.length msg))
+        |> Stream.writeBytes msg (Array.length msg)
+
+    let read =
+        reader {
+            let! msgLength = Stream.readNumber4
+            let! msg = Stream.readBytes (int msgLength)
+
+            return msg
+        }
+
+module Tip =
+    let blockHeaderSize = 100
+    let getMessageSize (msg:Tip) =
+            100
+
+    let write (msg:Tip) stream =
+        stream
+        |> Stream.writeBytes msg 100
+
+    let read =
+        reader {
+            let! msg = Stream.readBytes 100
+
+            return msg
+        }
+
+module PublishBlock =
+    let blockHeaderSize = 100
+    let getMessageSize (msg:PublishBlock) =
+            100
+
+    let write (msg:PublishBlock) stream =
+        stream
+        |> Stream.writeBytes msg 100
+
+    let read =
+        reader {
+            let! msg = Stream.readBytes 100
+
+            return msg
+        }
+
+
+module NewBlock =
+    let blockHeaderSize = 100
+    let peerIdSize = 4
+    let getMessageSize (msg:NewBlock) =
+        0 +
+            100 +
+            4 +
+            0
+
+    let write (msg:NewBlock) stream =
+        stream
+        |> Stream.writeBytes msg.blockHeader 100
+        |> Stream.writeBytes msg.peerId 4
+
+    let read =
+        reader {
+            let! blockHeader = Stream.readBytes 100
+            let! peerId = Stream.readBytes 4
+
+            return ({
+                        blockHeader = blockHeader;
+                        peerId = peerId;
+                    }: NewBlock)
+        }
+
+module GetBlock =
+    let blockHashSize = 32
+    let getMessageSize (msg:GetBlock) =
+            32
+
+    let write (msg:GetBlock) stream =
+        stream
+        |> Stream.writeBytes msg 32
+
+    let read =
+        reader {
+            let! msg = Stream.readBytes 32
+
+            return msg
+        }
+
+
+module GetNewBlock =
+    let peerIdSize = 4
+    let blockHashSize = 32
+    let getMessageSize (msg:GetNewBlock) =
+        0 +
+            4 +
+            32 +
+            0
+
+    let write (msg:GetNewBlock) stream =
+        stream
+        |> Stream.writeBytes msg.peerId 4
+        |> Stream.writeBytes msg.blockHash 32
+
+    let read =
+        reader {
+            let! peerId = Stream.readBytes 4
+            let! blockHash = Stream.readBytes 32
+
+            return ({
+                        peerId = peerId;
+                        blockHash = blockHash;
+                    }: GetNewBlock)
+        }
+
+
+module BlockRequest =
+    let peerIdSize = 4
+    let blockHashSize = 32
+    let getMessageSize (msg:BlockRequest) =
+        0 +
+            4 +
+            32 +
+            0
+
+    let write (msg:BlockRequest) stream =
+        stream
+        |> Stream.writeBytes msg.peerId 4
+        |> Stream.writeBytes msg.blockHash 32
+
+    let read =
+        reader {
+            let! peerId = Stream.readBytes 4
+            let! blockHash = Stream.readBytes 32
+
+            return ({
+                        peerId = peerId;
+                        blockHash = blockHash;
+                    }: BlockRequest)
+        }
+
+
+module SendBlock =
+    let peerIdSize = 4
+    let getMessageSize (msg:SendBlock) =
+        0 +
+            4 +
+            4 + Array.length msg.block +
+            0
+
+    let write (msg:SendBlock) stream =
+        stream
+        |> Stream.writeBytes msg.peerId 4
+        |> Stream.writeNumber4 (uint32 (Array.length msg.block))
+        |> Stream.writeBytes msg.block (Array.length msg.block)
+
+    let read =
+        reader {
+            let! peerId = Stream.readBytes 4
+            let! blockLength = Stream.readNumber4
+            let! block = Stream.readBytes (int blockLength)
+
+            return ({
+                        peerId = peerId;
+                        block = block;
+                    }: SendBlock)
+        }
+
+
+module SendTip =
+    let peerIdSize = 4
+    let blockHeaderSize = 100
+    let getMessageSize (msg:SendTip) =
+        0 +
+            4 +
+            100 +
+            0
+
+    let write (msg:SendTip) stream =
+        stream
+        |> Stream.writeBytes msg.peerId 4
+        |> Stream.writeBytes msg.blockHeader 100
+
+    let read =
+        reader {
+            let! peerId = Stream.readBytes 4
+            let! blockHeader = Stream.readBytes 100
+
+            return ({
+                        peerId = peerId;
+                        blockHeader = blockHeader;
+                    }: SendTip)
+        }
+
+module GetTip =
+    let peerIdSize = 4
+    let getMessageSize (msg:GetTip) =
+            4
+
+    let write (msg:GetTip) stream =
+        stream
+        |> Stream.writeBytes msg 4
+
+    let read =
+        reader {
+            let! msg = Stream.readBytes 4
+
+            return msg
+        }
+
 
 let private decode stream =
     let readMessage messageId stream =
@@ -445,6 +727,46 @@ let private decode stream =
             match SendTransaction.read stream with
             | None,stream -> None,stream
             | Some msg, stream -> Some (SendTransaction msg), stream
+        | BlockMessageId ->
+            match Block.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (Block msg), stream
+        | TipMessageId ->
+            match Tip.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (Tip msg), stream
+        | PublishBlockMessageId ->
+            match PublishBlock.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (PublishBlock msg), stream
+        | NewBlockMessageId ->
+            match NewBlock.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (NewBlock msg), stream
+        | GetBlockMessageId ->
+            match GetBlock.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (GetBlock msg), stream
+        | GetNewBlockMessageId ->
+            match GetNewBlock.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (GetNewBlock msg), stream
+        | BlockRequestMessageId ->
+            match BlockRequest.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (BlockRequest msg), stream
+        | SendBlockMessageId ->
+            match SendBlock.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (SendBlock msg), stream
+        | SendTipMessageId ->
+            match SendTip.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (SendTip msg), stream
+        | GetTipMessageId ->
+            match GetTip.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (GetTip msg), stream
         | _ -> None, stream
 
     let r = reader {
@@ -490,6 +812,16 @@ let send socket msg =
         | MemPool msg -> MemPool.write msg
         | GetTransaction msg -> GetTransaction.write msg
         | SendTransaction msg -> SendTransaction.write msg
+        | Block msg -> Block.write msg
+        | Tip msg -> Tip.write msg
+        | PublishBlock msg -> PublishBlock.write msg
+        | NewBlock msg -> NewBlock.write msg
+        | GetBlock msg -> GetBlock.write msg
+        | GetNewBlock msg -> GetNewBlock.write msg
+        | BlockRequest msg -> BlockRequest.write msg
+        | SendBlock msg -> SendBlock.write msg
+        | SendTip msg -> SendTip.write msg
+        | GetTip msg -> GetTip.write msg
 
     let messageId =
         match msg with
@@ -507,6 +839,16 @@ let send socket msg =
         | MemPool _ -> MemPoolMessageId
         | GetTransaction _ -> GetTransactionMessageId
         | SendTransaction _ -> SendTransactionMessageId
+        | Block _ -> BlockMessageId
+        | Tip _ -> TipMessageId
+        | PublishBlock _ -> PublishBlockMessageId
+        | NewBlock _ -> NewBlockMessageId
+        | GetBlock _ -> GetBlockMessageId
+        | GetNewBlock _ -> GetNewBlockMessageId
+        | BlockRequest _ -> BlockRequestMessageId
+        | SendBlock _ -> SendBlockMessageId
+        | SendTip _ -> SendTipMessageId
+        | GetTip _ -> GetTipMessageId
 
     let messageSize =
         match msg with
@@ -524,6 +866,16 @@ let send socket msg =
         | MemPool msg -> MemPool.getMessageSize msg
         | GetTransaction msg -> GetTransaction.getMessageSize msg
         | SendTransaction msg -> SendTransaction.getMessageSize msg
+        | Block msg -> Block.getMessageSize msg
+        | Tip msg -> Tip.getMessageSize msg
+        | PublishBlock msg -> PublishBlock.getMessageSize msg
+        | NewBlock msg -> NewBlock.getMessageSize msg
+        | GetBlock msg -> GetBlock.getMessageSize msg
+        | GetNewBlock msg -> GetNewBlock.getMessageSize msg
+        | BlockRequest msg -> BlockRequest.getMessageSize msg
+        | SendBlock msg -> SendBlock.getMessageSize msg
+        | SendTip msg -> SendTip.getMessageSize msg
+        | GetTip msg -> GetTip.getMessageSize msg
 
     //  Signature + message ID + message size
     let frameSize = 2 + 1 + messageSize

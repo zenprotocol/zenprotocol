@@ -33,6 +33,7 @@ let transportHandler transport client ownAddress msg (connector,addressBook) =
             Transport.getAddresses transport peerId             
  
     let requestMemPool = Transport.getMemPool transport
+    let requestTip = Transport.getTip transport
  
     match msg with 
     | InProcMessage.Transaction msg ->
@@ -52,6 +53,7 @@ let transportHandler transport client ownAddress msg (connector,addressBook) =
         // Request addresses and mempool            
         requestAddresses peerId 
         requestMemPool peerId
+        requestTip peerId
             
         (Connector.connected connector address),addressBook        
     | InProcMessage.Accepted peerId ->
@@ -59,6 +61,7 @@ let transportHandler transport client ownAddress msg (connector,addressBook) =
         // Request addresses and mempool            
         requestAddresses peerId 
         requestMemPool peerId
+        requestTip peerId
             
         connector,addressBook                                               
     | InProcMessage.Disconnected address ->
@@ -134,7 +137,40 @@ let transportHandler transport client ownAddress msg (connector,addressBook) =
             ()
                      
         connector, addressBook                
-                                      
+    | InProcMessage.BlockRequest {peerId=peerId;blockHash=blockHash} -> 
+        match Hash.fromBytes blockHash with
+        | Some blockHash ->
+            Blockchain.getBlock client peerId blockHash
+        | None -> ()
+        
+        connector, addressBook
+    | InProcMessage.GetTip peerId ->
+        Blockchain.getTip client peerId
+        connector, addressBook
+    | InProcMessage.Block block ->
+        match Block.deserialize block with
+        | Some block ->
+            Blockchain.validateBlock client block
+            connector,addressBook
+        | None ->
+            //TODO: log non-deserializable block
+            connector,addressBook
+    | InProcMessage.Tip blockHeader ->
+        match BlockHeader.deserialize blockHeader with
+        | Some blockHeader ->
+            Blockchain.handleTip client blockHeader
+            connector,addressBook
+        | None ->
+            //TODO: log non-deserializable blockheader
+            connector,addressBook
+    | InProcMessage.NewBlock {peerId=peerId;blockHeader=blockHeader} ->
+        match BlockHeader.deserialize blockHeader with
+        | Some blockHeader ->
+            Blockchain.validateNewBlockHeader client peerId blockHeader
+            connector,addressBook
+        | None ->
+            //TODO: log non-deserializable blockheader
+            connector,addressBook    
     | _ -> 
         // TODO: log unknown message
         connector, addressBook
@@ -154,6 +190,25 @@ let commandHandler transport command (state:State) =
         let bytes = Transaction.serialize Transaction.Full tx
         Transport.sendTransaction transport peerId bytes         
         state
+    | Command.SendBlock (peerId, block) ->
+        let bytes = Block.serialize block
+        Transport.sendBlock transport peerId bytes         
+        state
+    | Command.SendTip (peerId,blockHeader) ->
+        let bytes = BlockHeader.serialize blockHeader
+        Transport.sendTip transport peerId bytes
+        state
+    | Command.GetBlock blockHash ->
+        Transport.getBlock transport (Hash.bytes blockHash)
+        state
+    | Command.PublishBlock blockHeader ->
+        let bytes = BlockHeader.serialize blockHeader
+        Transport.publisNewBlock transport bytes
+
+        state
+    | Command.GetNewBlock (peerId,blockHash) ->
+        Transport.getNewBlock transport peerId (Hash.bytes blockHash)
+        state 
         
 let requestHandler request reply (state:State) = state
 

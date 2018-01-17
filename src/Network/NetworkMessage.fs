@@ -29,6 +29,16 @@ let MemPoolMessageId = 10uy
 [<LiteralAttribute>]
 let GetTransactionMessageId = 11uy
 [<LiteralAttribute>]
+let GetBlockMessageId = 12uy
+[<LiteralAttribute>]
+let BlockMessageId = 13uy
+[<LiteralAttribute>]
+let GetTipMessageId = 14uy
+[<LiteralAttribute>]
+let TipMessageId = 15uy
+[<LiteralAttribute>]
+let NewBlockMessageId = 16uy
+[<LiteralAttribute>]
 let UnknownPeerMessageId = 100uy
 [<LiteralAttribute>]
 let UnknownMessageMessageId = 101uy
@@ -66,6 +76,19 @@ type MemPool =
 type GetTransaction =
         byte[]
 
+type GetBlock =
+        byte[]
+
+type Block =
+        byte[]
+
+
+type Tip =
+        byte[]
+
+type NewBlock =
+        byte[]
+
 
 type UnknownMessage =
         byte
@@ -82,6 +105,11 @@ type T =
     | GetMemPool
     | MemPool of MemPool
     | GetTransaction of GetTransaction
+    | GetBlock of GetBlock
+    | Block of Block
+    | GetTip
+    | Tip of Tip
+    | NewBlock of NewBlock
     | UnknownPeer
     | UnknownMessage of UnknownMessage
 
@@ -243,6 +271,71 @@ module GetTransaction =
             return msg
         }
 
+module GetBlock =
+    let blockHashSize = 32
+    let getMessageSize (msg:GetBlock) =
+            32
+
+    let write (msg:GetBlock) stream =
+        stream
+        |> Stream.writeBytes msg 32
+
+    let read =
+        reader {
+            let! msg = Stream.readBytes 32
+
+            return msg
+        }
+
+module Block =
+    let getMessageSize (msg:Block) =
+            4 + Array.length msg
+
+    let write (msg:Block) stream =
+        stream
+        |> Stream.writeNumber4 (uint32 (Array.length msg))
+        |> Stream.writeBytes msg (Array.length msg)
+
+    let read =
+        reader {
+            let! msgLength = Stream.readNumber4
+            let! msg = Stream.readBytes (int msgLength)
+
+            return msg
+        }
+
+module Tip =
+    let blockHeaderSize = 100
+    let getMessageSize (msg:Tip) =
+            100
+
+    let write (msg:Tip) stream =
+        stream
+        |> Stream.writeBytes msg 100
+
+    let read =
+        reader {
+            let! msg = Stream.readBytes 100
+
+            return msg
+        }
+
+module NewBlock =
+    let blockHeaderSize = 100
+    let getMessageSize (msg:NewBlock) =
+            100
+
+    let write (msg:NewBlock) stream =
+        stream
+        |> Stream.writeBytes msg 100
+
+    let read =
+        reader {
+            let! msg = Stream.readBytes 100
+
+            return msg
+        }
+
 module UnknownMessage =
     let getMessageSize (msg:UnknownMessage) =
             1
@@ -302,6 +395,24 @@ let private decode stream =
             match GetTransaction.read stream with
             | None,stream -> None,stream
             | Some msg, stream -> Some (GetTransaction msg), stream
+        | GetBlockMessageId ->
+            match GetBlock.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (GetBlock msg), stream
+        | BlockMessageId ->
+            match Block.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (Block msg), stream
+        | GetTipMessageId ->
+            Some GetTip, stream
+        | TipMessageId ->
+            match Tip.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (Tip msg), stream
+        | NewBlockMessageId ->
+            match NewBlock.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (NewBlock msg), stream
         | UnknownPeerMessageId ->
             Some UnknownPeer, stream
         | UnknownMessageMessageId ->
@@ -350,6 +461,11 @@ let send socket msg =
         | GetMemPool -> id
         | MemPool msg -> MemPool.write msg
         | GetTransaction msg -> GetTransaction.write msg
+        | GetBlock msg -> GetBlock.write msg
+        | Block msg -> Block.write msg
+        | GetTip -> id
+        | Tip msg -> Tip.write msg
+        | NewBlock msg -> NewBlock.write msg
         | UnknownPeer -> id
         | UnknownMessage msg -> UnknownMessage.write msg
 
@@ -366,6 +482,11 @@ let send socket msg =
         | GetMemPool _ -> GetMemPoolMessageId
         | MemPool _ -> MemPoolMessageId
         | GetTransaction _ -> GetTransactionMessageId
+        | GetBlock _ -> GetBlockMessageId
+        | Block _ -> BlockMessageId
+        | GetTip _ -> GetTipMessageId
+        | Tip _ -> TipMessageId
+        | NewBlock _ -> NewBlockMessageId
         | UnknownPeer _ -> UnknownPeerMessageId
         | UnknownMessage _ -> UnknownMessageMessageId
 
@@ -382,6 +503,11 @@ let send socket msg =
         | GetMemPool -> 0
         | MemPool msg -> MemPool.getMessageSize msg
         | GetTransaction msg -> GetTransaction.getMessageSize msg
+        | GetBlock msg -> GetBlock.getMessageSize msg
+        | Block msg -> Block.getMessageSize msg
+        | GetTip -> 0
+        | Tip msg -> Tip.getMessageSize msg
+        | NewBlock msg -> NewBlock.getMessageSize msg
         | UnknownPeer -> 0
         | UnknownMessage msg -> UnknownMessage.getMessageSize msg
 

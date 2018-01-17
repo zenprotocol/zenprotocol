@@ -43,10 +43,14 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="PersistentBlock.fs" />
+    <Compile Include="BlockRepository.fs" />
     <Compile Include="EffectsWriter.fs" />
     <Compile Include="OrphanPool.fs" />
     <Compile Include="MemPool.fs" />
+    <Compile Include="State.fs" />
     <Compile Include="TransactionHandler.fs" />
+    <Compile Include="BlockHandler.fs" />
     <Compile Include="Handler.fs" />
     <Compile Include="main.fs" />
     <None Include="Script.fsx" />
@@ -62,6 +66,10 @@
     <ProjectReference Include="..\Messaging\Messaging.fsproj">
       <Project>{44277422-32e3-4f1b-bd6d-153b7a621444}</Project>
       <Name>Messaging</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Wallet\Wallet.fsproj">
+      <Project>{289A59EB-D1D4-499F-87B9-F75B799829C0}</Project>
+      <Name>Wallet</Name>
     </ProjectReference>
   </ItemGroup>
   <PropertyGroup>
