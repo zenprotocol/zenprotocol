@@ -13,6 +13,7 @@ type Argument =
     | Api of string
     | Bind of string
     | Ip of string
+    | Wipe 
     | [<AltCommandLine("-lr")>] Localhost
     | [<AltCommandLine("-l1")>] Local1
     | [<AltCommandLine("-l2")>] Local2
@@ -24,6 +25,7 @@ type Argument =
                 | Bind _ -> "Set the address the node should listen on"
                 | Chain _ -> "specify chain (local,test or main)."                
                 | Ip _ -> "specify the IP the node should relay to other peers"
+                | Wipe -> "wipe database"
                 | Localhost -> "specify if the node should local chain host"
                 | Local1 -> "run node with local1 settings, use for tests"
                 | Local2 -> "run node with local1 settings, use for tests"
@@ -62,6 +64,8 @@ let main argv =
     
     let mutable root = false 
     
+    let mutable wipe = false
+    
     List.iter (fun arg -> 
         match arg with 
         | Chain chain -> config.chain <- chain            
@@ -74,6 +78,7 @@ let main argv =
             config.miner <- true
             root <- true 
         | Local1 ->
+            config.dataPath <- "./l1"
             config.chain <- "local"
             config.listen <- true
             config.bind <- "127.0.0.1:37000"
@@ -81,6 +86,7 @@ let main argv =
             config.api.enabled <- true
             config.api.bind <- "127.0.0.1:36000"
         | Local2 ->
+            config.dataPath <- "./l2"
             config.chain <- "local"
             config.listen <- true
             config.bind <- "127.0.0.1:37001"
@@ -94,13 +100,20 @@ let main argv =
             config.bind <- address
             config.listen <- true
         | Ip ip ->
-            config.externalIp <- ip                
-                                       
-    ) (results.GetAllResults())
-    
+            config.externalIp <- ip
+        | Wipe -> wipe <- true                                                                                            
+    ) (results.GetAllResults())                 
+            
     let chain = getChain config
+    let dataPath = Platform.combine config.dataPath config.chain
+        
+    if wipe then 
+        Log.info "wiping database"
+        if System.IO.Directory.Exists dataPath then 
+                System.IO.Directory.Delete (dataPath,true)
+    
     use brokerActor = createBroker ()    
-    use blockchainActor = Blockchain.Main.main chain busName
+    use blockchainActor = Blockchain.Main.main dataPath chain busName
         
     use networkActor = 
         Network.Main.main busName config.externalIp config.listen config.bind config.seeds

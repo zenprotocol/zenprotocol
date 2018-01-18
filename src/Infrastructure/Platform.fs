@@ -45,6 +45,8 @@ let workingDirectory =
     Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
     |> normalizeNameToFileSystem
 
+let combine a b = Path.Combine (a,b)
+
 let getFrameworkPath =
     match getPlatform with
     | PlatformID.Unix -> "/usr/lib/mono/4.6.2-api/"

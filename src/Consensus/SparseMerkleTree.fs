@@ -159,6 +159,11 @@ let updateMultiple tree keys =
     
         let root,cache = update' tree tree.cache (Map.toArray data) keys N initialBase
         {tree with data=data;root=root;cache=cache}
+        
+let addMultiple tree keys =
+    keys
+    |> Array.map (fun (key,value) -> key,Value value) 
+    |> updateMultiple tree         
                   
 let add key value tree = 
     let data = Map.add key value tree.data    

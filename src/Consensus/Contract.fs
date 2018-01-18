@@ -75,3 +75,6 @@ let compile (code : string) : Result<T, string> =
 
 let run (contract : T) = 
     contract.fn contract.hash
+    
+let load path (hash:Hash.Hash) : T = 
+    failwith "not implemented yet"
