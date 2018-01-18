@@ -1,116 +1,89 @@
 ﻿module Consensus.Tests.ContractTests
 
 open Consensus
+open Types
 open NUnit.Framework
-open FsUnit
 open Hash
 open System.Text
-open Consensus.Types
-open Consensus.TxSkeleton
+open TxSkeleton
+open Crypto
+open SampleContract
 
 open TestsInfrastructure.Nunit
 
-let sampleContractCode = """
-open Zen.Types
-open Zen.Vector
-open Zen.Util
-
-val test: transactionSkeleton -> hash -> transactionSkeleton
-let test (Tx inputs outputs data) hash =
-  let output = {
-    lock = ContractLock hash 0 Empty;
-    spend = {
-      asset = hash;
-      amount = 1000UL
-    }
-  } in
-
-  let input = {
-      txHash = hashFromBase64 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-      index = 0ul
-  } in
-
-  let outputs' = VCons output outputs in
-  let inputs' = VCons input inputs in
-  Tx inputs' outputs' data"""
-
-let sampleContractHash = 
-    sampleContractCode
-    |> Encoding.UTF8.GetBytes
-    |> Hash.compute
-
-let private sampleContractTester txSkeleton hash =
-    let output = {
-        lock = Lock.Contract hash
-        spend =
-        {
-            asset = hash
-            amount = 1000UL
-        }
-    } 
-
-    let pInput = ({
-        txHash = Hash.zero
-        index = 0ul
-    }, {
-        lock = PK Hash.zero
-        spend = { asset = Hash.zero; amount = 0UL }
-    })
-
-    let outputs' = output :: txSkeleton.outputs
-    let pInputs' = pInput :: txSkeleton.pInputs
-    { txSkeleton with outputs = outputs'; pInputs = pInputs' }
-
-let sampleTxSkeleton = 
-    {
-        pInputs =
-            [{
-                txHash = Hash.zero
-                index = 1u
-            }, {
-                lock = PK Hash.zero
-                spend = { asset = Hash.zero; amount = 1UL }
-            }]
-        outputs =
-            [{
-                lock = PK Hash.zero
-                spend = { asset = Hash.zero; amount = 1UL }
-            }]
-    }
-
-let sampleContractExpectedResult = 
-    Ok (sampleContractTester sampleTxSkeleton sampleContractHash) : Result<TxSkeleton, string>
-
-let getSampleUtxoset utxos =
-    utxos
-    |> Map.add {
-        txHash = Hash.zero
-        index = 1u
-    } (UtxoSet.Unspent {
-        lock = PK Hash.zero
-        spend = { asset = Hash.zero; amount = 1UL }
-    })
-    |> Map.add {
-        txHash = Hash.zero
-        index = 0u
-    } (UtxoSet.Unspent {
-        lock = PK Hash.zero
-        spend = { asset = Hash.zero; amount = 0UL }
-    })
-
-[<Test>]
-let ``Should get contract function``() = 
-    match Contract.compile sampleContractCode with
-    | Ok contract ->
+let compileRunAndCompare code =
+    code
+    |> Contract.compile
+    |> Result.bind (fun contract ->
         // check hash validity
         (Hash.isValid contract.hash, true)
         |> shouldEqual 
         (contract.hash, sampleContractHash)
         |> shouldEqual 
-
         //execute and check
-        let utxos = getSampleUtxoset (UtxoSet.create())
-        (Contract.run contract utxos sampleTxSkeleton, sampleContractExpectedResult)
-        |> shouldEqual
-    | Error err ->
-        failwith err
+        Contract.run contract sampleInputTx)
+
+[<Test>]
+let ``Should get contract function``() = 
+    (compileRunAndCompare sampleContractCode
+    , (Ok sampleOutputTx : Result<TxSkeleton, string>))
+    |> shouldEqual
+
+[<Test>]
+let ``Should get 'extract' error for invalid תcode``() = 
+    (compileRunAndCompare (sampleContractCode + "###")
+    , (Error "extract" : Result<TxSkeleton, string>))
+    |> shouldEqual
+
+let validateInputs (contract:Contract.T) utxos tx =
+    let acs = ActiveContractSet.add contract.hash contract ActiveContractSet.empty
+    TransactionValidation.validateInputs acs utxos (Transaction.hash tx) tx
+    |> Result.mapError (function
+        | TransactionValidation.ValidationError.General error -> error
+        | other -> other.ToString())
+
+let compileRunAndValidate code =
+    Contract.compile code
+    |> Result.bind (fun contract ->
+        let utxoSet = getSampleUtxoset (UtxoSet.create())
+        Contract.run contract sampleInputTx
+        |> Result.bind (TxSkeleton.checkPrefix sampleInputTx)
+        |> Result.map (Transaction.fromTxSkeleton contract.hash)
+        |> Result.map (Transaction.addContractWitness contract.hash sampleInputTx)
+        |> Result.map (Transaction.sign [ sampleKeyPair ])
+        |> Result.bind (validateInputs contract utxoSet))
+
+[<Test>]
+let ``Contract generated transaction should be valid``() = 
+    (compileRunAndValidate sampleContractCode
+    , (Ok sampleExpectedResult : Result<Transaction, string>))
+    |> shouldEqual
+
+[<Test>]
+let ``Contract should not be able to create not it's own tokens``() = 
+    (compileRunAndValidate
+         """
+         open Zen.Types
+         open Zen.Vector
+         open Zen.Util
+
+         val test: transactionSkeleton -> hash -> transactionSkeleton
+         let test (Tx pInputs outputs data) hash =
+           let output = {
+             lock = ContractLock hash 0 Empty;
+             spend = {
+               asset = hashFromBase64 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; //aha! should be of hash value
+               amount = 1000UL
+             }
+           } in
+
+           let pInput = {
+               txHash = hashFromBase64 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+               index = 0ul
+           }, output in
+
+           let outputs' = VCons output outputs in
+           let pInputs' = VCons pInput pInputs in
+           Tx pInputs' outputs' data"""
+    , (Error "illegal creation/destruction of tokens" : Result<Transaction, string>))
+    |> shouldEqual

@@ -39,11 +39,11 @@ let requestHandler chain client (requestId:RequestId) request wallet =
         |> getTransactionResult
         |> reply
     | ActivateContract code ->
-        Account.getActivateContractTransaction wallet code
+        Account.createActivateContractTransaction wallet code
         |> getTransactionResult
         |> reply
     | ExecuteContract (cHash, spends) ->   
-        Account.getExecuteContractTransaction client chain cHash None spends
+        Account.createExecuteContractTransaction client chain cHash None spends
         |> getTransactionResult
         |> reply
 

@@ -79,12 +79,12 @@ let createTransaction chain account pkHash spend =
                     []
                 | false -> 
                     [{spend={spend with amount=(collectedAmount - spend.amount)};lock=PK account.publicKeyHash}]
-        Ok (Transaction.sign {inputs=inputs; outputs=outputs; witnesses=[]; contract = None} keys)
+        Ok (Transaction.sign keys {inputs=inputs; outputs=outputs; witnesses=[]; contract = None})
             
-let getActivateContractTransaction account code =
+let createActivateContractTransaction account code =
     let input, output = Map.toSeq account.outpoints |> Seq.head
     let output' = {output with lock=PK account.publicKeyHash}
-    Ok (Transaction.sign {inputs=[ input ]; outputs=[ output' ]; witnesses=[]; contract = Some code} [ account.keyPair ])
+    Ok (Transaction.sign [ account.keyPair ] {inputs=[ input ]; outputs=[ output' ]; witnesses=[]; contract = Some code})
 
 let createRoot () =                
     let account = 
@@ -98,7 +98,7 @@ let createRoot () =
         
     handleTransaction Transaction.rootTxHash Transaction.rootTx account             
 
-let getExecuteContractTransaction client chain cHash data spends =
+let createExecuteContractTransaction client chain cHash data spends =
     let input = TxSkeleton.empty //TODO: create origin txskeleton
     input
     |> Messaging.Services.Blockchain.executeContract client cHash 
@@ -107,14 +107,4 @@ let getExecuteContractTransaction client chain cHash data spends =
     | TransactionResult.Error e -> Error e
     //TODO: use contract lock instead
     //TODO: sign the transaction
-    |> Result.map (fun tx ->
-        Transaction.addWitness (
-            ContractWitness {
-                cHash = cHash 
-                beginInputs = List.length input.pInputs
-                beginOutputs = List.length input.outputs
-                inputsLength = List.length tx.inputs
-                outputsLength = List.length tx.outputs }
-            ) tx
-    )
     //TODO: send publish command

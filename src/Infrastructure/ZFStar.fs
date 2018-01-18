@@ -10,6 +10,9 @@ let private changeExtention extention path = Path.ChangeExtension (path, extenti
 
 let private (/) a b = Path.Combine (a,b)
 
+let private error s = 
+    sprintf "%s: %s" s
+
 let private compile' code =
     //let code = code + """nopen MBrace.FsPickler.Combinators
     //let pickler = Pickler.auto<ZFStar.Contract>
@@ -44,8 +47,8 @@ let private compile' code =
         else
             errors
             |> Array.map (fun e -> e.ToString()) 
-            |> Array.append [|"compile:"|]
             |> String.concat " "
+            |> error "compile"
             |> Error
     with _ as ex ->
         Exception.toError "compile" ex
@@ -72,6 +75,7 @@ let private extract code moduleName =
                  "--include"; "zulib"
                  "--no_default_includes"; fn'original //fn'elabed;
                  "--odir"; oDir ]
+            |> Result.mapError (fun _ -> "extract")
             |> Result.bind (fun _ -> File.ReadAllText fn'extracted |> Ok)
         with _ as ex ->
             Exception.toError "extract" ex
@@ -79,5 +83,6 @@ let private extract code moduleName =
         Directory.Delete (oDir, true)
 
 let compile code moduleName = 
-    extract code ("Z" + moduleName)
+    "Z" + moduleName
+    |> extract code
     |> Result.bind compile'
