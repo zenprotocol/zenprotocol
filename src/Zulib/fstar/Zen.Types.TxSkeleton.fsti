@@ -49,8 +49,12 @@ val mint:
   -> txSkeleton
   -> txSkeleton `cost` 64
 
+(*
 val destroy:
   amount:U64.t
   -> contractHash
   -> txSkeleton
   -> txSkeleton `cost` 64
+*)
+
+val isValid: txSkeleton -> bool `cost` 64
