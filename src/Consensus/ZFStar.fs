@@ -59,42 +59,40 @@ let private fstToFsLock (outputLock:outputLock) : Types.Lock =
 let private fsToFstOutput (output:Types.Output) : output =
     { lock = fsToFstLock output.lock; spend = { asset = Hash.bytes output.spend.asset; amount = output.spend.amount }}
 
-let private fstToFsOutput (output:output) : Consensus.Types.Output =
+let private fstToFsOutput (output:output) : Types.Output =
     { lock = fstToFsLock output.lock; spend = { asset = Hash.Hash output.spend.asset; amount = output.spend.amount }}
 
-let private fstToFsOutpoint (a:outpoint) : Types.Outpoint =
-    { txHash = Hash.Hash a.txHash; index = a.index }
+let private fstToFsPointedOutput (outpoint, output) : PointedOutput =
+    { txHash = Hash.Hash outpoint.txHash; index = outpoint.index }, fstToFsOutput output
 
-let private fsToFstOutpoint (a:Types.Outpoint) : outpoint =
-    { txHash = Hash.bytes a.txHash; index = a.index }
+let private fsToFstPointedOutput (outpoint:Types.Outpoint, output) : pointedOutput =
+    { txHash = Hash.bytes outpoint.txHash; index = outpoint.index }, fsToFstOutput output
 
 let private vectorToList (z:Zen.Vector.t<'Aa, _>) : List<'Aa> =
      // 0I's are eraseable
      Zen.Vector.foldl 0I 0I (fun acc e -> Zen.Cost.Realized.ret (e::acc)) [] z 
      |> unCost
-     |> List.rev
+  //   |> List.rev
 
 let private listToVector (ls:List<'Aa>) : Zen.Vector.t<'Aa, _> =
     let len = List.length ls 
     let lsIndexed = List.mapi (fun i elem -> bigint (len - i - 1), elem) ls // vectors are reverse-zero-indexed
-    List.foldBack (fun (i,x) acc -> Zen.Vector.VCons (i, x, acc)) lsIndexed Zen.Vector.VNil
+  //  List.foldBack (fun (i,x) acc -> Zen.Vector.VCons (i, x, acc)) lsIndexed Zen.Vector.VNil
+    List.fold (fun acc (i,x) -> Zen.Vector.VCons (i, x, acc)) Zen.Vector.VNil lsIndexed
 
-let convertResult utxoSet (Tx (_, outpoints, _, outputs, _)) =
+let convertResult (Tx (_, pOutputs, _, outputs, _)) =
     let vectorToList f vector = List.map f (vectorToList vector)
-    let outpoints' = outpoints |> vectorToList fstToFsOutpoint
-    UtxoSet.getUtxos outpoints' utxoSet
-    |> Option.bind (
-        fun outputs' -> 
-            Some {
-                pInputs = List.zip outpoints' outputs'
-                outputs = vectorToList fstToFsOutput outputs
-            })
+    let pOutputs' = pOutputs |> vectorToList fstToFsPointedOutput
+    {
+        pInputs = pOutputs'
+        outputs = vectorToList fstToFsOutput outputs
+    }
 
 let convertInput txSkeleton =
     let listToVector f list = listToVector (List.map f list)
     Tx (
         bigint (List.length txSkeleton.pInputs), 
-        txSkeleton.pInputs |> List.map fst |> listToVector fsToFstOutpoint, 
+        txSkeleton.pInputs |> listToVector fsToFstPointedOutput, 
         bigint (List.length txSkeleton.outputs), 
         txSkeleton.outputs |> listToVector fsToFstOutput, 
         Native.option.None

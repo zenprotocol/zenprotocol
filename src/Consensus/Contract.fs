@@ -5,19 +5,19 @@ open System.Text
 open FsBech32
 open Hash
 open Consensus.TxSkeleton
-open Consensus.ZFStar
 open Infrastructure
+open ZFStar
 open Zen.Types.Extracted
 open Exception
 
-type ContractFn = Hash -> UtxoSet.T -> TxSkeleton -> Result<TxSkeleton,string>
+type ContractFn = Hash -> TxSkeleton -> Result<TxSkeleton,string>
 
 type T = {
     hash: Hash
     fn:   ContractFn
 }
 
-let private findMethod (assembly : Assembly) =
+let private findMethod (assembly:Assembly) =
     try
         assembly
             .GetModules().[0]
@@ -25,7 +25,7 @@ let private findMethod (assembly : Assembly) =
             .GetMethods().[0]
             |> Ok
     with _ as ex ->
-        Exception.toError "get method" ex
+        Exception.toError "get contract method" ex
 
 let private invoke (methodInfo:MethodInfo) cHash input = 
     try
@@ -39,17 +39,12 @@ let private castOutput (output:System.Object) =
     with _ as ex ->
         Exception.toError "cast contract output" ex
 
-let convertResult' set result = 
-    match convertResult set result with
-    | Some result -> Ok result  
-    | None -> Error "contract result is missing outputs"
-
-let private wrap (methodInfo : MethodInfo) : ContractFn =
-    fun (Hash.Hash cHash) set txSkeleton ->
+let private wrap methodInfo =
+    fun (Hash.Hash cHash) txSkeleton ->
         convertInput txSkeleton
         |> invoke methodInfo cHash
         |> Result.bind castOutput
-        |> Result.bind (convertResult' set)
+        |> Result.map convertResult
 
 let hash contract = contract.hash
 
@@ -58,7 +53,7 @@ let computeHash (code:string) =
     |> Encoding.UTF8.GetBytes
     |> Hash.compute
 
-let compile (code : string) : Result<T, string> =
+let compile code =
     let hash = computeHash code
 
     hash 
@@ -73,7 +68,7 @@ let compile (code : string) : Result<T, string> =
             fn = fn
         })                
 
-let run (contract : T) = 
+let run contract = 
     contract.fn contract.hash
     
 let load path (hash:Hash.Hash) : T = 
