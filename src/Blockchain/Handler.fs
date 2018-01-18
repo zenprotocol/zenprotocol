@@ -78,7 +78,6 @@ let handleRequest reply request session timestamp state =
     match request with
     | ExecuteContract (txSkeleton, cHash) ->
         TransactionHandler.executeContract txSkeleton cHash state.memoryState
-        |> Result.map Transaction.fromTxSkeleton
         |> function 
         | Result.Ok tx -> Ok tx
         | Result.Error err -> Error err
