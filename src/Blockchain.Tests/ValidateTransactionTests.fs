@@ -16,6 +16,7 @@ open Messaging.Events
 open Infrastructure
 open Consensus.Tests.ContractTests
 open Blockchain.State
+open Consensus.Tests.SampleContract
 
 open TestsInfrastructure.Nunit
 
@@ -211,7 +212,7 @@ let ``orphan transaction is eventually invalid``() =
         let output' = {output with spend = {amount = output.spend.amount - 1UL; asset = output.spend.asset}}
         let outputs = output' :: List.tail tx.outputs
         let tx' = { tx with outputs = outputs}
-        Transaction.sign tx' [account1.keyPair]
+        Transaction.sign [account1.keyPair] tx'
     let tx2Hash = Transaction.hash tx2
 
     // Sending orphan transaction first, which should be added to orphan list
@@ -308,7 +309,7 @@ let ``Valid contract should be added to ActiveContractSet``() =
     let cHash = getStringHash contractCode
 
     let tx =
-        match Account.getActivateContractTransaction rootAccount contractCode with
+        match Account.createActivateContractTransaction rootAccount contractCode with
             | Result.Ok tx ->
                 tx
             | _ ->
@@ -345,7 +346,7 @@ let ``Invalid contract should not be added to ActiveContractSet``() =
     let cHash = getStringHash contractCode
 
     let tx =
-        match Account.getActivateContractTransaction rootAccount contractCode with
+        match Account.createActivateContractTransaction rootAccount contractCode with
             | Result.Ok tx -> tx
             | _ -> failwith "couldn't get tx"
 
@@ -379,7 +380,7 @@ let ``Valid contract should execute``() =
     use session = DatabaseContext.createSession databaseContext
     let account = Account.createRoot ()
     let state = { state with memoryState = { state.memoryState with utxoSet = getSampleUtxoset utxoSet } }
-    Account.getActivateContractTransaction account sampleContractCode
+    Account.createActivateContractTransaction account sampleContractCode
     |> Result.map (fun tx ->
         Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
         |> Writer.unwrap)
@@ -391,10 +392,7 @@ let ``Valid contract should execute``() =
                 match result with
                 | TransactionResult.Ok tx -> Result.Ok tx
                 | TransactionResult.Error tx -> Result.Error tx
-            let expected = 
-                sampleContractExpectedResult
-                |> Result.map Transaction.fromTxSkeleton
-            shouldEqual (was, expected))
-            (ExecuteContract (sampleTxSkeleton, sampleContractHash)) state)
+            shouldEqual (was, sampleExpectedResult))
+            (ExecuteContract (sampleInputTx, sampleContractHash)) state)
     |> Result.mapError failwith
     |> ignore
