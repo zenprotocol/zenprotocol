@@ -2,7 +2,7 @@ image: mono:5.4
 
 before_script:
  - apt-get update
- - apt-get install -y -qq fsharp libgomp1 libstdc++6
+ - apt-get install -y -qq fsharp libgomp1 libstdc++6 liblmdb0
 
 build:
  stage: build
