@@ -10,7 +10,7 @@ open Blockchain
 open Blockchain.EffectsWriter
 open State
 
-let handleCommand chain command timestamp (state:State) =   
+let handleCommand chain command session timestamp (state:State) =   
     match command with
     | ValidateTransaction tx -> 
         effectsWriter {
@@ -49,32 +49,32 @@ let handleCommand chain command timestamp (state:State) =
             
         Writer.bind writer (fun () -> Writer.ret state)    
     | ValidateBlock block ->
-        BlockHandler.validateBlock chain timestamp block false state
+        BlockHandler.validateBlock chain session timestamp block false state
     | ValidateMinedBlock block -> 
-        BlockHandler.validateBlock chain timestamp block true state 
+        BlockHandler.validateBlock chain session timestamp block true state 
     | HandleTip header ->
-        BlockHandler.handleTip chain header state
+        BlockHandler.handleTip chain session header state
     | ValidateNewBlockHeader (peerId, header) ->
-        BlockHandler.handleNewBlockHeader chain peerId header state
+        BlockHandler.handleNewBlockHeader chain session peerId header state
     | GetTip peerId ->
         effectsWriter {
-            if state.tipState.tip <> PersistentBlock.empty then
+            if state.tipState.tip <> ExtendedBlockHeader.empty then
                 do! sendTip peerId state.tipState.tip.header
             
             return state                                                      
         } 
     | GetBlock (peerId, blockHash) ->
         effectsWriter {
-            match BlockRepository.tryFind state.blockRepository blockHash with
+            match BlockRepository.tryGetHeader session blockHash with
             | None -> return state
             | Some block -> 
-                let block = PersistentBlock.fetchBlock block
+                let block = BlockRepository.getFullBlock session block
                 do! sendBlock peerId block
                                 
                 return state          
         }
                                                     
-let handleRequest reply request timestamp state = 
+let handleRequest reply request session timestamp state = 
     match request with
     | ExecuteContract (txSkeleton, cHash) ->
         TransactionHandler.executeContract txSkeleton cHash state.memoryState
@@ -86,5 +86,5 @@ let handleRequest reply request timestamp state =
     | _ -> ()
     ret state
     
-let handleEvent event timestamp state = 
+let handleEvent event session timestamp state = 
     ret state

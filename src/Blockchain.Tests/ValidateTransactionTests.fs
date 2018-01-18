@@ -58,18 +58,19 @@ let state = {
         }
     tipState = 
         {
-            tip = PersistentBlock.empty
+            tip = ExtendedBlockHeader.empty
             utxoSet = utxoSet
             activeContractSet = acs
             ema=EMA.create chain
-    }
-    blockRepository = BlockRepository.create ()
+    }    
     blockRequests= Map.empty
 }
 
 [<Test>]
 let ``valid transaction raise events and update state``() =
-    let result = Handler.handleCommand chain (ValidateTransaction tx) 1UL state
+    use databaseContext = DatabaseContext.createEmpty "test"
+    use session = DatabaseContext.createSession databaseContext
+    let result = Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
 
     let events, state' = Writer.unwrap result
 
@@ -87,9 +88,12 @@ let ``valid transaction raise events and update state``() =
 
 [<Test>]
 let ``Invalid tx doesn't raise events or update state``() =
+    use databaseContext = DatabaseContext.createEmpty "test"
+    
+    use session = DatabaseContext.createSession databaseContext
     let invalidTx = {inputs=[];outputs=[];witnesses=[];contract=None}
 
-    let result = Handler.handleCommand chain (ValidateTransaction invalidTx) 1UL state
+    let result = Handler.handleCommand chain (ValidateTransaction invalidTx) session 1UL state
 
     let events, state' = Writer.unwrap result
 
@@ -107,7 +111,10 @@ let ``Invalid tx doesn't raise events or update state``() =
 
 [<Test>]
 let ``tx already in mempool nothing happen`` () =
-    let result = Handler.handleCommand chain (ValidateTransaction Transaction.rootTx) 1UL state
+    use databaseContext = DatabaseContext.createEmpty "test"
+    
+    use session = DatabaseContext.createSession databaseContext
+    let result = Handler.handleCommand chain (ValidateTransaction Transaction.rootTx) session 1UL state
 
     let events, state' = Writer.unwrap result
 
@@ -120,10 +127,13 @@ let ``tx already in mempool nothing happen`` () =
 
 [<Test>]
 let ``orphan tx added to orphan list``() =
+    use databaseContext = DatabaseContext.createEmpty "test"
+    
+    use session = DatabaseContext.createSession databaseContext
     let utxoSet = UtxoSet.create()
     let state = {state with memoryState={state.memoryState with utxoSet=utxoSet}}
 
-    let result = Handler.handleCommand chain (ValidateTransaction tx) 1UL state
+    let result = Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
 
     let events, state' = Writer.unwrap result
 
@@ -140,6 +150,9 @@ let ``orphan tx added to orphan list``() =
 
 [<Test>]
 let ``origin tx hit mempool, orphan tx should be added to mempool``() =
+    use databaseContext = DatabaseContext.createEmpty "test"
+    
+    use session = DatabaseContext.createSession databaseContext
     let rootAccount = Account.createRoot ()
     let account1 = Account.create ()
     let account2 = Account.create ()
@@ -153,7 +166,7 @@ let ``origin tx hit mempool, orphan tx should be added to mempool``() =
     let tx2Hash = Transaction.hash tx2
 
     // Sending orphan transaction first, which should be added to orphan list
-    let result = Handler.handleCommand chain (ValidateTransaction tx2) 1UL state
+    let result = Handler.handleCommand chain (ValidateTransaction tx2) session 1UL state
     let events, state' = Writer.unwrap result
 
     // Checking that the transaction is only in the mempool and no event were raised
@@ -163,7 +176,7 @@ let ``origin tx hit mempool, orphan tx should be added to mempool``() =
     OrphanPool.containsTransaction tx2Hash state'.memoryState.orphanPool |> should equal true
 
     // Sending origin, which should cause both transaction to be added to the mempool
-    let result' = Handler.handleCommand chain (ValidateTransaction tx1) 1UL state'
+    let result' = Handler.handleCommand chain (ValidateTransaction tx1) session 1UL state'
     let events', state'' = Writer.unwrap result'
 
     // Checking that both transaction added to mempool and published
@@ -179,6 +192,9 @@ let ``origin tx hit mempool, orphan tx should be added to mempool``() =
 
 [<Test>]
 let ``orphan transaction is eventually invalid``() =
+    use databaseContext = DatabaseContext.createEmpty "test"
+    
+    use session = DatabaseContext.createSession databaseContext
     let rootAccount = Account.createRoot ()
     let account1 = Account.create ()
     let account2 = Account.create ()
@@ -199,7 +215,7 @@ let ``orphan transaction is eventually invalid``() =
     let tx2Hash = Transaction.hash tx2
 
     // Sending orphan transaction first, which should be added to orphan list
-    let result = Handler.handleCommand chain (ValidateTransaction tx2) 1UL state
+    let result = Handler.handleCommand chain (ValidateTransaction tx2) session 1UL state
     let events, state' = Writer.unwrap result
 
     // Checking that the transaction is only in the mempool and no event were raised
@@ -209,7 +225,7 @@ let ``orphan transaction is eventually invalid``() =
     OrphanPool.containsTransaction tx2Hash state'.memoryState.orphanPool |> should equal true
 
      // Sending origin, which should cause orphan transaction to be rejected and removed from orphan list
-    let result' = Handler.handleCommand chain (ValidateTransaction tx1) 1UL state'
+    let result' = Handler.handleCommand chain (ValidateTransaction tx1) session 1UL state'
     let events', state'' = Writer.unwrap result'
 
     // Checking that the origin tx is published and orphan removed as invalid
@@ -224,6 +240,9 @@ let ``orphan transaction is eventually invalid``() =
 
 [<Test>]
 let ``two orphan transaction spending same input``() =
+    use databaseContext = DatabaseContext.createEmpty "test"
+    
+    use session = DatabaseContext.createSession databaseContext
     let rootAccount = Account.createRoot ()
     let account1 = Account.create ()
     let account2 = Account.create ()
@@ -246,9 +265,9 @@ let ``two orphan transaction spending same input``() =
 
     // Sending both tx2 and tx3, both should be added to orphan pool
     let result =
-        Handler.handleCommand chain (ValidateTransaction tx2) 1UL state
+        Handler.handleCommand chain (ValidateTransaction tx2) session 1UL state
         >>=
-        Handler.handleCommand chain (ValidateTransaction tx3) 1UL
+        Handler.handleCommand chain (ValidateTransaction tx3) session 1UL
 
     let events, state' = Writer.unwrap result
 
@@ -262,7 +281,7 @@ let ``two orphan transaction spending same input``() =
     OrphanPool.containsTransaction tx3Hash state'.memoryState.orphanPool |> should equal true
 
     // Sending origin, which should pick one of the transactions (we cannot know which one, for now at least)
-    let result' = Handler.handleCommand chain (ValidateTransaction tx1) 1UL state'
+    let result' = Handler.handleCommand chain (ValidateTransaction tx1) session 1UL state'
     let events', state'' = Writer.unwrap result'
 
     // Checking that both transaction added to mempool and published
@@ -281,6 +300,9 @@ let ``two orphan transaction spending same input``() =
 
 [<Test>]
 let ``Valid contract should be added to ActiveContractSet``() =
+    use databaseContext = DatabaseContext.createEmpty "test"
+    
+    use session = DatabaseContext.createSession databaseContext
     let rootAccount = Account.createRoot ()
     let contractCode = "val test: nat -> nat\nlet test i = i + 1"
     let cHash = getStringHash contractCode
@@ -295,7 +317,7 @@ let ``Valid contract should be added to ActiveContractSet``() =
     let txHash = Transaction.hash tx
 
     let result =
-        Handler.handleCommand chain (ValidateTransaction tx) 1UL state
+        Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
 
     let events, state' = Writer.unwrap result
 
@@ -315,6 +337,9 @@ let ``Valid contract should be added to ActiveContractSet``() =
 
 [<Test>]
 let ``Invalid contract should not be added to ActiveContractSet``() =
+    use databaseContext = DatabaseContext.createEmpty "test"
+    
+    use session = DatabaseContext.createSession databaseContext
     let rootAccount = Account.createRoot ()
     let contractCode = "x"
     let cHash = getStringHash contractCode
@@ -327,7 +352,7 @@ let ``Invalid contract should not be added to ActiveContractSet``() =
     let txHash = Transaction.hash tx
 
     let result =
-        Handler.handleCommand chain (ValidateTransaction tx) 1UL state
+        Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
 
     let events, state' = Writer.unwrap result
     
@@ -349,11 +374,14 @@ let ``Invalid contract should not be added to ActiveContractSet``() =
 
 [<Test>]
 let ``Valid contract should execute``() =
+    use databaseContext = DatabaseContext.createEmpty "test"
+    
+    use session = DatabaseContext.createSession databaseContext
     let account = Account.createRoot ()
     let state = { state with memoryState = { state.memoryState with utxoSet = getSampleUtxoset utxoSet } }
     Account.getActivateContractTransaction account sampleContractCode
     |> Result.map (fun tx ->
-        Handler.handleCommand chain (ValidateTransaction tx) 1UL state
+        Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
         |> Writer.unwrap)
     |> Result.map (fun (_, state) ->
         ActiveContractSet.containsContract sampleContractHash state.memoryState.activeContractSet

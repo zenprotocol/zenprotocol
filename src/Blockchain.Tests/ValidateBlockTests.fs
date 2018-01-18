@@ -50,7 +50,7 @@ let acs = ActiveContractSet.empty
 let ema = EMA.create chain
 let genesisBlock = Block.createGenesis chain [Transaction.rootTx] (0UL,0UL)    
 
-let getState () = {
+let state = {
     memoryState = {
         utxoSet=utxoSet
         mempool=mempool
@@ -58,12 +58,11 @@ let getState () = {
         activeContractSet=acs
     }
     tipState = {
-       tip = PersistentBlock.empty
+       tip = ExtendedBlockHeader.empty
        utxoSet=utxoSet
        activeContractSet=acs
        ema=ema
     }
-    blockRepository = BlockRepository.create ()
     blockRequests= Map.empty
 }
          
@@ -96,27 +95,35 @@ let createChainFromGenesis length nonce =
     let ema = EMA.add chain genesisBlock.header.timestamp ema
     createChain length nonce genesisBlock ema rootAccount
     
-let getGenesisState () =     
-    BlockHandler.validateBlock chain timestamp genesisBlock false (getState ())
+let getGenesisState session =         
+    BlockHandler.validateBlock chain session timestamp genesisBlock false state
     |> Writer.unwrap
     |> snd         
     
-let validateChain blocks state = 
+let validateChain session blocks state = 
     List.fold (fun (_,state) block ->         
-        BlockHandler.validateBlock chain block.header.timestamp block false state
+        BlockHandler.validateBlock chain session block.header.timestamp block false state
         |> Writer.unwrap) ([], state) blocks                    
             
 [<Test>]
 let ``genesis block accepted``() = 
-    let state = getState()
+    use databaseContext = DatabaseContext.createEmpty "test"
+    use session = DatabaseContext.createSession databaseContext
+    
     let block = Block.createGenesis chain [Transaction.rootTx] (0UL,0UL)
     
     let events, state' = 
-        BlockHandler.validateBlock chain timestamp block false state
+        BlockHandler.validateBlock chain session timestamp block false state
         |> Writer.unwrap
         
     events |> should haveLength 1
     events |> should contain (EffectsWriter.EventEffect (BlockAdded block))
+    
+    BlockRepository.tryGetTip session 
+    |> should equal (Some (state'.tipState.tip,
+                           state'.tipState.utxoSet,
+                           state'.tipState.activeContractSet,
+                           state'.tipState.ema))
     
     state'.tipState.tip.header |> should equal block.header
     state'.tipState.utxoSet |> should equal state'.memoryState.utxoSet
@@ -125,24 +132,27 @@ let ``genesis block accepted``() =
                                    
 [<Test>]    
 let ``wrong genesis block should be rejected``() = 
-    let state = getState()
+    use databaseContext = DatabaseContext.createEmpty "test"
+    
+    use session = DatabaseContext.createSession databaseContext
     let block = Block.createGenesis chain [Transaction.rootTx] (0UL,1UL)    
     let events, state' = 
-        BlockHandler.validateBlock chain timestamp block false state
+        BlockHandler.validateBlock chain session timestamp block false state
         |> Writer.unwrap
         
-    events |> should haveLength 0    
-    state'.tipState.tip |> should equal PersistentBlock.empty
+    events |> should haveLength 0
+    state'.tipState.tip |> should equal ExtendedBlockHeader.empty
     state'.tipState.utxoSet |> should equal state'.memoryState.utxoSet
     state'.tipState.activeContractSet |> should equal state'.memoryState.activeContractSet
     areOutpointsInSet rootTxOutpoints state'.tipState.utxoSet |> should equal false 
     
 [<Test>]
 let ``validate new valid block which extended main chain``() =
-    let state = getState() 
+    use databaseContext = DatabaseContext.createEmpty "test"
+    use session = DatabaseContext.createSession databaseContext
                    
     let _, state =
-        BlockHandler.validateBlock chain timestamp genesisBlock false state         
+        BlockHandler.validateBlock chain session timestamp genesisBlock false state         
         |> Writer.unwrap  
         
     let tx = createTransaction rootAccount
@@ -150,16 +160,22 @@ let ``validate new valid block which extended main chain``() =
     
     // Mark the block as new so we will also have network command
     let _, state = 
-        BlockHandler.handleNewBlockHeader chain (Array.empty) block.header state
+        BlockHandler.handleNewBlockHeader chain session (Array.empty) block.header state
         |> Writer.unwrap        
         
     let events, state' = 
-        BlockHandler.validateBlock chain timestamp block false state
+        BlockHandler.validateBlock chain session timestamp block false state
         |> Writer.unwrap         
         
     events |> should haveLength 2
     events |> should contain (EffectsWriter.EventEffect (BlockAdded block))
     events |> should contain (EffectsWriter.NetworkCommand (PublishBlock block.header))
+
+    BlockRepository.tryGetTip session 
+    |> should equal (Some (state'.tipState.tip,
+                           state'.tipState.utxoSet,
+                           state'.tipState.activeContractSet,
+                           state'.tipState.ema))
 
     state'.tipState.tip.header |> should equal block.header
     state'.tipState.utxoSet |> should equal state'.memoryState.utxoSet
@@ -169,10 +185,11 @@ let ``validate new valid block which extended main chain``() =
      
 [<Test>]
 let ``validate new invalid block which try to extended main chain``() = 
-    let state = getState()
+    use databaseContext = DatabaseContext.createEmpty "test"
+    use session = DatabaseContext.createSession databaseContext
                    
     let _, state =
-        BlockHandler.validateBlock chain timestamp genesisBlock false state         
+        BlockHandler.validateBlock chain session timestamp genesisBlock false state         
         |> Writer.unwrap  
         
     let tx = createTransaction rootAccount
@@ -181,11 +198,11 @@ let ``validate new invalid block which try to extended main chain``() =
     
     // Mark the block as new so we will also have network command
     let _, state = 
-        BlockHandler.handleNewBlockHeader chain (Array.empty) block.header state
+        BlockHandler.handleNewBlockHeader chain session (Array.empty) block.header state
         |> Writer.unwrap        
         
     let events, state' = 
-        BlockHandler.validateBlock chain timestamp block false state
+        BlockHandler.validateBlock chain session timestamp block false state
         |> Writer.unwrap
         
     events |> should haveLength 0    
@@ -198,19 +215,21 @@ let ``validate new invalid block which try to extended main chain``() =
     
 [<Test>]
 let ``validating orphan block yield a request for block from network``() = 
-    let state = getState() 
+    use databaseContext = DatabaseContext.createEmpty "test"
+    
+    use session = DatabaseContext.createSession databaseContext 
         
     let tx = createTransaction rootAccount
     let block = Block.createTemplate genesisBlock.header timestamp state.tipState.ema acs [tx]
     
     let events, state' = 
-        BlockHandler.validateBlock chain timestamp block false state
+        BlockHandler.validateBlock chain session timestamp block false state
         |> Writer.unwrap         
         
     events |> should haveLength 1    
     events |> should contain (EffectsWriter.NetworkCommand (GetBlock block.header.parent))
 
-    state'.tipState.tip |> should equal PersistentBlock.empty
+    state'.tipState.tip |> should equal ExtendedBlockHeader.empty
     state'.tipState.utxoSet |> should equal state'.memoryState.utxoSet
     state'.tipState.activeContractSet |> should equal state'.memoryState.activeContractSet
     areOutpointsInSet rootTxOutpoints state'.tipState.utxoSet |> should equal false     
@@ -218,7 +237,9 @@ let ``validating orphan block yield a request for block from network``() =
     
 [<Test>]
 let ``validate new block which connect orphan chain which extend main chain``() = 
-    let state = getState() 
+    use databaseContext = DatabaseContext.createEmpty "test"
+    
+    use session = DatabaseContext.createSession databaseContext
         
     let tx = createTransaction rootAccount
          
@@ -227,17 +248,23 @@ let ``validate new block which connect orphan chain which extend main chain``() 
     
     // Sending orphan block first
     let _, state = 
-        BlockHandler.validateBlock chain timestamp block false state
+        BlockHandler.validateBlock chain session timestamp block false state
         |> Writer.unwrap         
         
     // Now sending the genesis, which should roll forward the chain
     let events, state' = 
-        BlockHandler.validateBlock chain timestamp genesisBlock false state
+        BlockHandler.validateBlock chain session timestamp genesisBlock false state
         |> Writer.unwrap   
         
     events |> should haveLength 2
     events |> should contain (EffectsWriter.EventEffect (BlockAdded genesisBlock))
     events |> should contain (EffectsWriter.EventEffect (BlockAdded block))
+       
+    BlockRepository.tryGetTip session 
+    |> should equal (Some (state'.tipState.tip,
+                           state'.tipState.utxoSet,
+                           state'.tipState.activeContractSet,
+                           state'.tipState.ema))       
        
     state'.tipState.tip.header |> should equal block.header
     state'.tipState.utxoSet |> should equal state'.memoryState.utxoSet
@@ -247,17 +274,20 @@ let ``validate new block which connect orphan chain which extend main chain``() 
     
 [<Test>]
 let ``validate new block which connect orphan chain which is not long enough to become main chain``() = 
-    let state = getGenesisState ()
+    use databaseContext = DatabaseContext.createEmpty "test"
+    
+    use session = DatabaseContext.createSession databaseContext    
+    let state = getGenesisState session
     
     let mainChain,account = createChainFromGenesis 3 0UL
     let alternativeChain, sideChainAccount = createChainFromGenesis 2 1UL
     
     // validate main chain first
-    let _,state = validateChain mainChain state
+    let _,state = validateChain session mainChain state
     
     // now validating orphan chain which is not long enough
     // we reverse the order of block in order to make it orphan first
-    let events ,state = validateChain (List.rev alternativeChain) state
+    let events ,state = validateChain session (List.rev alternativeChain) state
     
     let tip = List.last mainChain
     
@@ -270,19 +300,28 @@ let ``validate new block which connect orphan chain which is not long enough to 
 
 [<Test>]
 let ``orphan chain become longer than main chain``() = 
-    let state = getGenesisState ()
+    use databaseContext = DatabaseContext.createEmpty "test"
+    
+    use session = DatabaseContext.createSession databaseContext    
+    let state = getGenesisState session
         
     let mainChain, account = createChainFromGenesis 3 0UL
     let alternativeChain, sideChainAccount = createChainFromGenesis 2 1UL
     
     // validate main chain first
-    let _,state = validateChain alternativeChain state
+    let _,state = validateChain session alternativeChain state
     
     // now validating orphan chain which is longer
     // we reverse the order of block in order to make it orphan first
-    let events,state = validateChain (List.rev mainChain) state
+    let events,state = validateChain session (List.rev mainChain) state
     
     let tip = List.last mainChain
+    
+    BlockRepository.tryGetTip session 
+    |> should equal (Some (state.tipState.tip,
+                           state.tipState.utxoSet,
+                           state.tipState.activeContractSet,
+                           state.tipState.ema))    
     
     events |> should haveLength 5
     events.[0] |> should equal (EffectsWriter.EventEffect (BlockRemoved alternativeChain.[0]))
@@ -299,17 +338,20 @@ let ``orphan chain become longer than main chain``() =
 
 [<Test>]
 let ``new block extend fork chain which become longest``() = 
-    let state = getGenesisState ()
+    use databaseContext = DatabaseContext.createEmpty "test"
+    
+    use session = DatabaseContext.createSession databaseContext    
+    let state = getGenesisState session
         
     let mainChain, account = createChainFromGenesis 2 0UL
     let alternativeChain, sideChainAccount = createChainFromGenesis 1 1UL
     
     // validate main chain first
-    let _,state = validateChain alternativeChain state
+    let _,state = validateChain session alternativeChain state
     
     // now validating orphan chain which is longer
     // we reverse the order of block in order to make it orphan first
-    let events,state = validateChain mainChain state
+    let events,state = validateChain session mainChain state
     
     let tip = List.last mainChain
     
@@ -327,7 +369,10 @@ let ``new block extend fork chain which become longest``() =
 
 [<Test>]
 let ``2 orphan chains, one become longer than main chain``() = 
-    let state = getGenesisState ()
+    use databaseContext = DatabaseContext.createEmpty "test"
+    
+    use session = DatabaseContext.createSession databaseContext    
+    let state = getGenesisState session
     let orphanChain, orphanAccount =
         createChainFromGenesis 1 1UL
     let orphanBlock = List.head orphanChain
@@ -339,10 +384,10 @@ let ``2 orphan chains, one become longer than main chain``() =
     let sideChain2, sideChainAccount = createChain 2 3UL orphanBlock orphanEMA orphanAccount
     
     // validate all chains    
-    let _,state = validateChain mainChain state        
-    let _,state = validateChain sideChain1 state         
-    let _,state = validateChain sideChain2 state        
-    let events, state = validateChain orphanChain state
+    let _,state = validateChain session mainChain state        
+    let _,state = validateChain session sideChain1 state         
+    let _,state = validateChain session sideChain2 state        
+    let events, state = validateChain session orphanChain state
               
     let tip = List.last sideChain2
     
@@ -361,7 +406,10 @@ let ``2 orphan chains, one become longer than main chain``() =
     
 [<Test>]
 let ``2 orphan chains, two longer than main, one is longer``() = 
-    let state = getGenesisState ()
+    use databaseContext = DatabaseContext.createEmpty "test"
+    
+    use session = DatabaseContext.createSession databaseContext    
+    let state = getGenesisState session
     let orphanChain, orphanAccount =
         createChainFromGenesis 1 1UL
     let orphanBlock = List.head orphanChain
@@ -373,10 +421,10 @@ let ``2 orphan chains, two longer than main, one is longer``() =
     let sideChain2, sideChainAccount = createChain 3 3UL orphanBlock orphanEMA orphanAccount
     
     // validate all chains    
-    let _,state = validateChain mainChain state        
-    let _,state = validateChain sideChain1 state         
-    let _,state = validateChain sideChain2 state        
-    let events, state = validateChain orphanChain state
+    let _,state = validateChain session mainChain state        
+    let _,state = validateChain session sideChain1 state         
+    let _,state = validateChain session sideChain2 state        
+    let events, state = validateChain session orphanChain state
               
     let tip = List.last sideChain2
     
@@ -396,7 +444,10 @@ let ``2 orphan chains, two longer than main, one is longer``() =
     
 [<Test>]
 let ``2 orphan chains, two longer than main, longest is invalid, shuld pick second long``() = 
-    let state = getGenesisState ()
+    use databaseContext = DatabaseContext.createEmpty "test"
+    
+    use session = DatabaseContext.createSession databaseContext    
+    let state = getGenesisState session
     let orphanChain, orphanAccount =
         createChainFromGenesis 1 1UL
     let orphanBlock = List.head orphanChain
@@ -410,10 +461,10 @@ let ``2 orphan chains, two longer than main, longest is invalid, shuld pick seco
     let sideChain2, sideChainAccount = createChain 2 3UL orphanBlock orphanEMA orphanAccount        
     
     // validate all chains    
-    let _,state = validateChain mainChain state        
-    let _,state = validateChain sideChain1 state         
-    let _,state = validateChain sideChain2 state        
-    let events, state = validateChain orphanChain state
+    let _,state = validateChain session mainChain state        
+    let _,state = validateChain session sideChain1 state         
+    let _,state = validateChain session sideChain2 state        
+    let events, state = validateChain session orphanChain state
               
     let tip = List.last sideChain2
     
@@ -432,7 +483,10 @@ let ``2 orphan chains, two longer than main, longest is invalid, shuld pick seco
     
 [<Test>]
 let ``transaction in mempool and not in next block stays in mempool``() =    
-    let state = getGenesisState ()
+    use databaseContext = DatabaseContext.createEmpty "test"
+    
+    use session = DatabaseContext.createSession databaseContext    
+    let state = getGenesisState session
     let chain,account = createChainFromGenesis 1 0UL
     let tx1 = createTransaction rootAccount 
     let tx2 = createTransaction account
@@ -453,7 +507,7 @@ let ``transaction in mempool and not in next block stays in mempool``() =
         state with memoryState = {state.memoryState with utxoSet=utxoSet;mempool=mempool}
     }
     
-    let _, state = validateChain chain state
+    let _, state = validateChain session chain state
 
     Map.containsKey txHash2 state.memoryState.mempool  |> should equal true        
     Map.containsKey txHash1 state.memoryState.mempool  |> should equal false
@@ -464,7 +518,10 @@ let ``transaction in mempool and not in next block stays in mempool``() =
 
 [<Test>]
 let ``orphan transactions added to mempool after origin tx found in block``() =
-    let state = getGenesisState ()
+    use databaseContext = DatabaseContext.createEmpty "test"
+    
+    use session = DatabaseContext.createSession databaseContext    
+    let state = getGenesisState session
     let chain,account = createChainFromGenesis 1 0UL     
     let tx1 = createTransaction account    
     let txHash1 = Transaction.hash tx1
@@ -482,7 +539,7 @@ let ``orphan transactions added to mempool after origin tx found in block``() =
         state with memoryState = {state.memoryState with orphanPool=orphanPool}
     }
     
-    let _, state = validateChain chain state       
+    let _, state = validateChain session chain state       
 
     Map.containsKey txHash1 state.memoryState.mempool |> should equal true           
     Map.containsKey txHash2 state.memoryState.mempool |> should equal true
@@ -495,7 +552,10 @@ let ``orphan transactions added to mempool after origin tx found in block``() =
     
 [<Test>]    
 let ``validate new block header should ask for block``() = 
-    let state = getGenesisState ()    
+    use databaseContext = DatabaseContext.createEmpty "test"
+    
+    use session = DatabaseContext.createSession databaseContext    
+    let state = getGenesisState session    
     
     let block = 
         createChainFromGenesis 1 0UL
@@ -503,7 +563,7 @@ let ``validate new block header should ask for block``() =
         |> List.head
                 
     let events, _ = 
-        BlockHandler.handleNewBlockHeader chain Array.empty block.header state
+        BlockHandler.handleNewBlockHeader chain session Array.empty block.header state
         |> Writer.unwrap
         
     events |> should haveLength 1
@@ -511,7 +571,10 @@ let ``validate new block header should ask for block``() =
     
 [<Test>]    
 let ``validate new block header which we already asked for``() = 
-    let state = getGenesisState ()    
+    use databaseContext = DatabaseContext.createEmpty "test"
+    
+    use session = DatabaseContext.createSession databaseContext    
+    let state = getGenesisState session    
     
     let block = 
         createChainFromGenesis 1 0UL
@@ -519,17 +582,20 @@ let ``validate new block header which we already asked for``() =
         |> List.head
                 
     let _, state = 
-        BlockHandler.handleNewBlockHeader chain Array.empty block.header state
+        BlockHandler.handleNewBlockHeader chain session Array.empty block.header state
         |> Writer.unwrap
     let events, _ = 
-        BlockHandler.handleNewBlockHeader chain Array.empty block.header state
+        BlockHandler.handleNewBlockHeader chain session Array.empty block.header state
         |> Writer.unwrap    
         
     events |> should haveLength 0    
     
 [<Test>]    
 let ``new block should publish to network``() = 
-    let state = getGenesisState ()    
+    use databaseContext = DatabaseContext.createEmpty "test"
+    
+    use session = DatabaseContext.createSession databaseContext    
+    let state = getGenesisState session    
         
     let block = 
         createChainFromGenesis 1 0UL
@@ -537,17 +603,20 @@ let ``new block should publish to network``() =
         |> List.head
                 
     let _, state = 
-        BlockHandler.handleNewBlockHeader chain Array.empty block.header state
+        BlockHandler.handleNewBlockHeader chain session Array.empty block.header state
         |> Writer.unwrap
     let events, _ =
-        BlockHandler.validateBlock chain timestamp block false state
+        BlockHandler.validateBlock chain session timestamp block false state
         |> Writer.unwrap
             
     events |> should contain (EffectsWriter.NetworkCommand (PublishBlock block.header))
     
 [<Test>]    
 let ``mined block should publish to network``() = 
-    let state = getGenesisState ()    
+    use databaseContext = DatabaseContext.createEmpty "test"
+    
+    use session = DatabaseContext.createSession databaseContext    
+    let state = getGenesisState session    
         
     let block = 
         createChainFromGenesis 1 0UL
@@ -555,14 +624,17 @@ let ``mined block should publish to network``() =
         |> List.head
                 
     let events, _ =
-        BlockHandler.validateBlock chain timestamp block true state
+        BlockHandler.validateBlock chain session timestamp block true state
         |> Writer.unwrap
             
     events |> should contain (EffectsWriter.NetworkCommand (PublishBlock block.header))
     
 [<Test>]    
 let ``validate new tip should ask for block``() = 
-    let state = getGenesisState ()    
+    use databaseContext = DatabaseContext.createEmpty "test"
+    
+    use session = DatabaseContext.createSession databaseContext    
+    let state = getGenesisState session    
     
     let block = 
         createChainFromGenesis 1 0UL
@@ -570,7 +642,7 @@ let ``validate new tip should ask for block``() =
         |> List.head
                 
     let events, _ = 
-        BlockHandler.handleTip chain block.header state
+        BlockHandler.handleTip chain session block.header state
         |> Writer.unwrap
         
     events |> should haveLength 1
@@ -578,7 +650,10 @@ let ``validate new tip should ask for block``() =
     
 [<Test>]    
 let ``validate new tip which we already asked for``() = 
-    let state = getGenesisState ()    
+    use databaseContext = DatabaseContext.createEmpty "test"
+    
+    use session = DatabaseContext.createSession databaseContext    
+    let state = getGenesisState session    
     
     let block = 
         createChainFromGenesis 1 0UL
@@ -586,17 +661,20 @@ let ``validate new tip which we already asked for``() =
         |> List.head
                 
     let _, state = 
-        BlockHandler.handleTip chain block.header state
+        BlockHandler.handleTip chain session block.header state
         |> Writer.unwrap
     let events, _ = 
-        BlockHandler.handleTip chain block.header state
+        BlockHandler.handleTip chain session block.header state
         |> Writer.unwrap    
         
     events |> should haveLength 0   
     
 [<Test>]    
 let ``tip block should not be publish to network``() = 
-    let state = getGenesisState ()    
+    use databaseContext = DatabaseContext.createEmpty "test"
+    
+    use session = DatabaseContext.createSession databaseContext    
+    let state = getGenesisState session    
         
     let block = 
         createChainFromGenesis 1 0UL
@@ -604,10 +682,10 @@ let ``tip block should not be publish to network``() =
         |> List.head
                 
     let _, state = 
-        BlockHandler.handleTip chain block.header state
+        BlockHandler.handleTip chain session block.header state
         |> Writer.unwrap
     let events, _ =
-        BlockHandler.validateBlock chain timestamp block false state
+        BlockHandler.validateBlock chain session timestamp block false state
         |> Writer.unwrap
             
     events |> should not' (contain (EffectsWriter.NetworkCommand (PublishBlock block.header)))  

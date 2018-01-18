@@ -39,9 +39,9 @@ let isGenesis chain block =
     
     ChainParameters.getGenesisHash chain = blockHash
         
-let getChainWork (prevWork:bigint) block = 
+let getChainWork (prevWork:bigint) header = 
     let target = 
-        Difficulty.uncompress block.difficulty
+        Difficulty.uncompress header.difficulty
         |> Hash.toBigInt         
         
     let proof = bigint.Divide (TwoPow256, target + 1I)

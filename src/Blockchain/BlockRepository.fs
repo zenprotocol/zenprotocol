@@ -5,39 +5,84 @@ open Blockchain
 open Consensus
 open Consensus
 open Consensus.Types
-open PersistentBlock
+open DataAccess
+open MBrace.FsPickler.Combinators
+open Blockchain.DatabaseContext
+                             
+let contains session blockHash = 
+    Collection.containsKey session.context.blocks session.session blockHash                              
+                             
+let tryGetHeader session hash = 
+    Collection.tryGet session.context.blocks session.session hash
 
-type T = {
-        mutable blocks: Map<Hash.Hash, PersistentBlock.T>
-    }
+let getHeader session hash = 
+    Collection.get session.context.blocks session.session hash        
         
-let create () = 
+let saveHeader session (block:ExtendedBlockHeader.T) =
+    // TODO: save transactions
+    Collection.put session.context.blocks session.session block.hash block
+
+let getFullBlock session (block:ExtendedBlockHeader.T) =      
+    let transactions = 
+        Collection.get session.context.blockTransactions session.session block.hash
+        |> Seq.map (Collection.get session.context.transactions session.session)
+        |> Seq.toList
+        
     {
-        blocks=Map.empty
-    }        
-        
-let update (blockRepository:T) block =
-    blockRepository.blocks <- Map.add block.hash block blockRepository.blocks
-    Writer.ret ()
-        
-let insert = update
+        header=block.header
+        txMerkleRoot=block.txMerkleRoot
+        witnessMerkleRoot=block.witnessMerkleRoot
+        activeContractSetMerkleRoot=block.activeContractSetMerkleRoot
+        commitments=block.commitments
+        transactions=transactions
+    }   
+
+let saveFullBlock session blockHash (block:Block) = 
+    let transactions = 
+        block.transactions
+        |> List.map Transaction.hash
+        |> List.zip block.transactions
     
-let tryFind (blockRepository:T) hash : PersistentBlock.T option = 
-    Map.tryFind hash blockRepository.blocks
+    // Save all transactions
+    List.iter (fun (tx,txHash) -> Collection.put session.context.transactions session.session txHash tx) transactions 
+    
+    List.map snd transactions 
+    |> List.toSeq
+    |> Collection.put session.context.blockTransactions session.session blockHash
 
-let findParent (blockRepository:T) block : PersistentBlock.T = 
-    Map.find block.header.parent blockRepository.blocks 
+let saveBlockState session blockHash (utxoSet:UtxoSet.T) (acs:ActiveContractSet.T) ema = 
+    let blockState = 
+        {
+            ema = ema
+            utxoSet = utxoSet
+            activeContractSet = ActiveContractSet.getContractHashes acs
+        }         
+        
+    Collection.put session.context.blockState session.session blockHash blockState        
 
-//let findTip (blockRepository:T) : PersistentBlock.T  = failwith ""
-
-let getBlockChildren (blockRepository:T) (block:PersistentBlock.T) : PersistentBlock.T list = 
-    Map.filter (fun _ b -> b.header.parent = block.hash) blockRepository.blocks
-    |> Map.toList 
-    |> List.map snd
-
-let exist (blockRepository:T) blockHash = 
-    Map.containsKey blockHash blockRepository.blocks
-
-let findHeader blockRepository (hash:Hash.Hash) : BlockHeader = 
-    let block = Map.find hash blockRepository.blocks
-    block.header
+let getBlockState session blockHash =        
+    let blockState = Collection.get session.context.blockState session.session blockHash     
+    
+    let acs =  
+        blockState.activeContractSet
+        |> Seq.map (fun cHash -> cHash,Contract.load session.context.contractPath cHash)
+        |> Seq.toArray
+        |> SparseMerkleTree.addMultiple ActiveContractSet.empty 
+        
+    blockState.utxoSet,acs,blockState.ema                    
+    
+let getBlockChildren session (block:ExtendedBlockHeader.T) = 
+    Index.getAll session.context.blockChildrenIndex session.session block.hash             
+    
+let tryGetTip session = 
+    match SingleValue.tryGet session.context.tip session.session with
+    | Some blockHash -> 
+        let header = getHeader session blockHash  
+        let utxoSet,acs,ema = getBlockState session blockHash
+        
+        Some (header,utxoSet,acs,ema)
+    | None -> None                  
+    
+let updateTip session blockHash = 
+    SingleValue.put session.context.tip session.session blockHash     
+        
