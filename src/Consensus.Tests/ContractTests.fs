@@ -60,7 +60,7 @@ let ``Contract generated transaction should be valid``() =
     |> shouldEqual
 
 [<Test>]
-let ``Contract should not be able to create not it's own tokens``() = 
+let ``Contract should not be able to create tokens other than its own``() = 
     (compileRunAndValidate
          """
          open Zen.Types

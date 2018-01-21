@@ -173,7 +173,7 @@ let connect chain parent timestamp set acs ema =
             Error "incorrect proof of work" 
         elif isGenesis chain block then 
             Ok (block,nextEma)
-        elif block.header.timestamp <= EMA.median chain ema.delayed then
+        elif block.header.timestamp <= EMA.earliest ema then
             Error "block's timestamp is too early"
         elif block.header.timestamp > timestamp + MaxTimeInFuture then
             Error "block timestamp too far in the future"    

@@ -104,7 +104,7 @@ let ``connecting block should fail when transaction inputs are invalid``(parent:
 [<Test>]    
 let ``block timestamp too early``() =
     let ema = {
-        (EMA.create Chain.Test) with delayed = [timestamp-1UL;timestamp; timestamp+1UL]
+        (EMA.create Chain.Test) with delayed = [timestamp-5UL .. timestamp+5UL]
     }
         
     let rootAccount = Account.createRoot ()

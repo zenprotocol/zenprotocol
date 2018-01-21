@@ -76,6 +76,7 @@
       <Name>TestsInfrastructure</Name>
     </ProjectReference>
     <Compile Include="WitnessValidationTests.fs" />
+    <Compile Include="EMATests.fs" />
   </ItemGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
