@@ -8,7 +8,10 @@ module Cost = Zen.Cost.Realized
 module V = Zen.Vector
 module U64 = FStar.UInt64
 
+type pointedOutput = outpoint * output
+
 type txSkeleton =
+    // the uint64 fields represent cumulative asset amount totals
     { inputs : Collections.Map<asset, U64.t * list<pointedOutput>>;
       outputs : Collections.Map<asset, U64.t * list<output>> }
 
@@ -68,7 +71,7 @@ let addOutput (output : output) (txSkeleton : txSkeleton) : Cost.t<txSkeleton, u
 
 let lockToContract (spend : spend) (contractHash : hash)
     (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
-    lazy (let lock = ContractLock(contractHash, 0I, Empty)
+    lazy (let lock = ContractLock contractHash
 
           let output =
               { lock = lock;
@@ -105,7 +108,7 @@ let mint (amount : U64.t) (contractHash : contractHash)
               { asset = contractHash;
                 amount = amount }
 
-          let mintLock = ContractLock(contractHash, 0I, Empty)
+          let mintLock = ContractLock contractHash
 
           let mintOutput =
               { lock = mintLock;
@@ -121,7 +124,20 @@ let mint (amount : U64.t) (contractHash : contractHash)
           addInput pointedOutput txSkeleton |> Cost.__force)
     |> Cost.C
 
-let isValid(txSkeleton : txSkeleton) : Cost.t<bool, unit> =
+let destroy (amount : U64.t) (contractHash : contractHash)
+    (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
+    lazy (let destroySpend =
+              { asset = contractHash;
+                amount = amount }
+
+          let destroyOutput =
+              { lock = DestroyLock;
+                spend = destroySpend }
+
+          addOutput destroyOutput txSkeleton |> Cost.__force)
+    |> Cost.C
+
+let isValid (txSkeleton : txSkeleton) : Cost.t<bool, unit> =
     lazy (if keySet txSkeleton.inputs <> keySet txSkeleton.outputs then false
           else
               txSkeleton.inputs |> Map.forall(fun asset (inputAmount, _) ->
