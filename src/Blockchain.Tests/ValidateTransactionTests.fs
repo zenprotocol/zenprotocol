@@ -305,7 +305,21 @@ let ``Valid contract should be added to ActiveContractSet``() =
     
     use session = DatabaseContext.createSession databaseContext
     let rootAccount = Account.createRoot ()
-    let contractCode = "val test: nat -> nat\nlet test i = i + 1"
+    let contractCode = """
+    open Zen.Types
+    open Zen.Vector
+    open Zen.Util
+    open Zen.Base
+    open Zen.Cost
+    open Zen.ErrorT
+
+    val cf: transactionSkeleton -> cost nat 1
+    let cf _ = ~!2
+
+    val main: transactionSkeleton -> hash -> cost (result transactionSkeleton) 2
+    let main transactionSkeleton hash = 
+        ret @ transactionSkeleton
+    """
     let cHash = getStringHash contractCode
 
     let tx =

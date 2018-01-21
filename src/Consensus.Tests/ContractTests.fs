@@ -32,9 +32,9 @@ let ``Should get contract function``() =
     |> shouldEqual
 
 [<Test>]
-let ``Should get 'extract' error for invalid תcode``() = 
+let ``Should get 'elaborate' error for invalid תcode``() = 
     (compileRunAndCompare (sampleContractCode + "###")
-    , (Error "extract" : Result<TxSkeleton, string>))
+    , (Error "elaborate" : Result<TxSkeleton, string>))
     |> shouldEqual
 
 let validateInputs (contract:Contract.T) utxos tx =
@@ -68,9 +68,15 @@ let ``Contract should not be able to create tokens other than its own``() =
          open Zen.Types
          open Zen.Vector
          open Zen.Util
+         open Zen.Base
+         open Zen.Cost
+         open Zen.ErrorT
 
-         val test: transactionSkeleton -> hash -> transactionSkeleton
-         let test (Tx pInputs outputs data) hash =
+         val cf: transactionSkeleton -> cost nat 1
+         let cf _ = ~!22
+
+         val main: transactionSkeleton -> hash -> cost (result transactionSkeleton) 22
+         let main (Tx pInputs outputs data) hash =
            let output = {
              lock = ContractLock hash 0 Empty;
              spend = {
@@ -86,6 +92,6 @@ let ``Contract should not be able to create tokens other than its own``() =
 
            let outputs' = VCons output outputs in
            let pInputs' = VCons pInput pInputs in
-           Tx pInputs' outputs' data"""
+           ret @ Tx pInputs' outputs' data"""
     , (Error "illegal creation/destruction of tokens" : Result<Transaction, string>))
     |> shouldEqual
