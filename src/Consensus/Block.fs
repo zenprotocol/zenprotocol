@@ -89,7 +89,7 @@ let createTemplate (parent:BlockHeader) timestamp (ema:EMA.T) acs transactions =
         |> List.map Transaction.witnessHash
         |> MerkleTree.computeRoot
         
-    let acsMerkleRoot = SparseMerkleTree.root acs        
+    let acsMerkleRoot = SparseMerkleTree.root acs
         
     let parentHash = BlockHeader.hash parent        
                 
@@ -161,7 +161,7 @@ let validate chain =
     >=> checkCommitments
 
 /// Apply block to UTXO and ACS, operation can fail
-let connect chain parent timestamp set acs ema =    
+let connect chain contractsPath parent timestamp set acs ema =    
     let checkBlockNumber (block:Block) = 
         if parent.blockNumber + 1ul <> block.header.blockNumber then
             Error "blockNumber mismatch"
@@ -186,7 +186,7 @@ let connect chain parent timestamp set acs ema =
             // TODO: reject uncompiled contracts 
             block.transactions
             |> List.choose (fun tx -> tx.contract)        
-            |> List.map (fun contract -> Contract.compile contract)
+            |> List.map (fun contract -> Contract.compile contractsPath contract)
             |> List.choose (fun contract ->
                 match contract with
                 | Ok c -> Some c

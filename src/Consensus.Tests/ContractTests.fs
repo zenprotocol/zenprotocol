@@ -11,9 +11,11 @@ open SampleContract
 
 open TestsInfrastructure.Nunit
 
+let contractsPath = "./data"
+
 let compileRunAndCompare code =
     code
-    |> Contract.compile
+    |> Contract.compile contractsPath
     |> Result.bind (fun contract ->
         // check hash validity
         (Hash.isValid contract.hash, true)
@@ -43,7 +45,7 @@ let validateInputs (contract:Contract.T) utxos tx =
         | other -> other.ToString())
 
 let compileRunAndValidate code =
-    Contract.compile code
+    Contract.compile contractsPath code
     |> Result.bind (fun contract ->
         let utxoSet = getSampleUtxoset (UtxoSet.create())
         Contract.run contract sampleInputTx

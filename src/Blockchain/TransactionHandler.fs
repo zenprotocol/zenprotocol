@@ -9,12 +9,12 @@ open Consensus.TransactionValidation
 open State
 open Infrastructure.ServiceBus.Agent
 
-let private activateContract chain acs (tx : Types.Transaction) shouldPublishEvents =
+let private activateContract chain contractPath acs (tx : Types.Transaction) shouldPublishEvents =
     effectsWriter
         {
             match tx.contract with
             | Some code ->
-                match Contract.compile code with
+                match Contract.compile contractPath code with
                 | Ok contract ->
                     Log.warning "activating contract: %A" (Address.encode chain (Address.Contract contract.hash))
 
@@ -29,7 +29,7 @@ let private activateContract chain acs (tx : Types.Transaction) shouldPublishEve
                 return acs
         }
 
-let private validateOrphanTransaction chain state txHash tx  =
+let private validateOrphanTransaction chain contractPath state txHash tx  =
     effectsWriter 
         {
             match TransactionValidation.validateInputs state.activeContractSet state.utxoSet txHash tx with
@@ -40,7 +40,7 @@ let private validateOrphanTransaction chain state txHash tx  =
                 do! publish (TransactionAddedToMemPool (txHash, tx))
                 Log.info "Orphan transaction %s added to mempool" (Hash.toString txHash)
 
-                let! acs = activateContract chain state.activeContractSet tx true
+                let! acs = activateContract chain contractPath state.activeContractSet tx true
 
                 let orphanPool = OrphanPool.remove txHash state.orphanPool
                 return {state with activeContractSet=acs;mempool=mempool;utxoSet=utxoSet; orphanPool=orphanPool}
@@ -54,18 +54,18 @@ let private validateOrphanTransaction chain state txHash tx  =
                 return {state with orphanPool = orphanPool}
         }
         
-let rec validateOrphanTransactions chain state =      
+let rec validateOrphanTransactions chain contractPath state =      
     effectsWriter {
-        let! state' = OrphanPool.foldWriter (validateOrphanTransaction chain) state state.orphanPool
+        let! state' = OrphanPool.foldWriter (validateOrphanTransaction chain contractPath) state state.orphanPool
         
         // if orphan pool changed we run again until there is no change
         if state.orphanPool <> state.orphanPool then
-            return! validateOrphanTransactions chain state'
+            return! validateOrphanTransactions chain contractPath state'
         else
             return state'
     }
           
-let validateInputs chain txHash tx (state:MemoryState) shouldPublishEvents =
+let validateInputs chain contractPath txHash tx (state:MemoryState) shouldPublishEvents =
     effectsWriter
         {
             match TransactionValidation.validateInputs state.activeContractSet state.utxoSet txHash tx with
@@ -80,7 +80,7 @@ let validateInputs chain txHash tx (state:MemoryState) shouldPublishEvents =
 
                  return state
             | Ok tx ->
-                let! acs = activateContract chain state.activeContractSet tx shouldPublishEvents
+                let! acs = activateContract chain contractPath state.activeContractSet tx shouldPublishEvents
 
                 let utxoSet = UtxoSet.handleTransaction txHash tx state.utxoSet
                 let mempool = MemPool.add txHash tx state.mempool
@@ -93,11 +93,11 @@ let validateInputs chain txHash tx (state:MemoryState) shouldPublishEvents =
                 let state = {state with activeContractSet=acs;mempool=mempool;utxoSet=utxoSet}
 
                 
-                return! validateOrphanTransactions chain state
+                return! validateOrphanTransactions chain contractPath state
         }
 
 
-let validateTransaction chain tx (state:MemoryState) =
+let validateTransaction chain contractPath tx (state:MemoryState) =
     effectsWriter {
         let txHash = Transaction.hash tx
 
@@ -110,7 +110,7 @@ let validateTransaction chain tx (state:MemoryState) =
 
                 return state
             | Ok tx ->
-                return! validateInputs chain txHash tx state true
+                return! validateInputs chain contractPath txHash tx state true
     }
 
 let executeContract txSkeleton cHash state =

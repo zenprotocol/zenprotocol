@@ -13,37 +13,38 @@ let private (/) a b = Path.Combine (a,b)
 let private error s = 
     sprintf "%s: %s" s
 
-let private compile' code =
+let private compile' path moduleName code =
     //let code = code + """nopen MBrace.FsPickler.Combinators
     //let pickler = Pickler.auto<ZFStar.Contract>
     //let pickled = Binary.pickle pickler mainFunction"""
     try
-        let fn = Path.GetTempFileName()
-        let fni = changeExtention ".fs" fn
-        let fno = changeExtention ".dll" fn
-        File.WriteAllText(fni, code)
-        let (+/) = (/) Platform.getFrameworkPath
-        let errors, exitCode, dynamicAssembly =
+        let tempFileName = Path.GetTempFileName()
+        let codeFileName = changeExtention ".fs" tempFileName
+        let assemblyPath = Path.Combine(path, sprintf "%s.dll" moduleName)
+        File.WriteAllText(codeFileName, code)
+        let (+/) = (/) Platform.getFrameworkPath               
+        
+        let errors, exitCode =
             Async.RunSynchronously 
-            <| fsChecker.CompileToDynamicAssembly(
+            <| fsChecker.Compile(
                 [|"fsc.exe";
                 "--noframework";
                 "--mlcompatibility";
-                "-o"; fno;
-                "-a"; fni;
+                "-o"; assemblyPath;
+                "-a"; codeFileName;
                 "-r"; (+/) "mscorlib.dll";
                 "-r"; (+/) "System.Core.dll";
                 "-r"; (+/) "System.dll";
                 "-r"; (+/) "System.Numerics.dll";
                 "-r"; "zulib" / "Zulib.dll";
                 //"-r"; "FsPickler.dll";
-                "-r"; "FSharp.Compatibility.OCaml.dll"|], None) //Some (stdout, stderr))
+                "-r"; "FSharp.Compatibility.OCaml.dll"|])
         if exitCode = 0 then
-            match dynamicAssembly with
-            | None -> 
-                Error ""
-            | Some assembly ->
+            try 
+                let assembly = System.Reflection.Assembly.LoadFrom (assemblyPath)
                 Ok assembly
+            with 
+            | ex -> Error ex.Message                                   
         else
             errors
             |> Array.map (fun e -> e.ToString()) 
@@ -82,7 +83,18 @@ let private extract code moduleName =
     finally
         Directory.Delete (oDir, true)
 
-let compile code moduleName = 
-    "Z" + moduleName
-    |> extract code
-    |> Result.bind compile'
+let compile path code moduleName = 
+    let moduleName = ("Z" + moduleName) 
+
+    extract code moduleName
+    |> Result.bind (compile' path moduleName)
+    
+let load path moduleName = 
+    let moduleName = ("Z" + moduleName) 
+    let assemblyPath = Path.Combine(path, sprintf "%s.dll" moduleName)
+    
+    try 
+        let assembly = System.Reflection.Assembly.LoadFrom (assemblyPath)
+        Ok assembly
+    with 
+    | ex -> Error ex.Message

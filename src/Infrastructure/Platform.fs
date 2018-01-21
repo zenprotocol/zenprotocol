@@ -111,3 +111,12 @@ let run exe args =
             Error "failed to start process"
     with _ as ex ->
         Exception.toError "run" ex
+        
+let removeDirectory path = 
+    if Directory.Exists path then
+        Directory.Delete(path, true)  
+        
+let cleanDirectory path =
+    removeDirectory path
+    
+    Directory.CreateDirectory path |> ignore                

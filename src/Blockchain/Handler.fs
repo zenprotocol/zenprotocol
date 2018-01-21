@@ -9,12 +9,15 @@ open Consensus
 open Blockchain
 open Blockchain.EffectsWriter
 open State
+open DatabaseContext
 
-let handleCommand chain command session timestamp (state:State) =   
+let handleCommand chain command session timestamp (state:State) =
+    let contractPath = session.context.contractPath
+   
     match command with
     | ValidateTransaction tx -> 
         effectsWriter {
-            let! memoryState = TransactionHandler.validateTransaction chain tx state.memoryState
+            let! memoryState = TransactionHandler.validateTransaction chain contractPath tx state.memoryState
             return {state with memoryState = memoryState}
         }
     | GetMemPool peerId ->        
@@ -49,9 +52,9 @@ let handleCommand chain command session timestamp (state:State) =
             
         Writer.bind writer (fun () -> Writer.ret state)    
     | ValidateBlock block ->
-        BlockHandler.validateBlock chain session timestamp block false state
+        BlockHandler.validateBlock chain contractPath session timestamp block false state
     | ValidateMinedBlock block -> 
-        BlockHandler.validateBlock chain session timestamp block true state 
+        BlockHandler.validateBlock chain contractPath session timestamp block true state 
     | HandleTip header ->
         BlockHandler.handleTip chain session header state
     | ValidateNewBlockHeader (peerId, header) ->

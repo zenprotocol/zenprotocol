@@ -78,7 +78,7 @@ let main argv =
             config.miner <- true
             root <- true 
         | Local1 ->
-            config.dataPath <- "./l1"
+            config.dataPath <- "./data/l1"
             config.chain <- "local"
             config.listen <- true
             config.bind <- "127.0.0.1:37000"
@@ -86,7 +86,7 @@ let main argv =
             config.api.enabled <- true
             config.api.bind <- "127.0.0.1:36000"
         | Local2 ->
-            config.dataPath <- "./l2"
+            config.dataPath <- "./data/l2"
             config.chain <- "local"
             config.listen <- true
             config.bind <- "127.0.0.1:37001"

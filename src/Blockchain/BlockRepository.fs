@@ -63,9 +63,15 @@ let saveBlockState session blockHash (utxoSet:UtxoSet.T) (acs:ActiveContractSet.
 let getBlockState session blockHash =        
     let blockState = Collection.get session.context.blockState session.session blockHash     
     
+    let getOk (cHash,result) = 
+        match result with 
+        | Ok x -> cHash,x
+        | Error error -> failwithf "cannot load contract from db due to %A" error
+    
     let acs =  
         blockState.activeContractSet
         |> Seq.map (fun cHash -> cHash,Contract.load session.context.contractPath cHash)
+        |> Seq.map getOk
         |> Seq.toArray
         |> SparseMerkleTree.addMultiple ActiveContractSet.empty 
         
