@@ -7,7 +7,6 @@ nuget NUnit
 nuget NUnit.ConsoleRunner
 nuget FsUnit
 nuget FsCheck.NUnit >= 3.0.0-alpha2
-nuget Zen.FSharp.Compiler.Service
 nuget FAKE
 nuget FSharp.Compatibility.OCaml
 nuget libsodium-net
@@ -27,3 +26,4 @@ nuget FsBech32 >= 0.1.0.7
 nuget ZFStar 0.0.4
 nuget Zen.FSharp.Compiler.Service 17.0.2
 nuget LightningDB
+nuget ZFS-Tools

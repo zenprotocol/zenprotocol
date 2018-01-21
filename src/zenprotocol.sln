@@ -8,46 +8,47 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".paket", ".paket", "{368765
 		..\paket.dependencies = ..\paket.dependencies
 	EndProjectSection
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Consensus", "Consensus\Consensus.fsproj", "{5EC4457B-615A-4BBD-B3D5-D0E311B9D5E9}"
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Consensus", "Consensus\Consensus.fsproj", "{5EC4457B-615A-4BBD-B3D5-D0E311B9D5E9}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Consensus.Tests", "Consensus.Tests\Consensus.Tests.fsproj", "{B5E951FC-AE90-4EF1-9365-3E2B5A56B510}"
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Consensus.Tests", "Consensus.Tests\Consensus.Tests.fsproj", "{B5E951FC-AE90-4EF1-9365-3E2B5A56B510}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Infrastructure", "Infrastructure\Infrastructure.fsproj", "{81161F64-D019-422C-A3CF-321CDE6CA209}"
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Infrastructure", "Infrastructure\Infrastructure.fsproj", "{81161F64-D019-422C-A3CF-321CDE6CA209}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{C58A477F-36B7-429C-AD06-87A465B47F1D}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Messaging", "Messaging\Messaging.fsproj", "{44277422-32E3-4F1B-BD6D-153B7A621444}"
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Messaging", "Messaging\Messaging.fsproj", "{44277422-32E3-4F1B-BD6D-153B7A621444}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Node", "Node\Node.fsproj", "{9755DEA0-2931-486A-984A-0FAD1C44EDF7}"
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Node", "Node\Node.fsproj", "{9755DEA0-2931-486A-984A-0FAD1C44EDF7}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Blockchain", "Blockchain\Blockchain.fsproj", "{16B10D81-C99E-4562-810C-9B637234C72D}"
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Blockchain", "Blockchain\Blockchain.fsproj", "{16B10D81-C99E-4562-810C-9B637234C72D}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Network", "Network\Network.fsproj", "{8471EFE5-4B38-4969-AC2A-0BF64A031EBA}"
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Network", "Network\Network.fsproj", "{8471EFE5-4B38-4969-AC2A-0BF64A031EBA}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Network.Tests", "Network.Tests\Network.Tests.fsproj", "{0BE814E1-FD31-40B9-BD24-4572E3EF79C0}"
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Network.Tests", "Network.Tests\Network.Tests.fsproj", "{0BE814E1-FD31-40B9-BD24-4572E3EF79C0}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Api", "Api\Api.fsproj", "{BC871DA3-27D5-447D-A35E-D5DA8E8F9BC7}"
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Api", "Api\Api.fsproj", "{BC871DA3-27D5-447D-A35E-D5DA8E8F9BC7}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Cli", "Cli\Cli.fsproj", "{F2AB0CFF-5137-4A1C-858A-D317181B29FE}"
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Cli", "Cli\Cli.fsproj", "{F2AB0CFF-5137-4A1C-858A-D317181B29FE}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Wallet", "Wallet\Wallet.fsproj", "{289A59EB-D1D4-499F-87B9-F75B799829C0}"
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Wallet", "Wallet\Wallet.fsproj", "{289A59EB-D1D4-499F-87B9-F75B799829C0}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Wallet.Tests", "Wallet.Tests\Wallet.Tests.fsproj", "{B00B9A97-D059-434D-81B9-BDC5D07A7DDB}"
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Wallet.Tests", "Wallet.Tests\Wallet.Tests.fsproj", "{B00B9A97-D059-434D-81B9-BDC5D07A7DDB}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Blockchain.Tests", "Blockchain.Tests\Blockchain.Tests.fsproj", "{890069D1-B830-4407-BE70-265647B318CE}"
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Blockchain.Tests", "Blockchain.Tests\Blockchain.Tests.fsproj", "{890069D1-B830-4407-BE70-265647B318CE}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Infrastructure.Tests", "Infrastructure.Tests\Infrastructure.Tests.fsproj", "{058F4AA6-A889-4724-A96F-F947DE57B63A}"
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Infrastructure.Tests", "Infrastructure.Tests\Infrastructure.Tests.fsproj", "{058F4AA6-A889-4724-A96F-F947DE57B63A}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Targets", "Targets", "{CC32ABBD-17AA-491B-9543-AC6D7B6433E6}"
 	ProjectSection(SolutionItems) = preProject
 		CopyZulib.targets = CopyZulib.targets
+		RefFStar.props = RefFStar.props
 	EndProjectSection
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Miner", "Miner\Miner.fsproj", "{26EE7861-DF8C-46EA-889B-0A585B687209}"
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Miner", "Miner\Miner.fsproj", "{26EE7861-DF8C-46EA-889B-0A585B687209}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "TestsInfrastructure", "TestsInfrastructure\TestsInfrastructure.fsproj", "{9DF227BB-E98D-49D7-A33B-C0D5B170F430}"
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "TestsInfrastructure", "TestsInfrastructure\TestsInfrastructure.fsproj", "{9DF227BB-E98D-49D7-A33B-C0D5B170F430}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "DataAccess", "DataAccess\DataAccess.fsproj", "{CD83F0E5-0E3B-4582-924A-18DA50F4D7C7}"
+Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "DataAccess", "DataAccess\DataAccess.fsproj", "{CD83F0E5-0E3B-4582-924A-18DA50F4D7C7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
