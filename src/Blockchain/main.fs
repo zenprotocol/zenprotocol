@@ -8,10 +8,10 @@ open Messaging.Events
 open Consensus
 open State
 
-let main chain busName =
+let main dataPath chain busName =
     Actor.create<Command,Request,Event,State> busName serviceName (fun poller sbObservable ebObservable  ->  
         let publisher = EventBus.Publisher.create<Event> busName
-        let client = ServiceBus.Client.create busName
+        let client = ServiceBus.Client.create busName        
                                         
         let sbObservable = 
             sbObservable
@@ -25,18 +25,31 @@ let main chain busName =
             ebObservable
             |> Observable.map Handler.handleEvent
 
+        let databaseContext = DatabaseContext.create (Platform.combine dataPath "blockchain")                                
+
+        let tip,utxoSet,acs,ema = 
+            use session = DatabaseContext.createSession databaseContext
+            match BlockRepository.tryGetTip session with 
+            | Some (tip,utxoSet,acs,ema) ->
+                Log.info "Loading tip from db #%d %A" tip.header.blockNumber tip.hash
+                         
+                tip,utxoSet,acs,ema
+            | None -> 
+                Log.info "No tip in db"
+                ExtendedBlockHeader.empty,UtxoSet.create(),ActiveContractSet.empty,EMA.create chain
+
         let tipState = 
             {
-                activeContractSet=ActiveContractSet.empty;
-                utxoSet=UtxoSet.create()
-                ema=EMA.create chain 
-                tip=PersistentBlock.empty
+                activeContractSet=acs
+                utxoSet=utxoSet
+                ema=ema
+                tip=tip
             }
             
         let memoryState = 
             {
-                activeContractSet=ActiveContractSet.empty;
-                utxoSet=UtxoSet.create()
+                activeContractSet=acs
+                utxoSet=utxoSet
                 mempool=MemPool.empty
                 orphanPool=OrphanPool.create ()
             }
@@ -45,16 +58,19 @@ let main chain busName =
             {
                 memoryState = memoryState;
                 tipState = tipState;
-                blockRepository = BlockRepository.create ()
                 blockRequests= Map.empty
-            }            
+            }                                
                      
         let observable =                      
             Observable.merge sbObservable ebObservable
             |> Observable.scan (fun state handler -> 
-                let effectWriter = handler (Timestamp.now ()) state
-                EffectsWriter.run effectWriter publisher client
+                use session = DatabaseContext.createSession databaseContext
+                let effectWriter = handler session (Timestamp.now ()) state
+                let result = EffectsWriter.run effectWriter publisher client                
+                DataAccess.Session.commit session.session
+                
+                result 
                 ) state  
-                                                                                      
-        Disposables.empty, observable 
+                                                          
+        Disposables.toDisposable databaseContext, observable 
     )

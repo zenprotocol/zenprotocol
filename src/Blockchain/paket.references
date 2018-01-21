@@ -3,3 +3,5 @@ FSharp.Core
 FSharp.Control.Reactive
 System.Reactive.Linq
 FSharp.Compiler.Tools
+LightningDB
+FsPickler

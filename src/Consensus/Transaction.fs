@@ -30,27 +30,37 @@ let hash =
 let witnessHash = 
     //TODO: only serialize witness
     serialize Full >> Hash.compute    
-        
-let sign tx keyPairs =
+   
+let addWitnesses tx witnesses = 
+    { tx with witnesses = witnesses @ tx.witnesses }
+     
+let sign keyPairs tx =
     let txHash = hash tx
 
+    let pkWitnesses = 
+        List.map (
+            fun ((secretKey, publicKey)) -> PKWitness (PublicKey.serialize publicKey, Crypto.sign secretKey txHash)
+        ) keyPairs
+
     //// TODO: Should we also use sighash and not sign entire transaction?
-    { tx with
-        witnesses =
-            List.map (
-                fun ((secretKey, publicKey)) -> PKWitness (PublicKey.serialize publicKey, Crypto.sign secretKey txHash)
-            ) keyPairs }
+    addWitnesses tx pkWitnesses
 
-let addWitness witness tx =
-    { tx with witnesses = List.append tx.witnesses [ witness ] }
+let addContractWitness cHash inputTx tx =
+    addWitnesses tx [ ContractWitness {
+        cHash = cHash 
+        beginInputs = List.length inputTx.pInputs
+        beginOutputs = List.length inputTx.outputs
+        inputsLength = List.length inputTx.pInputs
+        outputsLength = List.length inputTx.outputs
+    } ]
 
-let fromTxSkeleton (txSkeleton:TxSkeleton) =
+let fromTxSkeleton cHash tx =
     {
-        inputs = 
-            txSkeleton.pInputs
+        inputs =
+            tx.pInputs
             |> List.filter (fun (input, _) -> input.txHash = Hash.zero && input.index = 0ul |> not)
             |> List.map fst
-        outputs = txSkeleton.outputs
+        outputs = tx.outputs
         witnesses = []
         contract = None
     }

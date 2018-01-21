@@ -32,7 +32,7 @@ let ``Transaction should be orphan``() =
         contract = None
     }
     let utxos = Map.ofSeq [ testInput1, Unspent output ]
-    (inputsValidation acs utxos tx keys, (Error Orphan : Result<Transaction, ValidationError>))
+    inputsValidationOrphan acs utxos tx keys
     |> shouldEqual
 
 [<Test>]

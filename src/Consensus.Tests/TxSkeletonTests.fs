@@ -24,7 +24,7 @@ let ``Transaction with additional single output should be a prefix of another`` 
         lock = PK testHash
         spend = {asset = Hash.zero; amount = 1UL } 
     }
-    let tx' = { tx with outputs = output :: tx.outputs }
+    let tx' = { tx with outputs = tx.outputs @ [ output ] }
     TxSkeleton.checkPrefix tx tx' = Ok tx'
 
 [<Property>]
@@ -37,7 +37,7 @@ let ``Transaction with additional single input should be a prefix of another`` (
         lock = PK testHash
         spend = {asset = Hash.zero; amount = 1UL } 
     }
-    let tx' = { tx with pInputs = (input, output) :: tx.pInputs }
+    let tx' = { tx with pInputs = tx.pInputs @ [ (input, output) ] }
     TxSkeleton.checkPrefix tx tx' = Ok tx'
 
 [<Property>]

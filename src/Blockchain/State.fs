@@ -10,7 +10,7 @@ type BlockRequest =
 
 type BlockState = 
     {
-        tip: PersistentBlock.T
+        tip: ExtendedBlockHeader.T
         utxoSet: UtxoSet.T 
         activeContractSet: ActiveContractSet.T
         ema:EMA.T        
@@ -25,8 +25,7 @@ type MemoryState =
     }    
 
 type State = 
-    {         
-        blockRepository:BlockRepository.T        
+    {                         
         tipState: BlockState
         memoryState: MemoryState
         blockRequests: Map<Hash.Hash, BlockRequest>             

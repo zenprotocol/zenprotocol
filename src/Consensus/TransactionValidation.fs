@@ -33,7 +33,16 @@ let private checkSpends m =
     Map.exists (fun _ v -> Option.isNone v) m |> not
 
 let private checkAmounts (tx, inputs) =
-    let outputs', inputs' = foldSpends tx.outputs, foldSpends inputs
+    let cHashes = 
+        tx.witnesses
+        |> List.choose (function | ContractWitness cw -> Some cw.cHash | _ -> None)
+
+    
+    let outputs =
+        tx.outputs
+        |> List.filter (fun output -> not <| List.contains output.spend.asset cHashes)
+
+    let outputs', inputs' = foldSpends outputs, foldSpends inputs
 
     if not <| checkSpends outputs' then
         GeneralError "outputs overflow"
@@ -44,30 +53,7 @@ let private checkAmounts (tx, inputs) =
     else
         Ok tx
 
-let private checkWitnesses acs set (Hash.Hash txHash, tx, inputs) =
-    let rec popContractsLocksOf cHash tx (pInputs: (Outpoint * Output) list) =
-        match pInputs with
-        | [] -> [] 
-        | (input, output) :: tail ->
-            match output.lock with 
-            | Contract cHash' when cHash' = cHash ->
-                popContractsLocksOf cHash' tx tail
-            | _ ->
-                (input, output) :: tail
-
-    let checkIssuedAndDestroyed txSkeleton (witness:ContractWitness) =
-        txSkeleton.pInputs.[witness.beginInputs..witness.beginInputs + witness.inputsLength]
-        |> List.forall (
-            fun (input, output) ->
-                input.txHash = Hash.zero && 
-                input.index = 0ul &&
-                output.spend.asset = witness.cHash &&
-                output.lock = Contract witness.cHash) &&
-        txSkeleton.outputs.[witness.beginOutputs..witness.beginOutputs + witness.outputsLength]
-        |> List.forall (
-            fun output ->
-                output.lock = Destroy && output.spend.asset = witness.cHash)
-
+let private checkWitnesses acs (Hash.Hash txHash, tx, inputs) =
     let checkPKWitness tx pInputs serializedPublicKey signature =
         match pInputs with
         | [] -> GeneralError "missing PK witness input" 
@@ -76,66 +62,78 @@ let private checkWitnesses acs set (Hash.Hash txHash, tx, inputs) =
             | Some publicKey ->
                 if PublicKey.hashSerialized serializedPublicKey = pkHash then
                     match verify publicKey signature txHash with
-                    | Valid ->
-                        Ok (tx, tail)
+                    | Valid -> Ok (tx, tail)
                     | _ -> GeneralError "invalid PK witness signature"
                 else GeneralError "PK witness mismatch"
             | _ -> GeneralError "invalid PK witness"
         | _ -> GeneralError "unexpected PK witness lock type"
 
-    let checkContractWitness tx acs set witness pInputs =
-        match ActiveContractSet.tryFind witness.cHash acs with
-        | Some contract ->
-            match Contract.run contract set tx with 
-            | Ok tx' ->
-                if checkIssuedAndDestroyed tx' witness then
-                    let pInputs = popContractsLocksOf witness.cHash tx' pInputs //witness.inputsLength //1!!!
-                    if List.length tx'.pInputs - List.length tx.pInputs = witness.inputsLength &&
-                       List.length tx'.outputs - List.length tx.outputs = witness.outputsLength then
-                        Ok (tx', pInputs)
-                    else
-                        GeneralError "input/output length mismatch"
-                else
-                    GeneralError "illegal creation/destruction of tokens"
+    let checkContractWitness tx acs cw pInputs =
+        let checkIssuedAndDestroyed txSkeleton cw =
+            txSkeleton.pInputs.[cw.beginInputs - 1 .. cw.beginInputs + cw.inputsLength - 1]
+            |> List.forall (fun (outpoint, {spend=spend}) ->
+                not <| TxSkeleton.isSkeletonOutpoint outpoint || spend.asset = cw.cHash) 
+            &&
+            txSkeleton.outputs.[cw.beginOutputs - 1 .. cw.beginOutputs + cw.outputsLength - 1]
+            |> List.forall (
+                function
+                | {lock=Destroy; spend=spend} -> spend.asset = cw.cHash
+                | _ -> true)
 
-            | Error err -> GeneralError err
+        match ActiveContractSet.tryFind cw.cHash acs with
+        | Some contract ->
+            match Contract.run contract tx with 
+            | Ok tx' ->
+                if checkIssuedAndDestroyed tx' cw then
+                    if List.length tx'.pInputs - List.length tx.pInputs = cw.inputsLength && 
+                       List.length tx'.outputs - List.length tx.outputs = cw.outputsLength then
+                        let rec popContractsLocksOf cHash tx pInputs =
+                            match pInputs with
+                            | [] -> [] 
+                            | (input, output) :: tail ->
+                                match output.lock with 
+                                | Contract cHash' when cHash' = cHash ->
+                                    popContractsLocksOf cHash' tx tail
+                                | _ -> (input, output) :: tail
+                        Ok (tx', popContractsLocksOf cw.cHash tx' pInputs)
+                    else GeneralError "input/output length mismatch"
+                else GeneralError "illegal creation/destruction of tokens"
+            | Error err -> GeneralError ("contract witness validation error:" + err)
         | None -> GeneralError "contract is not active"
 
-    //TODO: check the contract witness is single and last
-    let firstContractWitness = 
-        tx.witnesses
-        |> List.choose (
-            function
-            | ContractWitness cw -> Some cw
-            | _ -> None)
-        |> List.tryHead 
-       
-    let pInputs = List.zip tx.inputs inputs
-
-    let tx' = 
-        match firstContractWitness with
-        | Some cw -> TxSkeleton.applyMask tx cw inputs
-        | None -> TxSkeleton.fromTransaction tx inputs
-            
     let witnessesFolder state witness =
         state 
         |> Result.bind (fun (tx', pInputs) ->
             match witness with
             | PKWitness (serializedPublicKey, signature) ->
                 checkPKWitness tx' pInputs serializedPublicKey signature
-            | ContractWitness cw ->
-                checkContractWitness tx' acs set cw pInputs)
+            | ContractWitness cw -> 
+                checkContractWitness tx' acs cw pInputs
+        )
 
-    tx.witnesses
-    |> List.fold witnessesFolder (Ok (tx', pInputs))
+    let applyMaskIfContract pTx =
+        match List.tryPick
+            (function
+            | ContractWitness cw -> Some cw
+            | _ -> None) tx.witnesses with
+        | Some cw -> 
+            TxSkeleton.applyMask pTx cw
+        | _ -> 
+            Ok pTx
+
+    TxSkeleton.fromTransaction tx inputs 
+    |> Result.bind applyMaskIfContract
+    |> Result.mapError (fun err -> General err)
+    |> Result.bind (fun tx' -> 
+        List.fold witnessesFolder (Ok (tx', tx'.pInputs)) tx.witnesses)
     |> Result.bind (
-        fun (tx'', pInputs) ->
+        fun (tx', pInputs) -> 
             if not <| List.isEmpty pInputs then
                 GeneralError "missing witness(s)"
-            else if not <| TxSkeleton.isSkeletonOf tx'' tx then
+            else if not <| TxSkeleton.isSkeletonOf tx' tx then
                 GeneralError "contract validation failed"
             else 
-                Ok (tx, inputs) //, tx'') 
+                Ok (tx, inputs)
     )
 
 let private checkInputsNotEmpty tx = 
@@ -172,10 +170,10 @@ let private checkOrphan set txHash tx =
     | Some utxos -> 
         Ok (txHash, tx, utxos)
     | None -> 
-        Error <| 
-            match UtxoSet.isSomeSpent tx.inputs set with
-            | true -> DoubleSpend
-            | false -> Orphan
+        match UtxoSet.isSomeSpent tx.inputs set with
+        | true -> DoubleSpend
+        | false -> Orphan
+        |> Error
 
 let validateBasic = 
     checkInputsNotEmpty
@@ -186,5 +184,5 @@ let validateBasic =
 
 let validateInputs acs set txHash =
     checkOrphan set txHash
-    >=> checkWitnesses acs set
+    >=> checkWitnesses acs
     >=> checkAmounts

@@ -28,3 +28,5 @@ let undoBlock (block:Block) acs =
     |> List.toArray
     |> SparseMerkleTree.updateMultiple acs 
     
+let getContractHashes (acs:T) =
+    acs.data |> Map.toSeq |> Seq.map fst        
