@@ -8,6 +8,7 @@ open Consensus.TxSkeleton
 open Infrastructure
 open ZFStar
 open Zen.Types.Extracted
+open Zen.Types.TxSkeleton
 open Exception
 
 type ContractFn = Hash -> TxSkeleton -> Result<TxSkeleton,string>
@@ -35,7 +36,7 @@ let private invoke (methodInfo:MethodInfo) cHash input =
 
 let private castOutput (output:System.Object) =
     try
-        output :?> transactionSkeleton |> Ok
+        output :?> txSkeleton |> Ok
     with _ as ex ->
         Exception.toError "cast contract output" ex
 
