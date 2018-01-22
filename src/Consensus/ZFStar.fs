@@ -88,42 +88,30 @@ let convertResult (txSkeleton : Cost.t<result<txSkeleton>,unit>)
     match unCost txSkeleton with
     | ERR err -> Error err
     | EX err -> Error err.Message //TODO: remove EX
-    | OK {inputs=inputs; outputs=outputs} ->
+    | OK {inputs=_,inputMap; outputs=_,outputMap} ->
         let inputs =
-            Map.toList inputs
+            Map.toList inputMap
             |> List.collect(fun (_, (_, inputs)) -> inputs)
-            |> List.map fstToFsPointedOutput
+            |> List.sortBy fst
+            |> List.map (snd >> fstToFsPointedOutput)
         let outputs =
-            Map.toList outputs
+            Map.toList outputMap
             |> List.collect(fun (_, (_, outputs)) -> outputs)
-            |> List.map fstToFsOutput
+            |> List.sortBy fst
+            |> List.map (snd >> fstToFsOutput)
         Ok {pInputs=inputs; outputs=outputs}
 
-let private addInputToMap map (pointedOutput:pointedOutput) =
-    let {spend.asset = asset; amount = amount} = (snd pointedOutput).spend
-
-    if Map.containsKey asset map then
-        let oldAmount, pointedOutputs = Map.find asset map
-        map |> Map.add asset (amount + oldAmount, pointedOutput :: pointedOutputs)
-    else
-        map |> Map.add asset (amount, [pointedOutput])
-
-let private addOutputToMap map (output:output) =
-    let { spend.asset = asset; amount = amount } = output.spend
-
-    if Map.containsKey asset map then
-        let oldAmount, outputs = Map.find asset map
-        map |> Map.add asset (amount + oldAmount, output :: outputs)
-    else
-        map |> Map.add asset (amount, [output])
-
 let convertInput (txSkeleton:TxSkeleton) : txSkeleton =
-    let inputs =
-        txSkeleton.pInputs
-        |> List.map fsToFstPointedOutput
-        |> List.fold addInputToMap Map.empty
-    let outputs =
-        txSkeleton.outputs
-        |> List.map fsToFstOutput
-        |> List.fold addOutputToMap Map.empty
-    {inputs=inputs; outputs=outputs}
+    
+    let insertPointedOutput txSkeleton pointedOutput = 
+        insertPointedOutput pointedOutput txSkeleton
+    let insertOutput txSkeleton output = 
+        insertOutput output txSkeleton
+    let inputs = txSkeleton.pInputs |> List.map fsToFstPointedOutput
+    let outputs= txSkeleton.outputs |> List.map fsToFstOutput
+    
+    let txSkeletonWithInputsOnly = 
+        List.fold insertPointedOutput emptyTxSkeleton inputs
+    
+    List.fold insertOutput txSkeletonWithInputsOnly outputs
+    

@@ -27,7 +27,7 @@ let main transactionSkeleton hash =
 """
 
 let input : txSkeleton =
-    {inputs=Map.empty; outputs=Map.empty}
+    emptyTxSkeleton
     
 
 [<Test>]

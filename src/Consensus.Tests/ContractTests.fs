@@ -70,28 +70,30 @@ let ``Contract should not be able to create tokens other than its own``() =
          open Zen.Util
          open Zen.Base
          open Zen.Cost
-         open Zen.ErrorT
-
-         val cf: transactionSkeleton -> cost nat 1
-         let cf _ = ~!22
-
-         val main: transactionSkeleton -> hash -> cost (result transactionSkeleton) 22
-         let main (Tx pInputs outputs data) hash =
-           let output = {
-             lock = ContractLock hash 0 Empty;
-             spend = {
-               asset = hashFromBase64 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; //aha! should be of hash value
-               amount = 1000UL
-             }
-           } in
-
+         
+         module ET = Zen.ErrorT
+         
+         val cf: txSkeleton -> cost nat 1
+         let cf _ = ret 146
+         
+         val main: txSkeleton -> hash -> cost (result txSkeleton) 146
+         let main txSkeleton contractHash =
+           let spend = { 
+               asset=hashFromBase64 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+               amount=1000UL 
+               } in
+           let lock = ContractLock contractHash in
+           
+           let output = { lock=lock; spend=spend } in
+         
            let pInput = {
                txHash = hashFromBase64 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
                index = 0ul
            }, output in
-
-           let outputs' = VCons output outputs in
-           let pInputs' = VCons pInput pInputs in
-           ret @ Tx pInputs' outputs' data"""
+           
+           let txSkeleton1 = addInput pInput txSkeleton in
+           let txSkeleton2 = txSkeleton1 >>= lockToContract spend contractHash in
+           ET.retT txSkeleton2
+           """
     , (Error "illegal creation/destruction of tokens" : Result<Transaction, string>))
     |> shouldEqual

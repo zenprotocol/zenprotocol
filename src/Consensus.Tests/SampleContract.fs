@@ -13,31 +13,30 @@ open Zen.Vector
 open Zen.Util
 open Zen.Base
 open Zen.Cost
-open Zen.ErrorT
 
-val cf: transactionSkeleton -> cost nat 1
-let cf _ = ~!21
+module ET = Zen.ErrorT
 
-val main: transactionSkeleton -> hash -> cost (result transactionSkeleton) 21
-let main (Tx pInputs outputs data) hash =
-  let output = {
-    lock = ContractLock hash 0 Empty;
-    spend = {
-      asset = hash;
-      amount = 1000UL
-    }
-  } in
+val cf: txSkeleton -> cost nat 1
+let cf _ = ret 145
+
+val main: txSkeleton -> hash -> cost (result txSkeleton) 145
+let main txSkeleton contractHash =
+  let spend = { asset=contractHash; amount=1000UL } in
+  let lock = ContractLock contractHash in
+  
+  let output = { lock=lock; spend=spend } in
 
   let pInput = {
       txHash = hashFromBase64 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
       index = 0ul
   }, output in
+  
+  let txSkeleton1 = addInput pInput txSkeleton in
+  let txSkeleton2 = txSkeleton1 >>= lockToContract spend contractHash in
+  ET.retT txSkeleton2
+  """
 
-  let outputs' = VCons output outputs in
-  let pInputs' = VCons pInput pInputs in
-  ret @ Tx pInputs' outputs' data"""
-
-let sampleContractHash = 
+let sampleContractHash =
     sampleContractCode
     |> Encoding.UTF8.GetBytes
     |> Hash.compute

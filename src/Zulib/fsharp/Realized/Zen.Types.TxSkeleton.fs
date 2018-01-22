@@ -11,18 +11,27 @@ module U64 = FStar.UInt64
 type pointedOutput = outpoint * output
 
 type txSkeleton =
-    // the uint64 fields represent cumulative asset amount totals
-    { inputs : Collections.Map<asset, U64.t * list<pointedOutput>>;
-      outputs : Collections.Map<asset, U64.t * list<output>> }
+    { inputs : uint64 * // The number of elements in the map
+               // the uint64 field in the map codomain represents cumulative asset amount totals
+               // the uint64 field in the list in the map codomain represents the insertion index of each pointedOutput
+               Collections.Map<asset, uint64 * list<uint64 * pointedOutput>>;
+      outputs : uint64 * // The number of elements in the map
+                // the uint64 field in the map codomain represents cumulative asset amount totals
+                // the uint64 field in the list in the map codomain represents the insertion index of each output
+                Collections.Map<asset, uint64 * list<uint64 * output>> }
+
+let emptyTxSkeleton : txSkeleton =
+    { inputs = 0UL, Map.empty
+      outputs= 0UL, Map.empty }
 
 let getAvailableTokens (asset : asset) (txSkeleton : txSkeleton) : Cost.t<uint64, unit> =
     lazy (let unlockedAmount =
-              match Map.tryFind asset txSkeleton.inputs with
+              match snd txSkeleton.inputs |> Map.tryFind asset with
               | None -> 0UL
               | Some(amount, _) -> amount
 
           let lockedAmount =
-              match Map.tryFind asset txSkeleton.outputs with
+              match snd txSkeleton.outputs |> Map.tryFind asset with
               | None -> 0UL
               | Some(amount, _) -> amount
 
@@ -33,25 +42,28 @@ let insertPointedOutput (pointedOutput : pointedOutput)
     (txSkeleton : txSkeleton) : txSkeleton =
     let { asset = asset; amount = amount } = (snd pointedOutput).spend
 
-    let inputs =
-        if Map.containsKey asset txSkeleton.inputs then
-            let oldAmount, pointedOutputs = Map.find asset txSkeleton.inputs
-            txSkeleton.inputs
-            |> Map.add asset
-                   (amount + oldAmount, pointedOutput :: pointedOutputs)
-        else txSkeleton.inputs |> Map.add asset (amount, [ pointedOutput ])
-    { txSkeleton with inputs = inputs }
+    let num_inputs, inputMap = txSkeleton.inputs
+    let inputMap =
+        if inputMap |> Map.containsKey asset then
+            let oldAmount, pointedOutputs = Map.find asset inputMap
+            inputMap |> Map.add asset
+                            (amount + oldAmount,
+                            (num_inputs+1UL, pointedOutput)::pointedOutputs)
+        else inputMap |> Map.add asset (amount, [num_inputs+1UL, pointedOutput])
+    { txSkeleton with inputs = num_inputs + 1UL, inputMap }
 
 let insertOutput (output : output) (txSkeleton : txSkeleton) : txSkeleton =
     let { asset = asset; amount = amount } = output.spend
 
-    let outputs =
-        if Map.containsKey asset txSkeleton.inputs then
-            let oldAmount, outputs = Map.find asset txSkeleton.outputs
-            txSkeleton.outputs
-            |> Map.add asset (amount + oldAmount, output :: outputs)
-        else txSkeleton.outputs |> Map.add asset (amount, [ output ])
-    { txSkeleton with outputs = outputs }
+    let num_outputs, outputMap = txSkeleton.outputs
+    let outputMap =
+        if Map.containsKey asset outputMap then
+            let oldAmount, outputs = Map.find asset outputMap
+            outputMap |> Map.add asset
+                            (amount + oldAmount,
+                            (num_outputs+1UL, output)::outputs)
+        else outputMap |> Map.add asset (amount, [num_outputs+1UL, output])
+    { txSkeleton with outputs = num_outputs+1UL, outputMap }
 
 let addInput (pointedOutput : pointedOutput) (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
     lazy (insertPointedOutput pointedOutput txSkeleton) |> Cost.C
@@ -138,10 +150,13 @@ let destroy (amount : U64.t) (contractHash : contractHash)
     |> Cost.C
 
 let isValid (txSkeleton : txSkeleton) : Cost.t<bool, unit> =
-    lazy (if keySet txSkeleton.inputs <> keySet txSkeleton.outputs then false
+    let _, inputMap = txSkeleton.inputs
+    let _, outputMap = txSkeleton.outputs
+    lazy (if keySet inputMap <> keySet outputMap then false
           else
-              txSkeleton.inputs |> Map.forall(fun asset (inputAmount, _) ->
-                                       let outputAmount, _ =
-                                           Map.find asset txSkeleton.outputs
-                                       inputAmount = outputAmount))
-    |> Cost.C
+              inputMap
+              |> Map.forall(fun asset (inputAmount, _) ->
+                                let outputAmount, _ =
+                                           Map.find asset outputMap
+                                inputAmount = outputAmount)
+    ) |> Cost.C

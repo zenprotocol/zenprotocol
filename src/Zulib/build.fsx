@@ -97,6 +97,7 @@ Target "Extract" (fun _ ->
        "--codegen-lib";"Zen.Cost";
        "--codegen-lib";"Zen.Array";
        "--extract_module";"Zen.Types.Extracted";
+       "--extract_module";"Zen.Types.Main";
        "--codegen-lib";"Zen.Types";
        "--odir";extractedDir |]
 
@@ -136,7 +137,8 @@ Target "Build" (fun _ ->
       "fsharp/Realized/Zen.Sha3.Realized.fs";
       "fsharp/Realized/Zen.Merkle.fs";
       "fsharp/Realized/Zen.Util.fs";
-      "fsharp/Realized/Zen.Types.TxSkeleton.fs"
+      "fsharp/Realized/Zen.Types.TxSkeleton.fs";
+      "fsharp/Extracted/Zen.Types.Main.fs"
     |]
 
   let checker = FSharpChecker.Create()
