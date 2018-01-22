@@ -15,10 +15,10 @@ module Blockchain =
 
     type Command = 
         | ValidateTransaction of Types.Transaction
-        | GetMemPool of peerId:byte[]
-        | GetTransaction of peerId:byte[] * txHash:Hash.Hash
-        | GetBlock of peerId:byte[] * blockHash:Hash.Hash
-        | GetTip of peerId:byte[]
+        | RequestMemPool of peerId:byte[]
+        | RequestTransaction of peerId:byte[] * txHash:Hash.Hash
+        | RequestBlock of peerId:byte[] * blockHash:Hash.Hash
+        | RequestTip of peerId:byte[]
         | HandleMemPool of peerId:byte[] * Hash.Hash list
         | HandleTip of Types.BlockHeader
         | ValidateNewBlockHeader of peerId:byte[] * Types.BlockHeader
@@ -34,11 +34,11 @@ module Blockchain =
     let validateTransaction client tx = 
         Command.send client serviceName (ValidateTransaction tx)
     
-    let getMemPool client peerId = 
-        Command.send client serviceName (GetMemPool peerId)
+    let requestMemPool client peerId = 
+        Command.send client serviceName (RequestMemPool peerId)
         
-    let getTransaction client peerId txHash = 
-        Command.send client serviceName (GetTransaction (peerId,txHash))
+    let requestTransaction client peerId txHash = 
+        Command.send client serviceName (RequestTransaction (peerId,txHash))
     
     let handleMemPool client peerId txHashes =
         Command.send client serviceName (HandleMemPool (peerId,txHashes))                                                
@@ -63,12 +63,12 @@ module Blockchain =
         ValidateNewBlockHeader (peerId,header)
         |> Command.send client serviceName 
                 
-    let getBlock client peerId blockHash = 
-        GetBlock (peerId,blockHash)
+    let requestBlock client peerId blockHash = 
+        RequestBlock (peerId,blockHash)
         |> Command.send client serviceName
         
-    let getTip client peerId =
-        GetTip peerId         
+    let requestTip client peerId =
+        RequestTip peerId         
         |> Command.send client serviceName
         
     let getBlockTemplate client = 

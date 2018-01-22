@@ -20,13 +20,13 @@ let handleCommand chain command session timestamp (state:State) =
             let! memoryState = TransactionHandler.validateTransaction chain contractPath tx state.memoryState
             return {state with memoryState = memoryState}
         }
-    | GetMemPool peerId ->        
+    | RequestMemPool peerId ->        
         effectsWriter {
             let txHashes = MemPool.getTxHashes state.memoryState.mempool
             do! sendMemPool peerId txHashes
             return state
         }
-    | GetTransaction (peerId, txHash) -> 
+    | RequestTransaction (peerId, txHash) -> 
          effectsWriter {
             match MemPool.getTransaction txHash state.memoryState.mempool with
             | Some tx ->
@@ -59,14 +59,14 @@ let handleCommand chain command session timestamp (state:State) =
         BlockHandler.handleTip chain session header state
     | ValidateNewBlockHeader (peerId, header) ->
         BlockHandler.handleNewBlockHeader chain session peerId header state
-    | GetTip peerId ->
+    | RequestTip peerId ->
         effectsWriter {
             if state.tipState.tip <> ExtendedBlockHeader.empty then
                 do! sendTip peerId state.tipState.tip.header
             
             return state                                                      
         } 
-    | GetBlock (peerId, blockHash) ->
+    | RequestBlock (peerId, blockHash) ->
         effectsWriter {
             match BlockRepository.tryGetHeader session blockHash with
             | None -> return state
