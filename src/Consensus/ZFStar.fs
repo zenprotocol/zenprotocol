@@ -85,7 +85,7 @@ let private listToVector (ls:List<'Aa>) : Zen.Vector.t<'Aa, _> =
 
 let convertResult (txSkeleton : Cost.t<result<txSkeleton>,unit>)
     : Result<TxSkeleton, string> =
-    match uncost txSkeleton with
+    match unCost txSkeleton with
     | ERR err -> Error err
     | EX err -> Error err.Message //TODO: remove EX
     | OK {inputs=inputs; outputs=outputs} ->

@@ -5,6 +5,7 @@ open Infrastructure
 open TestsInfrastructure.Nunit
 open Exception
 open Zen.Types.Extracted
+open Zen.Types.TxSkeleton
 open FStar.Pervasives
 open Microsoft.FSharp.Core
 open Zen.Cost.Realized
@@ -25,14 +26,9 @@ let main transactionSkeleton hash =
     ret @ transactionSkeleton
 """
 
-let input =
-    Tx (
-        0I,
-        Zen.Vector.VNil,
-        0I,
-        Zen.Vector.VNil,
-        Native.option.None
-    )
+let input : txSkeleton =
+    {inputs=Map.empty; outputs=Map.empty}
+    
 
 [<Test>]
 let ``Should invoke compiled``() =
@@ -57,11 +53,11 @@ let ``Should invoke compiled``() =
                 Exception.toError "unable to invoke method" ex)
         |> Result.bind (fun result ->
             try
-                Ok (result :?> cost<result<transactionSkeleton>, unit>)
+                Ok (result :?> cost<result<txSkeleton>, unit>)
             with _ as ex ->
                 Exception.toError "unexpected result" ex)
         |> Result.map (
-            fun (Zen.Cost.Realized.C inj:cost<result<transactionSkeleton>, unit>) ->
+            fun (Zen.Cost.Realized.C inj:cost<result<txSkeleton>, unit>) ->
                 inj.Force()
         )
         |> Result.bind (function
@@ -70,4 +66,4 @@ let ``Should invoke compiled``() =
             | EX err -> Error err.Message //TODO: remove EX
         )
 
-    shouldEqual (result, (Ok input : Result<transactionSkeleton,string>))
+    shouldEqual (result, (Ok input : Result<txSkeleton,string>))
