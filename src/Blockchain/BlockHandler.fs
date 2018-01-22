@@ -325,7 +325,12 @@ let validateBlock chain contractPath session timestamp block mined (state:State)
                     do! publishBlock block.header
                     
                 if Block.isGenesis chain block then 
-                     return! handleGenesisBlock chain contractPath session timestamp state blockHash block                                                                                      
+                    let! state' = handleGenesisBlock chain contractPath session timestamp state blockHash block
+                     
+                    if state'.tipState.tip <> state.tipState.tip then
+                        do! publish (TipChanged state'.tipState.tip.header)
+                             
+                    return state'                                                                                                          
                 else
                     // try to find parent block                               
                     match BlockRepository.tryGetHeader session block.header.parent with
@@ -356,10 +361,16 @@ let validateBlock chain contractPath session timestamp block mined (state:State)
 
                             return state                        
                         | ExtendedBlockHeader.Connected ->
-                            if parent.hash = state.tipState.tip.hash then                        
-                                return! handleMainChain chain contractPath session timestamp state parent blockHash block
-                            else
-                                return! handleForkChain chain contractPath session timestamp state parent blockHash block
+                            let! state' =
+                                if parent.hash = state.tipState.tip.hash then                        
+                                    handleMainChain chain contractPath session timestamp state parent blockHash block
+                                else
+                                    handleForkChain chain contractPath session timestamp state parent blockHash block
+                                    
+                            if state'.tipState.tip <> state.tipState.tip then
+                                do! publish (TipChanged state'.tipState.tip.header)
+                                        
+                            return state'
     }
 
 let handleNewBlockHeader chain session peerId header (state:State) =

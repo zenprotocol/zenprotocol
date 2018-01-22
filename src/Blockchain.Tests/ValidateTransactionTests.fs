@@ -340,9 +340,8 @@ let ``Valid contract should be added to ActiveContractSet``() =
     ActiveContractSet.containsContract cHash state'.memoryState.activeContractSet |> should equal true
 
     // Checking that TransactionAddedToMemPool was published
-    events |> should haveLength 2
-    events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (txHash, tx)))
-    events |> should contain (EffectsWriter.EventEffect (ContractActivated (Contract.computeHash contractCode)))
+    events |> should haveLength 1
+    events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (txHash, tx)))    
 
     // Checking that the transaction was added to mempool
     MemPool.containsTransaction txHash state'.memoryState.mempool |> should equal true
@@ -401,12 +400,8 @@ let ``Valid contract should execute``() =
     |> Result.map (fun (_, state) ->
         ActiveContractSet.containsContract sampleContractHash state.memoryState.activeContractSet
         |> should equal true
-        Handler.handleRequest (fun result -> 
-            let was = 
-                match result with
-                | TransactionResult.Ok tx -> Result.Ok tx
-                | TransactionResult.Error tx -> Result.Error tx
-            shouldEqual (was, sampleExpectedResult))
-            (ExecuteContract (sampleInputTx, sampleContractHash)) state)
+        
+        TransactionHandler.executeContract sampleInputTx sampleContractHash state.memoryState
+        )                
     |> Result.mapError failwith
     |> ignore

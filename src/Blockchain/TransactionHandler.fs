@@ -18,9 +18,6 @@ let private activateContract chain contractPath acs (tx : Types.Transaction) sho
                 | Ok contract ->
                     Log.warning "activating contract: %A" (Address.encode chain (Address.Contract contract.hash))
 
-                    if shouldPublishEvents then
-                        do! publish (ContractActivated (Contract.hash contract))
-
                     return ActiveContractSet.add contract.hash contract acs
                 | Error err ->
                     Log.info "handle contract error: %A" err
