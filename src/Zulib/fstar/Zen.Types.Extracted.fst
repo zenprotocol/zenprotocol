@@ -117,14 +117,20 @@ unopteq type inputMsg = {
 val maxCost: nat
 let maxCost = 200
 
-noeq type costFunction = | CostFunc: #n:nat{n<=maxCost} -> f:(transactionSkeleton -> Zen.Cost.t nat n) -> costFunction
+noeq type costFunction =
+  | CostFunc: #n:nat{n<=maxCost}
+           -> f:( transactionSkeleton
+                  -> string
+                  -> Zen.Cost.t nat n)
+           -> costFunction
 
 noeq type mainFunction =
   | MainFunc: cf:costFunction
            -> mf: ( inTxSkel:transactionSkeleton
                     -> hash
+                    -> command: string
                     -> Zen.Cost.t (result transactionSkeleton)
-                                  (Zen.Cost.force ((CostFunc?.f cf) inTxSkel))
+                                  (Zen.Cost.force ((CostFunc?.f cf) inTxSkel command))
                   )
            -> mainFunction
 
