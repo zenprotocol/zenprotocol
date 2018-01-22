@@ -6,12 +6,15 @@ open Consensus.Types
 open Consensus.Tests
 open Wallet
 open NUnit.Framework
+open Infrastructure
 open FsCheck
 open FsCheck.NUnit
 open FsUnit
 
 let timestamp = 1515594186383UL + 1UL
 let difficulty = 0x20fffffful
+
+let contractsPath = "./data"
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``block with empty transactions failed validation``(header) =
@@ -65,14 +68,16 @@ let ``block with valid transactions pass validation``(header) (NonEmptyTransacti
     
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]        
 let ``connecting block failed when block number is not successive``(parent:BlockHeader) (block:Block) =
+
     let acs = ActiveContractSet.empty
     let utxoSet = UtxoSet.create ()
     let ema = EMA.create Chain.Test
  
-    parent.blockNumber + 1ul <> block.header.blockNumber ==> (Block.connect Chain.Test parent 1UL utxoSet acs ema block = Error "blockNumber mismatch")  
+    parent.blockNumber + 1ul <> block.header.blockNumber ==> (Block.connect Chain.Test contractsPath parent 1UL utxoSet acs ema block = Error "blockNumber mismatch")  
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``connecting block should fail when commitments are wrong``(parent:BlockHeader) (NonEmptyTransactions transactions) = 
+    
     let acs = ActiveContractSet.empty
     let utxoSet = UtxoSet.create ()
     let ema = EMA.create Chain.Test   
@@ -89,7 +94,7 @@ let ``connecting block should fail when commitments are wrong``(parent:BlockHead
     
     let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero;}
     
-    Block.connect Chain.Test parent (timestamp + 1UL) utxoSet acs ema block = Error "commitments mismatch"
+    Block.connect Chain.Test contractsPath parent (timestamp + 1UL) utxoSet acs ema block = Error "commitments mismatch"
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]    
 let ``connecting block should fail when transaction inputs are invalid``(parent:BlockHeader) (NonEmptyTransactions transactions) =
@@ -99,12 +104,12 @@ let ``connecting block should fail when transaction inputs are invalid``(parent:
  
     let block = Block.createTemplate parent timestamp ema acs transactions
         
-    Block.connect Chain.Test parent (timestamp + 1UL) utxoSet acs ema block = Error "transactions failed inputs validation due to Orphan"
+    Block.connect Chain.Test contractsPath parent (timestamp + 1UL) utxoSet acs ema block = Error "transactions failed inputs validation due to Orphan"
 
 [<Test>]    
 let ``block timestamp too early``() =
     let ema = {
-        (EMA.create Chain.Test) with delayed = [timestamp-1UL;timestamp; timestamp+1UL]
+        (EMA.create Chain.Test) with delayed = [timestamp-5UL .. timestamp+5UL]
     }
         
     let rootAccount = Account.createRoot ()
@@ -121,7 +126,7 @@ let ``block timestamp too early``() =
     
     let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "block's timestamp is too early"
 
-    Block.connect Chain.Test parent timestamp utxoSet acs ema block |> should equal expected
+    Block.connect Chain.Test contractsPath parent timestamp utxoSet acs ema block |> should equal expected
     
 [<Test>]    
 let ``block timestamp in the future``() =
@@ -143,7 +148,7 @@ let ``block timestamp in the future``() =
     
     let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "block timestamp too far in the future"
    
-    Block.connect Chain.Test parent timestamp utxoSet acs ema block |> should equal expected
+    Block.connect Chain.Test contractsPath parent timestamp utxoSet acs ema block |> should equal expected
 
 [<Test>]    
 let ``block with mismatch commitments fail connecting``() = 
@@ -163,7 +168,7 @@ let ``block with mismatch commitments fail connecting``() =
     
     let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "commitments mismatch"
     
-    Block.connect Chain.Test parent timestamp utxoSet acs ema block |> should equal expected
+    Block.connect Chain.Test contractsPath parent timestamp utxoSet acs ema block |> should equal expected
     
 [<Test>]    
 let ``can connect valid block``() = 
@@ -180,7 +185,7 @@ let ``can connect valid block``() =
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate parent (timestamp+1UL) ema acs [tx]
     
-    let result = Block.connect Chain.Test parent timestamp utxoSet acs ema block
+    let result = Block.connect Chain.Test contractsPath  parent timestamp utxoSet acs ema block
     
     match result with 
     | Ok _ -> ()

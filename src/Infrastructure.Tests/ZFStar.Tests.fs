@@ -1,39 +1,73 @@
 ﻿module Infrastructure.ZFStar.Tests
 
 open NUnit.Framework
-open FsUnit 
 open Infrastructure
+open TestsInfrastructure.Nunit
+open Exception
+open Zen.Types.Extracted
+open FStar.Pervasives
+open Microsoft.FSharp.Core
+open Zen.Cost.Realized
 
 let fstCode = """
-val test: nat -> nat
-let test i = i + 1
-"""
-let input = 10I
-let output = 11I
+open Zen.Types
+open Zen.Vector
+open Zen.Util
+open Zen.Base
+open Zen.Cost
+open Zen.ErrorT
 
-let (>=>) a b = Result.bind b a
+val cf: transactionSkeleton -> cost nat 1
+let cf _ = ~!2
+
+val main: transactionSkeleton -> hash -> cost (result transactionSkeleton) 2
+let main transactionSkeleton hash =
+    ret @ transactionSkeleton
+"""
+
+let input =
+    Tx (
+        0I,
+        Zen.Vector.VNil,
+        0I,
+        Zen.Vector.VNil,
+        Native.option.None
+    )
 
 [<Test>]
 let ``Should invoke compiled``() =
+    let assemblyDirectory = "./data"
 
-    let result = 
-        ZFStar.compile fstCode "Test"
+    Platform.cleanDirectory assemblyDirectory
+
+    let result =
+        ZFStar.compile assemblyDirectory fstCode "Test"
         |> Result.bind (fun assembly ->
-            try 
+            try
                 Ok (assembly
                 .GetModules().[0]
                 .GetTypes().[0]
-                .GetMethods().[0])
-            with | _ -> Error "could not access method")
+                .GetMethods().[1])
+            with _ as ex ->
+                Exception.toError "could not find method" ex)
         |> Result.bind (fun methodInfo ->
-            try 
-                Ok (methodInfo.Invoke(null, [| input |]))
-            with
-                | _ -> Error "unable to invoke method")
+            try
+                Ok (methodInfo.Invoke(null, [| input; null |]))
+            with _ as ex ->
+                Exception.toError "unable to invoke method" ex)
         |> Result.bind (fun result ->
-            try 
-                Ok (result :?> System.Numerics.BigInteger)
-            with
-                | _ -> Error "unexpected result")
+            try
+                Ok (result :?> cost<result<transactionSkeleton>, unit>)
+            with _ as ex ->
+                Exception.toError "unexpected result" ex)
+        |> Result.map (
+            fun (Zen.Cost.Realized.C inj:cost<result<transactionSkeleton>, unit>) ->
+                inj.Force()
+        )
+        |> Result.bind (function
+            | OK value -> Ok value
+            | ERR err -> Error err
+            | EX err -> Error err.Message //TODO: remove EX
+        )
 
-    should equal result (Ok output : Result<System.Numerics.BigInteger,string>)
+    shouldEqual (result, (Ok input : Result<transactionSkeleton,string>))

@@ -38,6 +38,9 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
+    <Reference Include="Zulib">
+      <HintPath>..\Zulib\bin\Zulib.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
@@ -53,6 +56,10 @@
     </ProjectReference>
     <Compile Include="Platform.Tests.fs" />
     <Compile Include="ZFStar.Tests.fs" />
+    <ProjectReference Include="..\TestsInfrastructure\TestsInfrastructure.fsproj">
+      <Project>{9DF227BB-E98D-49D7-A33B-C0D5B170F430}</Project>
+      <Name>TestsInfrastructure</Name>
+    </ProjectReference>
   </ItemGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
@@ -74,6 +81,17 @@
         </Reference>
         <Reference Include="AsyncIO">
           <HintPath>..\..\packages\AsyncIO\lib\net40\AsyncIO.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6.2'">
+      <ItemGroup>
+        <Reference Include="FSharp.Compatibility.OCaml">
+          <HintPath>..\..\packages\FSharp.Compatibility.OCaml\lib\net40\FSharp.Compatibility.OCaml.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
@@ -163,6 +181,17 @@
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6.2'">
       <ItemGroup>
+        <Reference Include="System.Collections.Immutable">
+          <HintPath>..\..\packages\System.Collections.Immutable\lib\netstandard1.0\System.Collections.Immutable.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6.2'">
+      <ItemGroup>
         <Reference Include="System.Reactive.Core">
           <HintPath>..\..\packages\System.Reactive.Core\lib\net46\System.Reactive.Core.dll</HintPath>
           <Private>True</Private>
@@ -221,6 +250,18 @@
       </ItemGroup>
     </When>
   </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6.2'">
+      <ItemGroup>
+        <Reference Include="System.Reflection.Metadata">
+          <HintPath>..\..\packages\System.Reflection.Metadata\lib\netstandard1.1\System.Reflection.Metadata.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Import Project="..\..\packages\NETStandard.Library\build\NETStandard.Library.targets" Condition="Exists('..\..\packages\NETStandard.Library\build\NETStandard.Library.targets')" Label="Paket" />
   <Import Project="..\..\packages\zen_z3_linux\build\zen_z3_linux.targets" Condition="Exists('..\..\packages\zen_z3_linux\build\zen_z3_linux.targets')" Label="Paket" />
   <Import Project="..\..\packages\zen_z3_osx\build\$(__paket__zen_z3_osx_targets).targets" Condition="Exists('..\..\packages\zen_z3_osx\build\$(__paket__zen_z3_osx_targets).targets')" Label="Paket" />
   <Import Project="..\..\packages\ZFStar\build\ZFStar.targets" Condition="Exists('..\..\packages\ZFStar\build\ZFStar.targets')" Label="Paket" />

@@ -3,7 +3,7 @@ module Consensus.UtxoSet
 open Consensus.Types
 
 type InputStatus =
-    | Spent of Output // TODO: this is a hack for undo blocks, we should not keep the output, we need to have access to output repository in the future
+    | Spent
     | Unspent of Output
 
 type T = Map<Outpoint, InputStatus>
@@ -14,7 +14,7 @@ let create () =
 let handleTransaction txHash tx (set:T) =
     let folder state input =
         match Map.find input state with
-        | Unspent output -> Map.add input (Spent output) state
+        | Unspent output -> Map.add input Spent state
         | _ -> failwith "Expected output to be unspent"
 
     let utxos = List.fold folder set tx.inputs
@@ -44,26 +44,3 @@ let getUtxos outpoints set =
                     None
                 | Some (Unspent output) -> Some (output :: list))
         outpoints (Some [])
-
-let undoBlock block utxoSet =
-
-    // unmark any spent output
-    let utxoSet  =
-        List.map (fun tx -> tx.inputs) block.transactions
-        |> List.concat
-        |> List.fold (fun utxoSet input ->
-            match Map.find input utxoSet with
-            | Spent output -> Map.add input (Unspent output) utxoSet
-            | _ -> failwith "Expected output to be spent"
-            ) utxoSet
-
-    // remove all outputs
-    List.fold (fun utxoSet tx ->
-        let txHash = Transaction.hash tx
-
-        tx.outputs
-        |> List.mapi (fun i _ -> i)
-        |> List.fold (fun utxoSet i ->
-            let outpoint = {txHash=txHash; index=uint32 i}
-
-            Map.remove outpoint utxoSet) utxoSet) utxoSet block.transactions

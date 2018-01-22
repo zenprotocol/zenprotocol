@@ -47,7 +47,7 @@ let fromString encoded =
     | Some decoded -> Hash decoded |> Ok
 
 let isValid (Hash hash) =
-    Array.length hash = 32
+    Array.length hash = Length
 
 let toBigInt (h:Hash) =
     h |> bytes

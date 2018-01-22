@@ -8,6 +8,9 @@ open Consensus.TxSkeleton
 open Infrastructure
 open ZFStar
 open Zen.Types.Extracted
+open FStar.Pervasives
+open Microsoft.FSharp.Core
+open Zen.Cost.Realized
 open Zen.Types.TxSkeleton
 open Exception
 
@@ -23,12 +26,12 @@ let private findMethod (assembly:Assembly) =
         assembly
             .GetModules().[0]
             .GetTypes().[0]
-            .GetMethods().[0]
+            .GetMethods().[1]
             |> Ok
     with _ as ex ->
         Exception.toError "get contract method" ex
 
-let private invoke (methodInfo:MethodInfo) cHash input = 
+let private invoke (methodInfo:MethodInfo) cHash input =
     try
         methodInfo.Invoke (null, [| input; cHash |]) |> Ok
     with _ as ex ->
@@ -36,7 +39,7 @@ let private invoke (methodInfo:MethodInfo) cHash input =
 
 let private castOutput (output:System.Object) =
     try
-        output :?> txSkeleton |> Ok
+        output :?> cost<result<txSkeleton>, unit> |> Ok
     with _ as ex ->
         Exception.toError "cast contract output" ex
 
@@ -45,32 +48,40 @@ let private wrap methodInfo =
         convertInput txSkeleton
         |> invoke methodInfo cHash
         |> Result.bind castOutput
-        |> Result.map convertResult
+        |> Result.bind convertResult
 
 let hash contract = contract.hash
 
-let computeHash (code:string) =    
+let computeHash (code:string) =
     code
     |> Encoding.UTF8.GetBytes
     |> Hash.compute
 
-let compile code =
+let compile contractsPath code =
     let hash = computeHash code
 
-    hash 
+    hash
     |> Hash.bytes
     |> Base16.encode
-    |> ZFStar.compile code
-    |> Result.bind findMethod 
+    |> ZFStar.compile contractsPath code
+    |> Result.bind findMethod
     |> Result.map wrap
     |> Result.map (fun fn ->
         {
             hash = hash
             fn = fn
-        })                
+        })
 
-let run contract = 
+let run contract =
     contract.fn contract.hash
-    
-let load path (hash:Hash.Hash) : T = 
-    failwith "not implemented yet"
+
+let load contractsPath (hash:Hash.Hash) =
+
+    ZFStar.load contractsPath (Hash.toString hash)
+    |> Result.bind findMethod
+    |> Result.map wrap
+    |> Result.map (fun fn ->
+        {
+            hash = hash
+            fn = fn
+        })

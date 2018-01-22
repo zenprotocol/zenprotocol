@@ -1,4 +1,5 @@
-﻿<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\..\packages\FSharp.Compiler.Tools\build\FSharp.Compiler.Tools.props" Condition="Exists('..\..\packages\FSharp.Compiler.Tools\build\FSharp.Compiler.Tools.props')" Label="Paket" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -64,6 +65,10 @@
     </ProjectReference>
     <Compile Include="SampleContract.fs" />
     <Compile Include="ContractTests.fs" />
+    <ProjectReference Include="..\Infrastructure\Infrastructure.fsproj">
+      <Project>{81161f64-d019-422c-a3cf-321cde6ca209}</Project>
+      <Name>Infrastructure</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Wallet\Wallet.fsproj">
       <Project>{289a59eb-d1d4-499f-87b9-f75b799829c0}</Project>
       <Name>Wallet</Name>
@@ -76,6 +81,7 @@
       <Name>TestsInfrastructure</Name>
     </ProjectReference>
     <Compile Include="WitnessValidationTests.fs" />
+    <Compile Include="EMATests.fs" />
   </ItemGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
@@ -169,6 +175,29 @@
       </ItemGroup>
     </When>
   </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6.2'">
+      <ItemGroup>
+        <Reference Include="System.Collections.Immutable">
+          <HintPath>..\..\packages\System.Collections.Immutable\lib\netstandard1.0\System.Collections.Immutable.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6.2'">
+      <ItemGroup>
+        <Reference Include="System.Reflection.Metadata">
+          <HintPath>..\..\packages\System.Reflection.Metadata\lib\netstandard1.1\System.Reflection.Metadata.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Import Project="..\..\packages\NETStandard.Library\build\NETStandard.Library.targets" Condition="Exists('..\..\packages\NETStandard.Library\build\NETStandard.Library.targets')" Label="Paket" />
   <Import Project="..\..\packages\zen_secp256k1_linux\build\$(__paket__zen_secp256k1_linux_targets).targets" Condition="Exists('..\..\packages\zen_secp256k1_linux\build\$(__paket__zen_secp256k1_linux_targets).targets')" Label="Paket" />
   <Import Project="..\..\packages\zen_secp256k1_osx\build\$(__paket__zen_secp256k1_osx_targets).targets" Condition="Exists('..\..\packages\zen_secp256k1_osx\build\$(__paket__zen_secp256k1_osx_targets).targets')" Label="Paket" />
   <Import Project="..\..\packages\zen_z3_linux\build\zen_z3_linux.targets" Condition="Exists('..\..\packages\zen_z3_linux\build\zen_z3_linux.targets')" Label="Paket" />

@@ -6,3 +6,5 @@ FSharp.Core
 FSharp.Data
 FSharp.Compiler.Tools
 Zen.FSharp.Compiler.Service
+ZFS-Tools
+ZFStar
