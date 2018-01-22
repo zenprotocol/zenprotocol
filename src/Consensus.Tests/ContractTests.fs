@@ -23,7 +23,7 @@ let compileRunAndCompare code =
         (contract.hash, sampleContractHash)
         |> shouldEqual 
         //execute and check
-        Contract.run contract sampleInputTx)
+        Contract.run contract "" sampleInputTx)
 
 [<Test>]
 let ``Should get contract function``() = 
@@ -48,7 +48,7 @@ let compileRunAndValidate code =
     Contract.compile contractsPath code
     |> Result.bind (fun contract ->
         let utxoSet = getSampleUtxoset (UtxoSet.create())
-        Contract.run contract sampleInputTx
+        Contract.run contract "" sampleInputTx
         |> Result.bind (TxSkeleton.checkPrefix sampleInputTx)
         |> Result.map (Transaction.fromTxSkeleton contract.hash)
         |> Result.map (Transaction.addContractWitness contract.hash sampleInputTx)
@@ -72,13 +72,13 @@ let ``Contract should not be able to create tokens other than its own``() =
          open Zen.Cost
          open Zen.ErrorT
 
-         val cf: transactionSkeleton -> cost nat 1
-         let cf _ = ~!22
+         val cf: transactionSkeleton -> string -> cost nat 1
+         let cf _ _ = ~!22
 
-         val main: transactionSkeleton -> hash -> cost (result transactionSkeleton) 22
-         let main (Tx pInputs outputs data) hash =
+         val main: transactionSkeleton -> hash -> string -> cost (result transactionSkeleton) 22
+         let main (Tx pInputs outputs data) chash command =
            let output = {
-             lock = ContractLock hash 0 Empty;
+             lock = ContractLock chash 0 Empty;
              spend = {
                asset = hashFromBase64 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; //aha! should be of hash value
                amount = 1000UL

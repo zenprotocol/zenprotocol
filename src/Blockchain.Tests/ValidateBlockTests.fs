@@ -572,7 +572,7 @@ let ``block with a contract activation is added to chain``() =
             | Ok tx -> tx
             | Error error -> failwith error 
                 
-    let acs = ActiveContractSet.add cHash {hash=cHash;fn=fun _ tx -> Ok tx} state.tipState.activeContractSet
+    let acs = ActiveContractSet.add cHash {hash=cHash;fn=fun _ _ tx -> Ok tx} state.tipState.activeContractSet
     
     let block = Block.createTemplate genesisBlock.header timestamp state.tipState.ema acs [tx]
     

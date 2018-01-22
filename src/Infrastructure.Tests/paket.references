@@ -11,3 +11,5 @@ zen_z3_osx
 ZFStar
 System.Reflection.Metadata
 FSharp.Compatibility.OCaml
+BouncyCastle
+FsBech32
