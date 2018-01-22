@@ -15,9 +15,12 @@ let (>=>) a b = Result.bind b a
 
 [<Test>]
 let ``Should invoke compiled``() =
+    let assemblyDirectory = "./data"
+
+    Platform.cleanDirectory assemblyDirectory
 
     let result = 
-        ZFStar.compile fstCode "Test"
+        ZFStar.compile assemblyDirectory fstCode "Test"
         |> Result.bind (fun assembly ->
             try 
                 Ok (assembly

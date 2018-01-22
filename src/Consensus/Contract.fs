@@ -53,13 +53,13 @@ let computeHash (code:string) =
     |> Encoding.UTF8.GetBytes
     |> Hash.compute
 
-let compile code =
+let compile contractsPath code =
     let hash = computeHash code
 
     hash 
     |> Hash.bytes
     |> Base16.encode
-    |> ZFStar.compile code
+    |> ZFStar.compile contractsPath code
     |> Result.bind findMethod 
     |> Result.map wrap
     |> Result.map (fun fn ->
@@ -71,5 +71,14 @@ let compile code =
 let run contract = 
     contract.fn contract.hash
     
-let load path (hash:Hash.Hash) : T = 
-    failwith "not implemented yet"
+let load contractsPath (hash:Hash.Hash) = 
+    
+    ZFStar.load contractsPath (Hash.toString hash)
+    |> Result.bind findMethod 
+    |> Result.map wrap
+    |> Result.map (fun fn ->
+        {
+            hash = hash
+            fn = fn
+        })         
+    

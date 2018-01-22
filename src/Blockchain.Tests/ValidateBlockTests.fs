@@ -12,6 +12,10 @@ open FsCheck
 open Messaging.Events
 open Messaging.Services.Network
 open Wallet
+open Blockchain.DatabaseContext
+open Consensus.Tests.SampleContract
+open Consensus.Contract
+open TestsInfrastructure.Constraints
 
 let (>>=) = Writer.bind
 let chain = Chain.Test
@@ -96,13 +100,13 @@ let createChainFromGenesis length nonce =
     createChain length nonce genesisBlock ema rootAccount
     
 let getGenesisState session =         
-    BlockHandler.validateBlock chain session timestamp genesisBlock false state
+    BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state
     |> Writer.unwrap
     |> snd         
     
 let validateChain session blocks state = 
     List.fold (fun (_,state) block ->         
-        BlockHandler.validateBlock chain session block.header.timestamp block false state
+        BlockHandler.validateBlock chain session.context.contractPath session block.header.timestamp block false state
         |> Writer.unwrap) ([], state) blocks                    
             
 [<Test>]
@@ -113,7 +117,7 @@ let ``genesis block accepted``() =
     let block = Block.createGenesis chain [Transaction.rootTx] (0UL,0UL)
     
     let events, state' = 
-        BlockHandler.validateBlock chain session timestamp block false state
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state
         |> Writer.unwrap
         
     events |> should haveLength 1
@@ -137,7 +141,7 @@ let ``wrong genesis block should be rejected``() =
     use session = DatabaseContext.createSession databaseContext
     let block = Block.createGenesis chain [Transaction.rootTx] (0UL,1UL)    
     let events, state' = 
-        BlockHandler.validateBlock chain session timestamp block false state
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state
         |> Writer.unwrap
         
     events |> should haveLength 0
@@ -152,7 +156,7 @@ let ``validate new valid block which extended main chain``() =
     use session = DatabaseContext.createSession databaseContext
                    
     let _, state =
-        BlockHandler.validateBlock chain session timestamp genesisBlock false state         
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state         
         |> Writer.unwrap  
         
     let tx = createTransaction rootAccount
@@ -164,7 +168,7 @@ let ``validate new valid block which extended main chain``() =
         |> Writer.unwrap        
         
     let events, state' = 
-        BlockHandler.validateBlock chain session timestamp block false state
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state
         |> Writer.unwrap         
         
     events |> should haveLength 2
@@ -189,7 +193,7 @@ let ``validate new invalid block which try to extended main chain``() =
     use session = DatabaseContext.createSession databaseContext
                    
     let _, state =
-        BlockHandler.validateBlock chain session timestamp genesisBlock false state         
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state         
         |> Writer.unwrap  
         
     let tx = createTransaction rootAccount
@@ -202,7 +206,7 @@ let ``validate new invalid block which try to extended main chain``() =
         |> Writer.unwrap        
         
     let events, state' = 
-        BlockHandler.validateBlock chain session timestamp block false state
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state
         |> Writer.unwrap
         
     events |> should haveLength 0    
@@ -223,7 +227,7 @@ let ``validating orphan block yield a request for block from network``() =
     let block = Block.createTemplate genesisBlock.header timestamp state.tipState.ema acs [tx]
     
     let events, state' = 
-        BlockHandler.validateBlock chain session timestamp block false state
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state
         |> Writer.unwrap         
         
     events |> should haveLength 1    
@@ -248,12 +252,12 @@ let ``validate new block which connect orphan chain which extend main chain``() 
     
     // Sending orphan block first
     let _, state = 
-        BlockHandler.validateBlock chain session timestamp block false state
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state
         |> Writer.unwrap         
         
     // Now sending the genesis, which should roll forward the chain
     let events, state' = 
-        BlockHandler.validateBlock chain session timestamp genesisBlock false state
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state
         |> Writer.unwrap   
         
     events |> should haveLength 2
@@ -548,7 +552,38 @@ let ``orphan transactions added to mempool after origin tx found in block``() =
     areOutpointsInSet (getTxOutpints tx1) state.tipState.utxoSet |> should equal false
     areOutpointsInSet (getTxOutpints tx2) state.memoryState.utxoSet |> should equal true     
     areOutpointsInSet (getTxOutpints tx2) state.tipState.utxoSet |> should equal false
-         
+    
+[<Test>]    
+let ``block with a contract activation is added to chain``() =
+    use databaseContext = DatabaseContext.createEmpty "test"
+    use session = DatabaseContext.createSession databaseContext   
+    let state = getGenesisState session
+    
+    let cHash = Contract.computeHash sampleContractCode
+    let tx = 
+        Account.createActivateContractTransaction rootAccount sampleContractCode 
+        |>  function
+            | Ok tx -> tx
+            | Error error -> failwith error 
+                
+    let acs = ActiveContractSet.add cHash {hash=cHash;fn=fun _ tx -> Ok tx} state.tipState.activeContractSet
+    
+    let block = Block.createTemplate genesisBlock.header timestamp state.tipState.ema acs [tx]
+    
+    let events, state' = 
+            BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state
+            |> Writer.unwrap
+            
+    events |> should haveLength 1
+    events |> should contain (EffectsWriter.EventEffect (BlockAdded block))
+        
+    let tip = BlockRepository.tryGetTip session         
+        
+    tip |> should be some 
+    
+    let _,_,acs,_ = (Option.get tip)
+    
+    SparseMerkleTree.root acs |> should equal (SparseMerkleTree.root state'.tipState.activeContractSet)
     
 [<Test>]    
 let ``validate new block header should ask for block``() = 
@@ -606,10 +641,10 @@ let ``new block should publish to network``() =
         BlockHandler.handleNewBlockHeader chain session Array.empty block.header state
         |> Writer.unwrap
     let events, _ =
-        BlockHandler.validateBlock chain session timestamp block false state
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state
         |> Writer.unwrap
             
-    events |> should contain (EffectsWriter.NetworkCommand (PublishBlock block.header))
+    events |> should contain (EffectsWriter.NetworkCommand (PublishBlock block.header))   
     
 [<Test>]    
 let ``mined block should publish to network``() = 
@@ -624,7 +659,7 @@ let ``mined block should publish to network``() =
         |> List.head
                 
     let events, _ =
-        BlockHandler.validateBlock chain session timestamp block true state
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp block true state
         |> Writer.unwrap
             
     events |> should contain (EffectsWriter.NetworkCommand (PublishBlock block.header))
@@ -685,7 +720,7 @@ let ``tip block should not be publish to network``() =
         BlockHandler.handleTip chain session block.header state
         |> Writer.unwrap
     let events, _ =
-        BlockHandler.validateBlock chain session timestamp block false state
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state
         |> Writer.unwrap
             
     events |> should not' (contain (EffectsWriter.NetworkCommand (PublishBlock block.header)))  

@@ -10,3 +10,4 @@ zen_secp256k1_osx
 zen_z3_osx
 FSharp.Compiler.Tools
 ZFStar
+System.Reflection.Metadata

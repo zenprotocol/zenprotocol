@@ -25,7 +25,7 @@ let main dataPath chain busName =
             ebObservable
             |> Observable.map Handler.handleEvent
 
-        let databaseContext = DatabaseContext.create (Platform.combine dataPath "blockchain")                                
+        let databaseContext = DatabaseContext.create dataPath                              
 
         let tip,utxoSet,acs,ema = 
             use session = DatabaseContext.createSession databaseContext

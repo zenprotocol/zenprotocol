@@ -16,17 +16,6 @@ let add = SparseMerkleTree.add
 let tryFind = SparseMerkleTree.tryFind  
 
 let containsContract = SparseMerkleTree.containsKey
-
-let undoBlock (block:Block) acs = 
-    // TODO: restore any expired contracts
-    // TODO: what if user send activate transaction twice? we will actually remove it from ACS
-    // TODO: we should not remove but substract the expired block height, if it lower than current, remove
-    
-    List.choose (fun tx -> tx.contract) block.transactions
-    |> List.map Contract.computeHash 
-    |> List.map (fun cHash -> cHash, SparseMerkleTree.Empty)
-    |> List.toArray
-    |> SparseMerkleTree.updateMultiple acs 
     
 let getContractHashes (acs:T) =
-    acs.data |> Map.toSeq |> Seq.map fst        
+    acs.data |> Map.toSeq |> Seq.map fst

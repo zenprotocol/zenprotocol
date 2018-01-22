@@ -9,3 +9,4 @@ zen_z3_osx
 FSharp.Compiler.Tools
 ZFStar
 FSharp.Compatibility.OCaml
+System.Reflection.Metadata
