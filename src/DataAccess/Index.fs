@@ -1,48 +1,71 @@
 [<CompilationRepresentation (CompilationRepresentationFlags.ModuleSuffix)>]
 module DataAccess.Index 
+open DataAccess
 
-open LightningDB
+open Lmdb
+open System
 
 let create (session:Session) collection name indexKeySize indexKeySerializer getIndexKeys =
-    let databaseConfiguration = new DatabaseConfiguration()
-    databaseConfiguration.Flags <- 
-        DatabaseOpenFlags.Create ||| DatabaseOpenFlags.DuplicatesFixed ||| DatabaseOpenFlags.DuplicatesSort
- 
-    let db = session.OpenDatabase (name, databaseConfiguration)
-     
+    let mutable db = 0ul
+            
+    mdb_dbi_open(session.tx, name, MDB_CREATE ||| MDB_DUPSORT ||| MDB_DUPFIXED, &db)
+    |> checkErrorCode 
+
     {
         collection = collection
         database = db
+        environment = session.env
         getIndexKeys = getIndexKeys
         indexKeySerializer = indexKeySerializer
         indexKeySize = indexKeySize
     }
     
 let getAll index (session:Session) key =
-    let parseKeys (cursor:LightningCursor) = 
+    let parseKeys bytes = 
         seq {
             let keys = 
-                cursor.Current.Value            
+                bytes           
                 |> Array.chunkBySize index.indexKeySize
                 
             for key in keys do
-                let isExist,value = session.TryGet (index.collection.database, key)
-                if isExist then 
-                    yield index.collection.valueDeseralizer value                
+                use pinnedKey = pin key
+                
+                let mutable keyData = byteArrayToData pinnedKey 
+                let mutable valueData = Data.empty
+                           
+                let result = mdb_get (session.tx,index.collection.database, &keyData,&valueData)
+                            
+                if result = 0 then
+                    let value = 
+                        dataToByteArray valueData
+                        |> index.collection.valueDeseralizer
+                                       
+                    yield value                
         }
-      
-    let key = index.indexKeySerializer key
-    
-    let cursor = session.CreateCursor index.database
         
-    if cursor.MoveTo key && cursor.GetMultiple () then
-        seq {                            
-            yield! parseKeys cursor
-                
-            while cursor.MoveNextMultiple () do 
-                yield! parseKeys cursor  
-                
-            cursor.Dispose()                                                                     
+    let mutable cursor = IntPtr.Zero      
+    
+    mdb_cursor_open (session.tx, index.database, &cursor) |> checkErrorCode
+    
+    let key = index.indexKeySerializer key
+    use pinnedKey = pin key
+    
+    let mutable keyData = byteArrayToData pinnedKey   
+    let mutable valueData = Data.empty
+    
+    let moveTo = mdb_cursor_get (cursor, &keyData, &valueData,CursorOperation.Set) = 0
+                    
+    if moveTo then                
+        seq {
+            let mutable moveNext = mdb_cursor_get (cursor, &keyData, &valueData, CursorOperation.GetMultiple) = 0
+            
+            while moveNext do
+                let bytes = dataToByteArray valueData
+                yield! parseKeys bytes
+                    
+                moveNext <- mdb_cursor_get (cursor, &keyData, &valueData, CursorOperation.NextMultiple) = 0
+                                                                                                        
+            mdb_cursor_close cursor
         }         
     else 
         Seq.empty

@@ -7,6 +7,8 @@ type T = Map<Hash.Hash, Transaction>
 
 let empty = Map.empty
 
+let isEmpty = Map.isEmpty
+
 let containsTransaction = Map.containsKey 
 
 let add = Map.add

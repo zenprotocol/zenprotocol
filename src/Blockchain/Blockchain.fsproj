@@ -149,17 +149,6 @@
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6.2'">
       <ItemGroup>
-        <Reference Include="LightningDB">
-          <HintPath>..\..\packages\LightningDB\lib\net45\LightningDB.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6.2'">
-      <ItemGroup>
         <Reference Include="System.ServiceModel">
           <Paket>True</Paket>
         </Reference>
@@ -232,5 +221,4 @@
       </ItemGroup>
     </When>
   </Choose>
-  <Import Project="..\..\packages\LightningDB\build\LightningDB.targets" Condition="Exists('..\..\packages\LightningDB\build\LightningDB.targets')" Label="Paket" />
 </Project>

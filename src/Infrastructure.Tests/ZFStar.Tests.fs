@@ -36,7 +36,7 @@ let input =
 
 [<Test>]
 let ``Should invoke compiled``() =
-    let assemblyDirectory = "./data"
+    let assemblyDirectory = "./test"
 
     Platform.cleanDirectory assemblyDirectory
 
