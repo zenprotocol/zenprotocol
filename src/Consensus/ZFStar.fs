@@ -72,21 +72,24 @@ let private vectorToList (z:Zen.Vector.t<'Aa, _>) : List<'Aa> =
      // 0I's are eraseable
      Zen.Vector.foldl 0I 0I (fun acc e -> Zen.Cost.Realized.ret (e::acc)) [] z 
      |> unCost
-  //   |> List.rev
 
 let private listToVector (ls:List<'Aa>) : Zen.Vector.t<'Aa, _> =
     let len = List.length ls 
     let lsIndexed = List.mapi (fun i elem -> bigint (len - i - 1), elem) ls // vectors are reverse-zero-indexed
-  //  List.foldBack (fun (i,x) acc -> Zen.Vector.VCons (i, x, acc)) lsIndexed Zen.Vector.VNil
     List.fold (fun acc (i,x) -> Zen.Vector.VCons (i, x, acc)) Zen.Vector.VNil lsIndexed
 
-let convertResult (Tx (_, pOutputs, _, outputs, _)) =
-    let vectorToList f vector = List.map f (vectorToList vector)
-    let pOutputs' = pOutputs |> vectorToList fstToFsPointedOutput
-    {
-        pInputs = pOutputs'
-        outputs = vectorToList fstToFsOutput outputs
-    }
+let convertResult : Zen.Cost.Realized.cost<result<transactionSkeleton>,unit> -> Result<TxSkeleton, string> =
+    unCost >> function
+    | OK (Tx (_, pOutputs, _, outputs, _)) ->
+        let vectorToList f vector = List.map f (vectorToList vector)
+        let pOutputs' = pOutputs |> vectorToList fstToFsPointedOutput
+        {
+            pInputs = pOutputs'
+            outputs = vectorToList fstToFsOutput outputs
+        }
+        |> Ok
+    | ERR err -> Error err
+    | EX err -> Error err.Message //TODO: remove EX
 
 let convertInput txSkeleton =
     let listToVector f list = listToVector (List.map f list)

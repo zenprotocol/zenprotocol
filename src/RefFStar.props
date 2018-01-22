@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <ItemGroup>
+    <Reference Include="fstar">
+      <HintPath>$(SolutionDir)\..\packages\ZFStar\tools\fstar.exe</HintPath>
+    </Reference>
+    <Reference Include="parser">
+      <HintPath>$(SolutionDir)\..\packages\ZFStar\tools\parser.dll</HintPath>
+    </Reference>
+    <Reference Include="prettyprint">
+      <HintPath>$(SolutionDir)\..\packages\ZFStar\tools\prettyprint.dll</HintPath>
+    </Reference>
+    <Reference Include="basic">
+      <HintPath>$(SolutionDir)\..\packages\ZFStar\tools\basic.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+    
+</Project>

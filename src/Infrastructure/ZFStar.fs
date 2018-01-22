@@ -54,32 +54,39 @@ let private compile' path moduleName code =
     with _ as ex ->
         Exception.toError "compile" ex
 
+let private elaborate input_filepath output_target =
+    try
+        let ast = FStar.Parser.Driver.parse_file input_filepath
+        let elab'd_ast = ASTUtils.elab_ast ast
+                         |> ASTUtils.add_main_to_ast
+        ASTUtils.write_ast_to_file elab'd_ast output_target
+        Ok ()
+    with _ as ex ->
+        Log.info "elaboration error: %A" ex
+        Error "elaborate"
+
 let private extract code moduleName =
     let oDir = Platform.normalizeNameToFileSystem (Path.GetTempPath()) / Path.GetRandomFileName()
     try
-        try
-            Directory.CreateDirectory oDir |> ignore
-            let fn = oDir / Platform.normalizeNameToFileSystem moduleName
-            let fn'original = 
-                fn
-                |> changeExtention ".orig"
-                |> changeExtention ".fst"
-            //let fn'elabed = changeExtention fn ".fst"
-            let fn'extracted = changeExtention ".fs" fn
-            File.WriteAllText(fn'original, sprintf "module %s\n%s" moduleName code)
-            //IOUtils.elaborate fn'orig fn'elabed
+        Directory.CreateDirectory oDir |> ignore
+        let fn = oDir / Platform.normalizeNameToFileSystem moduleName
+        let fn'original = changeExtention ".orig.fst" fn
+        let fn'elabed = changeExtention ".fst" fn
+        let fn'extracted = changeExtention ".fs" fn
+
+        File.WriteAllText(fn'original, sprintf "module %s\n%s" moduleName code)
+        elaborate fn'original fn'elabed
+        |> Result.bind (fun _ ->
             Platform.run "fstar.exe"
                 ["--smt"; Platform.workingDirectory / (Platform.getExeSuffix "z3")
                  "--codegen"; "FSharp"
                  "--prims"; "zulib" / "prims.fst"
                  "--extract_module"; moduleName
                  "--include"; "zulib"
-                 "--no_default_includes"; fn'original //fn'elabed;
+                 "--no_default_includes"; fn'elabed;
                  "--odir"; oDir ]
             |> Result.mapError (fun _ -> "extract")
-            |> Result.bind (fun _ -> File.ReadAllText fn'extracted |> Ok)
-        with _ as ex ->
-            Exception.toError "extract" ex
+            |> Result.bind (fun _ -> File.ReadAllText fn'extracted |> Ok))
     finally
         Directory.Delete (oDir, true)
 

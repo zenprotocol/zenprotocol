@@ -8,6 +8,10 @@ open Consensus.TxSkeleton
 open Infrastructure
 open ZFStar
 open Zen.Types.Extracted
+open FStar.Pervasives
+open Microsoft.FSharp.Core
+open Zen.Cost.Realized
+
 open Exception
 
 type ContractFn = Hash -> TxSkeleton -> Result<TxSkeleton,string>
@@ -22,7 +26,7 @@ let private findMethod (assembly:Assembly) =
         assembly
             .GetModules().[0]
             .GetTypes().[0]
-            .GetMethods().[0]
+            .GetMethods().[1]
             |> Ok
     with _ as ex ->
         Exception.toError "get contract method" ex
@@ -35,7 +39,7 @@ let private invoke (methodInfo:MethodInfo) cHash input =
 
 let private castOutput (output:System.Object) =
     try
-        output :?> transactionSkeleton |> Ok
+        output :?> cost<result<transactionSkeleton>, unit> |> Ok
     with _ as ex ->
         Exception.toError "cast contract output" ex
 
@@ -44,7 +48,7 @@ let private wrap methodInfo =
         convertInput txSkeleton
         |> invoke methodInfo cHash
         |> Result.bind castOutput
-        |> Result.map convertResult
+        |> Result.bind convertResult
 
 let hash contract = contract.hash
 

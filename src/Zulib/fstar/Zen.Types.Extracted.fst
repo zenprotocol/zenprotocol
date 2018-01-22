@@ -122,6 +122,7 @@ noeq type costFunction = | CostFunc: #n:nat{n<=maxCost} -> f:(transactionSkeleto
 noeq type mainFunction =
   | MainFunc: cf:costFunction
            -> mf: ( inTxSkel:transactionSkeleton
+                    -> hash
                     -> Zen.Cost.t (result transactionSkeleton)
                                   (Zen.Cost.force ((CostFunc?.f cf) inTxSkel))
                   )
