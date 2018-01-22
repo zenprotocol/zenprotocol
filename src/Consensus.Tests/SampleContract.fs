@@ -11,9 +11,15 @@ let sampleContractCode = """
 open Zen.Types
 open Zen.Vector
 open Zen.Util
+open Zen.Base
+open Zen.Cost
+open Zen.ErrorT
 
-val test: transactionSkeleton -> hash -> transactionSkeleton
-let test (Tx pInputs outputs data) hash =
+val cf: transactionSkeleton -> cost nat 1
+let cf _ = ~!21
+
+val main: transactionSkeleton -> hash -> cost (result transactionSkeleton) 21
+let main (Tx pInputs outputs data) hash =
   let output = {
     lock = ContractLock hash 0 Empty;
     spend = {
@@ -29,7 +35,7 @@ let test (Tx pInputs outputs data) hash =
 
   let outputs' = VCons output outputs in
   let pInputs' = VCons pInput pInputs in
-  Tx pInputs' outputs' data"""
+  ret @ Tx pInputs' outputs' data"""
 
 let sampleContractHash = 
     sampleContractCode
