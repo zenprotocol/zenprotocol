@@ -1,34 +1,54 @@
 [<CompilationRepresentation (CompilationRepresentationFlags.ModuleSuffix)>]
 module DataAccess.DatabaseContext
 
+open System
 open System.IO
-open LightningDB
+open System.Text
+open Lmdb
+
+let createSession (context:DatabaseContext) : Session =
+    let mutable tx = IntPtr.Zero  
+ 
+    mdb_txn_begin(context.environment,IntPtr.Zero,0ul,&tx)
+    |> checkErrorCode
+    
+    {tx=tx;env=context.environment}
 
 let create pathToFolder : DatabaseContext =             
-    let context = new LightningEnvironment(pathToFolder)
-    context.MaxDatabases <- 100
-    context.Open ()
+    let mutable environment = IntPtr.Zero       
+            
+    let fileInfo = FileInfo(pathToFolder)             
+            
+    if not fileInfo.Directory.Exists then
+        fileInfo.Directory.Create ()
+            
+    mdb_env_create(&environment)
+    |> checkErrorCode        
     
-    use session = context.BeginTransaction()
+    mdb_env_set_maxdbs(environment, 20ul)
+    |> checkErrorCode
     
-    let databaseConfiguration = new DatabaseConfiguration()
-    databaseConfiguration.Flags <- DatabaseOpenFlags.Create
+    mdb_env_open(environment,pathToFolder,MDB_NOSUBDIR,MDB_DEFAULT_MODE)
+    |> checkErrorCode
+   
+    let mutable tx = IntPtr.Zero  
     
-    let values = session.OpenDatabase("values", databaseConfiguration)
+    mdb_txn_begin(environment,IntPtr.Zero,0ul,&tx)
+    |> checkErrorCode
     
-    session.Commit ()
+    let db = Collection.create {tx=tx;env=environment} "values" id id id                    
+    
+    mdb_txn_commit(tx)
+    |> checkErrorCode
     
     {
-        environment = context
-        values=values
+        environment = environment
+        values=db
     }
         
-
 // Delete data folder before creating the database
 let createEmpty pathToFolder : DatabaseContext =
     if Directory.Exists pathToFolder then 
         Directory.Delete (pathToFolder,true)
     create pathToFolder
         
-let createSession (context:DatabaseContext) : Session = 
-    context.environment.BeginTransaction()    

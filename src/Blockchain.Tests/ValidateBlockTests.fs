@@ -55,18 +55,20 @@ let ema = EMA.create chain
 let genesisBlock = Block.createGenesis chain [Transaction.rootTx] (0UL,0UL)    
 
 let state = {
-    memoryState = {
-        utxoSet=utxoSet
-        mempool=mempool
-        orphanPool=orphanPool
-        activeContractSet=acs
-    }
-    tipState = {
-       tip = ExtendedBlockHeader.empty
-       utxoSet=utxoSet
-       activeContractSet=acs
-       ema=ema
-    }
+    memoryState = 
+        {
+            utxoSet=utxoSet
+            mempool=mempool
+            orphanPool=orphanPool
+            activeContractSet=acs
+        }
+    tipState = 
+        {
+           tip = ExtendedBlockHeader.empty
+           utxoSet=utxoSet
+           activeContractSet=acs
+           ema=ema
+        }
     blockRequests= Map.empty
 }
          

@@ -47,9 +47,6 @@
     <Content Include="config.yaml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="LightningDB.dll.config">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Content Include="paket.references" />
     <Content Include="zen-cli">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

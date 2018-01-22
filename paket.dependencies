@@ -25,5 +25,4 @@ nuget zen_z3_osx 4.5.1.7-v1f29cebd4df6
 nuget FsBech32 >= 0.1.0.7
 nuget ZFStar 0.0.4
 nuget Zen.FSharp.Compiler.Service 17.0.2
-nuget LightningDB
 nuget ZFS-Tools

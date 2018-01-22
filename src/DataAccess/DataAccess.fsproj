@@ -41,12 +41,14 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="Lmdb.fs" />
     <Compile Include="Types.fs" />
-    <Compile Include="SingleValue.fs" />
     <Compile Include="Session.fs" />
     <Compile Include="Collection.fs" />
+    <Compile Include="SingleValue.fs" />
     <Compile Include="Index.fs" />
     <Compile Include="DatabaseContext.fs" />
+    <Content Include="app.config" />
     <Content Include="paket.references" />
   </ItemGroup>
   <PropertyGroup>
@@ -64,19 +66,4 @@
       </ItemGroup>
     </When>
   </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.6.2'">
-      <ItemGroup>
-        <Reference Include="Microsoft.CSharp">
-          <Paket>True</Paket>
-        </Reference>
-        <Reference Include="LightningDB">
-          <HintPath>..\..\packages\LightningDB\lib\net45\LightningDB.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Import Project="..\..\packages\LightningDB\build\LightningDB.targets" Condition="Exists('..\..\packages\LightningDB\build\LightningDB.targets')" Label="Paket" />
 </Project>
