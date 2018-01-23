@@ -173,7 +173,7 @@ let getMemoryState chain session contractPath mempool orphanPool acs =
     // We loop through existing mempool and adding it as we go to a new mempool
     // We don't publish AddedMemPool event for mempool transaction as they are already in mempool
     // We only publish add to mem pool transactions to orphan transactions
-    let memoryState = {utxoSet=UtxoSet.empty;activeContractSet=acs;mempool=MemPool.empty;orphanPool=orphanPool}
+    let memoryState = {utxoSet=UtxoSet.asDatabase;activeContractSet=acs;mempool=MemPool.empty;orphanPool=orphanPool}
     
     let memoryState = TransactionHandler.validateOrphanTransactions chain session  contractPath memoryState
 
@@ -204,7 +204,7 @@ let rollForwardChain chain contractPath timestamp state session block persistent
             
             // Saving utxoset and empty it as utxo set is only a diff from persist state
             UtxoSetRepository.save session utxoSet                        
-            let utxoSet = UtxoSet.empty                          
+            let utxoSet = UtxoSet.asDatabase                          
                                                   
             let tipState = {activeContractSet=acs;ema=ema;tip=tip}
             let! memoryState = getMemoryState chain session contractPath mempool state.memoryState.orphanPool acs                                                                                           
@@ -222,7 +222,7 @@ let private handleGenesisBlock chain contractPath session timestamp (state:State
     effectsWriter {           
         let tryGetUTXO = UtxoSetRepository.tryGetOutput session
     
-        match Block.connect chain tryGetUTXO contractPath Block.genesisParent timestamp UtxoSet.empty state.tipState.activeContractSet state.tipState.ema block with
+        match Block.connect chain tryGetUTXO contractPath Block.genesisParent timestamp UtxoSet.asDatabase state.tipState.activeContractSet state.tipState.ema block with
         | Error error ->
             Log.info "Failed connecting genesis block %A due to %A" (Block.hash block) error
             return state
@@ -237,7 +237,7 @@ let private handleGenesisBlock chain contractPath session timestamp (state:State
             
             // Saving utxoset and empty it as utxo set is only a diff from persist state
             UtxoSetRepository.save session utxoSet                        
-            let utxoSet = UtxoSet.empty
+            let utxoSet = UtxoSet.asDatabase
                            
             // Pulishing event of the new block
             do! publish (BlockAdded block)
@@ -252,7 +252,7 @@ let private handleMainChain chain contractPath session timestamp (state:State) (
     effectsWriter {    
         let tryGetUTXO = UtxoSetRepository.tryGetOutput session
     
-        match Block.connect chain tryGetUTXO contractPath parent.header timestamp UtxoSet.empty state.tipState.activeContractSet state.tipState.ema block with
+        match Block.connect chain tryGetUTXO contractPath parent.header timestamp UtxoSet.asDatabase state.tipState.activeContractSet state.tipState.ema block with
         | Error error ->
             Log.info "Failed connecting block %A due to %A" (Block.hash block) error
             return state
@@ -268,7 +268,7 @@ let private handleMainChain chain contractPath session timestamp (state:State) (
             
             // Saving utxoset and empty it as utxo set is only a diff from persist state
             UtxoSetRepository.save session utxoSet                        
-            let utxoSet = UtxoSet.empty
+            let utxoSet = UtxoSet.asDatabase
                                                             
             // Pulishing event of the new block
             do! publish (BlockAdded block)
@@ -300,7 +300,7 @@ let private handleForkChain chain contractPath session timestamp (state:State) p
             let forkBlock = findForkBlock session extendedHeader currentTip
                 
             // undo blocks from mainnet to get fork block state
-            let forkState = undoBlocks session forkBlock currentTip UtxoSet.empty state.memoryState.mempool
+            let forkState = undoBlocks session forkBlock currentTip UtxoSet.asDatabase state.memoryState.mempool
                          
             match connectLongestChain chain contractPath timestamp session 
                     forkBlock forkState chains currentChainWork with
@@ -315,7 +315,7 @@ let private handleForkChain chain contractPath session timestamp (state:State) p
                 
                 // Saving utxoset and empty it as utxo set is only a diff from persist state
                 UtxoSetRepository.save session utxoSet                        
-                let utxoSet = UtxoSet.empty
+                let utxoSet = UtxoSet.asDatabase
             
                 do! removeBlocks session forkBlock currentTip
                 do! addBlocks session forkBlock tip

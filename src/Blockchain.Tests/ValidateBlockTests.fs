@@ -47,7 +47,7 @@ let createTransaction account =
     
 
 // Default initial state of mempool and utxoset
-let utxoSet = UtxoSet.empty
+let utxoSet = UtxoSet.asDatabase
 let mempool = MemPool.empty 
 let orphanPool = OrphanPool.create()
 let acs = ActiveContractSet.empty
@@ -130,9 +130,9 @@ let ``genesis block accepted``() =
                            state'.tipState.ema))
     
     state'.tipState.tip.header |> should equal block.header
-    state'.memoryState.utxoSet |> should equal UtxoSet.empty 
+    state'.memoryState.utxoSet |> should equal UtxoSet.asDatabase 
     state'.tipState.activeContractSet |> should equal state'.memoryState.activeContractSet
-    areOutpointsInSet session rootTxOutpoints UtxoSet.empty |> should equal true   
+    areOutpointsInSet session rootTxOutpoints UtxoSet.asDatabase |> should equal true   
                                    
 [<Test>]    
 let ``wrong genesis block should be rejected``() = 
@@ -146,9 +146,9 @@ let ``wrong genesis block should be rejected``() =
         
     events |> should haveLength 0
     state'.tipState.tip |> should equal ExtendedBlockHeader.empty
-    state'.memoryState.utxoSet |> should equal UtxoSet.empty
+    state'.memoryState.utxoSet |> should equal UtxoSet.asDatabase
     state'.tipState.activeContractSet |> should equal state'.memoryState.activeContractSet
-    areOutpointsInSet session rootTxOutpoints UtxoSet.empty |> should equal false 
+    areOutpointsInSet session rootTxOutpoints UtxoSet.asDatabase |> should equal false 
     
 [<Test>]
 let ``validate new valid block which extended main chain``() =
@@ -181,10 +181,10 @@ let ``validate new valid block which extended main chain``() =
                            state'.tipState.ema))
 
     state'.tipState.tip.header |> should equal block.header
-    state'.memoryState.utxoSet |> should equal UtxoSet.empty
+    state'.memoryState.utxoSet |> should equal UtxoSet.asDatabase
     state'.tipState.activeContractSet |> should equal state'.memoryState.activeContractSet
-    areOutpointsInSet session rootTxOutpoints UtxoSet.empty |> should equal false // SHOULD be spent           
-    areOutpointsInSet session (getTxOutpints tx) UtxoSet.empty |> should equal true
+    areOutpointsInSet session rootTxOutpoints UtxoSet.asDatabase |> should equal false // SHOULD be spent           
+    areOutpointsInSet session (getTxOutpints tx) UtxoSet.asDatabase |> should equal true
      
 [<Test>]
 let ``validate new invalid block which try to extended main chain``() = 
@@ -211,10 +211,10 @@ let ``validate new invalid block which try to extended main chain``() =
     events |> should haveLength 0    
 
     state'.tipState.tip.header |> should equal genesisBlock.header
-    state'.memoryState.utxoSet |> should equal UtxoSet.empty
+    state'.memoryState.utxoSet |> should equal UtxoSet.asDatabase
     state'.tipState.activeContractSet |> should equal state'.memoryState.activeContractSet
-    areOutpointsInSet session rootTxOutpoints UtxoSet.empty |> should equal true           
-    areOutpointsInSet session (getTxOutpints tx) UtxoSet.empty |> should equal false
+    areOutpointsInSet session rootTxOutpoints UtxoSet.asDatabase |> should equal true           
+    areOutpointsInSet session (getTxOutpints tx) UtxoSet.asDatabase |> should equal false
     
 [<Test>]
 let ``validating orphan block yield a request for block from network``() = 
@@ -233,10 +233,10 @@ let ``validating orphan block yield a request for block from network``() =
     events |> should contain (EffectsWriter.NetworkCommand (GetBlock block.header.parent))
 
     state'.tipState.tip |> should equal ExtendedBlockHeader.empty
-    state'.memoryState.utxoSet |> should equal UtxoSet.empty
+    state'.memoryState.utxoSet |> should equal UtxoSet.asDatabase
     state'.tipState.activeContractSet |> should equal state'.memoryState.activeContractSet
-    areOutpointsInSet session rootTxOutpoints UtxoSet.empty |> should equal false     
-    areOutpointsInSet session (getTxOutpints tx) UtxoSet.empty |> should equal false    
+    areOutpointsInSet session rootTxOutpoints UtxoSet.asDatabase |> should equal false     
+    areOutpointsInSet session (getTxOutpints tx) UtxoSet.asDatabase |> should equal false    
     
 [<Test>]
 let ``validate new block which connect orphan chain which extend main chain``() = 
@@ -269,10 +269,10 @@ let ``validate new block which connect orphan chain which extend main chain``() 
                            state'.tipState.ema))       
        
     state'.tipState.tip.header |> should equal block.header
-    state'.memoryState.utxoSet |> should equal UtxoSet.empty
+    state'.memoryState.utxoSet |> should equal UtxoSet.asDatabase
     state'.tipState.activeContractSet |> should equal state'.memoryState.activeContractSet
-    areOutpointsInSet session rootTxOutpoints UtxoSet.empty |> should equal false     
-    areOutpointsInSet session (getTxOutpints tx) UtxoSet.empty |> should equal true
+    areOutpointsInSet session rootTxOutpoints UtxoSet.asDatabase |> should equal false     
+    areOutpointsInSet session (getTxOutpints tx) UtxoSet.asDatabase |> should equal true
     
 [<Test>]
 let ``validate new block which connect orphan chain which is not long enough to become main chain``() = 
@@ -295,10 +295,10 @@ let ``validate new block which connect orphan chain which is not long enough to 
     
     events |> should haveLength 0
     state.tipState.tip.header |> should equal tip.header
-    state.memoryState.utxoSet |> should equal UtxoSet.empty
+    state.memoryState.utxoSet |> should equal UtxoSet.asDatabase
     state.tipState.activeContractSet |> should equal state.memoryState.activeContractSet
-    isAccountInSet session account UtxoSet.empty |> should equal true 
-    isAccountInSet session sideChainAccount UtxoSet.empty |> should equal false
+    isAccountInSet session account UtxoSet.asDatabase |> should equal true 
+    isAccountInSet session sideChainAccount UtxoSet.asDatabase |> should equal false
 
 [<Test>]
 let ``orphan chain become longer than main chain``() = 
@@ -332,10 +332,10 @@ let ``orphan chain become longer than main chain``() =
     events.[4] |> should equal (EffectsWriter.EventEffect (BlockAdded mainChain.[2]))
 
     state.tipState.tip.header |> should equal tip.header
-    state.memoryState.utxoSet |> should equal UtxoSet.empty
+    state.memoryState.utxoSet |> should equal UtxoSet.asDatabase
     state.tipState.activeContractSet |> should equal state.memoryState.activeContractSet
-    isAccountInSet session account UtxoSet.empty |> should equal true 
-    isAccountInSet session sideChainAccount UtxoSet.empty |> should equal false         
+    isAccountInSet session account UtxoSet.asDatabase |> should equal true 
+    isAccountInSet session sideChainAccount UtxoSet.asDatabase |> should equal false         
 
 [<Test>]
 let ``new block extend fork chain which become longest``() = 
@@ -364,10 +364,10 @@ let ``new block extend fork chain which become longest``() =
     events.[3] |> should equal (EffectsWriter.EventEffect (TipChanged state.tipState.tip.header))    
     
     state.tipState.tip.header |> should equal tip.header
-    state.memoryState.utxoSet |> should equal UtxoSet.empty
+    state.memoryState.utxoSet |> should equal UtxoSet.asDatabase
     state.tipState.activeContractSet |> should equal state.memoryState.activeContractSet
-    isAccountInSet session account UtxoSet.empty |> should equal true 
-    isAccountInSet session sideChainAccount UtxoSet.empty |> should equal false         
+    isAccountInSet session account UtxoSet.asDatabase |> should equal true 
+    isAccountInSet session sideChainAccount UtxoSet.asDatabase |> should equal false         
 
 [<Test>]
 let ``2 orphan chains, one become longer than main chain``() = 
@@ -402,10 +402,10 @@ let ``2 orphan chains, one become longer than main chain``() =
     events.[5] |> should equal (EffectsWriter.EventEffect (TipChanged state.tipState.tip.header))
 
     state.tipState.tip.header |> should equal tip.header
-    state.memoryState.utxoSet |> should equal UtxoSet.empty
+    state.memoryState.utxoSet |> should equal UtxoSet.asDatabase
     state.tipState.activeContractSet |> should equal state.memoryState.activeContractSet
-    isAccountInSet session account UtxoSet.empty |> should equal false 
-    isAccountInSet session sideChainAccount UtxoSet.empty |> should equal true
+    isAccountInSet session account UtxoSet.asDatabase |> should equal false 
+    isAccountInSet session sideChainAccount UtxoSet.asDatabase |> should equal true
     
 [<Test>]
 let ``2 orphan chains, two longer than main, one is longer``() = 
@@ -441,10 +441,10 @@ let ``2 orphan chains, two longer than main, one is longer``() =
     events.[6] |> should equal (EffectsWriter.EventEffect (TipChanged state.tipState.tip.header))
 
     state.tipState.tip.header |> should equal tip.header
-    state.memoryState.utxoSet |> should equal UtxoSet.empty
+    state.memoryState.utxoSet |> should equal UtxoSet.asDatabase
     state.tipState.activeContractSet |> should equal state.memoryState.activeContractSet
-    isAccountInSet session account UtxoSet.empty |> should equal false 
-    isAccountInSet session sideChainAccount UtxoSet.empty |> should equal true
+    isAccountInSet session account UtxoSet.asDatabase |> should equal false 
+    isAccountInSet session sideChainAccount UtxoSet.asDatabase |> should equal true
     
 [<Test>]
 let ``2 orphan chains, two longer than main, longest is invalid, shuld pick second long``() = 
@@ -481,10 +481,10 @@ let ``2 orphan chains, two longer than main, longest is invalid, shuld pick seco
     events.[5] |> should equal (EffectsWriter.EventEffect (TipChanged state.tipState.tip.header))    
 
     state.tipState.tip.header |> should equal tip.header
-    state.memoryState.utxoSet |> should equal UtxoSet.empty
+    state.memoryState.utxoSet |> should equal UtxoSet.asDatabase
     state.tipState.activeContractSet |> should equal state.memoryState.activeContractSet
-    isAccountInSet session account UtxoSet.empty |> should equal false 
-    isAccountInSet session sideChainAccount UtxoSet.empty |> should equal true
+    isAccountInSet session account UtxoSet.asDatabase |> should equal false 
+    isAccountInSet session sideChainAccount UtxoSet.asDatabase |> should equal true
     
 [<Test>]
 let ``transaction in mempool and not in next block stays in mempool``() =    
@@ -518,8 +518,8 @@ let ``transaction in mempool and not in next block stays in mempool``() =
     Map.containsKey txHash1 state.memoryState.mempool  |> should equal false
     areOutpointsInSet session (getTxOutpints tx1) state.memoryState.utxoSet |> should equal false
     areOutpointsInSet session (getTxOutpints tx2) state.memoryState.utxoSet |> should equal true 
-    areOutpointsInSet session (getTxOutpints tx1) UtxoSet.empty |> should equal true
-    areOutpointsInSet session (getTxOutpints tx2) UtxoSet.empty |> should equal false           
+    areOutpointsInSet session (getTxOutpints tx1) UtxoSet.asDatabase |> should equal true
+    areOutpointsInSet session (getTxOutpints tx2) UtxoSet.asDatabase |> should equal false           
 
 [<Test>]
 let ``orphan transactions added to mempool after origin tx found in block``() =
@@ -550,9 +550,9 @@ let ``orphan transactions added to mempool after origin tx found in block``() =
     Map.containsKey txHash2 state.memoryState.mempool |> should equal true
     state.memoryState.orphanPool |> should haveCount 0     
     areOutpointsInSet session (getTxOutpints tx1) state.memoryState.utxoSet |> should equal false     
-    areOutpointsInSet session (getTxOutpints tx1) UtxoSet.empty |> should equal false
+    areOutpointsInSet session (getTxOutpints tx1) UtxoSet.asDatabase |> should equal false
     areOutpointsInSet session (getTxOutpints tx2) state.memoryState.utxoSet |> should equal true     
-    areOutpointsInSet session (getTxOutpints tx2) UtxoSet.empty |> should equal false
+    areOutpointsInSet session (getTxOutpints tx2) UtxoSet.asDatabase |> should equal false
     
 [<Test>]    
 let ``block with a contract activation is added to chain``() =

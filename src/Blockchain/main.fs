@@ -48,7 +48,7 @@ let main dataPath chain busName =
         let memoryState = 
             {
                 activeContractSet=acs
-                utxoSet=UtxoSet.empty
+                utxoSet=UtxoSet.asDatabase
                 mempool=MemPool.empty
                 orphanPool=OrphanPool.create ()
             }

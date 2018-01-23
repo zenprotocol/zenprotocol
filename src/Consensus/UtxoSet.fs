@@ -12,7 +12,8 @@ type OutputStatus =
 
 type T = Map<Outpoint, OutputStatus>
     
-let empty = Map.empty
+/// Means that the utxoset is equal to the persisted utxoset    
+let asDatabase = Map.empty
 
 let handleTransaction tryGetOutput txHash tx set =
     let folder state input =
