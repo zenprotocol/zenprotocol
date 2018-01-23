@@ -82,9 +82,12 @@ let createTransaction chain account pkHash spend =
         Ok (Transaction.sign keys {inputs=inputs; outputs=outputs; witnesses=[]; contract = None})
             
 let createActivateContractTransaction account code =
-    let input, output = Map.toSeq account.outpoints |> Seq.head
-    let output' = {output with lock=PK account.publicKeyHash}
-    Ok (Transaction.sign [ account.keyPair ] {inputs=[ input ]; outputs=[ output' ]; witnesses=[]; contract = Some code})
+    Contract.recordHints code
+    |> Result.map (fun hints ->
+        let input, output = Map.toSeq account.outpoints |> Seq.head
+        let output' = {output with lock=PK account.publicKeyHash}
+        { inputs=[ input ]; outputs=[ output' ]; witnesses=[]; contract = Some (code, hints) })
+    |> Result.map (Transaction.sign [ account.keyPair ])
 
 let createRoot () =                
     let account = 

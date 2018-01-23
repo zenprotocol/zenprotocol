@@ -40,11 +40,7 @@ let private compile' path moduleName code =
                 //"-r"; "FsPickler.dll";
                 "-r"; "FSharp.Compatibility.OCaml.dll"|])
         if exitCode = 0 then
-            try 
-                let assembly = System.Reflection.Assembly.LoadFrom (assemblyPath)
-                Ok assembly
-            with 
-            | ex -> Error ex.Message                                   
+            Ok ()
         else
             errors
             |> Array.map (fun e -> e.ToString()) 
@@ -65,43 +61,71 @@ let private elaborate input_filepath output_target =
         Log.info "elaboration error: %A" ex
         Error "elaborate"
 
-let private extract code moduleName =
-    let oDir = Platform.normalizeNameToFileSystem (Path.GetTempPath()) / Path.GetRandomFileName()
-    try
-        Directory.CreateDirectory oDir |> ignore
-        let fn = oDir / Platform.normalizeNameToFileSystem moduleName
-        let fn'original = changeExtention ".orig.fst" fn
-        let fn'elabed = changeExtention ".fst" fn
-        let fn'extracted = changeExtention ".fs" fn
+let private fstar outDir inputFile args = 
+    [ "--smt"; Platform.workingDirectory / (Platform.getExeSuffix "z3")
+      "--prims"; "zulib" / "prims.fst"
+      "--include"; "zulib"
+      "--no_default_includes"; inputFile;
+      "--odir"; outDir ] @ args
+    |> Platform.run "fstar.exe"
 
-        File.WriteAllText(fn'original, sprintf "module %s\n%s" moduleName code)
-        elaborate fn'original fn'elabed
+let private wrapFStar errorResult outputFile fstarFn =
+    fstarFn
+    |> Result.mapError (fun _ -> errorResult)
+    |> Result.map (fun _ -> File.ReadAllText outputFile)
+
+let private initOutputDir moduleName = 
+    let oDir = Platform.normalizeNameToFileSystem (Path.GetTempPath()) / Path.GetRandomFileName()
+    Directory.CreateDirectory oDir |> ignore
+    oDir, oDir / Platform.normalizeNameToFileSystem moduleName
+
+let private extract (code, hints) moduleName = 
+    let oDir, file = initOutputDir moduleName
+    let originalFile = changeExtention ".orig.fst" file
+    let hintsFile = changeExtention ".fst.hints" file
+    let elaboratedFile = changeExtention ".fst" file
+    let extractedFile = changeExtention ".fs" file
+
+    File.WriteAllText(originalFile, sprintf "module %s\n%s" moduleName code)
+    File.WriteAllText(hintsFile, hints)
+
+    try
+        elaborate originalFile elaboratedFile
         |> Result.bind (fun _ ->
-            Platform.run "fstar.exe"
-                ["--smt"; Platform.workingDirectory / (Platform.getExeSuffix "z3")
-                 "--codegen"; "FSharp"
-                 "--prims"; "zulib" / "prims.fst"
-                 "--extract_module"; moduleName
-                 "--include"; "zulib"
-                 "--no_default_includes"; fn'elabed;
-                 "--odir"; oDir ]
-            |> Result.mapError (fun _ -> "extract")
-            |> Result.bind (fun _ -> File.ReadAllText fn'extracted |> Ok))
+            fstar oDir elaboratedFile [
+                "--use_hints"
+                "--codegen"; "FSharp"
+                "--extract_module"; moduleName ]
+            |> wrapFStar "extract" extractedFile)
     finally
         Directory.Delete (oDir, true)
 
-let compile path code moduleName = 
-    let moduleName = ("Z" + moduleName) 
+let recordHints code moduleName =
+    let oDir, file = initOutputDir moduleName
+    let originalFile = changeExtention ".orig.fst" file
+    let hintsFile = oDir / changeExtention ".fst.hints" file
+    let elaboratedFile = changeExtention ".fst" file
 
-    extract code moduleName
+    File.WriteAllText(originalFile, sprintf "module %s\n%s" moduleName code)
+
+    try
+        elaborate originalFile elaboratedFile
+        |> Result.bind (fun _ ->
+            fstar oDir elaboratedFile [
+                 "--record_hints"
+                 "--no_default_includes"; elaboratedFile ]
+            |> wrapFStar "record hints" hintsFile)
+    finally
+        Directory.Delete (oDir, true)
+
+let compile path (code,hints) moduleName = 
+    extract (code,hints) moduleName
     |> Result.bind (compile' path moduleName)
     
 let load path moduleName = 
-    let moduleName = ("Z" + moduleName) 
-    let assemblyPath = Path.Combine(path, sprintf "%s.dll" moduleName)
-    
     try 
-        let assembly = System.Reflection.Assembly.LoadFrom (assemblyPath)
-        Ok assembly
-    with 
-    | ex -> Error ex.Message
+        Path.Combine(path, sprintf "%s.dll" moduleName)
+        |> System.Reflection.Assembly.LoadFrom 
+        |> Ok
+    with _ as ex ->
+        Error ex.Message

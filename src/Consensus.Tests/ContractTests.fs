@@ -16,8 +16,9 @@ let contractsPath = "./data"
 let tryGetUTXO _ = None
 
 let compileRunAndCompare code =
-    code
-    |> Contract.compile contractsPath
+    Contract.recordHints code
+    |> Result.map (fun hints -> (code, hints))
+    |> Result.bind (Contract.compile contractsPath)
     |> Result.bind (fun contract ->
         // check hash validity
         (Hash.isValid contract.hash, true)
@@ -47,7 +48,9 @@ let validateInputs (contract:Contract.T) utxos tx =
         | other -> other.ToString())
 
 let compileRunAndValidate code =
-    Contract.compile contractsPath code
+    Contract.recordHints code
+    |> Result.map (fun hints -> (code, hints))
+    |> Result.bind (Contract.compile contractsPath)
     |> Result.bind (fun contract ->
 
         let utxoSet = getSampleUtxoset (UtxoSet.empty)
