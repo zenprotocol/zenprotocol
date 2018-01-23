@@ -18,10 +18,10 @@ open Zen.Base
 open Zen.Cost
 open Zen.ErrorT
 
-val cf: transactionSkeleton -> cost nat 1
+val cf: txSkeleton -> cost nat 1
 let cf _ = ~!2
 
-val main: transactionSkeleton -> hash -> cost (result transactionSkeleton) 2
+val main: txSkeleton -> hash -> result txSkeleton `cost` 2
 let main transactionSkeleton hash =
     ret @ transactionSkeleton
 """
