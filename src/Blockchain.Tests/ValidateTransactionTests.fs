@@ -316,9 +316,9 @@ let ``Valid contract should be added to ActiveContractSet``() =
     val cf: transactionSkeleton -> cost nat 1
     let cf _ = ~!2
 
-    val main: transactionSkeleton -> hash -> cost (result transactionSkeleton) 2
-    let main transactionSkeleton hash = 
-        ret @ transactionSkeleton
+    val main: txSkeleton -> hash -> result txSkeleton `cost` 2
+    let main txSkeleton hash = 
+        ret @ txSkeleton
     """
     let cHash = getStringHash contractCode
 
