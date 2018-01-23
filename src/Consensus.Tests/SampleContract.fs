@@ -15,15 +15,15 @@ open Zen.Base
 open Zen.Cost
 open Zen.ErrorT
 
-val cf: transactionSkeleton -> cost nat 1
-let cf _ = ~!21
+val cf: transactionSkeleton -> string -> cost nat 1
+let cf _ _ = ~!21
 
-val main: transactionSkeleton -> hash -> cost (result transactionSkeleton) 21
-let main (Tx pInputs outputs data) hash =
+val main: transactionSkeleton -> hash -> string -> cost (result transactionSkeleton) 21
+let main (Tx pInputs outputs data) chash command =
   let output = {
-    lock = ContractLock hash 0 Empty;
+    lock = ContractLock chash 0 Empty;
     spend = {
-      asset = hash;
+      asset = chash;
       amount = 1000UL
     }
   } in

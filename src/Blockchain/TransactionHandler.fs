@@ -113,7 +113,7 @@ let validateTransaction chain contractPath tx (state:MemoryState) =
 let executeContract txSkeleton cHash state =
     match ActiveContractSet.tryFind cHash state.activeContractSet with
     | Some contract ->
-        Contract.run contract txSkeleton
+        Contract.run contract "" txSkeleton
         |> Result.bind (TxSkeleton.checkPrefix txSkeleton)
         |> Result.map (Transaction.fromTxSkeleton contract.hash)
         |> Result.map (Transaction.addContractWitness contract.hash txSkeleton)

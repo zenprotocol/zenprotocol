@@ -82,7 +82,7 @@ let private checkWitnesses acs (Hash.Hash txHash, tx, inputs) =
 
         match ActiveContractSet.tryFind cw.cHash acs with
         | Some contract ->
-            match Contract.run contract tx with 
+            match Contract.run contract "" tx with 
             | Ok tx' ->
                 if checkIssuedAndDestroyed tx' cw then
                     if List.length tx'.pInputs - List.length tx.pInputs = cw.inputsLength && 

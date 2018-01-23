@@ -305,25 +305,10 @@ let ``Valid contract should be added to ActiveContractSet``() =
     
     use session = DatabaseContext.createSession databaseContext
     let rootAccount = Account.createRoot ()
-    let contractCode = """
-    open Zen.Types
-    open Zen.Vector
-    open Zen.Util
-    open Zen.Base
-    open Zen.Cost
-    open Zen.ErrorT
-
-    val cf: transactionSkeleton -> cost nat 1
-    let cf _ = ~!2
-
-    val main: transactionSkeleton -> hash -> cost (result transactionSkeleton) 2
-    let main transactionSkeleton hash = 
-        ret @ transactionSkeleton
-    """
-    let cHash = getStringHash contractCode
+    let cHash = getStringHash sampleContractCode
 
     let tx =
-        match Account.createActivateContractTransaction rootAccount contractCode with
+        match Account.createActivateContractTransaction rootAccount sampleContractCode with
             | Result.Ok tx ->
                 tx
             | _ ->
