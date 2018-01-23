@@ -11,7 +11,7 @@ open SampleContract
 
 open TestsInfrastructure.Nunit
 
-let contractsPath = "./data"
+let contractsPath = "./test"
 
 let tryGetUTXO _ = None
 

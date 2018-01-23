@@ -14,7 +14,7 @@ open FsUnit
 let timestamp = 1515594186383UL + 1UL
 let difficulty = 0x20fffffful
 
-let contractsPath = "./data"
+let contractsPath = "./test"
 
 let tryGetUTXO _ = None
  
