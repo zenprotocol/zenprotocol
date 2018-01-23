@@ -19,20 +19,20 @@ let compileRunAndCompare code =
     |> Result.bind (fun contract ->
         // check hash validity
         (Hash.isValid contract.hash, true)
-        |> shouldEqual 
+        |> shouldEqual
         (contract.hash, sampleContractHash)
-        |> shouldEqual 
+        |> shouldEqual
         //execute and check
-        Contract.run contract sampleInputTx)
+        Contract.run contract "" sampleInputTx)
 
 [<Test>]
-let ``Should get contract function``() = 
+let ``Should get contract function``() =
     (compileRunAndCompare sampleContractCode
     , (Ok sampleOutputTx : Result<TxSkeleton, string>))
     |> shouldEqual
 
 [<Test>]
-let ``Should get 'elaborate' error for invalid תcode``() = 
+let ``Should get 'elaborate' error for invalid תcode``() =
     (compileRunAndCompare (sampleContractCode + "###")
     , (Error "elaborate" : Result<TxSkeleton, string>))
     |> shouldEqual
@@ -48,7 +48,7 @@ let compileRunAndValidate code =
     Contract.compile contractsPath code
     |> Result.bind (fun contract ->
         let utxoSet = getSampleUtxoset (UtxoSet.create())
-        Contract.run contract sampleInputTx
+        Contract.run contract "" sampleInputTx
         |> Result.bind (TxSkeleton.checkPrefix sampleInputTx)
         |> Result.map (Transaction.fromTxSkeleton contract.hash)
         |> Result.map (Transaction.addContractWitness contract.hash sampleInputTx)
@@ -56,13 +56,13 @@ let compileRunAndValidate code =
         |> Result.bind (validateInputs contract utxoSet))
 
 [<Test>]
-let ``Contract generated transaction should be valid``() = 
+let ``Contract generated transaction should be valid``() =
     (compileRunAndValidate sampleContractCode
     , (Ok sampleExpectedResult : Result<Transaction, string>))
     |> shouldEqual
 
 [<Test>]
-let ``Contract should not be able to create tokens other than its own``() = 
+let ``Contract should not be able to create tokens other than its own``() =
     (compileRunAndValidate
          """
          open Zen.Types
@@ -70,27 +70,27 @@ let ``Contract should not be able to create tokens other than its own``() =
          open Zen.Util
          open Zen.Base
          open Zen.Cost
-         
+
          module ET = Zen.ErrorT
-         
-         val cf: txSkeleton -> cost nat 1
-         let cf _ = ret 146
-         
-         val main: txSkeleton -> hash -> cost (result txSkeleton) 146
-         let main txSkeleton contractHash =
-           let spend = { 
+
+         val cf: txSkeleton -> string -> cost nat 1
+         let cf _ _ = ret 146
+
+         val main: txSkeleton -> hash -> string -> cost (result txSkeleton) 146
+         let main txSkeleton contractHash command =
+           let spend = {
                asset=hashFromBase64 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-               amount=1000UL 
+               amount=1000UL
                } in
            let lock = ContractLock contractHash in
-           
+
            let output = { lock=lock; spend=spend } in
-         
+
            let pInput = {
                txHash = hashFromBase64 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
                index = 0ul
            }, output in
-           
+
            let txSkeleton1 = addInput pInput txSkeleton in
            let txSkeleton2 = txSkeleton1 >>= lockToContract spend contractHash in
            ET.retT txSkeleton2

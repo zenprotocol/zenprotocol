@@ -55,18 +55,20 @@ let ema = EMA.create chain
 let genesisBlock = Block.createGenesis chain [Transaction.rootTx] (0UL,0UL)    
 
 let state = {
-    memoryState = {
-        utxoSet=utxoSet
-        mempool=mempool
-        orphanPool=orphanPool
-        activeContractSet=acs
-    }
-    tipState = {
-       tip = ExtendedBlockHeader.empty
-       utxoSet=utxoSet
-       activeContractSet=acs
-       ema=ema
-    }
+    memoryState = 
+        {
+            utxoSet=utxoSet
+            mempool=mempool
+            orphanPool=orphanPool
+            activeContractSet=acs
+        }
+    tipState = 
+        {
+           tip = ExtendedBlockHeader.empty
+           utxoSet=utxoSet
+           activeContractSet=acs
+           ema=ema
+        }
     blockRequests= Map.empty
 }
          
@@ -120,7 +122,7 @@ let ``genesis block accepted``() =
         BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state
         |> Writer.unwrap
         
-    events |> should haveLength 1
+    events |> should haveLength 2
     events |> should contain (EffectsWriter.EventEffect (BlockAdded block))
     
     BlockRepository.tryGetTip session 
@@ -171,7 +173,7 @@ let ``validate new valid block which extended main chain``() =
         BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state
         |> Writer.unwrap         
         
-    events |> should haveLength 2
+    events |> should haveLength 3
     events |> should contain (EffectsWriter.EventEffect (BlockAdded block))
     events |> should contain (EffectsWriter.NetworkCommand (PublishBlock block.header))
 
@@ -260,7 +262,7 @@ let ``validate new block which connect orphan chain which extend main chain``() 
         BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state
         |> Writer.unwrap   
         
-    events |> should haveLength 2
+    events |> should haveLength 3
     events |> should contain (EffectsWriter.EventEffect (BlockAdded genesisBlock))
     events |> should contain (EffectsWriter.EventEffect (BlockAdded block))
        
@@ -327,7 +329,7 @@ let ``orphan chain become longer than main chain``() =
                            state.tipState.activeContractSet,
                            state.tipState.ema))    
     
-    events |> should haveLength 5
+    events |> should haveLength 6
     events.[0] |> should equal (EffectsWriter.EventEffect (BlockRemoved alternativeChain.[0]))
     events.[1] |> should equal (EffectsWriter.EventEffect (BlockRemoved alternativeChain.[1]))
     events.[2] |> should equal (EffectsWriter.EventEffect (BlockAdded mainChain.[0]))
@@ -359,11 +361,12 @@ let ``new block extend fork chain which become longest``() =
     
     let tip = List.last mainChain
     
-    events |> should haveLength 3
+    events |> should haveLength 4
     
     events.[0] |> should equal (EffectsWriter.EventEffect (BlockRemoved alternativeChain.[0]))
     events.[1] |> should equal (EffectsWriter.EventEffect (BlockAdded mainChain.[0]))
-    events.[2] |> should equal (EffectsWriter.EventEffect (BlockAdded mainChain.[1]))    
+    events.[2] |> should equal (EffectsWriter.EventEffect (BlockAdded mainChain.[1]))
+    events.[3] |> should equal (EffectsWriter.EventEffect (TipChanged state.tipState.tip.header))    
     
     state.tipState.tip.header |> should equal tip.header
     state.tipState.utxoSet |> should equal state.memoryState.utxoSet
@@ -395,12 +398,13 @@ let ``2 orphan chains, one become longer than main chain``() =
               
     let tip = List.last sideChain2
     
-    events |> should haveLength 5
+    events |> should haveLength 6
     events.[0] |> should equal (EffectsWriter.EventEffect (BlockRemoved mainChain.[0]))
     events.[1] |> should equal (EffectsWriter.EventEffect (BlockRemoved mainChain.[1]))
     events.[2] |> should equal (EffectsWriter.EventEffect (BlockAdded orphanBlock))
     events.[3] |> should equal (EffectsWriter.EventEffect (BlockAdded sideChain2.[0]))
     events.[4] |> should equal (EffectsWriter.EventEffect (BlockAdded sideChain2.[1]))
+    events.[5] |> should equal (EffectsWriter.EventEffect (TipChanged state.tipState.tip.header))
 
     state.tipState.tip.header |> should equal tip.header
     state.tipState.utxoSet |> should equal state.memoryState.utxoSet
@@ -432,13 +436,14 @@ let ``2 orphan chains, two longer than main, one is longer``() =
               
     let tip = List.last sideChain2
     
-    events |> should haveLength 6
+    events |> should haveLength 7
     events.[0] |> should equal (EffectsWriter.EventEffect (BlockRemoved mainChain.[0]))
     events.[1] |> should equal (EffectsWriter.EventEffect (BlockRemoved mainChain.[1]))
     events.[2] |> should equal (EffectsWriter.EventEffect (BlockAdded orphanBlock))
     events.[3] |> should equal (EffectsWriter.EventEffect (BlockAdded sideChain2.[0]))
     events.[4] |> should equal (EffectsWriter.EventEffect (BlockAdded sideChain2.[1]))
     events.[5] |> should equal (EffectsWriter.EventEffect (BlockAdded sideChain2.[2]))
+    events.[6] |> should equal (EffectsWriter.EventEffect (TipChanged state.tipState.tip.header))
 
     state.tipState.tip.header |> should equal tip.header
     state.tipState.utxoSet |> should equal state.memoryState.utxoSet
@@ -472,12 +477,13 @@ let ``2 orphan chains, two longer than main, longest is invalid, shuld pick seco
               
     let tip = List.last sideChain2
     
-    events |> should haveLength 5
+    events |> should haveLength 6
     events.[0] |> should equal (EffectsWriter.EventEffect (BlockRemoved mainChain.[0]))
     events.[1] |> should equal (EffectsWriter.EventEffect (BlockRemoved mainChain.[1]))
     events.[2] |> should equal (EffectsWriter.EventEffect (BlockAdded orphanBlock))
     events.[3] |> should equal (EffectsWriter.EventEffect (BlockAdded sideChain2.[0]))
-    events.[4] |> should equal (EffectsWriter.EventEffect (BlockAdded sideChain2.[1]))    
+    events.[4] |> should equal (EffectsWriter.EventEffect (BlockAdded sideChain2.[1]))
+    events.[5] |> should equal (EffectsWriter.EventEffect (TipChanged state.tipState.tip.header))    
 
     state.tipState.tip.header |> should equal tip.header
     state.tipState.utxoSet |> should equal state.memoryState.utxoSet
@@ -566,7 +572,7 @@ let ``block with a contract activation is added to chain``() =
             | Ok tx -> tx
             | Error error -> failwith error 
                 
-    let acs = ActiveContractSet.add cHash {hash=cHash;fn=fun _ tx -> Ok tx} state.tipState.activeContractSet
+    let acs = ActiveContractSet.add cHash {hash=cHash;fn=fun _ _ tx -> Ok tx} state.tipState.activeContractSet
     
     let block = Block.createTemplate genesisBlock.header timestamp state.tipState.ema acs [tx]
     
@@ -574,7 +580,7 @@ let ``block with a contract activation is added to chain``() =
             BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state
             |> Writer.unwrap
             
-    events |> should haveLength 1
+    events |> should haveLength 2
     events |> should contain (EffectsWriter.EventEffect (BlockAdded block))
         
     let tip = BlockRepository.tryGetTip session         

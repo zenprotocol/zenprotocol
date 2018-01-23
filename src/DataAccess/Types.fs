@@ -1,46 +1,60 @@
 namespace DataAccess
 
-open LightningDB
+open System
+open System.Runtime.InteropServices
 
-type DatabaseContext = 
+open Lmdb
+
+type Session = 
     {
-        environment: LightningEnvironment
-        values: LightningDatabase
+        mutable tx:IntPtr
+        env:IntPtr
     }
     interface System.IDisposable with   
-        member x.Dispose () =
-            x.values.Dispose()
-            x.environment.Dispose()
-
-type Session = LightningTransaction
-
+        member x.Dispose () =  
+            if x.tx <> IntPtr.Zero then          
+                mdb_txn_abort(x.tx)
+                x.tx <- IntPtr.Zero      
+      
 type Collection<'key,'value> = 
     {
-        database: LightningDatabase
+        environment: IntPtr
+        database: uint32        
         keySerializer: 'key->byte[]
         valueSerializer: 'value->byte[]
         valueDeseralizer: byte[]->'value
         indices: (Session->'key->'value->unit) list
     }
     interface System.IDisposable with   
+        member x.Dispose () =            
+            mdb_dbi_close(x.environment,x.database)
+            
+type DatabaseContext = 
+    {
+        environment: IntPtr
+        values: Collection<byte[],byte[]>
+    }
+    interface System.IDisposable with   
         member x.Dispose () =
-            x.database.Dispose()
+            (x.values :> IDisposable).Dispose()
+            mdb_env_close(x.environment)
                 
 type Index<'key,'value,'indexKey> = 
     {
         collection: Collection<'key,'value>
-        database: LightningDatabase
+        database: uint32
+        environment: IntPtr
         getIndexKeys: Session->'key->'value-> ('indexKey*'key) 
         indexKeySerializer: 'indexKey -> byte[]
         indexKeySize: int
     }
     interface System.IDisposable with   
         member x.Dispose () =
-            x.database.Dispose()  
-            
+            mdb_dbi_close(x.environment,x.database)
+           
 type SingleValue<'value> = 
     {
-        collection: LightningDatabase
+        collection: Collection<byte[],byte[]>
         name:byte[]
         serializer: 'value->byte[]
         deserializer: byte[]->'value

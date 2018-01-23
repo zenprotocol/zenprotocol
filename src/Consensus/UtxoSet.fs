@@ -33,7 +33,7 @@ let isSomeSpent outpoints set =
             | Some (Spent _) -> true
             | _ -> false) false outpoints
 
-let getUtxos outpoints set =
+let getUtxos outpoints set =    
     List.foldBack (fun outpoint state ->
         match state with
             | None -> None

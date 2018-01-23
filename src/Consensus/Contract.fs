@@ -14,7 +14,7 @@ open Zen.Cost.Realized
 open Zen.Types.TxSkeleton
 open Exception
 
-type ContractFn = Hash -> TxSkeleton -> Result<TxSkeleton,string>
+type ContractFn = Hash -> string -> TxSkeleton -> Result<TxSkeleton,string>
 
 type T = {
     hash: Hash
@@ -31,9 +31,9 @@ let private findMethod (assembly:Assembly) =
     with _ as ex ->
         Exception.toError "get contract method" ex
 
-let private invoke (methodInfo:MethodInfo) cHash input =
+let private invoke (methodInfo:MethodInfo) cHash command input =
     try
-        methodInfo.Invoke (null, [| input; cHash |]) |> Ok
+        methodInfo.Invoke (null, [| input; cHash; command |]) |> Ok
     with _ as ex ->
         Exception.toError "invoke contract" ex
 
@@ -44,9 +44,9 @@ let private castOutput (output:System.Object) =
         Exception.toError "cast contract output" ex
 
 let private wrap methodInfo =
-    fun (Hash.Hash cHash) txSkeleton ->
+    fun (Hash.Hash cHash) command txSkeleton ->
         convertInput txSkeleton
-        |> invoke methodInfo cHash
+        |> invoke methodInfo cHash command
         |> Result.bind castOutput
         |> Result.bind convertResult
 
@@ -72,8 +72,8 @@ let compile contractsPath code =
             fn = fn
         })
 
-let run contract =
-    contract.fn contract.hash
+let run contract command =
+    contract.fn contract.hash command
 
 let load contractsPath (hash:Hash.Hash) =
 

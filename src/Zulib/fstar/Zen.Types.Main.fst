@@ -10,7 +10,9 @@ let maxCost = 200
 noeq type costFunction =
     | CostFunc:
         #n:nat{n<=maxCost}
-        -> f:(txSkeleton -> nat `cost` n)
+        -> f:(txSkeleton
+              -> command:string
+              -> nat `cost` n)
         -> costFunction
 
 noeq type mainFunction =
@@ -18,6 +20,7 @@ noeq type mainFunction =
         cf:costFunction
         -> mf:( txSkel:txSkeleton
                 -> contractHash
-                -> result txSkeleton `cost` force ((CostFunc?.f cf) txSkel)
+                -> command:string
+                -> result txSkeleton `cost` force ((CostFunc?.f cf) txSkel command)
               )
         -> mainFunction

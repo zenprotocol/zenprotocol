@@ -27,6 +27,7 @@ module Blockchain =
 
     type Request = 
         | ExecuteContract of TxSkeleton * Hash.Hash
+        | GetBlockTemplate
 
     type Response = unit
         
@@ -69,6 +70,9 @@ module Blockchain =
     let getTip client peerId =
         GetTip peerId         
         |> Command.send client serviceName
+        
+    let getBlockTemplate client = 
+        Request.send<Request,Block option> client serviceName GetBlockTemplate // TODO: we return an option because for now we cannot mine empty blocks        
         
 module Network =
     type Command = 

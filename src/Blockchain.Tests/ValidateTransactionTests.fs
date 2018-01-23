@@ -57,13 +57,13 @@ let state = {
             orphanPool = orphanPool
             activeContractSet = acs
         }
-    tipState = 
+    tipState =
         {
             tip = ExtendedBlockHeader.empty
             utxoSet = utxoSet
             activeContractSet = acs
             ema=EMA.create chain
-    }    
+    }
     blockRequests= Map.empty
 }
 
@@ -90,7 +90,7 @@ let ``valid transaction raise events and update state``() =
 [<Test>]
 let ``Invalid tx doesn't raise events or update state``() =
     use databaseContext = DatabaseContext.createEmpty "test"
-    
+
     use session = DatabaseContext.createSession databaseContext
     let invalidTx = {inputs=[];outputs=[];witnesses=[];contract=None}
 
@@ -113,7 +113,7 @@ let ``Invalid tx doesn't raise events or update state``() =
 [<Test>]
 let ``tx already in mempool nothing happen`` () =
     use databaseContext = DatabaseContext.createEmpty "test"
-    
+
     use session = DatabaseContext.createSession databaseContext
     let result = Handler.handleCommand chain (ValidateTransaction Transaction.rootTx) session 1UL state
 
@@ -129,7 +129,7 @@ let ``tx already in mempool nothing happen`` () =
 [<Test>]
 let ``orphan tx added to orphan list``() =
     use databaseContext = DatabaseContext.createEmpty "test"
-    
+
     use session = DatabaseContext.createSession databaseContext
     let utxoSet = UtxoSet.create()
     let state = {state with memoryState={state.memoryState with utxoSet=utxoSet}}
@@ -152,7 +152,7 @@ let ``orphan tx added to orphan list``() =
 [<Test>]
 let ``origin tx hit mempool, orphan tx should be added to mempool``() =
     use databaseContext = DatabaseContext.createEmpty "test"
-    
+
     use session = DatabaseContext.createSession databaseContext
     let rootAccount = Account.createRoot ()
     let account1 = Account.create ()
@@ -194,7 +194,7 @@ let ``origin tx hit mempool, orphan tx should be added to mempool``() =
 [<Test>]
 let ``orphan transaction is eventually invalid``() =
     use databaseContext = DatabaseContext.createEmpty "test"
-    
+
     use session = DatabaseContext.createSession databaseContext
     let rootAccount = Account.createRoot ()
     let account1 = Account.create ()
@@ -242,7 +242,7 @@ let ``orphan transaction is eventually invalid``() =
 [<Test>]
 let ``two orphan transaction spending same input``() =
     use databaseContext = DatabaseContext.createEmpty "test"
-    
+
     use session = DatabaseContext.createSession databaseContext
     let rootAccount = Account.createRoot ()
     let account1 = Account.create ()
@@ -302,28 +302,13 @@ let ``two orphan transaction spending same input``() =
 [<Test>]
 let ``Valid contract should be added to ActiveContractSet``() =
     use databaseContext = DatabaseContext.createEmpty "test"
-    
+
     use session = DatabaseContext.createSession databaseContext
     let rootAccount = Account.createRoot ()
-    let contractCode = """
-    open Zen.Types
-    open Zen.Vector
-    open Zen.Util
-    open Zen.Base
-    open Zen.Cost
-    open Zen.ErrorT
-
-    val cf: txSkeleton -> cost nat 1
-    let cf _ = ~!2
-
-    val main: txSkeleton -> hash -> result txSkeleton `cost` 2
-    let main txSkeleton hash = 
-        ret @ txSkeleton
-    """
-    let cHash = getStringHash contractCode
+    let cHash = getStringHash sampleContractCode
 
     let tx =
-        match Account.createActivateContractTransaction rootAccount contractCode with
+        match Account.createActivateContractTransaction rootAccount sampleContractCode with
             | Result.Ok tx ->
                 tx
             | _ ->
@@ -340,9 +325,8 @@ let ``Valid contract should be added to ActiveContractSet``() =
     ActiveContractSet.containsContract cHash state'.memoryState.activeContractSet |> should equal true
 
     // Checking that TransactionAddedToMemPool was published
-    events |> should haveLength 2
+    events |> should haveLength 1
     events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (txHash, tx)))
-    events |> should contain (EffectsWriter.EventEffect (ContractActivated (Contract.computeHash contractCode)))
 
     // Checking that the transaction was added to mempool
     MemPool.containsTransaction txHash state'.memoryState.mempool |> should equal true
@@ -353,7 +337,7 @@ let ``Valid contract should be added to ActiveContractSet``() =
 [<Test>]
 let ``Invalid contract should not be added to ActiveContractSet``() =
     use databaseContext = DatabaseContext.createEmpty "test"
-    
+
     use session = DatabaseContext.createSession databaseContext
     let rootAccount = Account.createRoot ()
     let contractCode = "x"
@@ -370,7 +354,7 @@ let ``Invalid contract should not be added to ActiveContractSet``() =
         Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
 
     let events, state' = Writer.unwrap result
-    
+
     // Checking that the contract is in not the ACS
     ActiveContractSet.containsContract cHash acs |> should equal false
 
@@ -390,7 +374,7 @@ let ``Invalid contract should not be added to ActiveContractSet``() =
 [<Test>]
 let ``Valid contract should execute``() =
     use databaseContext = DatabaseContext.createEmpty "test"
-    
+
     use session = DatabaseContext.createSession databaseContext
     let account = Account.createRoot ()
     let state = { state with memoryState = { state.memoryState with utxoSet = getSampleUtxoset utxoSet } }
@@ -401,12 +385,8 @@ let ``Valid contract should execute``() =
     |> Result.map (fun (_, state) ->
         ActiveContractSet.containsContract sampleContractHash state.memoryState.activeContractSet
         |> should equal true
-        Handler.handleRequest (fun result -> 
-            let was = 
-                match result with
-                | TransactionResult.Ok tx -> Result.Ok tx
-                | TransactionResult.Error tx -> Result.Error tx
-            shouldEqual (was, sampleExpectedResult))
-            (ExecuteContract (sampleInputTx, sampleContractHash)) state)
+
+        TransactionHandler.executeContract sampleInputTx sampleContractHash state.memoryState
+        )
     |> Result.mapError failwith
     |> ignore

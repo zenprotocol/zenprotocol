@@ -1,66 +1,88 @@
 [<CompilationRepresentation (CompilationRepresentationFlags.ModuleSuffix)>]
 module DataAccess.Collection
 
-open LightningDB
+open System
+open Lmdb
+open System.Runtime.InteropServices
+
+let bufferSize = 1024 * 1024 * 1024 // One-megabyte
+let structSize = IntPtr.Size * 2 |> IntPtr
 
 let create (session:Session) name keySerializer valueSerializer valueDeseralizer =
-    let databaseConfiguration = new DatabaseConfiguration()
-    databaseConfiguration.Flags <- DatabaseOpenFlags.Create
- 
-    let db = session.OpenDatabase (name, databaseConfiguration)  
-      
+    let mutable db = 0ul
+        
+    mdb_dbi_open(session.tx, name, MDB_CREATE, &db)
+    |> checkErrorCode 
+
     {
-        database=db;
+        environment=session.env
+        database=db;        
         keySerializer=keySerializer
         valueSerializer=valueSerializer
         valueDeseralizer=valueDeseralizer
         indices=[]
     }
-    
+                     
 let addIndex index collection =
     let indexFunc (session:Session) key value = 
         let key,value = index.getIndexKeys session key value 
         let key = index.indexKeySerializer key
         let value = collection.keySerializer value
-               
-        // code thrown exception if key/value already exist
-        // so we catch and ignore
-        // the other option is to open a cursor and check if the key/value already exist
-        // which will be more expensive.
-        // We should send a PR to the Lightning project without an exception, maybe TryPut
-        try 
-            session.Put(index.database, key, value, PutOptions.NoDuplicateData)
-        with 
-        | :? LightningException as ex -> 
-            if ex.StatusCode <> -30799 then
-                raise ex
+                   
+        use pinnedKey = pin key
+        use pinnedValue = pin value                   
+                                                     
+        let mutable keyData = byteArrayToData pinnedKey
+        let mutable valueData = byteArrayToData pinnedValue               
+                        
+        let result = 
+            mdb_put(session.tx, index.database, &keyData, &valueData, MDB_NODUPDATA)
+
+        if result <> 0 && result <> MDB_KEYEXIST then
+            errorToString result 
+            |> failwith             
  
     let indices = indexFunc :: collection.indices
     {collection with indices=indices}
             
 let tryGet collection (session:Session) key =
-    let key = collection.keySerializer key 
-    let isExist,value = session.TryGet (collection.database, key)
-    
-    if isExist then 
-        Some <| collection.valueDeseralizer value
-    else 
-        None 
+    let keyBytes = collection.keySerializer key 
+    use pinnedKey = pin keyBytes
+
+    let mutable keyData = byteArrayToData pinnedKey
+    let mutable valueData = Data.empty
+     
+    let result = mdb_get (session.tx,collection.database,&keyData,&valueData)
+
+    if result = 0 then    
+        dataToByteArray valueData
+        |> collection.valueDeseralizer
+        |> Some
+    elif result = MDB_NOTFOUND then
+        None
+    else
+        errorToString result |> failwith     
         
 let get collection (session:Session) key = 
     match tryGet collection session key with
     | Some value -> value
     | None -> failwith "key was not found in the collection"  
         
-let put collection (session:Session) key value =
+let put collection session key value =
     let keyBytes = collection.keySerializer key
     let valueBytes = collection.valueSerializer value
     
-    session.Put(collection.database, keyBytes, valueBytes)
+    use pinnedKey = pin keyBytes
+    use pinnedValue = pin valueBytes      
+    
+    let mutable keyData = byteArrayToData pinnedKey
+    let mutable valueData = byteArrayToData pinnedValue
+    mdb_put(session.tx, collection.database, &keyData, &valueData, 0ul)
+    |> checkErrorCode
     
     List.iter (fun indexFunc -> indexFunc session key value) collection.indices         
     
 let containsKey collection (session:Session) key = 
-    let keyBytes = collection.keySerializer key
-
-    session.ContainsKey (collection.database,keyBytes)        
+    match tryGet collection session key with
+    | Some _ -> true
+    | None -> false     

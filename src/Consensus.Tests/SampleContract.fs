@@ -16,21 +16,21 @@ open Zen.Cost
 
 module ET = Zen.ErrorT
 
-val cf: txSkeleton -> cost nat 1
-let cf _ = ret 145
+val cf: txSkeleton -> string -> cost nat 1
+let cf _ _ = ret 145
 
-val main: txSkeleton -> hash -> cost (result txSkeleton) 145
-let main txSkeleton contractHash =
+val main: txSkeleton -> hash -> string -> cost (result txSkeleton) 145
+let main txSkeleton contractHash command =
   let spend = { asset=contractHash; amount=1000UL } in
   let lock = ContractLock contractHash in
-  
+
   let output = { lock=lock; spend=spend } in
 
   let pInput = {
       txHash = hashFromBase64 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
       index = 0ul
   }, output in
-  
+
   let txSkeleton1 = addInput pInput txSkeleton in
   let txSkeleton2 = txSkeleton1 >>= lockToContract spend contractHash in
   ET.retT txSkeleton2
@@ -49,7 +49,7 @@ let private sampleContractTester txSkeleton hash =
             asset = hash
             amount = 1000UL
         }
-    } 
+    }
 
     let pInput =
         {
@@ -57,8 +57,8 @@ let private sampleContractTester txSkeleton hash =
             index = 0ul
         }, output
 
-    let outputs' = txSkeleton.outputs @ [ output ] 
-    let pInputs' = txSkeleton.pInputs @ [ pInput ] 
+    let outputs' = txSkeleton.outputs @ [ output ]
+    let pInputs' = txSkeleton.pInputs @ [ pInput ]
     { txSkeleton with outputs = outputs'; pInputs = pInputs' }
 
 let sampleKeyPair = KeyPair.create()
@@ -74,16 +74,16 @@ let sampleOutput = {
     spend = { asset = Hash.zero; amount = 1UL }
 }
 
-let sampleInputTx = 
+let sampleInputTx =
     {
         pInputs = [ sampleInput, sampleOutput ]
         outputs = [ sampleOutput ]
     }
 
-let sampleOutputTx = 
+let sampleOutputTx =
     sampleContractTester sampleInputTx sampleContractHash
 
-let sampleExpectedResult = 
+let sampleExpectedResult =
     sampleOutputTx
     |> Transaction.fromTxSkeleton sampleContractHash
     |> Transaction.addContractWitness sampleContractHash sampleInputTx

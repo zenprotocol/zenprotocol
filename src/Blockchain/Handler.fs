@@ -77,14 +77,26 @@ let handleCommand chain command session timestamp (state:State) =
                 return state          
         }
                                                     
-let handleRequest reply request session timestamp state = 
+let handleRequest (requestId:RequestId) request session timestamp state = 
     match request with
     | ExecuteContract (txSkeleton, cHash) ->
         TransactionHandler.executeContract txSkeleton cHash state.memoryState
         |> function 
         | Result.Ok tx -> Ok tx
         | Result.Error err -> Error err
-        |> reply
+        |> requestId.reply
+    | GetBlockTemplate ->
+        if MemPool.isEmpty state.memoryState.mempool || state.tipState.tip = ExtendedBlockHeader.empty then 
+            requestId.reply<Types.Block option> None
+        else
+            let transactions = 
+                Map.toSeq state.memoryState.mempool 
+                |> Seq.map snd
+                |> List.ofSeq
+        
+            let block = Block.createTemplate state.tipState.tip.header (Timestamp.now ()) state.tipState.ema state.memoryState.activeContractSet transactions
+            
+            requestId.reply<Types.Block option> (Some block)            
     | _ -> ()
     ret state
     

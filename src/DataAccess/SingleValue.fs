@@ -8,14 +8,10 @@ let create (databaseContext:DatabaseContext) (name:string) serializer deserialze
         deserializer=deserialzer;
     }
     
-let tryGet<'value> (singleValue:SingleValue<'value>) (session:Session) =
-    let exist, value = session.TryGet (singleValue.collection,singleValue.name)
-    
-    if exist then
-        Some (singleValue.deserializer value)
-    else 
-        None
+let tryGet<'value> (singleValue:SingleValue<'value>) (session:Session) =         
+    Collection.tryGet singleValue.collection session singleValue.name
+    |> Option.map singleValue.deserializer        
         
 let put<'value> (singleValue:SingleValue<'value>) (session:Session) value = 
-    session.Put (singleValue.collection, singleValue.name, singleValue.serializer value)        
+    Collection.put singleValue.collection session singleValue.name (singleValue.serializer value)     
      
