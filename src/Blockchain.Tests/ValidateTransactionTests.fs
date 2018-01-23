@@ -313,7 +313,7 @@ let ``Valid contract should be added to ActiveContractSet``() =
     open Zen.Cost
     open Zen.ErrorT
 
-    val cf: transactionSkeleton -> cost nat 1
+    val cf: txSkeleton -> cost nat 1
     let cf _ = ~!2
 
     val main: txSkeleton -> hash -> result txSkeleton `cost` 2
