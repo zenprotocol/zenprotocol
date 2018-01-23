@@ -40,9 +40,14 @@ let getModuleName (code : string) =
     |> Encoding.UTF8.GetBytes
     |> computeHash
     |> Base16.encode
+    |> (+) "Test"
 
 let compileAndInvoke fstCode args =
-    ZFStar.compile assemblyDirectory fstCode (getModuleName fstCode)
+    let moduleName = getModuleName fstCode
+    ZFStar.recordHints fstCode moduleName
+    |> Result.map (fun hints -> (fstCode, hints))
+    |> Result.bind (fun (code, hints) -> ZFStar.compile assemblyDirectory (code, hints) moduleName)
+    |> Result.bind (fun _ -> ZFStar.load assemblyDirectory moduleName)
     |> Result.bind (fun assembly ->
         try
             Ok (assembly
@@ -71,23 +76,33 @@ let compileAndInvoke fstCode args =
         | EX err -> Error err.Message //TODO: remove EX
     )
 
+let fstCode = """
+    open Zen.Types
+    open Zen.Vector
+    open Zen.Util
+    open Zen.Base
+    open Zen.Cost
+    open Zen.ErrorT
+
+    val cf: txSkeleton -> string -> cost nat 1
+    let cf _ _ = ~!2
+
+    val main: txSkeleton -> hash -> string -> cost (result txSkeleton) 2
+    let main tx chash command =
+        ret @ tx
+    """
+
+[<Test>]
+let ``Should record hints``() =
+    (ZFStar.recordHints fstCode (getModuleName fstCode)
+    |> Result.map (fun _ -> ())
+    |> Result.map (fun _ -> ())
+    , (Ok() : Result<unit, string>))
+    |> shouldEqual
+
 [<Test>]
 let ``Should invoke compiled``() =
-    (compileAndInvoke """
-        open Zen.Types
-        open Zen.Vector
-        open Zen.Util
-        open Zen.Base
-        open Zen.Cost
-        open Zen.ErrorT
-
-        val cf: txSkeleton -> string -> cost nat 1
-        let cf _ _ = ~!2
-
-        val main: txSkeleton -> hash -> string -> cost (result txSkeleton) 2
-        let main tx chash command =
-            ret @ tx
-        """
+    (compileAndInvoke fstCode
     [| input; null; null |]
     , (Ok input : Result<txSkeleton,string>))
     |> shouldEqual

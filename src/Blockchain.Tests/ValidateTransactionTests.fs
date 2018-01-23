@@ -59,7 +59,7 @@ let state = {
         }
     tipState =
         {
-            tip = ExtendedBlockHeader.empty            
+            tip = ExtendedBlockHeader.empty
             activeContractSet = acs
             ema=EMA.create chain
     }
@@ -84,7 +84,7 @@ let ``valid transaction raise events and update state``() =
     MemPool.containsTransaction txHash state'.memoryState.mempool |> should equal true
 
     // Checking the tx is in the utxoset
-    UtxoSet.getUtxos (UtxoSetRepository.tryGetOutput session) txOutpoints state'.memoryState.utxoSet 
+    UtxoSet.getUtxos (UtxoSetRepository.tryGetOutput session) txOutpoints state'.memoryState.utxoSet
     |> should equal (Some tx.outputs)
 
 [<Test>]
@@ -344,9 +344,10 @@ let ``Invalid contract should not be added to ActiveContractSet``() =
     let cHash = getStringHash contractCode
 
     let tx =
-        match Account.createActivateContractTransaction rootAccount contractCode with
-            | Result.Ok tx -> tx
-            | _ -> failwith "couldn't get tx"
+        let input, output = Map.toSeq rootAccount.outpoints |> Seq.head
+        let output' = {output with lock=PK rootAccount.publicKeyHash}
+        { inputs=[ input ]; outputs=[ output' ]; witnesses=[]; contract = Some (contractCode, "") }
+        |> (Transaction.sign [ rootAccount.keyPair ])
 
     let txHash = Transaction.hash tx
 
