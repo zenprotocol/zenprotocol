@@ -27,21 +27,20 @@ let main dataPath chain busName =
 
         let databaseContext = DatabaseContext.create dataPath                              
 
-        let tip,utxoSet,acs,ema = 
+        let tip,acs,ema = 
             use session = DatabaseContext.createSession databaseContext
             match BlockRepository.tryGetTip session with 
-            | Some (tip,utxoSet,acs,ema) ->
+            | Some (tip,acs,ema) ->
                 Log.info "Loading tip from db #%d %A" tip.header.blockNumber tip.hash
                          
-                tip,utxoSet,acs,ema
+                tip,acs,ema
             | None -> 
                 Log.info "No tip in db"
-                ExtendedBlockHeader.empty,UtxoSet.create(),ActiveContractSet.empty,EMA.create chain
+                ExtendedBlockHeader.empty,ActiveContractSet.empty,EMA.create chain
 
         let tipState = 
             {
-                activeContractSet=acs
-                utxoSet=utxoSet
+                activeContractSet=acs                
                 ema=ema
                 tip=tip
             }
@@ -49,7 +48,7 @@ let main dataPath chain busName =
         let memoryState = 
             {
                 activeContractSet=acs
-                utxoSet=utxoSet
+                utxoSet=UtxoSet.empty
                 mempool=MemPool.empty
                 orphanPool=OrphanPool.create ()
             }

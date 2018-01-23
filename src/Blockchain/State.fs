@@ -8,10 +8,9 @@ type BlockRequest =
     | Tip
     | NewBlock
 
-type BlockState = 
+type TipState = 
     {
-        tip: ExtendedBlockHeader.T
-        utxoSet: UtxoSet.T 
+        tip: ExtendedBlockHeader.T         
         activeContractSet: ActiveContractSet.T
         ema:EMA.T        
     }   
@@ -26,7 +25,7 @@ type MemoryState =
 
 type State = 
     {                         
-        tipState: BlockState
+        tipState: TipState
         memoryState: MemoryState
         blockRequests: Map<Hash.Hash, BlockRequest>             
     }

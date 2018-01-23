@@ -37,13 +37,15 @@ type ArbitraryGenerators =
                 let outpoints = [ 1uy..List.length pkOutputs |> byte ] |> List.map outpoint
                 return List.zip outpoints unspentPkOutputs |> Map.ofList, Map.ofList pkKeyOutputs
             }
-        let txGenerator (utxos, (keyMap: Map<Output, KeyPair>)) = 
+        let txGenerator (utxos, (keyMap: Map<Output, KeyPair>)) =
+            let tryGetUTXO _ = None
+         
             gen { 
                 let outpoints = utxos |> Map.toList |> List.map fst
                 let! txInputs = Gen.shuffle outpoints 
                 let! size = Gen.choose (0, Array.length txInputs - 1)
                 let txInputs = List.ofArray txInputs.[0..size]
-                let txOutputs = UtxoSet.getUtxos txInputs utxos |> Option.get //expecting Some
+                let txOutputs = UtxoSet.getUtxos tryGetUTXO txInputs utxos |> Option.get //expecting Some
                 let keys = List.map (fun output -> Map.find output keyMap) txOutputs
                 let tx =
                     {

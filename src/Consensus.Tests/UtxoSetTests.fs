@@ -9,6 +9,8 @@ open FsCheck.NUnit
 open FsCheck
 open FsUnit
 
+let tryGetUTXO _ = None
+
 [<Test>]
 let ``handling transaction add outputs to set``() = 
     let tx1 = {
@@ -27,11 +29,11 @@ let ``handling transaction add outputs to set``() =
     }   
         
     let set = 
-        UtxoSet.create ()
-        |> UtxoSet.handleTransaction tx1Hash tx1        
+        UtxoSet.empty
+        |> UtxoSet.handleTransaction tryGetUTXO tx1Hash tx1        
     
-    UtxoSet.isSomeSpent tx2.inputs set |> should equal false
-    UtxoSet.getUtxos tx2.inputs set |> should equal (Some tx1.outputs)
+    UtxoSet.isSomeSpent tryGetUTXO tx2.inputs set |> should equal false
+    UtxoSet.getUtxos tryGetUTXO tx2.inputs set |> should equal (Some tx1.outputs)
         
 [<Test>]
 let ``handling transaction mark inputs as spent``() = 
@@ -52,12 +54,12 @@ let ``handling transaction mark inputs as spent``() =
     let tx2Hash = Transaction.hash tx2
         
     let set = 
-        UtxoSet.create ()
-        |> UtxoSet.handleTransaction tx1Hash tx1   
-        |> UtxoSet.handleTransaction tx2Hash tx2     
+        UtxoSet.empty
+        |> UtxoSet.handleTransaction tryGetUTXO tx1Hash tx1   
+        |> UtxoSet.handleTransaction tryGetUTXO tx2Hash tx2     
     
-    UtxoSet.getUtxos tx2.inputs set |> should equal None
-    UtxoSet.isSomeSpent tx2.inputs set |> should equal true
+    UtxoSet.getUtxos tryGetUTXO tx2.inputs set |> should equal None
+    UtxoSet.isSomeSpent tryGetUTXO tx2.inputs set |> should equal true
         
         
 [<Test>]
@@ -66,7 +68,7 @@ let ``Should find Utxo``() =
     let outpoint = { txHash = hash; index = 100u }
     let output = { lock = PK hash; spend = { asset = hash; amount = 100UL }}
     let utxos = Map.ofSeq [ (outpoint, Unspent output) ]
-    let outputResult = UtxoSet.getUtxos [ outpoint ] utxos
+    let outputResult = UtxoSet.getUtxos tryGetUTXO [ outpoint ] utxos
     
     match outputResult with 
     | None -> failwith "could not find utxo"
@@ -77,7 +79,7 @@ let ``Distinct outpoint count should match utxos count``(utxos:Map<Outpoint, Out
     let utxos  = Map.map (fun _ value -> Unspent value) utxos
     let distinctOutpoints = utxos |> Map.toList |> List.map fst
 
-    match UtxoSet.getUtxos distinctOutpoints utxos with
+    match UtxoSet.getUtxos tryGetUTXO distinctOutpoints utxos with
     | None -> false
     | Some outputs -> List.length outputs = List.length distinctOutpoints
     
@@ -85,10 +87,10 @@ let ``Distinct outpoint count should match utxos count``(utxos:Map<Outpoint, Out
 let ``Should be some utxos``(utxos:Map<Outpoint, Output>) =
     let utxos  = Map.map (fun _ value -> Unspent value) utxos
 
-    Option.isSome <| UtxoSet.getUtxos (utxos |> Map.toList |> List.map fst) utxos
+    Option.isSome <| UtxoSet.getUtxos tryGetUTXO (utxos |> Map.toList |> List.map fst) utxos
 
 [<Property>]
 let ``Should be none utxos``(utxos:Map<Outpoint, Output>) (outpoints:List<Outpoint>) =
     let utxos  = Map.map (fun _ value -> Unspent value) utxos
 
-    (outpoints |> List.distinct |> List.length > Map.count utxos) ==> (Option.isNone <| UtxoSet.getUtxos outpoints utxos)
+    (outpoints |> List.distinct |> List.length > Map.count utxos) ==> (Option.isNone <| UtxoSet.getUtxos tryGetUTXO outpoints utxos)

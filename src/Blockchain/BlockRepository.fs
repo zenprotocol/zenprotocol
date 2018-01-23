@@ -18,8 +18,7 @@ let tryGetHeader session hash =
 let getHeader session hash = 
     Collection.get session.context.blocks session.session hash        
         
-let saveHeader session (block:ExtendedBlockHeader.T) =
-    // TODO: save transactions
+let saveHeader session (block:ExtendedBlockHeader.T) =    
     Collection.put session.context.blocks session.session block.hash block
 
 let getFullBlock session (block:ExtendedBlockHeader.T) =      
@@ -50,11 +49,10 @@ let saveFullBlock session blockHash (block:Block) =
     |> List.toSeq
     |> Collection.put session.context.blockTransactions session.session blockHash
 
-let saveBlockState session blockHash (utxoSet:UtxoSet.T) (acs:ActiveContractSet.T) ema = 
+let saveBlockState session blockHash (acs:ActiveContractSet.T) ema = 
     let blockState = 
         {
-            ema = ema
-            utxoSet = utxoSet
+            ema = ema            
             activeContractSet = ActiveContractSet.getContractHashes acs
         }         
         
@@ -75,7 +73,7 @@ let getBlockState session blockHash =
         |> Seq.toArray
         |> SparseMerkleTree.addMultiple ActiveContractSet.empty 
         
-    blockState.utxoSet,acs,blockState.ema                    
+    acs,blockState.ema                    
     
 let getBlockChildren session (block:ExtendedBlockHeader.T) = 
     Index.getAll session.context.blockChildrenIndex session.session block.hash             
@@ -84,11 +82,11 @@ let tryGetTip session =
     match SingleValue.tryGet session.context.tip session.session with
     | Some blockHash -> 
         let header = getHeader session blockHash  
-        let utxoSet,acs,ema = getBlockState session blockHash
+        let acs,ema = getBlockState session blockHash
         
-        Some (header,utxoSet,acs,ema)
+        Some (header,acs,ema)
     | None -> None                  
     
 let updateTip session blockHash = 
-    SingleValue.put session.context.tip session.session blockHash     
+    SingleValue.put session.context.tip session.session blockHash
         

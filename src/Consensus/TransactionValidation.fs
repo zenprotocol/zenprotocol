@@ -165,12 +165,12 @@ let private checkInputsStructure tx =
     else
         Ok tx
 
-let private checkOrphan set txHash tx =
-    match getUtxos tx.inputs set with
+let private checkOrphan tryGetUTXO set txHash tx =
+    match getUtxos tryGetUTXO tx.inputs set with
     | Some utxos -> 
         Ok (txHash, tx, utxos)
     | None -> 
-        match UtxoSet.isSomeSpent tx.inputs set with
+        match UtxoSet.isSomeSpent tryGetUTXO tx.inputs set with
         | true -> DoubleSpend
         | false -> Orphan
         |> Error
@@ -182,7 +182,7 @@ let validateBasic =
     >=> checkDuplicateInputs
     >=> checkInputsStructure
 
-let validateInputs acs set txHash =
-    checkOrphan set txHash
+let validateInputs tryGetUTXO acs set txHash =
+    checkOrphan tryGetUTXO set txHash
     >=> checkWitnesses acs
     >=> checkAmounts

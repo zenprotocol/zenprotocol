@@ -10,7 +10,9 @@ let getSignedTx tx keys =
     signedTx, txHash
 
 let private inputsValidation acs utxos signedTx txHash keys =
-    validateInputs acs utxos txHash signedTx
+    let tryGetUTXO _ = None
+    
+    validateInputs tryGetUTXO acs utxos txHash signedTx
 
 let inputsValidationMsg msg acs utxos tx keys =
     let signedTx, txHash = getSignedTx tx keys
