@@ -296,3 +296,6 @@ __pycache__/
 # Zulib
 src/Zulib/fsharp/Extracted
 .DS_Store
+
+# Directory of test data
+test/
