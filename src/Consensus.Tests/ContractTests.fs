@@ -19,20 +19,20 @@ let compileRunAndCompare code =
     |> Result.bind (fun contract ->
         // check hash validity
         (Hash.isValid contract.hash, true)
-        |> shouldEqual 
+        |> shouldEqual
         (contract.hash, sampleContractHash)
-        |> shouldEqual 
+        |> shouldEqual
         //execute and check
         Contract.run contract "" sampleInputTx)
 
 [<Test>]
-let ``Should get contract function``() = 
+let ``Should get contract function``() =
     (compileRunAndCompare sampleContractCode
     , (Ok sampleOutputTx : Result<TxSkeleton, string>))
     |> shouldEqual
 
 [<Test>]
-let ``Should get 'elaborate' error for invalid תcode``() = 
+let ``Should get 'elaborate' error for invalid תcode``() =
     (compileRunAndCompare (sampleContractCode + "###")
     , (Error "elaborate" : Result<TxSkeleton, string>))
     |> shouldEqual
@@ -56,13 +56,13 @@ let compileRunAndValidate code =
         |> Result.bind (validateInputs contract utxoSet))
 
 [<Test>]
-let ``Contract generated transaction should be valid``() = 
+let ``Contract generated transaction should be valid``() =
     (compileRunAndValidate sampleContractCode
     , (Ok sampleExpectedResult : Result<Transaction, string>))
     |> shouldEqual
 
 [<Test>]
-let ``Contract should not be able to create tokens other than its own``() = 
+let ``Contract should not be able to create tokens other than its own``() =
     (compileRunAndValidate
          """
          open Zen.Types
@@ -70,28 +70,30 @@ let ``Contract should not be able to create tokens other than its own``() =
          open Zen.Util
          open Zen.Base
          open Zen.Cost
-         open Zen.ErrorT
 
-         val cf: transactionSkeleton -> string -> cost nat 1
-         let cf _ _ = ~!22
+         module ET = Zen.ErrorT
 
-         val main: transactionSkeleton -> hash -> string -> cost (result transactionSkeleton) 22
-         let main (Tx pInputs outputs data) chash command =
-           let output = {
-             lock = ContractLock chash 0 Empty;
-             spend = {
-               asset = hashFromBase64 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; //aha! should be of hash value
-               amount = 1000UL
-             }
-           } in
+         val cf: txSkeleton -> string -> cost nat 1
+         let cf _ _ = ret 146
+
+         val main: txSkeleton -> hash -> string -> cost (result txSkeleton) 146
+         let main txSkeleton contractHash command =
+           let spend = {
+               asset=hashFromBase64 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+               amount=1000UL
+               } in
+           let lock = ContractLock contractHash in
+
+           let output = { lock=lock; spend=spend } in
 
            let pInput = {
                txHash = hashFromBase64 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
                index = 0ul
            }, output in
 
-           let outputs' = VCons output outputs in
-           let pInputs' = VCons pInput pInputs in
-           ret @ Tx pInputs' outputs' data"""
+           let txSkeleton1 = addInput pInput txSkeleton in
+           let txSkeleton2 = txSkeleton1 >>= lockToContract spend contractHash in
+           ET.retT txSkeleton2
+           """
     , (Error "illegal creation/destruction of tokens" : Result<Transaction, string>))
     |> shouldEqual

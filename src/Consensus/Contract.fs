@@ -11,7 +11,7 @@ open Zen.Types.Extracted
 open FStar.Pervasives
 open Microsoft.FSharp.Core
 open Zen.Cost.Realized
-
+open Zen.Types.TxSkeleton
 open Exception
 
 type ContractFn = Hash -> string -> TxSkeleton -> Result<TxSkeleton,string>
@@ -31,7 +31,7 @@ let private findMethod (assembly:Assembly) =
     with _ as ex ->
         Exception.toError "get contract method" ex
 
-let private invoke (methodInfo:MethodInfo) cHash command input = 
+let private invoke (methodInfo:MethodInfo) cHash command input =
     try
         methodInfo.Invoke (null, [| input; cHash; command |]) |> Ok
     with _ as ex ->
@@ -39,7 +39,7 @@ let private invoke (methodInfo:MethodInfo) cHash command input =
 
 let private castOutput (output:System.Object) =
     try
-        output :?> cost<result<transactionSkeleton>, unit> |> Ok
+        output :?> cost<result<txSkeleton>, unit> |> Ok
     with _ as ex ->
         Exception.toError "cast contract output" ex
 
@@ -52,7 +52,7 @@ let private wrap methodInfo =
 
 let hash contract = contract.hash
 
-let computeHash (code:string) =    
+let computeHash (code:string) =
     code
     |> Encoding.UTF8.GetBytes
     |> Hash.compute
@@ -60,29 +60,28 @@ let computeHash (code:string) =
 let compile contractsPath code =
     let hash = computeHash code
 
-    hash 
+    hash
     |> Hash.bytes
     |> Base16.encode
     |> ZFStar.compile contractsPath code
-    |> Result.bind findMethod 
+    |> Result.bind findMethod
     |> Result.map wrap
     |> Result.map (fun fn ->
         {
             hash = hash
             fn = fn
-        })                
+        })
 
-let run contract command = 
+let run contract command =
     contract.fn contract.hash command
-    
-let load contractsPath (hash:Hash.Hash) = 
-    
+
+let load contractsPath (hash:Hash.Hash) =
+
     ZFStar.load contractsPath (Hash.toString hash)
-    |> Result.bind findMethod 
+    |> Result.bind findMethod
     |> Result.map wrap
     |> Result.map (fun fn ->
         {
             hash = hash
             fn = fn
-        })         
-    
+        })

@@ -9,6 +9,7 @@ nuget FsUnit
 nuget FsCheck.NUnit >= 3.0.0-alpha2
 nuget FAKE
 nuget FSharp.Compatibility.OCaml
+nuget FSharpx.Collections
 nuget libsodium-net
 nuget FsNetMQ >= 0.2.7.0
 nuget FsPickler

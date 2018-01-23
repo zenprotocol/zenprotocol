@@ -5,6 +5,7 @@ open Infrastructure
 open TestsInfrastructure.Nunit
 open Exception
 open Zen.Types.Extracted
+open Zen.Types.TxSkeleton
 open FStar.Pervasives
 open Microsoft.FSharp.Core
 open Zen.Cost.Realized
@@ -23,14 +24,9 @@ let clean =
 [<TearDown>]
     clean
 
-let input =
-    Tx (
-        0I,
-        Zen.Vector.VNil,
-        0I,
-        Zen.Vector.VNil,
-        Native.option.None
-    )
+let input : txSkeleton =
+    emptyTxSkeleton
+
 
 let computeHash bytes =
     let hash = Array.zeroCreate 32
@@ -45,10 +41,10 @@ let getModuleName (code : string) =
     |> computeHash
     |> Base16.encode
 
-let compileAndInvoke fstCode args = 
+let compileAndInvoke fstCode args =
     ZFStar.compile assemblyDirectory fstCode (getModuleName fstCode)
     |> Result.bind (fun assembly ->
-        try 
+        try
             Ok (assembly
             .GetModules().[0]
             .GetTypes().[0]
@@ -56,17 +52,17 @@ let compileAndInvoke fstCode args =
         with _ as ex ->
             Exception.toError "could not find method" ex)
     |> Result.bind (fun methodInfo ->
-        try 
+        try
             Ok (methodInfo.Invoke(null, args))
         with _ as ex ->
             Exception.toError "unable to invoke method" ex)
     |> Result.bind (fun result ->
-        try 
-            Ok (result :?> cost<result<transactionSkeleton>, unit>)
+        try
+            Ok (result :?> cost<result<txSkeleton>, unit>)
         with _ as ex ->
             Exception.toError "unexpected result" ex)
     |> Result.map (
-        fun (Zen.Cost.Realized.C inj:cost<result<transactionSkeleton>, unit>) -> 
+        fun (Zen.Cost.Realized.C inj:cost<result<txSkeleton>, unit>) ->
             inj.Force()
     )
     |> Result.bind (function
@@ -85,15 +81,15 @@ let ``Should invoke compiled``() =
         open Zen.Cost
         open Zen.ErrorT
 
-        val cf: transactionSkeleton -> string -> cost nat 1
+        val cf: txSkeleton -> string -> cost nat 1
         let cf _ _ = ~!2
 
-        val main: transactionSkeleton -> hash -> string -> cost (result transactionSkeleton) 2
-        let main tx chash command = 
+        val main: txSkeleton -> hash -> string -> cost (result txSkeleton) 2
+        let main tx chash command =
             ret @ tx
-        """ 
+        """
     [| input; null; null |]
-    , (Ok input : Result<transactionSkeleton,string>))
+    , (Ok input : Result<txSkeleton,string>))
     |> shouldEqual
 
 [<Test>]
@@ -106,13 +102,13 @@ let ``Should throw with command's value``() =
         open Zen.Cost
         open Zen.ErrorT
 
-        val cf: transactionSkeleton -> string -> cost nat 1
+        val cf: txSkeleton -> string -> cost nat 1
         let cf _ _ = ~!1
 
-        val main: transactionSkeleton -> hash -> string -> cost (result transactionSkeleton) 1
-        let main tx chash command = 
+        val main: txSkeleton -> hash -> string -> cost (result txSkeleton) 1
+        let main tx chash command =
             failw command
-        """ 
+        """
     [| null; null; "test command" |]
-    , (Error "test command" : Result<transactionSkeleton,string>))
+    , (Error "test command" : Result<txSkeleton,string>))
     |> shouldEqual

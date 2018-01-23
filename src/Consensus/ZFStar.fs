@@ -1,20 +1,25 @@
 ﻿module Consensus.ZFStar
 
+open Operators.Checked
+
 open Consensus.Types
 open Consensus.TxSkeleton
 open Zen.Types.Extracted
+open Zen.Types.TxSkeleton
 open FStar.Pervasives
 open Zen.Vector
 
-let private unCost (Zen.Cost.Realized.C inj:Zen.Cost.Realized.cost<'Aa, 'An>) : 'Aa = inj.Force()
+module Cost = Zen.Cost.Realized
+
+let private unCost (Cost.C inj:Zen.Cost.Realized.cost<'Aa, 'An>) : 'Aa = inj.Force()
 
 let private throwNotImplemented s1 s2 =
     sprintf "%s %s" s1 s2
     |> System.NotImplementedException
     |> raise
-     
-let private fsToFstLock (outputLock:Types.Lock) : outputLock =
-    match outputLock with 
+
+let private fsToFstLock (outputLock:Types.Lock) : lock =
+    match outputLock with
     | PK (Hash.Hash pkHash) ->
         PKLock pkHash
     //| Types.Lock.Contract (Hash.Hash pkHash, null) ->
@@ -22,7 +27,7 @@ let private fsToFstLock (outputLock:Types.Lock) : outputLock =
     //| Types.Lock.Contract (Hash.Hash pkHash, [||]) ->
         //ContractLock (pkHash, 0I, Empty)
     | Contract (Hash.Hash pkHash) ->
-        ContractLock (pkHash, 0I, Empty)
+        ContractLock pkHash
 
 
     //TODO:
@@ -36,14 +41,14 @@ let private fsToFstLock (outputLock:Types.Lock) : outputLock =
         //TODO
         throwNotImplemented "fsToFstLock" (outputLock.ToString())
 
-let private fstToFsLock (outputLock:outputLock) : Types.Lock =
-    match outputLock with 
-    | PKLock (pkHash) ->
+let private fstToFsLock (outputLock:lock) : Types.Lock =
+    match outputLock with
+    | PKLock pkHash ->
         PK (Hash.Hash pkHash)
 
 
     //TODO:
-    | ContractLock (pkHash, _, _) ->
+    | ContractLock pkHash ->
         Contract (Hash.Hash pkHash)
     //| ContractLock (pkHash, _, _) ->
         //Types.Lock.Contract (Hash.Hash pkHash, [||])
@@ -70,33 +75,43 @@ let private fsToFstPointedOutput (outpoint:Types.Outpoint, output) : pointedOutp
 
 let private vectorToList (z:Zen.Vector.t<'Aa, _>) : List<'Aa> =
      // 0I's are eraseable
-     Zen.Vector.foldl 0I 0I (fun acc e -> Zen.Cost.Realized.ret (e::acc)) [] z 
+     Zen.Vector.foldl 0I 0I (fun acc e -> Cost.ret (e::acc)) [] z
      |> unCost
 
 let private listToVector (ls:List<'Aa>) : Zen.Vector.t<'Aa, _> =
-    let len = List.length ls 
+    let len = List.length ls
     let lsIndexed = List.mapi (fun i elem -> bigint (len - i - 1), elem) ls // vectors are reverse-zero-indexed
     List.fold (fun acc (i,x) -> Zen.Vector.VCons (i, x, acc)) Zen.Vector.VNil lsIndexed
 
-let convertResult : Zen.Cost.Realized.cost<result<transactionSkeleton>,unit> -> Result<TxSkeleton, string> =
-    unCost >> function
-    | OK (Tx (_, pOutputs, _, outputs, _)) ->
-        let vectorToList f vector = List.map f (vectorToList vector)
-        let pOutputs' = pOutputs |> vectorToList fstToFsPointedOutput
-        {
-            pInputs = pOutputs'
-            outputs = vectorToList fstToFsOutput outputs
-        }
-        |> Ok
+let convertResult (txSkeleton : Cost.t<result<txSkeleton>,unit>)
+    : Result<TxSkeleton, string> =
+    match unCost txSkeleton with
     | ERR err -> Error err
     | EX err -> Error err.Message //TODO: remove EX
+    | OK {inputs=_,inputMap; outputs=_,outputMap} ->
+        let inputs =
+            Map.toList inputMap
+            |> List.collect(fun (_, (_, inputs)) -> inputs)
+            |> List.sortBy fst
+            |> List.map (snd >> fstToFsPointedOutput)
+        let outputs =
+            Map.toList outputMap
+            |> List.collect(fun (_, (_, outputs)) -> outputs)
+            |> List.sortBy fst
+            |> List.map (snd >> fstToFsOutput)
+        Ok {pInputs=inputs; outputs=outputs}
 
-let convertInput txSkeleton =
-    let listToVector f list = listToVector (List.map f list)
-    Tx (
-        bigint (List.length txSkeleton.pInputs), 
-        txSkeleton.pInputs |> listToVector fsToFstPointedOutput, 
-        bigint (List.length txSkeleton.outputs), 
-        txSkeleton.outputs |> listToVector fsToFstOutput, 
-        Native.option.None
-    )
+let convertInput (txSkeleton:TxSkeleton) : txSkeleton =
+    
+    let insertPointedOutput txSkeleton pointedOutput = 
+        insertPointedOutput pointedOutput txSkeleton
+    let insertOutput txSkeleton output = 
+        insertOutput output txSkeleton
+    let inputs = txSkeleton.pInputs |> List.map fsToFstPointedOutput
+    let outputs= txSkeleton.outputs |> List.map fsToFstOutput
+    
+    let txSkeletonWithInputsOnly = 
+        List.fold insertPointedOutput emptyTxSkeleton inputs
+    
+    List.fold insertOutput txSkeletonWithInputsOnly outputs
+    

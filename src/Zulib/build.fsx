@@ -52,7 +52,8 @@ Target "RecordHints" (fun _ ->
   let args =
     [| //"--z3refresh";
        //"--verify_all";
-       "--record_hints" |]
+       "--record_hints"
+       "--cache_checked_modules" |]
 
   let exitCodes = Array.Parallel.map (fun file -> runFStar args [|file|]) zulibFiles
   if not (Array.forall (fun exitCode -> exitCode = 0) exitCodes)
@@ -63,6 +64,7 @@ Target "Verify" (fun _ ->
   let args =
     [| "--use_hints";
        "--use_hint_hashes"
+       "--cache_checked_modules"
     |]
 
   let exitCodes = Array.Parallel.map (fun file -> runFStar args [|file|]) zulibFiles
@@ -77,7 +79,8 @@ Target "Extract" (fun _ ->
 
   let args =
     [|
-       "--lax";
+       //"--lax";
+       "--cache_checked_modules"
        //"--use_hints";
        //"--use_hint_hashes";
        "--codegen";"FSharp";
@@ -94,6 +97,7 @@ Target "Extract" (fun _ ->
        "--codegen-lib";"Zen.Cost";
        "--codegen-lib";"Zen.Array";
        "--extract_module";"Zen.Types.Extracted";
+       "--extract_module";"Zen.Types.Main";
        "--codegen-lib";"Zen.Types";
        "--odir";extractedDir |]
 
@@ -133,6 +137,8 @@ Target "Build" (fun _ ->
       "fsharp/Realized/Zen.Sha3.Realized.fs";
       "fsharp/Realized/Zen.Merkle.fs";
       "fsharp/Realized/Zen.Util.fs";
+      "fsharp/Realized/Zen.Types.TxSkeleton.fs";
+      "fsharp/Extracted/Zen.Types.Main.fs"
     |]
 
   let checker = FSharpChecker.Create()
@@ -155,6 +161,7 @@ Target "Build" (fun _ ->
       "-r"; "../../packages/FSharp.Core/lib/net45/FSharp.Core.dll"
       "-r"; "../../packages/FSharp.Compatibility.OCaml/lib/net40/FSharp.Compatibility.OCaml.dll"
       "-r"; "../../packages/libsodium-net/lib/Net40/Sodium.dll"
+      "-r"; "../../packages/FSharpx.Collections/lib/net40/FSharpx.Collections.dll"
       "-r"; "../../packages/BouncyCastle/lib/BouncyCastle.Crypto.dll"
     |]
 
