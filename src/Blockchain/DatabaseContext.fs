@@ -3,6 +3,7 @@ module Blockchain.DatabaseContext
 open DataAccess
 open Consensus
 open Consensus.Types
+open Consensus.UtxoSet
 open Infrastructure
 open MBrace.FsPickler
 
@@ -10,8 +11,7 @@ open MBrace.FsPickler
 // TODO:Implement serialize and deserialize for persistence
 type BlockState = 
     {
-        ema:EMA.T
-        utxoSet:UtxoSet.T // TODO:We can actually optimize this by only saving the outpoint and status without output
+        ema:EMA.T        
         activeContractSet:Hash.Hash seq
     }
 
@@ -19,6 +19,7 @@ type T =
     {        
         databaseContext:DataAccess.DatabaseContext
         tip:SingleValue<Hash.Hash>
+        utxoSet:Collection<Outpoint, OutputStatus>
         blocks:Collection<Hash.Hash,ExtendedBlockHeader.T>
         blockChildrenIndex: Index<Hash.Hash,ExtendedBlockHeader.T,Hash.Hash> 
         blockState:Collection<Hash.Hash,BlockState>
@@ -56,7 +57,7 @@ let private deserializeHashes bytes =
     |> Array.chunkBySize Hash.Length
     |> Array.toSeq
     |> Seq.map Hash.Hash
-       
+                  
 let createSession context : Session = 
     let session = DataAccess.DatabaseContext.createSession context.databaseContext  
     {
@@ -88,11 +89,18 @@ let create dataPath =
         blocks
         |> Collection.addIndex blockChildrenIndex
         
-    Session.commit session      
+    let utxoSet = 
+        Collection.create session "utxoset"
+            binarySerializer.Pickle<Outpoint> 
+            binarySerializer.Pickle<OutputStatus>
+            binarySerializer.UnPickle<OutputStatus>              
+        
+    Session.commit session
     
     {
-        databaseContext = databaseContext
+        databaseContext = databaseContext        
         tip=tip
+        utxoSet=utxoSet
         blocks=blocks
         blockChildrenIndex=blockChildrenIndex
         blockState=blockState

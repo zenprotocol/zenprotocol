@@ -111,7 +111,7 @@ let transportHandler transport client ownAddress msg (connector,addressBook) =
             
             connector, addressBook
     | InProcMessage.GetMemPool peerId ->            
-        Blockchain.getMemPool client peerId
+        Blockchain.requestMemPool client peerId
     
         connector, addressBook      
     | InProcMessage.MemPool {peerId=peerId;txs=bytes} ->            
@@ -131,7 +131,7 @@ let transportHandler transport client ownAddress msg (connector,addressBook) =
     | InProcMessage.GetTransaction {peerId=peerId;txHash=txHash} ->
         match Hash.fromBytes txHash with
         | Some txHash -> 
-            Blockchain.getTransaction client peerId txHash
+            Blockchain.requestTransaction client peerId txHash
         | None -> 
             // TODO: we might want to punish the sending node
             ()
@@ -140,12 +140,12 @@ let transportHandler transport client ownAddress msg (connector,addressBook) =
     | InProcMessage.BlockRequest {peerId=peerId;blockHash=blockHash} -> 
         match Hash.fromBytes blockHash with
         | Some blockHash ->
-            Blockchain.getBlock client peerId blockHash
+            Blockchain.requestBlock client peerId blockHash
         | None -> ()
         
         connector, addressBook
     | InProcMessage.GetTip peerId ->
-        Blockchain.getTip client peerId
+        Blockchain.requestTip client peerId
         connector, addressBook
     | InProcMessage.Block block ->
         match Block.deserialize block with

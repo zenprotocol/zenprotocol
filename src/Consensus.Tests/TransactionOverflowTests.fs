@@ -14,7 +14,7 @@ open TransactionNunitHelpers
 open TransactionHelpers
 open TestsInfrastructure.Nunit
 
-let utxos = UtxoSet.create()
+let utxos = UtxoSet.empty
 let acs = ActiveContractSet.empty
 
 [<Test>]

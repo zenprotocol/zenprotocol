@@ -80,7 +80,20 @@ let put collection session key value =
     mdb_put(session.tx, collection.database, &keyData, &valueData, 0ul)
     |> checkErrorCode
     
-    List.iter (fun indexFunc -> indexFunc session key value) collection.indices         
+    List.iter (fun indexFunc -> indexFunc session key value) collection.indices
+    
+let delete collection session key = 
+    let keyBytes = collection.keySerializer key
+    use pinnedKey = pin keyBytes
+    let mutable keyData = byteArrayToData pinnedKey
+    
+    mdb_del(session.tx, collection.database, &keyData, IntPtr.Zero)
+    |> checkErrorCode
+    
+    //TODO: at the moment delete is not supported with indices, so
+    // we throw when collection has indices
+    if not <| List.isEmpty collection.indices then
+        failwith "delete doesn't work with indices"
     
 let containsKey collection (session:Session) key = 
     match tryGet collection session key with

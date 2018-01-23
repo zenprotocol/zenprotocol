@@ -161,7 +161,7 @@ let validate chain =
     >=> checkCommitments
 
 /// Apply block to UTXO and ACS, operation can fail
-let connect chain contractsPath parent timestamp set acs ema =    
+let connect chain tryGetUTXO contractsPath parent timestamp set acs ema =    
     let checkBlockNumber (block:Block) = 
         if parent.blockNumber + 1ul <> block.header.blockNumber then
             Error "blockNumber mismatch"
@@ -211,7 +211,7 @@ let connect chain contractsPath parent timestamp set acs ema =
         if isGenesis chain block then
             let set = List.fold (fun set tx ->
                 let txHash = (Transaction.hash tx)
-                UtxoSet.handleTransaction txHash tx set) set block.transactions
+                UtxoSet.handleTransaction tryGetUTXO txHash tx set) set block.transactions
             Ok (block,set,acs,ema) 
         else                       
             List.fold (fun state tx->
@@ -220,10 +220,10 @@ let connect chain contractsPath parent timestamp set acs ema =
                 | Ok (block,set,acs,ema) -> 
                     let txHash = (Transaction.hash tx)
                 
-                    match TransactionValidation.validateInputs acs set txHash tx with
+                    match TransactionValidation.validateInputs tryGetUTXO acs set txHash tx with
                     | Error err -> Error (sprintf "transactions failed inputs validation due to %A" err)
                     | _ -> 
-                        let set = UtxoSet.handleTransaction txHash tx set
+                        let set = UtxoSet.handleTransaction tryGetUTXO txHash tx set
                         Ok (block,set,acs,ema) 
                     ) (Ok (block,set,acs,ema)) block.transactions
 
