@@ -6,7 +6,6 @@ open FsBech32
 open Hash
 open Consensus.TxSkeleton
 open Infrastructure
-open ZFStar
 open Zen.Types.Extracted
 open FStar.Pervasives
 open Microsoft.FSharp.Core
@@ -21,9 +20,9 @@ type T = {
     fn:   ContractFn
 }
 
-let private findMethod (assembly:Assembly) =
+let private findMethod assembly =
     try
-        assembly
+        (assembly:Assembly)
             .GetModules().[0]
             .GetTypes().[0]
             .GetMethods().[1]
@@ -31,57 +30,63 @@ let private findMethod (assembly:Assembly) =
     with _ as ex ->
         Exception.toError "get contract method" ex
 
-let private invoke (methodInfo:MethodInfo) cHash command input =
+let private invoke methodInfo cHash command input =
     try
-        methodInfo.Invoke (null, [| input; cHash; command |]) |> Ok
+        (methodInfo:MethodInfo).Invoke (null, [| input; cHash; command |]) |> Ok
     with _ as ex ->
         Exception.toError "invoke contract" ex
 
-let private castOutput (output:System.Object) =
+let private castOutput output =
     try
-        output :?> cost<result<txSkeleton>, unit> |> Ok
+        (output:System.Object) :?> cost<result<txSkeleton>, unit> |> Ok
     with _ as ex ->
         Exception.toError "cast contract output" ex
 
 let private wrap methodInfo =
     fun (Hash.Hash cHash) command txSkeleton ->
-        convertInput txSkeleton
+        ZFStar.convertInput txSkeleton
         |> invoke methodInfo cHash command
         |> Result.bind castOutput
-        |> Result.bind convertResult
+        |> Result.bind ZFStar.convertResult
 
 let hash contract = contract.hash
 
-let computeHash (code:string) =
-    code
+
+let private getModuleName =
+    Hash.bytes
+    >> Base16.encode
+    >> (+) "Z"
+
+let computeHash code =
+    (code : string)
     |> Encoding.UTF8.GetBytes
     |> Hash.compute
 
-let compile contractsPath code =
+let load contractsPath hash =
+    getModuleName hash
+    |> ZFStar.load contractsPath
+    |> Result.bind findMethod
+    |> Result.map wrap
+    |> Result.map (fun fn ->
+        {
+            hash = hash
+            fn = fn
+        })
+
+let compile contractsPath (code, hints) =
     let hash = computeHash code
 
     hash
-    |> Hash.bytes
-    |> Base16.encode
-    |> ZFStar.compile contractsPath code
-    |> Result.bind findMethod
-    |> Result.map wrap
-    |> Result.map (fun fn ->
-        {
-            hash = hash
-            fn = fn
-        })
+    |> getModuleName
+    |> ZFStar.compile contractsPath (code, hints)
+    |> Result.map (fun _ -> hash)
+    |> Result.bind (load contractsPath)
+
+let recordHints code =
+    code
+    |> computeHash
+    |> getModuleName
+    |> ZFStar.recordHints code
 
 let run contract command =
     contract.fn contract.hash command
-
-let load contractsPath (hash:Hash.Hash) =
-
-    ZFStar.load contractsPath (Hash.toString hash)
-    |> Result.bind findMethod
-    |> Result.map wrap
-    |> Result.map (fun fn ->
-        {
-            hash = hash
-            fn = fn
-        })

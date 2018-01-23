@@ -39,7 +39,7 @@ type Transaction = {
     inputs: Outpoint list
     outputs: Output list
     witnesses: Witness list
-    contract: string Option
+    contract: (string * string) Option
 }
 
 type Nonce = uint64 * uint64
