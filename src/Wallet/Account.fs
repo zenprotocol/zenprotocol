@@ -1,4 +1,4 @@
-﻿module Wallet.Account
+module Wallet.Account
 
 open Consensus
 open Consensus.ChainParameters

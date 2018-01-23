@@ -6,12 +6,9 @@ open Hash
 open TxSkeleton
 open Infrastructure.ServiceBus.Client
 
-// We are using custom result because fspicker cannot serialize result
-type TransactionResult =
-    | Ok of Transaction
-    | Error of string                             
 
-// We are using custom result because fspicker cannot serialize result
+type TransactionResult = Result<Transaction,string>
+
 type ActivateContractTransactionResult =
     | Ok of Transaction * Hash
     | Error of string                             

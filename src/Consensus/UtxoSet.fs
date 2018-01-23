@@ -16,9 +16,9 @@ type T = Map<Outpoint, OutputStatus>
 let asDatabase = Map.empty
 
 let get getUTXO outpoint set =
-    match Map.tryFind outpoint set with
-    | Some x-> x
-    | None -> getUTXO outpoint
+    defaultArg
+        <| Map.tryFind outpoint set
+        <| getUTXO outpoint     // return value if outpoint isn't in set
          
 let handleTransaction getUTXO txHash tx set =
     let folder state input =
@@ -39,15 +39,7 @@ let handleTransaction getUTXO txHash tx set =
     set
 
 let isSomeSpent getUTXO outpoints set =
-    List.fold (fun state outpoint ->
-        match state with
-        | true -> true
-        | false ->
-            match get getUTXO outpoint set with
-            | Spent -> true
-            | NoOutput
-            | Unspent _ -> false            
-            ) false outpoints
+    List.exists (fun outpoint -> get getUTXO outpoint set = Spent) outpoints
 
 let getUtxos getUTXO outpoints set =    
     List.foldBack (fun outpoint state ->
@@ -77,7 +69,7 @@ let undoBlock getOutput getUTXO block set =
             ) set
 
     // remove all outputs
-    List.foldBack (fun tx utxoSet ->
+    List.fold (fun utxoSet tx ->
         let txHash = Transaction.hash tx
 
         tx.outputs
@@ -86,5 +78,5 @@ let undoBlock getOutput getUTXO block set =
             let outpoint = {txHash=txHash; index=uint32 i}
                                     
             Map.add outpoint NoOutput utxoSet    
-            ) utxoSet) block.transactions utxoSet
+            ) utxoSet) utxoSet block.transactions
         

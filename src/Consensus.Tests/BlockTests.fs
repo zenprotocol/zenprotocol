@@ -18,6 +18,7 @@ let difficulty = 0x20fffffful
 let contractsPath = "./test"
 
 let getUTXO _ = UtxoSet.NoOutput
+let getWallet _ = Map.empty
  
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``block with empty transactions failed validation``(header) =

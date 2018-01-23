@@ -138,7 +138,7 @@ let rec private update' tree cache data keys (height:UInt64) _base =
             
             cacheNodes tree cache left right height _base splitIndex
         | true,true -> failwith "this should never happen (unsorted D or broken split?)" 
-        | _,_ -> 
+        | false,false -> 
             let left,cache = update' tree cache leftData leftKeys (height - 1UL) _base
             let right,cache = update' tree cache rightData rightKeys (height - 1UL) splitIndex
             

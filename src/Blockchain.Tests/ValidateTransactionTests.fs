@@ -1,4 +1,4 @@
-﻿module Blockchain.Tests.ValidateTransactionTests
+module Blockchain.Tests.ValidateTransactionTests
 
 // This tests only for ValidateTransaction command
 // We don't need to cover the entire outcome of transaction validation

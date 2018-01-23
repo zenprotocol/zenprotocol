@@ -1,4 +1,4 @@
-﻿module Consensus.Tests.TransactionHelpers
+module Consensus.Tests.TransactionHelpers
 
 open Consensus
 open Consensus.Types

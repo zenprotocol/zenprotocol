@@ -1,4 +1,4 @@
-﻿module Consensus.Tests.ContractTests
+module Consensus.Tests.ContractTests
 
 open Consensus
 open Types
