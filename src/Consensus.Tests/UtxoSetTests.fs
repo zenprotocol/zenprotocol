@@ -29,7 +29,7 @@ let ``handling transaction add outputs to set``() =
     }   
         
     let set = 
-        UtxoSet.empty
+        UtxoSet.asDatabase
         |> UtxoSet.handleTransaction tryGetUTXO tx1Hash tx1        
     
     UtxoSet.isSomeSpent tryGetUTXO tx2.inputs set |> should equal false
@@ -54,7 +54,7 @@ let ``handling transaction mark inputs as spent``() =
     let tx2Hash = Transaction.hash tx2
         
     let set = 
-        UtxoSet.empty
+        UtxoSet.asDatabase
         |> UtxoSet.handleTransaction tryGetUTXO tx1Hash tx1   
         |> UtxoSet.handleTransaction tryGetUTXO tx2Hash tx2     
     

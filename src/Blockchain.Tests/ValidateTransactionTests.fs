@@ -44,7 +44,7 @@ let txHash = Transaction.hash tx
 let txOutpoints = getTxOutpints txHash tx
 
 // Default initial state of mempool and utxoset
-let utxoSet = UtxoSet.empty |> UtxoSet.handleTransaction (fun _ -> None) Transaction.rootTxHash Transaction.rootTx
+let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction (fun _ -> None) Transaction.rootTxHash Transaction.rootTx
 let mempool = MemPool.empty |> MemPool.add Transaction.rootTxHash Transaction.rootTx
 let orphanPool = OrphanPool.create()
 let acs = ActiveContractSet.empty
@@ -131,7 +131,7 @@ let ``orphan tx added to orphan list``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
-    let utxoSet = UtxoSet.empty
+    let utxoSet = UtxoSet.asDatabase
     let state = {state with memoryState={state.memoryState with utxoSet=utxoSet}}
 
     let result = Handler.handleCommand chain (ValidateTransaction tx) session 1UL state

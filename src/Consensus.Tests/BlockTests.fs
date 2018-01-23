@@ -14,7 +14,7 @@ open FsUnit
 let timestamp = 1515594186383UL + 1UL
 let difficulty = 0x20fffffful
 
-let contractsPath = "./data"
+let contractsPath = "./test"
 
 let tryGetUTXO _ = None
  
@@ -72,7 +72,7 @@ let ``block with valid transactions pass validation``(header) (NonEmptyTransacti
 let ``connecting block failed when block number is not successive``(parent:BlockHeader) (block:Block) =
 
     let acs = ActiveContractSet.empty
-    let utxoSet = UtxoSet.empty
+    let utxoSet = UtxoSet.asDatabase
     let ema = EMA.create Chain.Test
 
     parent.blockNumber + 1ul <> block.header.blockNumber ==> (Block.connect Chain.Test tryGetUTXO contractsPath parent 1UL utxoSet acs ema block = Error "blockNumber mismatch")  
@@ -81,7 +81,7 @@ let ``connecting block failed when block number is not successive``(parent:Block
 let ``connecting block should fail when commitments are wrong``(parent:BlockHeader) (NonEmptyTransactions transactions) = 
     
     let acs = ActiveContractSet.empty
-    let utxoSet = UtxoSet.empty
+    let utxoSet = UtxoSet.asDatabase
     let ema = EMA.create Chain.Test   
     
     let header = {
@@ -101,7 +101,7 @@ let ``connecting block should fail when commitments are wrong``(parent:BlockHead
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]    
 let ``connecting block should fail when transaction inputs are invalid``(parent:BlockHeader) (NonEmptyTransactions transactions) =
     let acs = ActiveContractSet.empty
-    let utxoSet = UtxoSet.empty
+    let utxoSet = UtxoSet.asDatabase
     let ema = EMA.create Chain.Test   
  
     let block = Block.createTemplate parent timestamp ema acs transactions
@@ -121,7 +121,7 @@ let ``block timestamp too early``() =
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation") 
     
     let acs = ActiveContractSet.empty
-    let utxoSet = UtxoSet.empty |> UtxoSet.handleTransaction tryGetUTXO Transaction.rootTxHash Transaction.rootTx    
+    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction tryGetUTXO Transaction.rootTxHash Transaction.rootTx    
     
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate parent timestamp ema acs [tx]
@@ -143,7 +143,7 @@ let ``block timestamp in the future``() =
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation") 
     
     let acs = ActiveContractSet.empty
-    let utxoSet = UtxoSet.empty |> UtxoSet.handleTransaction tryGetUTXO Transaction.rootTxHash Transaction.rootTx    
+    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction tryGetUTXO Transaction.rootTxHash Transaction.rootTx    
     
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate parent (timestamp + Block.MaxTimeInFuture + 1UL) ema acs [tx]
@@ -161,7 +161,7 @@ let ``block with mismatch commitments fail connecting``() =
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation") 
     
     let acs = ActiveContractSet.empty
-    let utxoSet = UtxoSet.empty |> UtxoSet.handleTransaction tryGetUTXO Transaction.rootTxHash Transaction.rootTx
+    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction tryGetUTXO Transaction.rootTxHash Transaction.rootTx
     let ema = EMA.create Chain.Test
     
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0x20fffffful;nonce=0UL,0UL}
@@ -181,7 +181,7 @@ let ``can connect valid block``() =
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation") 
     
     let acs = ActiveContractSet.empty
-    let utxoSet = UtxoSet.empty |> UtxoSet.handleTransaction tryGetUTXO Transaction.rootTxHash Transaction.rootTx
+    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction tryGetUTXO Transaction.rootTxHash Transaction.rootTx
     let ema = EMA.create Chain.Test
     
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}

@@ -13,7 +13,7 @@ open System.Text
 open Org.BouncyCastle.Crypto.Digests
 open FsBech32
 
-let assemblyDirectory = "./data"
+let assemblyDirectory = "./test"
 
 let clean =
     Platform.cleanDirectory assemblyDirectory

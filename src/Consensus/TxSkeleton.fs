@@ -24,8 +24,6 @@ let checkPrefix txSub txSuper =
        txSuper.outputs => txSub.outputs then
         Ok txSuper
     else
-        printfn "sub) %A " txSub
-        printfn "super) %A " txSuper
         Error "invalid prefix"
 
 let fromTransaction tx outputs =

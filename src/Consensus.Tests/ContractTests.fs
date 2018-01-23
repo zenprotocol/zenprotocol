@@ -11,7 +11,7 @@ open SampleContract
 
 open TestsInfrastructure.Nunit
 
-let contractsPath = "./data"
+let contractsPath = "./test"
 
 let tryGetUTXO _ = None
 
@@ -53,7 +53,7 @@ let compileRunAndValidate code =
     |> Result.bind (Contract.compile contractsPath)
     |> Result.bind (fun contract ->
 
-        let utxoSet = getSampleUtxoset (UtxoSet.empty)
+        let utxoSet = getSampleUtxoset (UtxoSet.asDatabase)
         Contract.run contract "" sampleInputTx
         |> Result.bind (TxSkeleton.checkPrefix sampleInputTx)
         |> Result.map (Transaction.fromTxSkeleton contract.hash)
