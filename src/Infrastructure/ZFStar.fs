@@ -21,32 +21,36 @@ let private compile' path moduleName code =
         let tempFileName = Path.GetTempFileName()
         let codeFileName = changeExtention ".fs" tempFileName
         let assemblyPath = Path.Combine(path, sprintf "%s.dll" moduleName)
-        File.WriteAllText(codeFileName, code)
-        let (+/) = (/) Platform.getFrameworkPath               
         
-        let errors, exitCode =
-            Async.RunSynchronously 
-            <| fsChecker.Compile(
-                [|"fsc.exe";
-                "--noframework";
-                "--mlcompatibility";
-                "-o"; assemblyPath;
-                "-a"; codeFileName;
-                "-r"; (+/) "mscorlib.dll";
-                "-r"; (+/) "System.Core.dll";
-                "-r"; (+/) "System.dll";
-                "-r"; (+/) "System.Numerics.dll";
-                "-r"; "zulib" / "Zulib.dll";
-                //"-r"; "FsPickler.dll";
-                "-r"; "FSharp.Compatibility.OCaml.dll"|])
-        if exitCode = 0 then
+        if File.Exists assemblyPath then
             Ok ()
-        else
-            errors
-            |> Array.map (fun e -> e.ToString()) 
-            |> String.concat " "
-            |> error "compile"
-            |> Error
+        else        
+            File.WriteAllText(codeFileName, code)
+            let (+/) = (/) Platform.getFrameworkPath               
+            
+            let errors, exitCode =
+                Async.RunSynchronously 
+                <| fsChecker.Compile(
+                    [|"fsc.exe";
+                    "--noframework";
+                    "--mlcompatibility";
+                    "-o"; assemblyPath;
+                    "-a"; codeFileName;
+                    "-r"; (+/) "mscorlib.dll";
+                    "-r"; (+/) "System.Core.dll";
+                    "-r"; (+/) "System.dll";
+                    "-r"; (+/) "System.Numerics.dll";
+                    "-r"; "zulib" / "Zulib.dll";
+                    //"-r"; "FsPickler.dll";
+                    "-r"; "FSharp.Compatibility.OCaml.dll"|])
+            if exitCode = 0 then
+                Ok ()
+            else
+                errors
+                |> Array.map (fun e -> e.ToString()) 
+                |> String.concat " "
+                |> error "compile"
+                |> Error
     with _ as ex ->
         Exception.toError "compile" ex
 
