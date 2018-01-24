@@ -66,9 +66,9 @@ let main dataPath chain busName =
             |> Observable.scan (fun state handler -> 
                 use session = DatabaseContext.createSession databaseContext
                 let effectWriter = handler session (Timestamp.now ()) state
-                let result = EffectsWriter.run effectWriter publisher client                
                 DataAccess.Session.commit session.session
-                
+                let result = EffectsWriter.run effectWriter publisher client                
+                                
                 result 
                 ) state  
                                                           
