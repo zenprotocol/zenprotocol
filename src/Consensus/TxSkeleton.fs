@@ -12,6 +12,18 @@ let empty =
         pInputs = []
         outputs = []
     }
+    
+let addInputs inputs (txSkeleton:TxSkeleton) =     
+    {txSkeleton with pInputs=List.append txSkeleton.pInputs inputs}
+    
+let addOutput output (txSkeleton:TxSkeleton) = 
+    {txSkeleton with outputs=List.append txSkeleton.outputs [output]}    
+    
+let addChange asset inputsAmount outputsAmount pkHash txSkeleton = 
+    if inputsAmount > outputsAmount then
+        addOutput {lock=PK pkHash;spend={amount=inputsAmount-outputsAmount;asset=asset}} txSkeleton
+    else
+        txSkeleton                        
 
 let checkPrefix txSub txSuper = 
     let (=>) (super:List<'a>) (sub:List<'a>) = 
@@ -44,8 +56,8 @@ let applyMask tx cw =
        tx.outputs => cw.outputsLength then
         Ok { 
             tx with 
-                pInputs = tx.pInputs.[cw.beginInputs - 1 .. cw.inputsLength - 1]
-                outputs = tx.outputs.[cw.beginOutputs - 1 .. cw.outputsLength - 1]
+                pInputs = tx.pInputs.[0 .. cw.beginInputs - 1 ]
+                outputs = tx.outputs.[0 .. cw.beginOutputs - 1 ]
         }
     else
         Error "could not apply mask"

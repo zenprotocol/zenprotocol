@@ -32,7 +32,7 @@ let createTransaction address amount account =
     | Result.Error error -> failwith error
 let getTxOutpints txHash tx = List.mapi (fun i _ -> {txHash=txHash;index= uint32 i}) tx.outputs
 let areOutpointsInSet session outpoints set =
-    match UtxoSet.getUtxos (UtxoSetRepository.tryGetOutput session) outpoints set with
+    match UtxoSet.getUtxos (UtxoSetRepository.get session) outpoints set with
     | Some _ -> true
     | None -> false
 
@@ -44,7 +44,7 @@ let txHash = Transaction.hash tx
 let txOutpoints = getTxOutpints txHash tx
 
 // Default initial state of mempool and utxoset
-let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction (fun _ -> None) Transaction.rootTxHash Transaction.rootTx
+let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction (fun _ -> UtxoSet.NoOuput) Transaction.rootTxHash Transaction.rootTx
 let contractWallets = ContractWallets.asDatabase
 let mempool = MemPool.empty |> MemPool.add Transaction.rootTxHash Transaction.rootTx
 let orphanPool = OrphanPool.create()
@@ -86,7 +86,7 @@ let ``valid transaction raise events and update state``() =
     MemPool.containsTransaction txHash state'.memoryState.mempool |> should equal true
 
     // Checking the tx is in the utxoset
-    UtxoSet.getUtxos (UtxoSetRepository.tryGetOutput session) txOutpoints state'.memoryState.utxoSet
+    UtxoSet.getUtxos (UtxoSetRepository.get session) txOutpoints state'.memoryState.utxoSet
     |> should equal (Some tx.outputs)
 
 [<Test>]
@@ -107,7 +107,7 @@ let ``Invalid tx doesn't raise events or update state``() =
     MemPool.containsTransaction txHash state'.memoryState.mempool |> should equal false
 
     // Checking the tx is not in the utxoset
-    UtxoSet.getUtxos (UtxoSetRepository.tryGetOutput session) txOutpoints state'.memoryState.utxoSet |> should equal None
+    UtxoSet.getUtxos (UtxoSetRepository.get session) txOutpoints state'.memoryState.utxoSet |> should equal None
 
     // Orphan should be empty
     Map.isEmpty state'.memoryState.orphanPool |> should equal true
@@ -147,7 +147,7 @@ let ``orphan tx added to orphan list``() =
     MemPool.containsTransaction txHash state'.memoryState.mempool |> should equal false
 
     // Checking the tx is not in the utxoset
-    UtxoSet.getUtxos (UtxoSetRepository.tryGetOutput session) txOutpoints state'.memoryState.utxoSet |> should equal None
+    UtxoSet.getUtxos (UtxoSetRepository.get session) txOutpoints state'.memoryState.utxoSet |> should equal None
 
     OrphanPool.containsTransaction txHash state'.memoryState.orphanPool |> should equal true
 
@@ -175,7 +175,7 @@ let ``origin tx hit mempool, orphan tx should be added to mempool``() =
     // Checking that the transaction is only in the mempool and no event were raised
     events |> should haveLength 0
     MemPool.containsTransaction tx2Hash state'.memoryState.mempool |> should equal false
-    UtxoSet.getUtxos (UtxoSetRepository.tryGetOutput session) (getTxOutpints tx2Hash tx2) state'.memoryState.utxoSet |> should equal None
+    UtxoSet.getUtxos (UtxoSetRepository.get session) (getTxOutpints tx2Hash tx2) state'.memoryState.utxoSet |> should equal None
     OrphanPool.containsTransaction tx2Hash state'.memoryState.orphanPool |> should equal true
 
     // Sending origin, which should cause both transaction to be added to the mempool
@@ -188,8 +188,8 @@ let ``origin tx hit mempool, orphan tx should be added to mempool``() =
     events' |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (tx2Hash,tx2)))
     MemPool.containsTransaction tx1Hash state''.memoryState.mempool |> should equal true
     MemPool.containsTransaction tx2Hash state''.memoryState.mempool |> should equal true
-    UtxoSet.getUtxos (UtxoSetRepository.tryGetOutput session) (getTxOutpints tx1Hash tx1) state''.memoryState.utxoSet |> should equal None // Was already spent by tx2
-    UtxoSet.getUtxos (UtxoSetRepository.tryGetOutput session) (getTxOutpints tx2Hash tx2) state''.memoryState.utxoSet |> should equal (Some tx2.outputs)
+    UtxoSet.getUtxos (UtxoSetRepository.get session) (getTxOutpints tx1Hash tx1) state''.memoryState.utxoSet |> should equal None // Was already spent by tx2
+    UtxoSet.getUtxos (UtxoSetRepository.get session) (getTxOutpints tx2Hash tx2) state''.memoryState.utxoSet |> should equal (Some tx2.outputs)
     OrphanPool.containsTransaction tx2Hash state''.memoryState.orphanPool |> should equal false
     OrphanPool.containsTransaction tx1Hash state''.memoryState.orphanPool |> should equal false
 
@@ -224,7 +224,7 @@ let ``orphan transaction is eventually invalid``() =
     // Checking that the transaction is only in the mempool and no event were raised
     events |> should haveLength 0
     MemPool.containsTransaction tx2Hash state'.memoryState.mempool |> should equal false
-    UtxoSet.getUtxos (UtxoSetRepository.tryGetOutput session) (getTxOutpints tx2Hash tx2) state'.memoryState.utxoSet |> should equal None
+    UtxoSet.getUtxos (UtxoSetRepository.get session) (getTxOutpints tx2Hash tx2) state'.memoryState.utxoSet |> should equal None
     OrphanPool.containsTransaction tx2Hash state'.memoryState.orphanPool |> should equal true
 
      // Sending origin, which should cause orphan transaction to be rejected and removed from orphan list
@@ -236,8 +236,8 @@ let ``orphan transaction is eventually invalid``() =
     events' |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (tx1Hash,tx1)))
     MemPool.containsTransaction tx1Hash state''.memoryState.mempool |> should equal true
     MemPool.containsTransaction tx2Hash state''.memoryState.mempool |> should equal false
-    UtxoSet.getUtxos (UtxoSetRepository.tryGetOutput session) (getTxOutpints tx1Hash tx1) state''.memoryState.utxoSet |> should equal (Some tx1.outputs)
-    UtxoSet.getUtxos (UtxoSetRepository.tryGetOutput session) (getTxOutpints tx2Hash tx2) state''.memoryState.utxoSet |> should equal None
+    UtxoSet.getUtxos (UtxoSetRepository.get session) (getTxOutpints tx1Hash tx1) state''.memoryState.utxoSet |> should equal (Some tx1.outputs)
+    UtxoSet.getUtxos (UtxoSetRepository.get session) (getTxOutpints tx2Hash tx2) state''.memoryState.utxoSet |> should equal None
     OrphanPool.containsTransaction tx2Hash state''.memoryState.orphanPool |> should equal false
     OrphanPool.containsTransaction tx1Hash state''.memoryState.orphanPool |> should equal false
 
@@ -278,8 +278,8 @@ let ``two orphan transaction spending same input``() =
     events |> should haveLength 0
     MemPool.containsTransaction tx2Hash state'.memoryState.mempool |> should equal false
     MemPool.containsTransaction tx3Hash state'.memoryState.mempool |> should equal false
-    UtxoSet.getUtxos (UtxoSetRepository.tryGetOutput session) (getTxOutpints tx2Hash tx2) state'.memoryState.utxoSet |> should equal None
-    UtxoSet.getUtxos (UtxoSetRepository.tryGetOutput session) (getTxOutpints tx3Hash tx3) utxoSet |> should equal None
+    UtxoSet.getUtxos (UtxoSetRepository.get session) (getTxOutpints tx2Hash tx2) state'.memoryState.utxoSet |> should equal None
+    UtxoSet.getUtxos (UtxoSetRepository.get session) (getTxOutpints tx3Hash tx3) utxoSet |> should equal None
     OrphanPool.containsTransaction tx2Hash state'.memoryState.orphanPool |> should equal true
     OrphanPool.containsTransaction tx3Hash state'.memoryState.orphanPool |> should equal true
 
@@ -294,7 +294,7 @@ let ``two orphan transaction spending same input``() =
     MemPool.containsTransaction tx2Hash state''.memoryState.mempool <> MemPool.containsTransaction tx3Hash state''.memoryState.mempool
     |> should equal true
 
-    UtxoSet.getUtxos (UtxoSetRepository.tryGetOutput session) (getTxOutpints tx1Hash tx1) state''.memoryState.utxoSet |> should equal None // Was already spent by tx2
+    UtxoSet.getUtxos (UtxoSetRepository.get session) (getTxOutpints tx1Hash tx1) state''.memoryState.utxoSet |> should equal None // Was already spent by tx2
     areOutpointsInSet session (getTxOutpints tx2Hash tx2) state''.memoryState.utxoSet <> areOutpointsInSet session (getTxOutpints tx3Hash tx3) state''.memoryState.utxoSet
     |> should equal true
 
@@ -389,7 +389,7 @@ let ``Valid contract should execute``() =
         ActiveContractSet.containsContract sampleContractHash state.memoryState.activeContractSet
         |> should equal true
 
-        TransactionHandler.executeContract session sampleInputTx sampleContractHash state.memoryState
+        TransactionHandler.executeContract session sampleInputTx sampleContractHash "" state.memoryState
         )
     |> Result.mapError failwith
     |> ignore

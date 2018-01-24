@@ -14,7 +14,7 @@ type ActivateContractArgs =
         member arg.Usage = ""
 
 type ExecuteContractArgs = 
-    | [<MainCommand("COMMAND");ExactlyOnce>] ExecuteContract_Arguments of asset:string * amount:int64 * address:string
+    | [<MainCommand("COMMAND");ExactlyOnce>] ExecuteContract_Arguments of address:string * command:string * asset:string * amount:int64 
     interface IArgParserTemplate with
         member arg.Usage = ""
                                                                              
@@ -109,8 +109,8 @@ let main argv =
                     | code, HttpResponseBody.Text text -> printfn "Failed %d %s" code text
                     | code,_ -> printfn "Failed %d with binary response" code
     | Some (Execute args) ->
-        let asset,amount,address = args.GetResult <@ ExecuteContract_Arguments @>
-        let activate = new ContractExecuteRequestJson.Root(address, [| new ContractExecuteRequestJson.Spend(asset, amount) |])
+        let address,command,asset,amount = args.GetResult <@ ExecuteContract_Arguments @>
+        let activate = new ContractExecuteRequestJson.Root(address,command, [| new ContractExecuteRequestJson.Spend(asset, amount) |])
 
         let response = activate.JsonValue.Request (getUri "wallet/contract/execute")
 

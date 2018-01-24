@@ -14,6 +14,10 @@ open Blockchain.EffectsWriter
 open Messaging.Events
 open State
 
+let getUTXO = UtxoSetRepository.get
+let getOutput = TransactionRepository.getOutput
+let getWallet = ContractWalletRepository.get
+
 // Change the status of the entire chain from the root orphan block up to all tips from Orphan to Connected 
 let rec private unorphanChain session extendedHeader =
     let unorphanChildChain parent extendedHeader =         
@@ -62,12 +66,9 @@ let rec private connectChain chain contractPath timestamp session (origin:Extend
                                                 
             validTip,(utxoSet,acs,ema, mempool, contractWallets)                
         else 
-            let block = BlockRepository.getFullBlock session tip
+            let block = BlockRepository.getFullBlock session tip        
         
-            let tryGetUTXO = UtxoSetRepository.tryGetOutput session
-            let getWallet = ContractWalletRepository.get session
-        
-            match Block.connect chain tryGetUTXO getWallet contractPath parent.header timestamp utxoSet acs ema contractWallets block with
+            match Block.connect chain (getUTXO session) (getWallet session) contractPath parent.header timestamp utxoSet acs ema contractWallets block with
             | Error error ->
                 BlockRepository.saveHeader session (ExtendedBlockHeader.invalid tip)
             
@@ -167,13 +168,13 @@ let rec private undoBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:Extend
         let mempool = MemPool.undoBlock fullBlock mempool
         let utxoSet = 
             UtxoSet.undoBlock
-                (TransactionRepository.getOutput session)
-                (UtxoSetRepository.tryGetOutput session)
+                (getOutput session)
+                (getUTXO session)
                 fullBlock utxoSet
         let contractWallets = 
             ContractWallets.undoBlock 
-                (TransactionRepository.getOutput session)
-                (ContractWalletRepository.get session)
+                (getOutput session)
+                (getWallet session)
                 fullBlock contractWallets
                               
         undoBlocks session forkBlock parent utxoSet contractWallets mempool                       
@@ -232,11 +233,8 @@ let rollForwardChain chain contractPath timestamp state session block persistent
     }
 
 let private handleGenesisBlock chain contractPath session timestamp (state:State) blockHash block =
-    effectsWriter {           
-        let tryGetUTXO = UtxoSetRepository.tryGetOutput session
-        let getWallet = ContractWalletRepository.get session
-        
-        match Block.connect chain tryGetUTXO getWallet contractPath Block.genesisParent timestamp UtxoSet.asDatabase 
+    effectsWriter {                          
+        match Block.connect chain (getUTXO session) (getWallet session) contractPath Block.genesisParent timestamp UtxoSet.asDatabase 
                 state.tipState.activeContractSet state.tipState.ema ContractWallets.asDatabase block with
         | Error error ->
             Log.info "Failed connecting genesis block %A due to %A" (Block.hash block) error
@@ -263,11 +261,8 @@ let private handleGenesisBlock chain contractPath session timestamp (state:State
 // New block can also unorphan a chain and extend the chain even further
 // So we also have to unorphan any chain and find longest chain
 let private handleMainChain chain contractPath session timestamp (state:State) (parent:ExtendedBlockHeader.T) blockHash block =    
-    effectsWriter {    
-        let tryGetUTXO = UtxoSetRepository.tryGetOutput session
-        let getWallet = ContractWalletRepository.get session
-    
-        match Block.connect chain tryGetUTXO getWallet contractPath parent.header timestamp UtxoSet.asDatabase 
+    effectsWriter {            
+        match Block.connect chain (getUTXO session) (getWallet session) contractPath parent.header timestamp UtxoSet.asDatabase 
                 state.tipState.activeContractSet state.tipState.ema ContractWallets.asDatabase block with
         | Error error ->
             Log.info "Failed connecting block %A due to %A" (Block.hash block) error

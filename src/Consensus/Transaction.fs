@@ -45,20 +45,20 @@ let sign keyPairs tx =
     //// TODO: Should we also use sighash and not sign entire transaction?
     addWitnesses tx pkWitnesses
 
-let addContractWitness cHash inputTx tx =
+let addContractWitness cHash initialTxSkelton finalTxSkeleton tx =
     addWitnesses tx [ ContractWitness {
         cHash = cHash 
-        beginInputs = List.length inputTx.pInputs
-        beginOutputs = List.length inputTx.outputs
-        inputsLength = List.length inputTx.pInputs
-        outputsLength = List.length inputTx.outputs
+        beginInputs = List.length initialTxSkelton.pInputs
+        beginOutputs = List.length initialTxSkelton.outputs
+        inputsLength = List.length finalTxSkeleton.pInputs - List.length initialTxSkelton.pInputs
+        outputsLength = List.length finalTxSkeleton.outputs - List.length initialTxSkelton.outputs
     } ]
 
-let fromTxSkeleton cHash tx =
+let fromTxSkeleton tx =
     {
         inputs =
             tx.pInputs
-            |> List.filter (fun (input, _) -> input.txHash = Hash.zero && input.index = 0ul |> not)
+            |> List.filter (fun (input, _) -> not (input.txHash = Hash.zero && input.index = 0ul) )
             |> List.map fst
         outputs = tx.outputs
         witnesses = []

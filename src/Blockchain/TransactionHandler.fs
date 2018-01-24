@@ -11,6 +11,9 @@ open Consensus.TransactionValidation
 open State
 open Infrastructure.ServiceBus.Agent
 
+let getUTXO = UtxoSetRepository.get
+let getWallet = ContractWalletRepository.get
+
 let private activateContract chain contractPath acs (tx : Types.Transaction) shouldPublishEvents =
     effectsWriter
         {
@@ -30,15 +33,12 @@ let private activateContract chain contractPath acs (tx : Types.Transaction) sho
 
 let private validateOrphanTransaction chain session contractPath state txHash tx  =
     effectsWriter 
-        {
-            let tryGetUTXO = UtxoSetRepository.tryGetOutput session
-            let getWallet = ContractWalletRepository.get session
-        
-            match TransactionValidation.validateInputs tryGetUTXO getWallet 
+        {            
+            match TransactionValidation.validateInputs (getUTXO session) (getWallet session)
                     state.activeContractSet state.utxoSet state.contractWallets txHash tx with
             | Ok (tx,pInputs) ->
-                let utxoSet = UtxoSet.handleTransaction tryGetUTXO txHash tx state.utxoSet
-                let contractWallets = ContractWallets.handleTransaction getWallet state.contractWallets txHash tx pInputs 
+                let utxoSet = UtxoSet.handleTransaction (getUTXO session) txHash tx state.utxoSet
+                let contractWallets = ContractWallets.handleTransaction (getWallet session) state.contractWallets txHash tx pInputs 
                 let mempool = MemPool.add txHash tx state.mempool
 
                 do! publish (TransactionAddedToMemPool (txHash, tx))
@@ -76,11 +76,8 @@ let rec validateOrphanTransactions chain session contractPath state =
           
 let validateInputs chain session contractPath txHash tx (state:MemoryState) shouldPublishEvents =
     effectsWriter
-        {
-            let tryGetUTXO = UtxoSetRepository.tryGetOutput session
-            let getWallet = ContractWalletRepository.get session
-        
-            match TransactionValidation.validateInputs tryGetUTXO getWallet 
+        {           
+            match TransactionValidation.validateInputs (getUTXO session) (getWallet session)
                     state.activeContractSet state.utxoSet state.contractWallets txHash tx with
             | Error Orphan ->
                 let orphanPool = OrphanPool.add txHash tx state.orphanPool
@@ -95,8 +92,8 @@ let validateInputs chain session contractPath txHash tx (state:MemoryState) shou
             | Ok (tx,pInputs) ->
                 let! acs = activateContract chain contractPath state.activeContractSet tx shouldPublishEvents
 
-                let utxoSet = UtxoSet.handleTransaction tryGetUTXO txHash tx state.utxoSet
-                let contractWallets = ContractWallets.handleTransaction getWallet state.contractWallets txHash tx pInputs
+                let utxoSet = UtxoSet.handleTransaction (getUTXO session) txHash tx state.utxoSet
+                let contractWallets = ContractWallets.handleTransaction (getWallet session) state.contractWallets txHash tx pInputs
                 let mempool = MemPool.add txHash tx state.mempool
 
                 if shouldPublishEvents then
@@ -131,15 +128,19 @@ let validateTransaction chain session contractPath tx (state:MemoryState) =
                 return! validateInputs chain session contractPath txHash tx state true
     }
 
-let executeContract session txSkeleton cHash state =
+let executeContract session txSkeleton cHash command state =
     match ActiveContractSet.tryFind cHash state.activeContractSet with
     | Some contract ->
         
         let contractWallet = 
             ContractWallets.get (ContractWalletRepository.get session) cHash state.contractWallets 
     
-        Contract.run contract "" contractWallet txSkeleton
+        Contract.run contract command contractWallet txSkeleton                
         |> Result.bind (TxSkeleton.checkPrefix txSkeleton)
-        |> Result.map (Transaction.fromTxSkeleton contract.hash)
-        |> Result.map (Transaction.addContractWitness contract.hash txSkeleton)
+        |> Result.map (fun finalTxSkeleton ->            
+            let tx = Transaction.fromTxSkeleton finalTxSkeleton
+            
+            Transaction.addContractWitness contract.hash txSkeleton finalTxSkeleton tx)
+            
+            
     | None -> Error "Contract not active"

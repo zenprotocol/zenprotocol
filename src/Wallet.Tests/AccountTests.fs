@@ -6,6 +6,7 @@ open Consensus
 open Consensus.ChainParameters
 open Consensus.Types
 open Wallet
+open TestsInfrastructure.Constraints
 
 let chain = ChainParameters.Test
 
@@ -170,3 +171,33 @@ let ``picking from multiple inputs``() =
                 
         alice' |> balanceShouldBe Hash.zero 10UL
         bob'' |> balanceShouldBe Hash.zero 2UL
+        
+[<Test>]
+let ``create execute contract transaction``() = 
+    let account = Account.createRoot ()
+    
+    let executeContract _ _ txSkeleton =             
+        let tx = 
+            txSkeleton
+            |> TxSkeleton.addOutput {lock=Contract Hash.zero;spend={asset=Hash.zero;amount=1UL}} 
+            |> Transaction.fromTxSkeleton 
+
+        tx |> Messaging.Services.TransactionResult.Ok
+    
+    let spends = Map.add Hash.zero 1UL Map.empty
+    
+    let result = Account.createExecuteContractTransaction account executeContract Hash.zero "" spends
+    
+    result |> should be ok
+    
+    let tx = 
+        match result with
+        | Ok tx -> tx
+        | Error error -> failwith error
+    
+    tx.inputs |> should haveLength 1    
+    
+    
+    
+                  
+        

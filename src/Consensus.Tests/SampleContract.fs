@@ -84,9 +84,8 @@ let sampleOutputTx =
     sampleContractTester sampleInputTx sampleContractHash
 
 let sampleExpectedResult =
-    sampleOutputTx
-    |> Transaction.fromTxSkeleton sampleContractHash
-    |> Transaction.addContractWitness sampleContractHash sampleInputTx
+    let tx = Transaction.fromTxSkeleton sampleOutputTx    
+    Transaction.addContractWitness sampleContractHash sampleInputTx sampleOutputTx tx
     |> Transaction.sign [ sampleKeyPair ]
 
 let getSampleUtxoset utxos =
