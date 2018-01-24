@@ -128,15 +128,15 @@ let validateTransaction chain session contractPath tx (state:MemoryState) =
                 return! validateInputs chain session contractPath txHash tx state true
     }
 
-let executeContract session txSkeleton cHash state =
+let executeContract session txSkeleton cHash command state =
     match ActiveContractSet.tryFind cHash state.activeContractSet with
     | Some contract ->
         
         let contractWallet = 
             ContractWallets.get (ContractWalletRepository.get session) cHash state.contractWallets 
     
-        Contract.run contract "" contractWallet txSkeleton
+        Contract.run contract command contractWallet txSkeleton
         |> Result.bind (TxSkeleton.checkPrefix txSkeleton)
-        |> Result.map (Transaction.fromTxSkeleton contract.hash)
+        |> Result.map Transaction.fromTxSkeleton
         |> Result.map (Transaction.addContractWitness contract.hash txSkeleton)
     | None -> Error "Contract not active"

@@ -85,7 +85,7 @@ let sampleOutputTx =
 
 let sampleExpectedResult =
     sampleOutputTx
-    |> Transaction.fromTxSkeleton sampleContractHash
+    |> Transaction.fromTxSkeleton
     |> Transaction.addContractWitness sampleContractHash sampleInputTx
     |> Transaction.sign [ sampleKeyPair ]
 

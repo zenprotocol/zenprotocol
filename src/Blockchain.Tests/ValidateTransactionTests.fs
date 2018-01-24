@@ -389,7 +389,7 @@ let ``Valid contract should execute``() =
         ActiveContractSet.containsContract sampleContractHash state.memoryState.activeContractSet
         |> should equal true
 
-        TransactionHandler.executeContract session sampleInputTx sampleContractHash state.memoryState
+        TransactionHandler.executeContract session sampleInputTx sampleContractHash "" state.memoryState
         )
     |> Result.mapError failwith
     |> ignore

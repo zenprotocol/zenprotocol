@@ -116,6 +116,7 @@ let recordHints code moduleName =
                  "--no_default_includes"; elaboratedFile ]
             |> wrapFStar "record hints" hintsFile)
     finally
+        ()
         Directory.Delete (oDir, true)
 
 let compile path (code,hints) moduleName = 

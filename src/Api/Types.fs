@@ -43,6 +43,7 @@ type ContractActivateRequestJson = JsonProvider<"""
 type ContractExecuteRequestJson = JsonProvider<"""
 {
     "address": "address",
+    "command":"command",
     "spends": [
         {
             "asset": "hash",

@@ -58,27 +58,36 @@ let getBalance account =
      
 let getAddress chain account = 
     Address.encode chain (Address.PK account.publicKeyHash)
-     
-let createTransaction chain account pkHash spend =
+
+let private getInputs account spend = 
     let collectInputs ((inputs, keys), collectedAmount) outpoint output =
         if spend.amount > collectedAmount && spend.asset = output.spend.asset then
-            ((outpoint :: inputs, account.keyPair :: keys), output.spend.amount + collectedAmount)
+            (((outpoint,output) :: inputs, account.keyPair :: keys), output.spend.amount + collectedAmount)
         else 
             ((inputs, keys), collectedAmount)
-
+            
     let (inputs, keys), collectedAmount = Map.fold collectInputs (([],[]),0UL) account.outpoints
+     
+    if collectedAmount >= spend.amount then
+        Ok (inputs,keys,collectedAmount)
+    else
+        Error "Not enough tokens"        
+     
+let createTransaction chain account pkHash spend =
+
+    match getInputs account spend with
+    | Error error -> Error error
+    | Ok (inputs,keys,amount) ->
+        let inputs = List.map fst inputs
     
-    match collectedAmount >= spend.amount with
-    | false -> Error "Not enough tokens"
-    | true ->
         let outputs = 
             {spend=spend;lock=PK pkHash} :: 
             // checking if change is needed
-            match collectedAmount = spend.amount with
+            match amount = spend.amount with
                 | true ->
                     []
                 | false -> 
-                    [{spend={spend with amount=(collectedAmount - spend.amount)};lock=PK account.publicKeyHash}]
+                    [{spend={spend with amount=(amount - spend.amount)};lock=PK account.publicKeyHash}]
         Ok (Transaction.sign keys {inputs=inputs; outputs=outputs; witnesses=[]; contract = None})
             
 let createActivateContractTransaction account code =
@@ -101,13 +110,29 @@ let createRoot () =
         
     handleTransaction Transaction.rootTxHash Transaction.rootTx account             
 
-let createExecuteContractTransaction client chain cHash data spends =
-    let input = TxSkeleton.empty //TODO: create origin txskeleton
-    input
-    |> Messaging.Services.Blockchain.executeContract client cHash 
-    |> function
-    | TransactionResult.Ok tx -> Ok tx
-    | TransactionResult.Error e -> Error e
+let createExecuteContractTransaction account executeContract cHash command spends =
+     
+    Map.fold (fun state asset amount ->
+        match state with
+        | Error error -> Error error 
+        | Ok (txSkeleton,keys) ->
+            match getInputs account {asset=asset;amount=amount} with
+            | Error error -> Error error
+            | Ok (inputs,keys',collectedAmount) ->
+                let txSkeleton = 
+                    TxSkeleton.addInputs inputs txSkeleton
+                    |> TxSkeleton.addChange asset collectedAmount amount account.publicKeyHash
+                                    
+                let keys = List.append keys keys'
+                
+                Ok (txSkeleton,keys)) (Ok (TxSkeleton.empty,List.empty)) spends
+    |> Result.bind (fun (txSkeleton,keys) ->                                                        
+        executeContract cHash command txSkeleton 
+        |> function
+        | TransactionResult.Ok tx -> 
+            Transaction.sign keys tx
+            |> Ok         
+        | TransactionResult.Error e -> Error e)
     //TODO: use contract lock instead
     //TODO: sign the transaction
     //TODO: send publish command

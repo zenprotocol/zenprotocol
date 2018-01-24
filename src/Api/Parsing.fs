@@ -31,7 +31,7 @@ let getContractExecute chain json =
         | Error err -> Error ("Address is invalid: " + err)
         | Ok cHash ->
             let mutable spends = Map.empty
-            let mutable errors = List.empty
+            let mutable errors = List.empty            
            
             for item in json.Spends do
                 getSpend' item.Asset item.Amount
@@ -41,7 +41,7 @@ let getContractExecute chain json =
                 |> ignore
 
             if List.isEmpty errors then
-                Ok (cHash, spends)
+                Ok (cHash, json.Command, spends)
             else
                 errors
                 |> String.concat " "

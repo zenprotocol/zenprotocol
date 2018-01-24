@@ -30,7 +30,7 @@ module Blockchain =
         | ValidateMinedBlock of Types.Block
 
     type Request = 
-        | ExecuteContract of TxSkeleton * Hash.Hash
+        | ExecuteContract of TxSkeleton * string * Hash.Hash
         | GetBlockTemplate
 
     type Response = unit
@@ -47,8 +47,8 @@ module Blockchain =
     let handleMemPool client peerId txHashes =
         Command.send client serviceName (HandleMemPool (peerId,txHashes))                                                
 
-    let executeContract client cHash txSkeleton = 
-        ExecuteContract (txSkeleton, cHash)
+    let executeContract client cHash command txSkeleton = 
+        ExecuteContract (txSkeleton,command, cHash)
         |> Request.send<Request, TransactionResult> client serviceName
         
     let validateBlock client block = 
@@ -103,7 +103,7 @@ module Wallet =
         | GetBalance
         | Spend of Hash * Spend
         | ActivateContract of string
-        | ExecuteContract of Hash * Map<Hash.Hash, uint64>
+        | ExecuteContract of Hash * string * Map<Hash.Hash, uint64>
 
     let serviceName = "wallet"
     
@@ -119,5 +119,5 @@ module Wallet =
     let activateContract client code =
         Request.send<Request, ActivateContractTransactionResult> client serviceName (ActivateContract (code))
 
-    let executeContract client address spends =
-        Request.send<Request, TransactionResult> client serviceName (ExecuteContract (address, spends))
+    let executeContract client address command spends =
+        Request.send<Request, TransactionResult> client serviceName (ExecuteContract (address,command, spends))

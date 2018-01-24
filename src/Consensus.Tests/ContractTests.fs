@@ -58,7 +58,7 @@ let compileRunAndValidate code =
         let utxoSet = getSampleUtxoset (UtxoSet.asDatabase)
         Contract.run contract "" Map.empty sampleInputTx
         |> Result.bind (TxSkeleton.checkPrefix sampleInputTx)
-        |> Result.map (Transaction.fromTxSkeleton contract.hash)
+        |> Result.map Transaction.fromTxSkeleton
         |> Result.map (Transaction.addContractWitness contract.hash sampleInputTx)
         |> Result.map (Transaction.sign [ sampleKeyPair ])
         |> Result.bind (validateInputs contract utxoSet ContractWallets.asDatabase)

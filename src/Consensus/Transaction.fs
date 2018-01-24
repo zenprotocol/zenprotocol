@@ -54,11 +54,11 @@ let addContractWitness cHash inputTx tx =
         outputsLength = List.length inputTx.outputs
     } ]
 
-let fromTxSkeleton cHash tx =
+let fromTxSkeleton tx =
     {
         inputs =
             tx.pInputs
-            |> List.filter (fun (input, _) -> input.txHash = Hash.zero && input.index = 0ul |> not)
+            |> List.filter (fun (input, _) -> not (input.txHash = Hash.zero && input.index = 0ul) )
             |> List.map fst
         outputs = tx.outputs
         witnesses = []

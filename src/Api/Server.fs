@@ -73,8 +73,8 @@ let handleRequest chain client (request,reply) =
     | Post ("/wallet/contract/execute", Some body) ->
         match getContractExecute chain body with
         | Result.Error error -> replyError error
-        | Result.Ok (cHash, spends) ->
-            Wallet.executeContract client cHash spends
+        | Result.Ok (cHash, command, spends) ->
+            Wallet.executeContract client cHash command spends
             |> validateTx
     | _ ->
         reply StatusCode.NotFound NoContent    
