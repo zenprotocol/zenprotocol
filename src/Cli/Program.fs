@@ -70,7 +70,7 @@ let main argv =
     match results.TryGetSubCommand() with
     | Some (Spend args) ->        
         let asset,amount,address = args.GetResult <@ Spend_Arguments @>
-        let send = new SpendJson.Root(address, new SpendJson.Spend(asset, amount))        
+        let send = new SpendRequestJson.Root(address, new SpendRequestJson.Spend(asset, amount))        
         
         let response = send.JsonValue.Request (getUri "wallet/spend")
         
@@ -80,12 +80,12 @@ let main argv =
         | code,_ -> printfn "Failed %d with binary response" code
     | Some (Balance _) -> 
         let balance = 
-            BalanceJson.Load(getUri "wallet/balance")
+            BalanceResponseJson.Load(getUri "wallet/balance")
                 
         printfn "Asset\t\t| Balance"
         printfn "============================"
         
-        Array.iter (fun (assertBalance:BalanceJson.Root) -> 
+        Array.iter (fun (assertBalance:BalanceResponseJson.Root) -> 
             printfn " %s\t| %d" assertBalance.Asset assertBalance.Balance) balance                                                                   
     | Some (Address _) ->
         let address = 
@@ -100,17 +100,17 @@ let main argv =
                 printfn "File not found: %s" file
             | true ->
                 let code = System.IO.File.ReadAllText file
-                let activate = new ContractActivateJson.Root(code)        
+                let activate = new ContractActivateRequestJson.Root(code)        
         
                 let response = activate.JsonValue.Request (getUri "wallet/contract/activate")
         
                 match response.StatusCode, response.Body with
-                    | 200,_ -> printfn "Success"
+                    | 200,_ -> printfn "Success %A" response.Body
                     | code, HttpResponseBody.Text text -> printfn "Failed %d %s" code text
                     | code,_ -> printfn "Failed %d with binary response" code
     | Some (Execute args) ->
         let asset,amount,address = args.GetResult <@ ExecuteContract_Arguments @>
-        let activate = new ContractExecuteJson.Root(address, [| new ContractExecuteJson.Spend(asset, amount) |])
+        let activate = new ContractExecuteRequestJson.Root(address, [| new ContractExecuteRequestJson.Spend(asset, amount) |])
 
         let response = activate.JsonValue.Request (getUri "wallet/contract/execute")
 

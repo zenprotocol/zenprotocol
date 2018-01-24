@@ -40,7 +40,11 @@ let requestHandler chain client (requestId:RequestId) request wallet =
         |> reply
     | ActivateContract code ->
         Account.createActivateContractTransaction wallet code
-        |> getTransactionResult
+        |> function
+        | Result.Ok tx -> 
+            ActivateContractTransactionResult.Ok (tx, Consensus.Transaction.hash tx)
+        | Result.Error err -> 
+            ActivateContractTransactionResult.Error err
         |> reply
     | ExecuteContract (cHash, spends) ->   
         Account.createExecuteContractTransaction client chain cHash None spends

@@ -27,9 +27,9 @@ let handleRequest chain client (request,reply) =
 
     let validateTx result =
         match result with
-        | Error error -> 
+        | TransactionResult.Error error -> 
             replyError error
-        | Ok tx ->
+        | TransactionResult.Ok tx ->
             Blockchain.validateTransaction client tx
             reply StatusCode.OK NoContent
 
@@ -40,7 +40,7 @@ let handleRequest chain client (request,reply) =
         let json = 
             balances
             |> Map.toSeq
-            |> Seq.map (fun (key,value) -> new BalanceJson.Root(Hash.toString key, int64 value)) 
+            |> Seq.map (fun (key,value) -> new BalanceResponseJson.Root(Hash.toString key, int64 value)) 
             |> Seq.map (fun balance -> balance.JsonValue)
             |> Seq.toArray
             |> JsonValue.Array
@@ -60,8 +60,16 @@ let handleRequest chain client (request,reply) =
         match getContractActivate chain body with
         | Result.Error error -> replyError error
         | Result.Ok code ->
-            Wallet.activateContract client code
-            |> validateTx
+            match Wallet.activateContract client code with
+            | Error error -> 
+                replyError error
+            | Ok (tx, cHash) ->
+                let address = 
+                    Address.Contract cHash
+                    |> Address.encode chain
+                Blockchain.validateTransaction client tx
+                let json = new ContractActivateResponseJson.Root (address, Hash.toString cHash)
+                reply StatusCode.OK (JsonContent json.JsonValue)
     | Post ("/wallet/contract/execute", Some body) ->
         match getContractExecute chain body with
         | Result.Error error -> replyError error

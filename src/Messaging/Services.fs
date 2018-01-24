@@ -10,6 +10,10 @@ type TransactionResult =
     | Ok of Transaction
     | Error of string                             
 
+type ActivateContractTransactionResult =
+    | Ok of Transaction * Hash
+    | Error of string                             
+
 module Blockchain = 
     let serviceName = "blockchain"
 
@@ -113,7 +117,7 @@ module Wallet =
         Request.send<Request, TransactionResult> client serviceName (Spend (address, spend))
 
     let activateContract client code =
-        Request.send<Request, TransactionResult> client serviceName (ActivateContract (code))
+        Request.send<Request, ActivateContractTransactionResult> client serviceName (ActivateContract (code))
 
     let executeContract client address spends =
         Request.send<Request, TransactionResult> client serviceName (ExecuteContract (address, spends))
