@@ -135,8 +135,12 @@ let executeContract session txSkeleton cHash command state =
         let contractWallet = 
             ContractWallets.get (ContractWalletRepository.get session) cHash state.contractWallets 
     
-        Contract.run contract command contractWallet txSkeleton
+        Contract.run contract command contractWallet txSkeleton                
         |> Result.bind (TxSkeleton.checkPrefix txSkeleton)
-        |> Result.map Transaction.fromTxSkeleton
-        |> Result.map (Transaction.addContractWitness contract.hash txSkeleton)
+        |> Result.map (fun finalTxSkeleton ->            
+            let tx = Transaction.fromTxSkeleton finalTxSkeleton
+            
+            Transaction.addContractWitness contract.hash txSkeleton finalTxSkeleton tx)
+            
+            
     | None -> Error "Contract not active"

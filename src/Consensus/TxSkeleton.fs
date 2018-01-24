@@ -56,8 +56,8 @@ let applyMask tx cw =
        tx.outputs => cw.outputsLength then
         Ok { 
             tx with 
-                pInputs = tx.pInputs.[cw.beginInputs - 1 .. cw.inputsLength - 1]
-                outputs = tx.outputs.[cw.beginOutputs - 1 .. cw.outputsLength - 1]
+                pInputs = tx.pInputs.[0 .. cw.beginInputs - 1 ]
+                outputs = tx.outputs.[0 .. cw.beginOutputs - 1 ]
         }
     else
         Error "could not apply mask"
