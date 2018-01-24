@@ -161,7 +161,7 @@ let validate chain =
     >=> checkCommitments
 
 /// Apply block to UTXO and ACS, operation can fail
-let connect chain tryGetUTXO getWallet contractsPath parent timestamp set acs ema contractWallets =    
+let connect chain getUTXO getWallet contractsPath parent timestamp set acs ema contractWallets =    
     let checkBlockNumber (block:Block) = 
         if parent.blockNumber + 1ul <> block.header.blockNumber then
             Error "blockNumber mismatch"
@@ -211,7 +211,7 @@ let connect chain tryGetUTXO getWallet contractsPath parent timestamp set acs em
         if isGenesis chain block then
             let set = List.fold (fun set tx ->
                 let txHash = (Transaction.hash tx)
-                UtxoSet.handleTransaction tryGetUTXO txHash tx set) set block.transactions
+                UtxoSet.handleTransaction getUTXO txHash tx set) set block.transactions
             Ok (block,set,acs,ema, Map.empty) // TODO: the genesis might do have contract wallets  
         else                       
             List.fold (fun state tx->
@@ -220,10 +220,10 @@ let connect chain tryGetUTXO getWallet contractsPath parent timestamp set acs em
                 | Ok (block,set,acs,ema,contractWallets) -> 
                     let txHash = (Transaction.hash tx) 
                 
-                    match TransactionValidation.validateInputs tryGetUTXO getWallet acs set contractWallets txHash tx with
+                    match TransactionValidation.validateInputs getUTXO getWallet acs set contractWallets txHash tx with
                     | Error err -> Error (sprintf "transactions failed inputs validation due to %A" err)
                     | Ok (_,pInputs) -> 
-                        let set = UtxoSet.handleTransaction tryGetUTXO txHash tx set
+                        let set = UtxoSet.handleTransaction getUTXO txHash tx set
                         let contractWallets = 
                             ContractWallets.handleTransaction getWallet contractWallets txHash tx pInputs                        
                             

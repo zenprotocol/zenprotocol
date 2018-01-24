@@ -27,7 +27,7 @@ let getTxOutpints tx = List.mapi (fun i _ ->
     
 let rootTxOutpoints = getTxOutpints Transaction.rootTx
 let areOutpointsInSet session outpoints set =
-    match UtxoSet.getUtxos (UtxoSetRepository.tryGetOutput session) outpoints set with
+    match UtxoSet.getUtxos (UtxoSetRepository.get session) outpoints set with
     | Some _ -> true
     | None -> false
 let isAccountInSet session (account:Account.T) =
@@ -507,8 +507,8 @@ let ``transaction in mempool and not in next block stays in mempool``() =
         
     let utxoSet = 
         state.memoryState.utxoSet 
-        |> UtxoSet.handleTransaction (UtxoSetRepository.tryGetOutput session) txHash1 tx1
-        |> UtxoSet.handleTransaction (UtxoSetRepository.tryGetOutput session) txHash2 tx2        
+        |> UtxoSet.handleTransaction (UtxoSetRepository.get session) txHash1 tx1
+        |> UtxoSet.handleTransaction (UtxoSetRepository.get session) txHash2 tx2        
         
     let state = {
         state with memoryState = {state.memoryState with utxoSet=utxoSet;mempool=mempool}

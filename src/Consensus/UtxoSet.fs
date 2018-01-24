@@ -6,7 +6,7 @@ module Consensus.UtxoSet
 open Consensus.Types
 
 type OutputStatus =
-    | Removed
+    | NoOuput
     | Spent
     | Unspent of Output
 
@@ -15,18 +15,18 @@ type T = Map<Outpoint, OutputStatus>
 /// Means that the utxoset is equal to the persisted utxoset    
 let asDatabase = Map.empty
 
-let handleTransaction tryGetOutput txHash tx set =
+let get getUTXO outpoint set =
+    match Map.tryFind outpoint set with
+    | Some x-> x
+    | None -> getUTXO outpoint
+         
+let handleTransaction getUTXO txHash tx set =
     let folder state input =
-        match Map.tryFind input state with
-        | Some (Unspent _) -> Map.add input Spent state
-        | Some Removed
-        | Some Spent -> failwith "Expected output to be unspent"
-        | None -> 
-            // Doesn't exist in memory, trying disk
-            match tryGetOutput input with
-            | Some (Unspent _) -> Map.add input Spent state
-            | _ -> failwith "Expected output to be unspent"
-    
+        match get getUTXO input state with
+        | Unspent _ -> Map.add input Spent state
+        | NoOuput
+        | Spent -> failwith "Expected output to be unspent"
+                
     let outputsWithIndex = List.mapi (fun i output -> (uint32 i,output)) tx.outputs
 
     let set = 
@@ -38,62 +38,42 @@ let handleTransaction tryGetOutput txHash tx set =
         
     set
 
-let isSomeSpent tryGetOutput outpoints set =
+let isSomeSpent getUTXO outpoints set =
     List.fold (fun state outpoint ->
         match state with
         | true -> true
         | false ->
-            match Map.tryFind outpoint set with
-            | Some Spent -> true
-            | Some Removed
-            | Some (Unspent _) -> false
-            | None ->
-                // Doesn't exist in memory, trying disk
-                match tryGetOutput outpoint with
-                | Some Spent -> true
-                | _ -> false
+            match get getUTXO outpoint set with
+            | Spent -> true
+            | NoOuput
+            | Unspent _ -> false            
             ) false outpoints
 
-let getUtxos tryGetOutput outpoints set =    
+let getUtxos getUTXO outpoints set =    
     List.foldBack (fun outpoint state ->
         match state with
             | None -> None
             | Some list ->
-                match Map.tryFind outpoint set with
-                | Some Removed                 
-                | Some Spent ->
+                match get getUTXO outpoint set with
+                | NoOuput                 
+                | Spent ->
                     None
-                | Some (Unspent output) -> Some (output :: list)
-                | None ->
-                    // Doesn't exist in memory, trying disk
-                    match tryGetOutput outpoint with
-                    | None
-                    | Some Removed
-                    | Some Spent ->
-                        None
-                    | Some (Unspent output) -> Some (output :: list))  
+                | Unspent output -> Some (output :: list))                
         outpoints (Some [])
 
-let undoBlock getOutput tryGetOutput block set =
+let undoBlock getOutput getUTXO block set =
 
     // unmark any spent output
     let utxoSet  =
         List.map (fun tx -> tx.inputs) block.transactions
         |> List.concat
         |> List.fold (fun set input ->
-            match Map.tryFind input set with
-            | Some Spent -> 
+            match get getUTXO input set with
+            | Spent -> 
                 let output = getOutput input
                 Map.add input (Unspent output) set
-            | Some Removed
-            | Some (Unspent _) -> failwith "Expected output to be spent"
-            | None ->
-                // Doesn't exist in memory, trying disk
-                match tryGetOutput input with
-                | Some Spent ->
-                    let output = getOutput input
-                    Map.add input (Unspent output) set
-                | _ -> failwith "Expected output to be spent"
+            | NoOuput
+            | Unspent _ -> failwith "Expected output to be spent"            
             ) set
 
     // remove all outputs
@@ -105,6 +85,6 @@ let undoBlock getOutput tryGetOutput block set =
         |> List.fold (fun utxoSet i ->
             let outpoint = {txHash=txHash; index=uint32 i}
                                     
-            Map.add outpoint Removed utxoSet    
+            Map.add outpoint NoOuput utxoSet    
             ) utxoSet) utxoSet block.transactions
         

@@ -14,7 +14,7 @@ open TestsInfrastructure.Nunit
 
 let contractsPath = "./test"
 
-let tryGetUTXO _ = None
+let getUTXO _ = UtxoSet.NoOuput
 let getWallet _ = Map.empty
 
 let compileRunAndCompare code =
@@ -44,7 +44,7 @@ let ``Should get 'elaborate' error for invalid תcode``() =
 
 let validateInputs (contract:Contract.T) utxos contractWallets tx  =
     let acs = ActiveContractSet.add contract.hash contract ActiveContractSet.empty
-    TransactionValidation.validateInputs tryGetUTXO getWallet acs utxos contractWallets (Transaction.hash tx) tx
+    TransactionValidation.validateInputs getUTXO getWallet acs utxos contractWallets (Transaction.hash tx) tx
     |> Result.mapError (function
         | TransactionValidation.ValidationError.General error -> error
         | other -> other.ToString())
