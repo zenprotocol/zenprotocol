@@ -12,7 +12,7 @@ let private getSpend' asset amount =
 
 let getSpend chain json =
     try
-        let json = SpendJson.Parse json
+        let json = SpendRequestJson.Parse json
 
         Address.decodePK chain json.Address
         |> function 
@@ -26,7 +26,7 @@ let getSpend chain json =
 
 let getContractExecute chain json =
     try 
-        let json = ContractExecuteJson.Parse json
+        let json = ContractExecuteRequestJson.Parse json
         match Address.decodeContract chain json.Address with 
         | Error err -> Error ("Address is invalid: " + err)
         | Ok cHash ->
@@ -51,7 +51,7 @@ let getContractExecute chain json =
 
 let getContractActivate chain json =
     try 
-        let json = ContractActivateJson.Parse json
+        let json = ContractActivateRequestJson.Parse json
 
         if String.length json.Code = 0 then
             Error "Contract code is empty"

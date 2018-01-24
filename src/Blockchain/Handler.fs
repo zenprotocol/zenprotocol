@@ -82,7 +82,7 @@ let handleRequest (requestId:RequestId) request session timestamp state =
     | ExecuteContract (txSkeleton, cHash) ->
         TransactionHandler.executeContract session txSkeleton cHash state.memoryState
         |> function 
-        | Result.Ok tx -> Ok tx
+        | Result.Ok tx -> Ok (tx, cHash)
         | Result.Error err -> Error err
         |> requestId.reply
     | GetBlockTemplate ->

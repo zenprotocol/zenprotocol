@@ -2,7 +2,7 @@ namespace Api.Types
 
 open FSharp.Data
 
-type BalanceJson = JsonProvider<"""
+type BalanceResponseJson = JsonProvider<"""
 [
     {
         "asset": "hash",
@@ -13,11 +13,18 @@ type BalanceJson = JsonProvider<"""
 
 type AddressJson = JsonProvider<"""
 {
-    "address":"address"
+    "address" : "address"
+}
+""">   
+
+type ContractActivateResponseJson = JsonProvider<"""
+{
+    "address" : "address",
+    "hash" : "hash"
 }
 """>   
  
-type SpendJson = JsonProvider<"""
+type SpendRequestJson = JsonProvider<"""
 {
     "address": "address",
     "spend": {
@@ -27,13 +34,13 @@ type SpendJson = JsonProvider<"""
 }
 """>
 
-type ContractActivateJson = JsonProvider<"""
+type ContractActivateRequestJson = JsonProvider<"""
 {
     "code": "string"
 }
 """>
 
-type ContractExecuteJson = JsonProvider<"""
+type ContractExecuteRequestJson = JsonProvider<"""
 {
     "address": "address",
     "spends": [
