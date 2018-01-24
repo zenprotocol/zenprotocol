@@ -61,9 +61,9 @@ let handleRequest chain client (request,reply) =
         | Result.Error error -> replyError error
         | Result.Ok code ->
             match Wallet.activateContract client code with
-            | Error error -> 
+            | ActivateContractTransactionResult.Error error -> 
                 replyError error
-            | Ok (tx, cHash) ->
+            | ActivateContractTransactionResult.Ok (tx, cHash) ->
                 let address = 
                     Address.Contract cHash
                     |> Address.encode chain
