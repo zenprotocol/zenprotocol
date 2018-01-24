@@ -23,6 +23,8 @@ type Output = {
     spend: Spend
 }
 
+type PointedOutput = Outpoint * Output
+
 type ContractWitness = {
     cHash: Hash
     beginInputs: int

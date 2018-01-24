@@ -20,6 +20,7 @@ type T =
         databaseContext:DataAccess.DatabaseContext
         tip:SingleValue<Hash.Hash>
         utxoSet:Collection<Outpoint, OutputStatus>
+        contractWallets:Collection<Hash.Hash,ContractWallets.ContractWallet>
         blocks:Collection<Hash.Hash,ExtendedBlockHeader.T>
         blockChildrenIndex: Index<Hash.Hash,ExtendedBlockHeader.T,Hash.Hash> 
         blockState:Collection<Hash.Hash,BlockState>
@@ -90,10 +91,16 @@ let create dataPath =
         |> Collection.addIndex blockChildrenIndex
         
     let utxoSet = 
-        Collection.create session "utxoset"
+        Collection.create session "utxoSet"
             binarySerializer.Pickle<Outpoint> 
             binarySerializer.Pickle<OutputStatus>
             binarySerializer.UnPickle<OutputStatus>              
+        
+    let contractWallets = 
+        Collection.create session "contractWallets"
+            Hash.bytes
+            binarySerializer.Pickle<ContractWallets.ContractWallet>
+            binarySerializer.UnPickle<ContractWallets.ContractWallet>
         
     Session.commit session
     
@@ -101,6 +108,7 @@ let create dataPath =
         databaseContext = databaseContext        
         tip=tip
         utxoSet=utxoSet
+        contractWallets=contractWallets
         blocks=blocks
         blockChildrenIndex=blockChildrenIndex
         blockState=blockState

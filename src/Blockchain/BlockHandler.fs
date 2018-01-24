@@ -2,6 +2,12 @@ module Blockchain.BlockHandler
 
 open Blockchain
 open Blockchain
+open Blockchain
+open Blockchain
+open Blockchain
+open Blockchain
+open Blockchain
+open Blockchain
 open Consensus
 open Infrastructure
 open Blockchain.EffectsWriter
@@ -44,35 +50,36 @@ let rec private connectChain chain contractPath timestamp session (origin:Extend
     else 
         let parent = BlockRepository.getHeader session tip.header.parent
     
-        let validTip,(utxoSet, acs, ema, mempool) = 
+        let validTip,(utxoSet, acs, ema, mempool, contractWallets) = 
             connectChain chain contractPath timestamp session origin originState parent
             
         // If invalid skip the block            
         if not (ExtendedBlockHeader.isValid tip) then
-            validTip,(utxoSet,acs,ema, mempool)               
+            validTip,(utxoSet,acs,ema, mempool, contractWallets)               
         elif validTip <> parent then
             // parent block is invalid, so so are we       
             BlockRepository.saveHeader session (ExtendedBlockHeader.invalid tip)         
                                                 
-            validTip,(utxoSet,acs,ema, mempool)                
+            validTip,(utxoSet,acs,ema, mempool, contractWallets)                
         else 
             let block = BlockRepository.getFullBlock session tip
         
             let tryGetUTXO = UtxoSetRepository.tryGetOutput session
+            let getWallet = ContractWalletRepository.get session
         
-            match Block.connect chain tryGetUTXO contractPath parent.header timestamp utxoSet acs ema block with
+            match Block.connect chain tryGetUTXO getWallet contractPath parent.header timestamp utxoSet acs ema contractWallets block with
             | Error error ->
                 BlockRepository.saveHeader session (ExtendedBlockHeader.invalid tip)
             
                 Log.info "Failed connecting block %A due to %A" tip.hash error
-                validTip,(utxoSet,acs,ema, mempool)
-            | Ok (block,utxoSet,acs,ema) ->   
+                validTip,(utxoSet,acs,ema, mempool, contractWallets)
+            | Ok (block,utxoSet,acs,ema, contractWallets) ->   
                 
                 BlockRepository.saveBlockState session tip.hash acs ema                          
                                                                                      
                 let mempool = MemPool.handleBlock block mempool
                 
-                tip,(utxoSet,acs,ema, mempool)
+                tip,(utxoSet,acs,ema, mempool, contractWallets)
 
 
 let rec private connectLongestChain chain contractPath timestamp session origin originState chains minChainWork =
@@ -148,11 +155,11 @@ let rec private addBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:Extende
         }
 
 // Undo blocks from current state in order to get the state of the forkblock
-let rec private undoBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:ExtendedBlockHeader.T) utxoSet mempool = 
+let rec private undoBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:ExtendedBlockHeader.T) utxoSet contractWallets mempool = 
     if tip.header = forkBlock.header then
         let acs,ema = BlockRepository.getBlockState session tip.hash
     
-        (utxoSet,acs,ema,mempool)
+        (utxoSet,acs,ema,mempool,contractWallets)
     else 
         let parent = BlockRepository.getHeader session tip.header.parent
         let fullBlock = BlockRepository.getFullBlock session tip
@@ -163,8 +170,13 @@ let rec private undoBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:Extend
                 (TransactionRepository.getOutput session)
                 (UtxoSetRepository.tryGetOutput session)
                 fullBlock utxoSet
-                          
-        undoBlocks session forkBlock parent utxoSet mempool                       
+        let contractWallets = 
+            ContractWallets.undoBlock 
+                (TransactionRepository.getOutput session)
+                (ContractWalletRepository.get session)
+                fullBlock contractWallets
+                              
+        undoBlocks session forkBlock parent utxoSet contractWallets mempool                       
         
 // After applying block or blocks we must readd mempool transactions to the ACS and UTXO    
 let getMemoryState chain session contractPath mempool orphanPool acs =                                                
@@ -173,16 +185,17 @@ let getMemoryState chain session contractPath mempool orphanPool acs =
     // We loop through existing mempool and adding it as we go to a new mempool
     // We don't publish AddedMemPool event for mempool transaction as they are already in mempool
     // We only publish add to mem pool transactions to orphan transactions
-    let memoryState = {utxoSet=UtxoSet.asDatabase;activeContractSet=acs;mempool=MemPool.empty;orphanPool=orphanPool}
+    let memoryState = {utxoSet=UtxoSet.asDatabase;contractWallets=ContractWallets.asDatabase;
+                        activeContractSet=acs;mempool=MemPool.empty;orphanPool=orphanPool}
     
-    let memoryState = TransactionHandler.validateOrphanTransactions chain session  contractPath memoryState
+    let memoryState = TransactionHandler.validateOrphanTransactions chain session contractPath memoryState
 
     Map.fold (fun writer txHash tx -> 
                       
         Writer.bind writer (fun memoryState ->
             TransactionHandler.validateInputs chain session  contractPath txHash tx memoryState false)) memoryState mempool
                                             
-let rollForwardChain chain contractPath timestamp state session block persistentBlock utxoSet acs ema =
+let rollForwardChain chain contractPath timestamp state session block persistentBlock acs ema =
     effectsWriter {   
         // unorphan any orphan chain starting with current block
         unorphanChain session persistentBlock
@@ -193,18 +206,18 @@ let rollForwardChain chain contractPath timestamp state session block persistent
         let currentChainWork = ExtendedBlockHeader.chainWork persistentBlock
         let chains = findLongerChains session persistentBlock currentChainWork
         let chain' = 
-            connectLongestChain chain contractPath timestamp session persistentBlock (utxoSet,acs,ema, mempool) chains currentChainWork                                 
+            connectLongestChain chain contractPath timestamp session persistentBlock 
+                (UtxoSet.asDatabase,acs,ema, mempool, ContractWallets.asDatabase) chains currentChainWork                                 
         
         match chain' with
-        | Some (tip,(utxoSet,acs,ema,mempool)) -> 
+        | Some (tip,(utxoSet,acs,ema,mempool, contractWallets)) -> 
             Log.info "Rolling forward chain to #%d %A" tip.header.blockNumber tip.hash
         
             // update tip
             BlockRepository.updateTip session tip.hash
             
-            // Saving utxoset and empty it as utxo set is only a diff from persist state
             UtxoSetRepository.save session utxoSet                        
-            let utxoSet = UtxoSet.asDatabase                          
+            ContractWalletRepository.save session contractWallets
                                                   
             let tipState = {activeContractSet=acs;ema=ema;tip=tip}
             let! memoryState = getMemoryState chain session contractPath mempool state.memoryState.orphanPool acs                                                                                           
@@ -221,12 +234,14 @@ let rollForwardChain chain contractPath timestamp state session block persistent
 let private handleGenesisBlock chain contractPath session timestamp (state:State) blockHash block =
     effectsWriter {           
         let tryGetUTXO = UtxoSetRepository.tryGetOutput session
-    
-        match Block.connect chain tryGetUTXO contractPath Block.genesisParent timestamp UtxoSet.asDatabase state.tipState.activeContractSet state.tipState.ema block with
+        let getWallet = ContractWalletRepository.get session
+        
+        match Block.connect chain tryGetUTXO getWallet contractPath Block.genesisParent timestamp UtxoSet.asDatabase 
+                state.tipState.activeContractSet state.tipState.ema ContractWallets.asDatabase block with
         | Error error ->
             Log.info "Failed connecting genesis block %A due to %A" (Block.hash block) error
             return state
-        | Ok (block,utxoSet,acs,ema) ->
+        | Ok (block,utxoSet,acs,ema,contractWallets) ->
             Log.info "Genesis block received" 
           
             let extendedHeader = ExtendedBlockHeader.createGenesis blockHash block
@@ -235,14 +250,13 @@ let private handleGenesisBlock chain contractPath session timestamp (state:State
             BlockRepository.saveBlockState session blockHash acs ema
             BlockRepository.updateTip session extendedHeader.hash
             
-            // Saving utxoset and empty it as utxo set is only a diff from persist state
             UtxoSetRepository.save session utxoSet                        
-            let utxoSet = UtxoSet.asDatabase
+            ContractWalletRepository.save session contractWallets
                            
             // Pulishing event of the new block
             do! publish (BlockAdded block)
                                                             
-            return! rollForwardChain chain contractPath timestamp state session block extendedHeader utxoSet acs ema               
+            return! rollForwardChain chain contractPath timestamp state session block extendedHeader acs ema               
     }
 
 // Handle new block that is extending the main chain
@@ -251,12 +265,14 @@ let private handleGenesisBlock chain contractPath session timestamp (state:State
 let private handleMainChain chain contractPath session timestamp (state:State) (parent:ExtendedBlockHeader.T) blockHash block =    
     effectsWriter {    
         let tryGetUTXO = UtxoSetRepository.tryGetOutput session
+        let getWallet = ContractWalletRepository.get session
     
-        match Block.connect chain tryGetUTXO contractPath parent.header timestamp UtxoSet.asDatabase state.tipState.activeContractSet state.tipState.ema block with
+        match Block.connect chain tryGetUTXO getWallet contractPath parent.header timestamp UtxoSet.asDatabase 
+                state.tipState.activeContractSet state.tipState.ema ContractWallets.asDatabase block with
         | Error error ->
             Log.info "Failed connecting block %A due to %A" (Block.hash block) error
             return state
-        | Ok (block,utxoSet,acs,ema) ->  
+        | Ok (block,utxoSet,acs,ema,contractWallets) ->  
             Log.info "New block #%d %A" block.header.blockNumber blockHash 
                                      
             let extendedHeader = ExtendedBlockHeader.createConnected parent blockHash block
@@ -266,14 +282,13 @@ let private handleMainChain chain contractPath session timestamp (state:State) (
             BlockRepository.saveBlockState session extendedHeader.hash acs ema
             BlockRepository.updateTip session extendedHeader.hash
             
-            // Saving utxoset and empty it as utxo set is only a diff from persist state
             UtxoSetRepository.save session utxoSet                        
-            let utxoSet = UtxoSet.asDatabase
+            ContractWalletRepository.save session contractWallets
                                                             
             // Pulishing event of the new block
             do! publish (BlockAdded block)
 
-            return! rollForwardChain chain contractPath timestamp state session block extendedHeader utxoSet acs ema
+            return! rollForwardChain chain contractPath timestamp state session block extendedHeader acs ema
     }                   
 
 // New block that is extending one of the fork chains
@@ -300,23 +315,22 @@ let private handleForkChain chain contractPath session timestamp (state:State) p
             let forkBlock = findForkBlock session extendedHeader currentTip
                 
             // undo blocks from mainnet to get fork block state
-            let forkState = undoBlocks session forkBlock currentTip UtxoSet.asDatabase state.memoryState.mempool
+            let forkState = undoBlocks session forkBlock currentTip 
+                                UtxoSet.asDatabase ContractWallets.asDatabase state.memoryState.mempool 
                          
             match connectLongestChain chain contractPath timestamp session 
                     forkBlock forkState chains currentChainWork with
             | None ->
                 // No connectable chain is not longer than current chain
                 return state                                    
-            | Some (tip,(utxoSet,acs,ema,mempool)) ->
+            | Some (tip,(utxoSet,acs,ema,mempool,contractWallets)) ->
                 Log.info "Reorg to #%d %A" tip.header.blockNumber tip.hash
             
                 // update tip
                 BlockRepository.updateTip session tip.hash 
-                
-                // Saving utxoset and empty it as utxo set is only a diff from persist state
                 UtxoSetRepository.save session utxoSet                        
-                let utxoSet = UtxoSet.asDatabase
-            
+                ContractWalletRepository.save session contractWallets
+                
                 do! removeBlocks session forkBlock currentTip
                 do! addBlocks session forkBlock tip
                 
