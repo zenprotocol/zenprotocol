@@ -42,7 +42,7 @@ let requestHandler chain client (requestId:RequestId) request wallet =
         Account.createActivateContractTransaction wallet code
         |> function
         | Result.Ok tx -> 
-            ActivateContractTransactionResult.Ok (tx, Consensus.Transaction.hash tx)
+            ActivateContractTransactionResult.Ok (tx, Consensus.Contract.computeHash code)
         | Result.Error err -> 
             ActivateContractTransactionResult.Error err
         |> reply

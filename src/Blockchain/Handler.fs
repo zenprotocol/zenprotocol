@@ -82,8 +82,8 @@ let handleRequest (requestId:RequestId) request session timestamp state =
     | ExecuteContract (txSkeleton, cHash) ->
         TransactionHandler.executeContract session txSkeleton cHash state.memoryState
         |> function 
-        | Result.Ok tx -> Ok (tx, cHash)
-        | Result.Error err -> Error err
+        | Result.Ok tx -> TransactionResult.Ok tx
+        | Result.Error err -> TransactionResult.Error err
         |> requestId.reply
     | GetBlockTemplate ->
         if MemPool.isEmpty state.memoryState.mempool || state.tipState.tip = ExtendedBlockHeader.empty then 
