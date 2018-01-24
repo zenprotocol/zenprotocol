@@ -1,5 +1,7 @@
 module Blockchain.TransactionHandler
 
+open Blockchain
+open Blockchain
 open Blockchain.EffectsWriter
 open Messaging.Events
 open Infrastructure
@@ -30,10 +32,13 @@ let private validateOrphanTransaction chain session contractPath state txHash tx
     effectsWriter 
         {
             let tryGetUTXO = UtxoSetRepository.tryGetOutput session
+            let getWallet = ContractWalletRepository.get session
         
-            match TransactionValidation.validateInputs tryGetUTXO state.activeContractSet state.utxoSet txHash tx with
-            | Ok tx ->
+            match TransactionValidation.validateInputs tryGetUTXO getWallet 
+                    state.activeContractSet state.utxoSet state.contractWallets txHash tx with
+            | Ok (tx,pInputs) ->
                 let utxoSet = UtxoSet.handleTransaction tryGetUTXO txHash tx state.utxoSet
+                let contractWallets = ContractWallets.handleTransaction getWallet state.contractWallets txHash tx pInputs 
                 let mempool = MemPool.add txHash tx state.mempool
 
                 do! publish (TransactionAddedToMemPool (txHash, tx))
@@ -42,7 +47,12 @@ let private validateOrphanTransaction chain session contractPath state txHash tx
                 let! acs = activateContract chain contractPath state.activeContractSet tx true
 
                 let orphanPool = OrphanPool.remove txHash state.orphanPool
-                return {state with activeContractSet=acs;mempool=mempool;utxoSet=utxoSet; orphanPool=orphanPool}
+                return {state with 
+                            activeContractSet=acs;
+                            mempool=mempool;
+                            utxoSet=utxoSet; 
+                            contractWallets=contractWallets; 
+                            orphanPool=orphanPool}
             | Error (Orphan _) ->
                 // transacation is still orphan, nothing to do
                 return state
@@ -68,8 +78,10 @@ let validateInputs chain session contractPath txHash tx (state:MemoryState) shou
     effectsWriter
         {
             let tryGetUTXO = UtxoSetRepository.tryGetOutput session
+            let getWallet = ContractWalletRepository.get session
         
-            match TransactionValidation.validateInputs tryGetUTXO state.activeContractSet state.utxoSet txHash tx with
+            match TransactionValidation.validateInputs tryGetUTXO getWallet 
+                    state.activeContractSet state.utxoSet state.contractWallets txHash tx with
             | Error Orphan ->
                 let orphanPool = OrphanPool.add txHash tx state.orphanPool
 
@@ -80,10 +92,11 @@ let validateInputs chain session contractPath txHash tx (state:MemoryState) shou
                  Log.info "Transacation %s failed inputs validation: %A" (Hash.toString txHash) error
 
                  return state
-            | Ok tx ->
+            | Ok (tx,pInputs) ->
                 let! acs = activateContract chain contractPath state.activeContractSet tx shouldPublishEvents
 
                 let utxoSet = UtxoSet.handleTransaction tryGetUTXO txHash tx state.utxoSet
+                let contractWallets = ContractWallets.handleTransaction getWallet state.contractWallets txHash tx pInputs
                 let mempool = MemPool.add txHash tx state.mempool
 
                 if shouldPublishEvents then
@@ -91,7 +104,11 @@ let validateInputs chain session contractPath txHash tx (state:MemoryState) shou
 
                 Log.info "Transaction %s added to mempool" (Hash.toString txHash)
 
-                let state = {state with activeContractSet=acs;mempool=mempool;utxoSet=utxoSet}
+                let state = {state with 
+                                activeContractSet=acs;
+                                mempool=mempool;
+                                utxoSet=utxoSet;
+                                contractWallets=contractWallets}
 
                 
                 return! validateOrphanTransactions chain session contractPath state
@@ -114,10 +131,14 @@ let validateTransaction chain session contractPath tx (state:MemoryState) =
                 return! validateInputs chain session contractPath txHash tx state true
     }
 
-let executeContract txSkeleton cHash state =
+let executeContract session txSkeleton cHash state =
     match ActiveContractSet.tryFind cHash state.activeContractSet with
     | Some contract ->
-        Contract.run contract "" txSkeleton
+        
+        let contractWallet = 
+            ContractWallets.get (ContractWalletRepository.get session) cHash state.contractWallets 
+    
+        Contract.run contract "" contractWallet txSkeleton
         |> Result.bind (TxSkeleton.checkPrefix txSkeleton)
         |> Result.map (Transaction.fromTxSkeleton contract.hash)
         |> Result.map (Transaction.addContractWitness contract.hash txSkeleton)

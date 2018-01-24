@@ -48,6 +48,7 @@ let createTransaction account =
 
 // Default initial state of mempool and utxoset
 let utxoSet = UtxoSet.asDatabase
+let contractWallets = ContractWallets.asDatabase
 let mempool = MemPool.empty 
 let orphanPool = OrphanPool.create()
 let acs = ActiveContractSet.empty
@@ -61,6 +62,7 @@ let state = {
             mempool=mempool
             orphanPool=orphanPool
             activeContractSet=acs
+            contractWallets=contractWallets
         }
     tipState = 
         {
@@ -567,7 +569,7 @@ let ``block with a contract activation is added to chain``() =
             | Ok tx -> tx
             | Error error -> failwith error 
                 
-    let acs = ActiveContractSet.add cHash {hash=cHash;fn=fun _ _ tx -> Ok tx} state.tipState.activeContractSet
+    let acs = ActiveContractSet.add cHash {hash=cHash;fn=fun _ _ _ tx -> Ok tx} state.tipState.activeContractSet
     
     let block = Block.createTemplate genesisBlock.header timestamp state.tipState.ema acs [tx]
     

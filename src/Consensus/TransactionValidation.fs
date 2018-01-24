@@ -51,9 +51,9 @@ let private checkAmounts (tx, inputs) =
     else if outputs' <> inputs' then
         GeneralError "invalid amounts"
     else
-        Ok tx
+        Ok (tx,inputs)
 
-let private checkWitnesses acs (Hash.Hash txHash, tx, inputs) =
+let private checkWitnesses getWallet acs contractWallets (Hash.Hash txHash, tx, inputs) =
     let checkPKWitness tx pInputs serializedPublicKey signature =
         match pInputs with
         | [] -> GeneralError "missing PK witness input" 
@@ -82,7 +82,8 @@ let private checkWitnesses acs (Hash.Hash txHash, tx, inputs) =
 
         match ActiveContractSet.tryFind cw.cHash acs with
         | Some contract ->
-            match Contract.run contract "" tx with 
+            let contractWallet = (ContractWallets.get getWallet cw.cHash contractWallets)
+            match Contract.run contract "" contractWallet tx with 
             | Ok tx' ->
                 if checkIssuedAndDestroyed tx' cw then
                     if List.length tx'.pInputs - List.length tx.pInputs = cw.inputsLength && 
@@ -182,7 +183,7 @@ let validateBasic =
     >=> checkDuplicateInputs
     >=> checkInputsStructure
 
-let validateInputs tryGetUTXO acs set txHash =
+let validateInputs tryGetUTXO getWallet acs set contractWallets txHash =
     checkOrphan tryGetUTXO set txHash
-    >=> checkWitnesses acs
+    >=> checkWitnesses getWallet acs contractWallets
     >=> checkAmounts

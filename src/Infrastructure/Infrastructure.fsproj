@@ -43,6 +43,7 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Endpoint.fs" />
+    <Compile Include="List.fs" />
     <Compile Include="Log.fs" />
     <Compile Include="ServiceBusMessage.fs" />
     <Compile Include="ServiceBus.fs" />

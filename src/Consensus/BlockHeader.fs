@@ -6,8 +6,6 @@ open Consensus.ChainParameters
 open FsNetMQ.Stream
 open FsNetMQ.Stream.Reader
 
-open MBrace.FsPickler.Combinators
-
 [<Literal>]
 let Size = 100 
 

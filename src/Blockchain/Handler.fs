@@ -80,7 +80,7 @@ let handleCommand chain command session timestamp (state:State) =
 let handleRequest (requestId:RequestId) request session timestamp state = 
     match request with
     | ExecuteContract (txSkeleton, cHash) ->
-        TransactionHandler.executeContract txSkeleton cHash state.memoryState
+        TransactionHandler.executeContract session txSkeleton cHash state.memoryState
         |> function 
         | Result.Ok tx -> Ok tx
         | Result.Error err -> Error err

@@ -2,8 +2,6 @@
 
 open Consensus.Types
 
-type PointedOutput = Outpoint * Output
-
 type TxSkeleton = {
     pInputs: PointedOutput list
     outputs: Output list

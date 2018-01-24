@@ -45,6 +45,7 @@ let txOutpoints = getTxOutpints txHash tx
 
 // Default initial state of mempool and utxoset
 let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction (fun _ -> None) Transaction.rootTxHash Transaction.rootTx
+let contractWallets = ContractWallets.asDatabase
 let mempool = MemPool.empty |> MemPool.add Transaction.rootTxHash Transaction.rootTx
 let orphanPool = OrphanPool.create()
 let acs = ActiveContractSet.empty
@@ -56,6 +57,7 @@ let state = {
             mempool = mempool
             orphanPool = orphanPool
             activeContractSet = acs
+            contractWallets=contractWallets
         }
     tipState =
         {
@@ -387,7 +389,7 @@ let ``Valid contract should execute``() =
         ActiveContractSet.containsContract sampleContractHash state.memoryState.activeContractSet
         |> should equal true
 
-        TransactionHandler.executeContract sampleInputTx sampleContractHash state.memoryState
+        TransactionHandler.executeContract session sampleInputTx sampleContractHash state.memoryState
         )
     |> Result.mapError failwith
     |> ignore

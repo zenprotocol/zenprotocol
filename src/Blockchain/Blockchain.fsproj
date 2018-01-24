@@ -48,6 +48,7 @@
     <Compile Include="DatabaseContext.fs" />
     <Compile Include="TransactionRepository.fs" />
     <Compile Include="UtxoSetRepository.fs" />
+    <Compile Include="ContractWalletRepository.fs" />
     <Compile Include="BlockRepository.fs" />
     <Compile Include="EffectsWriter.fs" />
     <Compile Include="OrphanPool.fs" />
@@ -57,7 +58,6 @@
     <Compile Include="BlockHandler.fs" />
     <Compile Include="Handler.fs" />
     <Compile Include="main.fs" />
-    
     <None Include="Script.fsx" />
     <Content Include="paket.references" />
     <ProjectReference Include="..\Consensus\Consensus.fsproj">

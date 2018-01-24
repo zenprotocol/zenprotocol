@@ -13,7 +13,8 @@ open Zen.Cost.Realized
 open Zen.Types.TxSkeleton
 open Exception
 
-type ContractFn = Hash -> string -> TxSkeleton -> Result<TxSkeleton,string>
+
+type ContractFn = Hash -> string -> ContractWallets.ContractWallet -> TxSkeleton -> Result<TxSkeleton,string>
 
 type T = {
     hash: Hash
@@ -43,7 +44,7 @@ let private castOutput output =
         Exception.toError "cast contract output" ex
 
 let private wrap methodInfo =
-    fun (Hash.Hash cHash) command txSkeleton ->
+    fun (Hash.Hash cHash) command contractWallet txSkeleton ->
         ZFStar.convertInput txSkeleton
         |> invoke methodInfo cHash command
         |> Result.bind castOutput
