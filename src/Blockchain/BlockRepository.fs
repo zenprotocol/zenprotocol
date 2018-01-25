@@ -53,7 +53,7 @@ let saveBlockState session blockHash (acs:ActiveContractSet.T) ema =
     let blockState = 
         {
             ema = ema            
-            activeContractSet = ActiveContractSet.getContractHashes acs
+            activeContractSet = ActiveContractSet.getContractHashes acs |> List.ofSeq
         }         
         
     Collection.put session.context.blockState session.session blockHash blockState        
@@ -68,10 +68,10 @@ let getBlockState session blockHash =
     
     let acs =  
         blockState.activeContractSet
-        |> Seq.map (fun cHash -> cHash,Contract.load session.context.contractPath cHash)
-        |> Seq.map getOk
-        |> Seq.toArray
-        |> SparseMerkleTree.addMultiple ActiveContractSet.empty 
+        |> List.map (fun cHash -> cHash,Contract.load session.context.contractPath cHash)
+        |> List.map getOk
+        |> List.toArray
+        |> SparseMerkleTree.addMultiple ActiveContractSet.empty     
         
     acs,blockState.ema                    
     
