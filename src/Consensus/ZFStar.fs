@@ -11,7 +11,7 @@ open Zen.Vector
 
 module Cost = Zen.Cost.Realized
 
-let private unCost (Cost.C inj:Zen.Cost.Realized.cost<'Aa, 'An>) : 'Aa = inj.Force()
+let unCost (Cost.C inj:Zen.Cost.Realized.cost<'Aa, 'An>) : 'Aa = inj.Force()
 
 let private throwNotImplemented s1 s2 =
     sprintf "%s %s" s1 s2
