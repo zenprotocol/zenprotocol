@@ -83,7 +83,7 @@ let private initOutputDir moduleName =
     Directory.CreateDirectory oDir |> ignore
     oDir, oDir / Platform.normalizeNameToFileSystem moduleName
 
-let private extract (code, hints) moduleName = 
+let private extract (code, hints, limits) moduleName = 
     let oDir, file = initOutputDir moduleName
     let originalFile = changeExtention ".orig.fst" file
     let hintsFile = changeExtention ".fst.hints" file
@@ -94,13 +94,46 @@ let private extract (code, hints) moduleName =
     File.WriteAllText(hintsFile, hints)
 
     try
+        let maxFuel, maxIFuel = limits
         elaborate originalFile elaboratedFile
         |> Result.bind (fun _ ->
             fstar oDir elaboratedFile [
-                "--use_hints"
                 "--codegen"; "FSharp"
-                "--extract_module"; moduleName ]
+                "--extract_module"; moduleName 
+                "--max_fuel"; maxFuel.ToString()
+                "--max_ifuel"; maxIFuel.ToString()
+                ]
             |> wrapFStar "extract" extractedFile)
+    finally
+        Directory.Delete (oDir, true)
+
+let calculateMetrics hints = 
+    let oDir, file = initOutputDir "" //as for now, using the filesystem as temprary solution
+    let hintsFile = changeExtention ".fst.hints" file
+
+    File.WriteAllText(hintsFile, hints)
+
+    try
+        try
+            Hints.read_hints hintsFile
+            |> Option.map (fun hintsDB ->
+                let hintsMap = Hints.hints_to_hintsMap hintsDB.hints
+                let getFuel hint = int (hint : Hints.Hint).fuel
+                let getIFuel hint = int (hint : Hints.Hint).ifuel
+                let getMax getterFn hintsMap =
+                    hintsMap
+                    |> Map.toSeq
+                    |> Seq.map snd
+                    |> Seq.map (fun hints -> 
+                        List.map getterFn hints
+                        |> List.max)
+                    |> Seq.max
+                (getMax getFuel hintsMap, getMax getIFuel hintsMap))
+            |> function
+            | Some limits -> Ok limits
+            | None -> Error "limits"
+        with _ as ex ->
+            Exception.toError "limits" ex
     finally
         Directory.Delete (oDir, true)
 
@@ -120,13 +153,13 @@ let recordHints code moduleName =
                  "--no_default_includes"; elaboratedFile ]
             |> wrapFStar "record hints" hintsFile)
     finally
-        ()
         Directory.Delete (oDir, true)
 
 let compile path (code,hints) moduleName = 
-    extract (code,hints) moduleName
+    calculateMetrics hints
+    |> Result.bind (fun limits -> extract (code,hints,limits) moduleName)
     |> Result.bind (compile' path moduleName)
-    
+
 let load path moduleName = 
     try 
         Path.Combine(path, sprintf "%s.dll" moduleName)

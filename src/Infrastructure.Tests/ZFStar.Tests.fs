@@ -127,3 +127,10 @@ let ``Should throw with command's value``() =
     [| null; null; "test command" |]
     , (Error "test command" : Result<txSkeleton,string>))
     |> shouldEqual
+
+[<Test>]
+let ``Should get some metrics from hints module``() =
+    (ZFStar.recordHints fstCode (getModuleName fstCode) 
+    |> Result.bind (ZFStar.calculateMetrics) 
+    |> Result.map (fun (maxFuel, maxIFuel) -> maxFuel > 0 && maxIFuel > 0)
+    , (Ok true : Result<bool, string>)) |> shouldEqual
