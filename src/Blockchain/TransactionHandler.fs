@@ -68,7 +68,7 @@ let rec validateOrphanTransactions chain session contractPath state =
         let! state' = OrphanPool.foldWriter (validateOrphanTransaction chain session contractPath) state state.orphanPool
         
         // if orphan pool changed we run again until there is no change
-        if state.orphanPool <> state.orphanPool then
+        if state'.orphanPool <> state.orphanPool then
             return! validateOrphanTransactions chain session contractPath state'
         else
             return state'

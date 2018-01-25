@@ -12,7 +12,7 @@ open MBrace.FsPickler
 type BlockState = 
     {
         ema:EMA.T        
-        activeContractSet:Hash.Hash seq
+        activeContractSet:Hash.Hash list
     }
 
 type T = 
