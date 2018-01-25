@@ -22,19 +22,22 @@ val addInputs(#n:nat):
   -> txSkeleton `cost` M.(64 * n + 64)
 
 val lockToContract:
-  spend
+  asset
+  -> U64.t
   -> contractHash
   -> txSkeleton
   -> txSkeleton `cost` 64
 
 val lockToPubKey:
-  spend
+  asset
+  -> U64.t
   -> pkHash:hash
   -> txSkeleton
   -> txSkeleton `cost` 64
 
 val lockToAddress:
-  spend
+  asset
+  -> U64.t
   -> address:hash
   -> txSkeleton
   -> txSkeleton `cost` 64

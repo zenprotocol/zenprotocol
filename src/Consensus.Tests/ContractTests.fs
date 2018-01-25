@@ -84,9 +84,9 @@ let ``Contract should not be able to create tokens other than its own``() =
          module ET = Zen.ErrorT
 
          val cf: txSkeleton -> string -> cost nat 1
-         let cf _ _ = ret 146
+         let cf _ _ = ret 149
 
-         val main: txSkeleton -> hash -> string -> cost (result txSkeleton) 146
+         val main: txSkeleton -> hash -> string -> cost (result txSkeleton) 149
          let main txSkeleton contractHash command =
            let spend = {
                asset=hashFromBase64 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
@@ -102,7 +102,7 @@ let ``Contract should not be able to create tokens other than its own``() =
            }, output in
 
            let txSkeleton1 = addInput pInput txSkeleton in
-           let txSkeleton2 = txSkeleton1 >>= lockToContract spend contractHash in
+           let txSkeleton2 = txSkeleton1 >>= lockToContract spend.asset spend.amount contractHash in
            ET.retT txSkeleton2
            """
     , (Error "illegal creation/destruction of tokens" : Result<Transaction, string>))

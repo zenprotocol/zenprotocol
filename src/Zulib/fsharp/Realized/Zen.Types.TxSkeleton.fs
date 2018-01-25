@@ -81,37 +81,34 @@ let rec addInputs (_ : Prims.nat) (pointedOutputs : V.t<pointedOutput, unit>)
 let addOutput (output : output) (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
     lazy (insertOutput output txSkeleton) |> Cost.C
 
-let lockToContract (spend : spend) (contractHash : hash)
+let lockToContract (asset : asset) (amount:uint64) (contractHash : hash)
     (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
     lazy (let lock = ContractLock contractHash
 
           let output =
               { lock = lock;
-                spend = spend }
+                spend = {asset=asset;amount=amount} }
           insertOutput output txSkeleton)
     |> Cost.C
 
-let lockToPubKey (spend : spend) (pkHash : hash) (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
+let lockToPubKey (asset : asset) (amount:uint64) (pkHash : hash) (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
     lazy (let lock = PKLock pkHash
 
           let output =
               { lock = lock;
-                spend = spend }
+                spend = {asset=asset;amount=amount} }
           insertOutput output txSkeleton)
     |> Cost.C
 
-let lockToAddress (spend : spend) (address : hash) (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
-    lockToPubKey spend address txSkeleton
+let lockToAddress (asset : asset) (amount:uint64) (address : hash) (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
+    lockToPubKey asset amount address txSkeleton
 
 let addChangeOutput (asset : asset) (contractHash : contractHash)
     (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
     lazy (let tokensAvailable =
               getAvailableTokens asset txSkeleton |> Cost.__force
 
-          let spend =
-              { asset = asset;
-                amount = tokensAvailable }
-          lockToContract spend contractHash txSkeleton |> Cost.__force)
+          lockToContract asset tokensAvailable contractHash txSkeleton |> Cost.__force)
     |> Cost.C
 
 let mint (amount : U64.t) (contractHash : contractHash)
