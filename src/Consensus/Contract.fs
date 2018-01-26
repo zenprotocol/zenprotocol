@@ -15,43 +15,64 @@ open Exception
 
 
 type ContractFn = Hash -> string -> ContractWallets.ContractWallet -> TxSkeleton -> Result<TxSkeleton,string>
+type ContractCostFn = string -> ContractWallets.ContractWallet -> TxSkeleton -> Result<bigint,string>
 
 type T = {
     hash: Hash
     fn:   ContractFn
+    costFn: ContractCostFn
 }
 
-let private findMethod assembly =
+let private findMethods assembly =
     try
-        (assembly:Assembly)
-            .GetModules().[0]
-            .GetTypes().[0]
-            .GetMethods().[1]
-            |> Ok
+        let getMethod name =
+            (assembly:Assembly)
+                .GetModules().[0]
+                .GetTypes().[0].GetMethod(name)
+        Ok (getMethod "main", getMethod "cf")
     with _ as ex ->
-        Exception.toError "get contract method" ex
+        Exception.toError "get contract methods" ex
 
-let private invoke methodInfo cHash command input =
+let private invokeMainFn methodInfo cHash command input =
     try
         (methodInfo:MethodInfo).Invoke (null, [| input; cHash; command |]) |> Ok
     with _ as ex ->
-        Exception.toError "invoke contract" ex
+        Exception.toError "invoke contract main fn" ex
 
-let private castOutput output =
+let private invokeCostFn methodInfo command input =
+    try
+        (methodInfo:MethodInfo).Invoke (null, [| input; command |]) |> Ok
+    with _ as ex ->
+        Exception.toError "invoke contract cost fn" ex
+
+let private castMainFnOutput output =
     try
         (output:System.Object) :?> cost<result<txSkeleton>, unit> |> Ok
     with _ as ex ->
-        Exception.toError "cast contract output" ex
+        Exception.toError "cast contract main fn output" ex
 
-let private wrap methodInfo =
+let private castCostFnOutput output =
+    try
+        (output:System.Object) :?> cost<bigint, unit> |> Ok
+    with _ as ex ->
+        Exception.toError "cast contract cost fn output" ex
+
+let private wrap (mainMethodInfo, costMethidInfo) =
+    (
     fun (Hash.Hash cHash) command contractWallet txSkeleton ->
         ZFStar.convertInput txSkeleton
-        |> invoke methodInfo cHash command
-        |> Result.bind castOutput
+        |> invokeMainFn mainMethodInfo cHash command
+        |> Result.bind castMainFnOutput
         |> Result.bind ZFStar.convertResult
+    ,
+    fun command contractWallet txSkeleton ->
+        ZFStar.convertInput txSkeleton
+        |> invokeCostFn costMethidInfo command
+        |> Result.bind castCostFnOutput
+        |> Result.map ZFStar.unCost
+    )
 
 let hash contract = contract.hash
-
 
 let private getModuleName =
     Hash.bytes
@@ -66,12 +87,13 @@ let computeHash code =
 let load contractsPath hash =
     getModuleName hash
     |> ZFStar.load contractsPath
-    |> Result.bind findMethod
+    |> Result.bind findMethods
     |> Result.map wrap
-    |> Result.map (fun fn ->
+    |> Result.map (fun (mainFn, costFn) ->
         {
             hash = hash
-            fn = fn
+            fn = mainFn
+            costFn = costFn
         })
 
 let compile contractsPath (code, hints) =
@@ -89,5 +111,9 @@ let recordHints code =
     |> getModuleName
     |> ZFStar.recordHints code
 
-let run contract command =
-    contract.fn contract.hash command
+let getCost contract command =
+    contract.costFn command
+
+let run contract command wallet inputTx =
+    contract.fn contract.hash command wallet inputTx
+

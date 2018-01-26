@@ -17,17 +17,19 @@ let contractsPath = "./test"
 let getUTXO _ = UtxoSet.NoOuput
 let getWallet _ = Map.empty
 
-let compileRunAndCompare code =
+let compile code = 
     Contract.recordHints code
     |> Result.map (fun hints -> (code, hints))
     |> Result.bind (Contract.compile contractsPath)
+
+let compileRunAndCompare code =
+    compile code
     |> Result.bind (fun contract ->
         // check hash validity
         (Hash.isValid contract.hash, true)
         |> shouldEqual
         (contract.hash, sampleContractHash)
         |> shouldEqual
-        //execute and check
         Contract.run contract "" Map.empty sampleInputTx)
 
 [<Test>]
@@ -50,11 +52,8 @@ let validateInputs (contract:Contract.T) utxos contractWallets tx  =
         | other -> other.ToString())
 
 let compileRunAndValidate code =
-    Contract.recordHints code
-    |> Result.map (fun hints -> (code, hints))
-    |> Result.bind (Contract.compile contractsPath)
+    compile code
     |> Result.bind (fun contract ->
-
         let utxoSet = getSampleUtxoset (UtxoSet.asDatabase)
         Contract.run contract "" Map.empty sampleInputTx
         |> Result.bind (TxSkeleton.checkPrefix sampleInputTx)
@@ -69,6 +68,14 @@ let compileRunAndValidate code =
 let ``Contract generated transaction should be valid``() =
     (compileRunAndValidate sampleContractCode
     , (Ok sampleExpectedResult : Result<Transaction, string>))
+    |> shouldEqual
+
+[<Test>]
+let ``Should get expected contract cost``() =
+    (compile sampleContractCode
+     |> Result.bind (fun contract -> 
+        Contract.getCost contract "" Map.empty sampleInputTx)
+    , (Ok 146I : Result<bigint, string>))
     |> shouldEqual
 
 [<Test>]

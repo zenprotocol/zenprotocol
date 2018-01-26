@@ -134,7 +134,12 @@ let executeContract session txSkeleton cHash command state =
         
         let contractWallet = 
             ContractWallets.get (ContractWalletRepository.get session) cHash state.contractWallets 
-    
+
+        Contract.getCost contract command contractWallet txSkeleton
+        |> Result.map (Log.info "Running contract with cost: %A")
+        |> Result.mapError (Log.info "Error getting contract with cost: %A")
+        |> ignore
+                
         Contract.run contract command contractWallet txSkeleton                
         |> Result.bind (TxSkeleton.checkPrefix txSkeleton)
         |> Result.map (fun finalTxSkeleton ->            
