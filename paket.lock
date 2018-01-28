@@ -1,8 +1,8 @@
 RESTRICTION: == net462
 NUGET
   remote: https://www.nuget.org/api/v2
-    Argu (4.2.1)
-      FSharp.Core (>= 3.1.2)
+    Argu (5.0)
+      FSharp.Core (>= 4.0.0.1)
     AsyncIO (0.1.40)
     Baseclass.Contrib.Nuget.Output (2.4.1)
     BouncyCastle (1.8.1)
@@ -19,12 +19,21 @@ NUGET
     FSharp.Compiler.Tools (4.1.29)
     FSharp.Configuration (1.3.1)
       FSharp.Core (>= 4.0.0.1)
+    FSharp.Control.AsyncSeq (2.0.20)
+      FSharp.Core (>= 3.1.2)
+      System.ValueTuple (>= 4.4)
     FSharp.Control.Reactive (3.5)
       System.Reactive (>= 3.0)
-    FSharp.Core (4.3)
+    FSharp.Core (4.3.2)
     FSharp.Data (2.4.4)
+    FSharpx.Async (1.13.2)
+      FSharp.Control.AsyncSeq
+      FSharp.Core
     FSharpx.Collections (1.17)
       FSharp.Core
+    FSharpx.Extras (2.2.1)
+      FSharpx.Async
+      FSharpx.Collections
     FsNetMQ (0.2.7)
       FSharp.Core
       NetMQ (>= 4.0.0.156-pre)
@@ -41,7 +50,7 @@ NUGET
     NETStandard.Library (2.0.1)
       Microsoft.NETCore.Platforms (>= 1.1)
     NUnit (3.9)
-    NUnit.ConsoleRunner (3.7)
+    NUnit.ConsoleRunner (3.8)
     System.Collections.Immutable (1.4)
       NETStandard.Library (>= 1.6.1)
     System.Reactive (3.1.1)
@@ -59,6 +68,7 @@ NUGET
     System.Reflection.Metadata (1.5)
       NETStandard.Library (>= 1.6.1)
       System.Collections.Immutable (>= 1.4)
+    System.ValueTuple (4.4)
     Zen.FSharp.Compiler.Service (17.0.2)
       System.Collections.Immutable (>= 1.3.1)
       System.Reflection.Metadata (>= 1.4.2)
@@ -66,5 +76,5 @@ NUGET
     zen_secp256k1_osx (0.1.0.25-v6ad5cdb42a1a)
     zen_z3_linux (4.5.1.7-v1f29cebd4df)
     zen_z3_osx (4.5.1.7-v1f29cebd4df6)
-    ZFS-Tools (0.0.7)
+    ZFS-Tools (0.0.8)
     ZFStar (0.0.5)
