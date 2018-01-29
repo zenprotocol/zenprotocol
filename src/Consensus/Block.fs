@@ -18,6 +18,8 @@ let pickler = Pickler.auto<Block>
 
 let private (>=>) f1 f2 x = Result.bind f2 (f1 x)
 
+let result = new Infrastructure.Result.ResultBuilder<string>()
+
 let private createCommitments txMerkleRoot witnessMerkleRoot acsMerkleRoot rest =
     [ txMerkleRoot; witnessMerkleRoot; acsMerkleRoot; ] @ rest
     
@@ -119,18 +121,30 @@ let validate chain =
         BlockHeader.validate chain block.header
         |> Result.map (fun _ -> block)  
         
-    let checkTxBasic (block:Block) = 
-        // we skip this if this is the genesis
+    //let checkTxBasic (block:Block) = 
+        //if isGenesis chain block then
+        //    Ok block
+        //else             
+            //List.fold (fun state tx->
+                //match state with
+                //| Error e -> Error e
+                //| ok -> 
+                    //match TransactionValidation.validateBasic tx with
+                    //| Error err -> Error (sprintf "transaction %A failed validation due to %A" (Transaction.hash tx) err)
+                    //| _ -> ok) (Ok block) block.transactions
+    
+    let checkTxBasic (block:Block) = result {
+        // skip if genesis block
         if isGenesis chain block then
-            Ok block
-        else             
-            List.fold (fun state tx->
-                match state with
-                | Error e -> Error e
-                | ok -> 
-                    match TransactionValidation.validateBasic tx with
-                    | Error err -> Error (sprintf "transaction %A failed validation due to %A" (Transaction.hash tx) err)
-                    | _ -> ok) (Ok block) block.transactions
+            return block
+        else
+            for tx in block.transactions do
+                let! validTx = 
+                    TransactionValidation.validateBasic tx 
+                    |> Result.mapError (sprintf "transaction %A failed validation due to %A" (Transaction.hash tx) )
+                ()
+            return block
+    }
                     
     let checkCommitments (block:Block) = 
         let txMerkleRoot = 

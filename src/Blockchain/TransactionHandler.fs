@@ -47,7 +47,7 @@ let private validateOrphanTransaction session contractPath state txHash tx  =
                                 utxoSet=utxoSet; 
                                 orphanPool=orphanPool}
                 | Error error ->
-                    Log.info "Orphan transacation %s contract failed activation %A" (Hash.toString txHash) error 
+                    Log.info "Orphan transaction %s contract failed activation %A" (Hash.toString txHash) error
                     
                     let orphanPool = OrphanPool.remove txHash state.orphanPool
                     return {state with orphanPool = orphanPool}
@@ -56,7 +56,7 @@ let private validateOrphanTransaction session contractPath state txHash tx  =
                 // transacation is still orphan, nothing to do
                 return state
             | Error error ->
-                Log.info "Orphan transacation %s failed validation: %A" (Hash.toString txHash) error
+                Log.info "Orphan transaction %s failed validation: %A" (Hash.toString txHash) error
 
                 let orphanPool = OrphanPool.remove txHash state.orphanPool
                 return {state with orphanPool = orphanPool}
@@ -81,17 +81,17 @@ let validateInputs session contractPath txHash tx (state:MemoryState) shouldPubl
             | Error Orphan ->
                 let orphanPool = OrphanPool.add txHash tx state.orphanPool
 
-                Log.info "Transaction %s is orphan, adding to orphan pool" (Hash.toString txHash)
+                Log.info "Transaction %s is an orphan. Adding to orphan pool." (Hash.toString txHash)
 
                 return {state with orphanPool = orphanPool}
             | Error ContractNotActive ->
                 let orphanPool = OrphanPool.add txHash tx state.orphanPool
-                
-                Log.info "Transaction %s try to run inactive contract, adding to orphan pool" (Hash.toString txHash)
+            
+                Log.info "Transaction %s tried to run an inactive contract. Adding to orphan pool." (Hash.toString txHash)
 
                 return {state with orphanPool = orphanPool} 
             | Error error ->
-                 Log.info "Transacation %s failed inputs validation: %A" (Hash.toString txHash) error
+                 Log.info "Transaction %s failed inputs validation: %A" (Hash.toString txHash) error
 
                  return state
             | Ok tx ->
@@ -113,7 +113,7 @@ let validateInputs session contractPath txHash tx (state:MemoryState) shouldPubl
                     
                     return! validateOrphanTransactions session contractPath state
                 | Error error ->
-                     Log.info "Transacation %s contract failed activation: %A" (Hash.toString txHash) error
+                     Log.info "Transaction %s contract failed activation: %A" (Hash.toString txHash) error
                     
                      return state
         }
@@ -130,7 +130,7 @@ let validateTransaction chain session contractPath tx (state:MemoryState) =
         else
             match TransactionValidation.validateBasic tx with
             | Error error ->
-                Log.info "Transacation %s failed basic validation: %A" (Hash.toString txHash) error
+                Log.info "Transaction %s failed basic validation: %A" (Hash.toString txHash) error
 
                 return state
             | Ok tx ->
