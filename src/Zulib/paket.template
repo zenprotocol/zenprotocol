@@ -1,0 +1,8 @@
+type file
+id Zulib
+version 0.0.1
+authors ZenProtocol
+description
+	Zen Protocol ZFStar standard library
+files
+	bin/Zulib.dll ==> lib

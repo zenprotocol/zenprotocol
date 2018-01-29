@@ -1,0 +1,5 @@
+type project
+authors Zen Protocol
+
+dependencies
+    Zulib >= 0.0.1

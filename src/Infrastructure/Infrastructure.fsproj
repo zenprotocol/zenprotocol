@@ -54,6 +54,7 @@
     <Compile Include="Http.fs" />
     <Compile Include="Disposables.fs" />
     <Compile Include="Subject.fs" />
+    <Content Include="Infrastructure.fsproj.paket.template" />
     <Content Include="ServiceBusMessage.xml" />
     <Content Include="paket.references" />
     <Compile Include="Exception.fs" />
