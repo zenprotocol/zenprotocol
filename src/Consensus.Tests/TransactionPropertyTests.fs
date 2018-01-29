@@ -38,7 +38,7 @@ type ArbitraryGenerators =
                 return List.zip outpoints unspentPkOutputs |> Map.ofList, Map.ofList pkKeyOutputs
             }
         let txGenerator (utxos, (keyMap: Map<Output, KeyPair>)) =
-            let getUTXO _ = UtxoSet.NoOuput
+            let getUTXO _ = UtxoSet.NoOutput
          
             gen { 
                 let outpoints = utxos |> Map.toList |> List.map fst

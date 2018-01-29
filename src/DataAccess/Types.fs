@@ -29,6 +29,8 @@ type Collection<'key,'value> =
         member x.Dispose () =            
             mdb_dbi_close(x.environment,x.database)
             
+type MultiCollection<'key,'value> = MultiCollection of Collection<'key,'value>            
+            
 type DatabaseContext = 
     {
         environment: IntPtr

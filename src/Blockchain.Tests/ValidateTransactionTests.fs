@@ -44,8 +44,7 @@ let txHash = Transaction.hash tx
 let txOutpoints = getTxOutpints txHash tx
 
 // Default initial state of mempool and utxoset
-let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction (fun _ -> UtxoSet.NoOuput) Transaction.rootTxHash Transaction.rootTx
-let contractWallets = ContractWallets.asDatabase
+let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction (fun _ -> UtxoSet.NoOutput) Transaction.rootTxHash Transaction.rootTx
 let mempool = MemPool.empty |> MemPool.add Transaction.rootTxHash Transaction.rootTx
 let orphanPool = OrphanPool.create()
 let acs = ActiveContractSet.empty
@@ -57,7 +56,6 @@ let state = {
             mempool = mempool
             orphanPool = orphanPool
             activeContractSet = acs
-            contractWallets=contractWallets
         }
     tipState =
         {
@@ -393,3 +391,48 @@ let ``Valid contract should execute``() =
         )
     |> Result.mapError failwith
     |> ignore
+
+[<Test>]
+let ``contract using wallet``() = 
+    let code = """
+    open Zen.Types
+    open Zen.Vector
+    open Zen.Util
+    open Zen.Base
+    open Zen.Cost
+    open Zen.Assets
+    open FStar.Mul
+    
+    module ET = Zen.ErrorT
+    
+    val cf: txSkeleton -> string -> #l:nat -> wallet l -> cost nat 5
+    let cf _ _ #l _ = ret (l * 128 + 134) 
+    
+    val main: txSkeleton -> hash -> string -> #l:nat -> wallet l -> cost (result txSkeleton) (l * 128 + 134)
+    let main txSkeleton contractHash command #l wallet =
+      let result = getInputs zenAsset 1UL wallet txSkeleton in
+      ET.of_optionT "not enough Zens" result              
+      """
+    
+    let cHash = code |> System.Text.Encoding.UTF8.GetBytes |> Hash.compute
+    use databaseContext = DatabaseContext.createEmpty "test"
+    use session = DatabaseContext.createSession databaseContext
+    let account = Account.createRoot ()
+    
+    let output = {lock=Contract cHash;spend={asset=Hash.zero;amount=1UL}}
+    let utxoSet = Map.add {txHash=Hash.zero;index=1ul} (UtxoSet.Unspent output) utxoSet
+    
+    let state = { state with memoryState = { state.memoryState with utxoSet = utxoSet } }
+    
+    Account.createActivateContractTransaction account code
+        |> Result.map (fun tx ->
+            Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
+            |> Writer.unwrap)
+        |> Result.map (fun (_, state) ->
+            ActiveContractSet.containsContract cHash state.memoryState.activeContractSet
+            |> should equal true
+    
+            TransactionHandler.executeContract session sampleInputTx cHash "" state.memoryState
+            )
+        |> Result.mapError failwith
+        |> ignore

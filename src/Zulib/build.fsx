@@ -1,6 +1,6 @@
 
-#r @"../../packages/System.Reflection.Metadata/lib/portable-net45+win8/System.Reflection.Metadata.dll"
-//#r @"../../packages/System.Reflection.Metadata/lib/netstandard1.1/System.Reflection.Metadata.dll"
+//#r @"../../packages/System.Reflection.Metadata/lib/portable-net45+win8/System.Reflection.Metadata.dll"
+#r @"../../packages/System.Reflection.Metadata/lib/netstandard1.1/System.Reflection.Metadata.dll"
 #r @"../../packages/FAKE/tools/FakeLib.dll"
 #r @"../../packages/Zen.FSharp.Compiler.Service/lib/net45/Zen.FSharp.Compiler.Service.dll"
 
@@ -96,7 +96,7 @@ Target "Extract" (fun _ ->
        "--extract_module";"Zen.Cost.Extracted";
        "--codegen-lib";"Zen.Cost";
        "--codegen-lib";"Zen.Array";
-       "--extract_module";"Zen.Types.Extracted";
+       "--extract_module";"Zen.Types.Extracted";       
        "--extract_module";"Zen.Types.Main";
        "--codegen-lib";"Zen.Types";
        "--odir";extractedDir |]
@@ -138,6 +138,7 @@ Target "Build" (fun _ ->
       "fsharp/Realized/Zen.Merkle.fs";
       "fsharp/Realized/Zen.Util.fs";
       "fsharp/Realized/Zen.Types.TxSkeleton.fs";
+      "fsharp/Realized/Zen.Types.Wallet.fs";
       "fsharp/Realized/Zen.Assets.fs";
       "fsharp/Extracted/Zen.Types.Main.fs"
     |]

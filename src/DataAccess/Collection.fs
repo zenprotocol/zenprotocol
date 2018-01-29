@@ -5,9 +5,6 @@ open System
 open Lmdb
 open System.Runtime.InteropServices
 
-let bufferSize = 1024 * 1024 * 1024 // One-megabyte
-let structSize = IntPtr.Size * 2 |> IntPtr
-
 let create (session:Session) name keySerializer valueSerializer valueDeseralizer =
     let mutable db = 0ul
         
@@ -86,8 +83,9 @@ let delete collection session key =
     let keyBytes = collection.keySerializer key
     use pinnedKey = pin keyBytes
     let mutable keyData = byteArrayToData pinnedKey
+    let mutable valueData = Data.empty
     
-    mdb_del(session.tx, collection.database, &keyData, IntPtr.Zero)
+    mdb_del(session.tx, collection.database, &keyData, &valueData)
     |> checkErrorCode
     
     //TODO: at the moment delete is not supported with indices, so

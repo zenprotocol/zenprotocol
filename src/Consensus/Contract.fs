@@ -12,10 +12,12 @@ open Microsoft.FSharp.Core
 open Zen.Cost.Realized
 open Zen.Types.TxSkeleton
 open Exception
+open Consensus.Types
 
+type ContractWallet = PointedOutput list
 
-type ContractFn = Hash -> string -> ContractWallets.ContractWallet -> TxSkeleton -> Result<TxSkeleton,string>
-type ContractCostFn = string -> ContractWallets.ContractWallet -> TxSkeleton -> Result<bigint,string>
+type ContractFn = Hash -> string -> ContractWallet -> TxSkeleton -> Result<TxSkeleton,string>
+type ContractCostFn = string -> ContractWallet -> TxSkeleton -> Result<bigint,string>
 
 type T = {
     hash: Hash
@@ -33,15 +35,16 @@ let private findMethods assembly =
     with _ as ex ->
         Exception.toError "get contract methods" ex
 
-let private invokeMainFn methodInfo cHash command input =
+
+let private invokeMainFn methodInfo cHash command contractWallet input =
     try
-        (methodInfo:MethodInfo).Invoke (null, [| input; cHash; command |]) |> Ok
+        (methodInfo:MethodInfo).Invoke (null, [| input; cHash; command ; ZFStar.vectorLength contractWallet; contractWallet |]) |> Ok
     with _ as ex ->
         Exception.toError "invoke contract main fn" ex
 
-let private invokeCostFn methodInfo command input =
+let private invokeCostFn methodInfo command contractWallet input =
     try
-        (methodInfo:MethodInfo).Invoke (null, [| input; command |]) |> Ok
+        (methodInfo:MethodInfo).Invoke (null, [| input; command; ZFStar.vectorLength contractWallet;  contractWallet |]) |> Ok
     with _ as ex ->
         Exception.toError "invoke contract cost fn" ex
 
@@ -57,17 +60,21 @@ let private castCostFnOutput output =
     with _ as ex ->
         Exception.toError "cast contract cost fn output" ex
 
-let private wrap (mainMethodInfo, costMethidInfo) =
+let private wrap (mainMethodInfo, costMethodInfo) =
     (
     fun (Hash.Hash cHash) command contractWallet txSkeleton ->
-        ZFStar.convertInput txSkeleton
-        |> invokeMainFn mainMethodInfo cHash command
+        let txSkeleton' = ZFStar.convertInput txSkeleton
+        let contractWallet' = ZFStar.convetWallet contractWallet
+        
+        invokeMainFn mainMethodInfo cHash command contractWallet' txSkeleton'
         |> Result.bind castMainFnOutput
         |> Result.bind ZFStar.convertResult
     ,
     fun command contractWallet txSkeleton ->
-        ZFStar.convertInput txSkeleton
-        |> invokeCostFn costMethidInfo command
+        let txSkeleton' = ZFStar.convertInput txSkeleton
+        let contractWallet' = ZFStar.convetWallet contractWallet
+        
+        invokeCostFn costMethodInfo command contractWallet' txSkeleton'
         |> Result.bind castCostFnOutput
         |> Result.map ZFStar.unCost
     )

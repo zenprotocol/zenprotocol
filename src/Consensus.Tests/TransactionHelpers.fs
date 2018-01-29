@@ -10,11 +10,9 @@ let getSignedTx tx keys =
     signedTx, txHash
 
 let private inputsValidation acs utxos signedTx txHash =
-    let getUTXO _ = UtxoSet.NoOuput
-    let getWallet _ = Map.empty
+    let getUTXO _ = UtxoSet.NoOutput
     
-    validateInputs getUTXO getWallet acs utxos ContractWallets.asDatabase txHash signedTx
-    |> Result.map fst
+    validateInputs getUTXO acs utxos txHash signedTx
 
 let inputsValidationMsg msg acs utxos tx keys =
     let signedTx, txHash = getSignedTx tx keys

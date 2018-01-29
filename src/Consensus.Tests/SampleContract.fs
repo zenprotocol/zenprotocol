@@ -16,11 +16,11 @@ open Zen.Cost
 
 module ET = Zen.ErrorT
 
-val cf: txSkeleton -> string -> cost nat 1
-let cf _ _ = ret 146
+val cf: txSkeleton -> string -> #l:nat -> wallet l -> cost nat 1
+let cf _ _ #l _ = ret 146
 
-val main: txSkeleton -> hash -> string -> cost (result txSkeleton) 146
-let main txSkeleton contractHash command =
+val main: txSkeleton -> hash -> string -> #l:nat -> wallet l -> cost (result txSkeleton) 146
+let main txSkeleton contractHash command #l wallet =
   let spend = { asset=contractHash; amount=1000UL } in
   let lock = ContractLock contractHash in
 

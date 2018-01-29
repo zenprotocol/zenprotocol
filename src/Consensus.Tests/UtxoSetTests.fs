@@ -9,7 +9,7 @@ open FsCheck.NUnit
 open FsCheck
 open FsUnit
 
-let getUTXO _ = NoOuput
+let getUTXO _ = NoOutput
 
 [<Test>]
 let ``handling transaction add outputs to set``() = 

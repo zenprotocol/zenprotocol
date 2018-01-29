@@ -1,8 +1,10 @@
 module Zen.Types.Main
 
 open Zen.Types.TxSkeleton
+open Zen.Types.Wallet
 open Zen.Types.Extracted
 open Zen.Cost
+
 
 val maxCost: nat
 let maxCost = 200
@@ -12,6 +14,8 @@ noeq type costFunction =
         #n:nat{n<=maxCost}
         -> f:(txSkeleton
               -> command:string
+              -> #l:nat
+              -> wallet l
               -> nat `cost` n)
         -> costFunction
 
@@ -21,6 +25,8 @@ noeq type mainFunction =
         -> mf:( txSkel:txSkeleton
                 -> contractHash
                 -> command:string
-                -> result txSkeleton `cost` force ((CostFunc?.f cf) txSkel command)
+                -> #l:nat
+                -> wallet:wallet l
+                -> result txSkeleton `cost` force ((CostFunc?.f cf) txSkel command wallet)
               )
         -> mainFunction
