@@ -43,6 +43,7 @@
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Lmdb.fs" />
     <Compile Include="Types.fs" />
+    <Compile Include="MultiCollection.fs" />
     <Compile Include="Session.fs" />
     <Compile Include="Collection.fs" />
     <Compile Include="SingleValue.fs" />

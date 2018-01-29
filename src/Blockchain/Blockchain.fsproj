@@ -48,7 +48,7 @@
     <Compile Include="DatabaseContext.fs" />
     <Compile Include="TransactionRepository.fs" />
     <Compile Include="UtxoSetRepository.fs" />
-    <Compile Include="ContractWalletRepository.fs" />
+    <Compile Include="ContractUtxoRepository.fs" />
     <Compile Include="BlockRepository.fs" />
     <Compile Include="EffectsWriter.fs" />
     <Compile Include="OrphanPool.fs" />

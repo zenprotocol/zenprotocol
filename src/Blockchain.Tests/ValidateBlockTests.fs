@@ -48,7 +48,6 @@ let createTransaction account =
 
 // Default initial state of mempool and utxoset
 let utxoSet = UtxoSet.asDatabase
-let contractWallets = ContractWallets.asDatabase
 let mempool = MemPool.empty 
 let orphanPool = OrphanPool.create()
 let acs = ActiveContractSet.empty
@@ -62,7 +61,6 @@ let state = {
             mempool=mempool
             orphanPool=orphanPool
             activeContractSet=acs
-            contractWallets=contractWallets
         }
     tipState = 
         {

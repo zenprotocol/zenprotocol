@@ -78,7 +78,7 @@ extern int mdb_get(IntPtr txn, uint32 dbi, Data& key, Data& data)
 extern int mdb_put(IntPtr txn, uint32 dbi, Data& key, Data& data, uint32 flags)
 
 [<DllImport("lmdb", CallingConvention = CallingConvention.Cdecl)>]
-extern int mdb_del(IntPtr txn, uint32 dbi, Data& key, IntPtr value);
+extern int mdb_del(IntPtr txn, uint32 dbi, Data& key, Data& value);
 
 [<DllImport("lmdb", CallingConvention = CallingConvention.Cdecl)>]
 extern int mdb_cursor_open(IntPtr txn, uint32 dbi, IntPtr& cursor)

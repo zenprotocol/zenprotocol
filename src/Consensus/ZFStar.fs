@@ -101,6 +101,10 @@ let convertResult (txSkeleton : Cost.t<result<txSkeleton>,unit>)
             |> List.map (snd >> fstToFsOutput)
         Ok {pInputs=inputs; outputs=outputs}
 
+let convetWallet (wallet:PointedOutput list) =     
+    List.map fsToFstPointedOutput wallet
+    |> listToVector   
+
 let convertInput (txSkeleton:TxSkeleton) : txSkeleton =
     
     let insertPointedOutput txSkeleton pointedOutput = 
@@ -115,3 +119,7 @@ let convertInput (txSkeleton:TxSkeleton) : txSkeleton =
     
     List.fold insertOutput txSkeletonWithInputsOnly outputs
     
+let vectorLength v = 
+    match v with 
+    | VCons (l,_,_) -> l + 1I
+    | VNil -> 0I

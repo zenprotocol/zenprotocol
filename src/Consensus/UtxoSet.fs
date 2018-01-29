@@ -6,7 +6,7 @@ module Consensus.UtxoSet
 open Consensus.Types
 
 type OutputStatus =
-    | NoOuput
+    | NoOutput
     | Spent
     | Unspent of Output
 
@@ -24,7 +24,7 @@ let handleTransaction getUTXO txHash tx set =
     let folder state input =
         match get getUTXO input state with
         | Unspent _ -> Map.add input Spent state
-        | NoOuput
+        | NoOutput
         | Spent -> failwith "Expected output to be unspent"
                 
     let outputsWithIndex = List.mapi (fun i output -> (uint32 i,output)) tx.outputs
@@ -45,7 +45,7 @@ let isSomeSpent getUTXO outpoints set =
         | false ->
             match get getUTXO outpoint set with
             | Spent -> true
-            | NoOuput
+            | NoOutput
             | Unspent _ -> false            
             ) false outpoints
 
@@ -55,7 +55,7 @@ let getUtxos getUTXO outpoints set =
             | None -> None
             | Some list ->
                 match get getUTXO outpoint set with
-                | NoOuput                 
+                | NoOutput                 
                 | Spent ->
                     None
                 | Unspent output -> Some (output :: list))                
@@ -72,7 +72,7 @@ let undoBlock getOutput getUTXO block set =
             | Spent -> 
                 let output = getOutput input
                 Map.add input (Unspent output) set
-            | NoOuput
+            | NoOutput
             | Unspent _ -> failwith "Expected output to be spent"            
             ) set
 
@@ -85,6 +85,6 @@ let undoBlock getOutput getUTXO block set =
         |> List.fold (fun utxoSet i ->
             let outpoint = {txHash=txHash; index=uint32 i}
                                     
-            Map.add outpoint NoOuput utxoSet    
+            Map.add outpoint NoOutput utxoSet    
             ) utxoSet) utxoSet block.transactions
         

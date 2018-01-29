@@ -14,8 +14,7 @@ open TestsInfrastructure.Nunit
 
 let contractsPath = "./test"
 
-let getUTXO _ = UtxoSet.NoOuput
-let getWallet _ = Map.empty
+let getUTXO _ = UtxoSet.NoOutput
 
 let compile code = 
     Contract.recordHints code
@@ -30,7 +29,7 @@ let compileRunAndCompare code =
         |> shouldEqual
         (contract.hash, sampleContractHash)
         |> shouldEqual
-        Contract.run contract "" Map.empty sampleInputTx)
+        Contract.run contract "" List.empty sampleInputTx)
 
 [<Test>]
 let ``Should get contract function``() =
@@ -44,9 +43,9 @@ let ``Should get 'elaborate' error for invalid תcode``() =
     , (Error "elaborate" : Result<TxSkeleton, string>))
     |> shouldEqual
 
-let validateInputs (contract:Contract.T) utxos contractWallets tx  =
+let validateInputs (contract:Contract.T) utxos tx  =
     let acs = ActiveContractSet.add contract.hash contract ActiveContractSet.empty
-    TransactionValidation.validateInputs getUTXO getWallet acs utxos contractWallets (Transaction.hash tx) tx
+    TransactionValidation.validateInputs getUTXO acs utxos (Transaction.hash tx) tx
     |> Result.mapError (function
         | TransactionValidation.ValidationError.General error -> error
         | other -> other.ToString())
@@ -55,14 +54,13 @@ let compileRunAndValidate code =
     compile code
     |> Result.bind (fun contract ->
         let utxoSet = getSampleUtxoset (UtxoSet.asDatabase)
-        Contract.run contract "" Map.empty sampleInputTx
+        Contract.run contract "" List.empty sampleInputTx
         |> Result.bind (TxSkeleton.checkPrefix sampleInputTx)
         |> Result.map (fun finalTxSkeleton ->
             let tx = Transaction.fromTxSkeleton finalTxSkeleton
             Transaction.addContractWitness contract.hash sampleInputTx finalTxSkeleton tx)        
         |> Result.map (Transaction.sign [ sampleKeyPair ])
-        |> Result.bind (validateInputs contract utxoSet ContractWallets.asDatabase)
-        |> Result.map fst)
+        |> Result.bind (validateInputs contract utxoSet))        
 
 [<Test>]
 let ``Contract generated transaction should be valid``() =
@@ -74,7 +72,7 @@ let ``Contract generated transaction should be valid``() =
 let ``Should get expected contract cost``() =
     (compile sampleContractCode
      |> Result.bind (fun contract -> 
-        Contract.getCost contract "" Map.empty sampleInputTx)
+        Contract.getCost contract "" List.empty sampleInputTx)
     , (Ok 146I : Result<bigint, string>))
     |> shouldEqual
 
@@ -90,11 +88,11 @@ let ``Contract should not be able to create tokens other than its own``() =
 
          module ET = Zen.ErrorT
 
-         val cf: txSkeleton -> string -> cost nat 1
-         let cf _ _ = ret 149
+         val cf: txSkeleton -> string -> #l:nat -> wallet l -> cost nat 1
+         let cf _ _ #l _ = ret 149
 
-         val main: txSkeleton -> hash -> string -> cost (result txSkeleton) 149
-         let main txSkeleton contractHash command =
+         val main: txSkeleton -> hash -> string -> #l:nat -> wallet l -> cost (result txSkeleton) 149
+         let main txSkeleton contractHash command #l wallet =
            let spend = {
                asset=hashFromBase64 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
                amount=1000UL

@@ -161,7 +161,7 @@ let validate chain =
     >=> checkCommitments
 
 /// Apply block to UTXO and ACS, operation can fail
-let connect chain getUTXO getWallet contractsPath parent timestamp set acs ema contractWallets =    
+let connect chain getUTXO contractsPath parent timestamp set acs ema =    
     let checkBlockNumber (block:Block) = 
         if parent.blockNumber + 1ul <> block.header.blockNumber then
             Error "blockNumber mismatch"
@@ -212,23 +212,21 @@ let connect chain getUTXO getWallet contractsPath parent timestamp set acs ema c
             let set = List.fold (fun set tx ->
                 let txHash = (Transaction.hash tx)
                 UtxoSet.handleTransaction getUTXO txHash tx set) set block.transactions
-            Ok (block,set,acs,ema, Map.empty) // TODO: the genesis might do have contract wallets  
+            Ok (block,set,acs,ema)
         else                       
             List.fold (fun state tx->
                 match state with
                 | Error e -> Error e
-                | Ok (block,set,acs,ema,contractWallets) -> 
+                | Ok (block,set,acs,ema) -> 
                     let txHash = (Transaction.hash tx) 
                 
-                    match TransactionValidation.validateInputs getUTXO getWallet acs set contractWallets txHash tx with
+                    match TransactionValidation.validateInputs getUTXO acs set txHash tx with
                     | Error err -> Error (sprintf "transactions failed inputs validation due to %A" err)
-                    | Ok (_,pInputs) -> 
+                    | Ok _ -> 
                         let set = UtxoSet.handleTransaction getUTXO txHash tx set
-                        let contractWallets = 
-                            ContractWallets.handleTransaction getWallet contractWallets txHash tx pInputs                        
                             
-                        Ok (block,set,acs,ema,contractWallets) 
-                    ) (Ok (block,set,acs,ema, contractWallets)) block.transactions
+                        Ok (block,set,acs,ema) 
+                    ) (Ok (block,set,acs,ema)) block.transactions
 
     checkBlockNumber
     >=> checkDifficulty

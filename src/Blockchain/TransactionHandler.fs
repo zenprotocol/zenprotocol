@@ -12,7 +12,6 @@ open State
 open Infrastructure.ServiceBus.Agent
 
 let getUTXO = UtxoSetRepository.get
-let getWallet = ContractWalletRepository.get
 
 let private activateContract chain contractPath acs (tx : Types.Transaction) shouldPublishEvents =
     effectsWriter
@@ -34,11 +33,10 @@ let private activateContract chain contractPath acs (tx : Types.Transaction) sho
 let private validateOrphanTransaction chain session contractPath state txHash tx  =
     effectsWriter 
         {            
-            match TransactionValidation.validateInputs (getUTXO session) (getWallet session)
-                    state.activeContractSet state.utxoSet state.contractWallets txHash tx with
-            | Ok (tx,pInputs) ->
+            match TransactionValidation.validateInputs (getUTXO session)
+                    state.activeContractSet state.utxoSet txHash tx with
+            | Ok tx ->
                 let utxoSet = UtxoSet.handleTransaction (getUTXO session) txHash tx state.utxoSet
-                let contractWallets = ContractWallets.handleTransaction (getWallet session) state.contractWallets txHash tx pInputs 
                 let mempool = MemPool.add txHash tx state.mempool
 
                 do! publish (TransactionAddedToMemPool (txHash, tx))
@@ -51,7 +49,6 @@ let private validateOrphanTransaction chain session contractPath state txHash tx
                             activeContractSet=acs;
                             mempool=mempool;
                             utxoSet=utxoSet; 
-                            contractWallets=contractWallets; 
                             orphanPool=orphanPool}
             | Error (Orphan _) ->
                 // transacation is still orphan, nothing to do
@@ -77,8 +74,8 @@ let rec validateOrphanTransactions chain session contractPath state =
 let validateInputs chain session contractPath txHash tx (state:MemoryState) shouldPublishEvents =
     effectsWriter
         {           
-            match TransactionValidation.validateInputs (getUTXO session) (getWallet session)
-                    state.activeContractSet state.utxoSet state.contractWallets txHash tx with
+            match TransactionValidation.validateInputs (getUTXO session)
+                    state.activeContractSet state.utxoSet txHash tx with
             | Error Orphan ->
                 let orphanPool = OrphanPool.add txHash tx state.orphanPool
 
@@ -89,11 +86,10 @@ let validateInputs chain session contractPath txHash tx (state:MemoryState) shou
                  Log.info "Transacation %s failed inputs validation: %A" (Hash.toString txHash) error
 
                  return state
-            | Ok (tx,pInputs) ->
+            | Ok tx ->
                 let! acs = activateContract chain contractPath state.activeContractSet tx shouldPublishEvents
 
                 let utxoSet = UtxoSet.handleTransaction (getUTXO session) txHash tx state.utxoSet
-                let contractWallets = ContractWallets.handleTransaction (getWallet session) state.contractWallets txHash tx pInputs
                 let mempool = MemPool.add txHash tx state.mempool
 
                 if shouldPublishEvents then
@@ -105,8 +101,7 @@ let validateInputs chain session contractPath txHash tx (state:MemoryState) shou
                                 activeContractSet=acs;
                                 mempool=mempool;
                                 utxoSet=utxoSet;
-                                contractWallets=contractWallets}
-
+                             }   
                 
                 return! validateOrphanTransactions chain session contractPath state
         }
@@ -130,10 +125,8 @@ let validateTransaction chain session contractPath tx (state:MemoryState) =
 
 let executeContract session txSkeleton cHash command state =
     match ActiveContractSet.tryFind cHash state.activeContractSet with
-    | Some contract ->
-        
-        let contractWallet = 
-            ContractWallets.get (ContractWalletRepository.get session) cHash state.contractWallets 
+    | Some contract ->      
+        let contractWallet = ContractUtxoRepository.getContractUtxo session cHash state.utxoSet 
 
         Contract.getCost contract command contractWallet txSkeleton
         |> Result.map (Log.info "Running contract with cost: %A")

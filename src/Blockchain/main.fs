@@ -51,7 +51,6 @@ let main dataPath chain busName =
                 utxoSet=UtxoSet.asDatabase
                 mempool=MemPool.empty
                 orphanPool=OrphanPool.create ()
-                contractWallets=ContractWallets.asDatabase
             }
             
         let state = 

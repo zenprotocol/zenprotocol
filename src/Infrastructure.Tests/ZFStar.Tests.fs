@@ -53,10 +53,10 @@ let compileAndInvoke fstCode args =
             Ok (assembly
             .GetModules().[0]
             .GetTypes().[0]
-            .GetMethods().[1])
+            .GetMethod("main"))
         with _ as ex ->
             Exception.toError "could not find method" ex)
-    |> Result.bind (fun methodInfo ->
+    |> Result.bind (fun methodInfo ->        
         try
             Ok (methodInfo.Invoke(null, args))
         with _ as ex ->
@@ -84,11 +84,11 @@ let fstCode = """
     open Zen.Cost
     open Zen.ErrorT
 
-    val cf: txSkeleton -> string -> cost nat 1
-    let cf _ _ = ~!2
+    val cf: txSkeleton -> string -> #l:nat -> wallet l -> cost nat 1
+    let cf _ _ #l _ = ~!2
 
-    val main: txSkeleton -> hash -> string -> cost (result txSkeleton) 2
-    let main tx chash command =
+    val main: txSkeleton -> hash -> string -> #l:nat -> wallet l -> cost (result txSkeleton) 2
+    let main tx chash command #l _ =
         ret @ tx
     """
 
@@ -103,7 +103,7 @@ let ``Should record hints``() =
 [<Test>]
 let ``Should invoke compiled``() =
     (compileAndInvoke fstCode
-    [| input; null; null |]
+    [| input; null; null; 0I; null |]
     , (Ok input : Result<txSkeleton,string>))
     |> shouldEqual
 
@@ -117,14 +117,14 @@ let ``Should throw with command's value``() =
         open Zen.Cost
         open Zen.ErrorT
 
-        val cf: txSkeleton -> string -> cost nat 1
-        let cf _ _ = ~!1
+        val cf: txSkeleton -> string -> #l:nat -> wallet l -> cost nat 1
+        let cf _ _#l _ = ~!1
 
-        val main: txSkeleton -> hash -> string -> cost (result txSkeleton) 1
-        let main tx chash command =
+        val main: txSkeleton -> hash -> string -> #l:nat -> wallet l -> cost (result txSkeleton) 1
+        let main tx chash command #l _ =
             failw command
         """
-    [| null; null; "test command" |]
+    [| null; null; "test command";0I;null |]
     , (Error "test command" : Result<txSkeleton,string>))
     |> shouldEqual
 

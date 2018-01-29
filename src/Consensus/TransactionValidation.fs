@@ -51,10 +51,14 @@ let private checkAmounts (tx, inputs) =
     else if outputs' <> inputs' then
         GeneralError "invalid amounts"
     else
-        Ok (tx,inputs)
+        Ok tx
 
-let private checkWitnesses getWallet acs contractWallets (Hash.Hash txHash, tx, inputs) =
-    let checkPKWitness tx pInputs serializedPublicKey signature =
+let getContractWallet tx inputs cHash =     
+    List.zip tx.inputs inputs
+    |> List.filter (fun (_,output) -> output.lock = Contract cHash)                                        
+
+let private checkWitnesses acs (Hash.Hash txHash, tx, inputs) =       
+    let checkPKWitness inputTx pInputs serializedPublicKey signature =
         match pInputs with
         | [] -> GeneralError "missing PK witness input" 
         | (_, {lock=PK pkHash}) :: tail -> 
@@ -62,13 +66,13 @@ let private checkWitnesses getWallet acs contractWallets (Hash.Hash txHash, tx, 
             | Some publicKey ->
                 if PublicKey.hashSerialized serializedPublicKey = pkHash then
                     match verify publicKey signature txHash with
-                    | Valid -> Ok (tx, tail)
+                    | Valid -> Ok (inputTx, tail)
                     | _ -> GeneralError "invalid PK witness signature"
                 else GeneralError "PK witness mismatch"
             | _ -> GeneralError "invalid PK witness"
         | _ -> GeneralError "unexpected PK witness lock type"
 
-    let checkContractWitness tx acs cw pInputs =
+    let checkContractWitness inputTx acs cw pInputs =
         let checkIssuedAndDestroyed txSkeleton cw =
             txSkeleton.pInputs.[cw.beginInputs - 1 .. cw.beginInputs + cw.inputsLength - 1]
             |> List.forall (fun (outpoint, {spend=spend}) ->
@@ -79,24 +83,27 @@ let private checkWitnesses getWallet acs contractWallets (Hash.Hash txHash, tx, 
                 function
                 | {lock=Destroy; spend=spend} -> spend.asset = cw.cHash
                 | _ -> true)
+                
+        let rec popContractsLocksOf cHash pInputs =
+            match pInputs with
+            | [] -> [] 
+            | (input, output) :: tail ->
+                match output.lock with 
+                | Contract cHash' when cHash' = cHash ->
+                    popContractsLocksOf cHash' tail
+                | _ -> (input, output) :: tail                
 
         match ActiveContractSet.tryFind cw.cHash acs with
         | Some contract ->
-            let contractWallet = (ContractWallets.get getWallet cw.cHash contractWallets)
-            match Contract.run contract "" contractWallet tx with 
-            | Ok tx' ->
-                if checkIssuedAndDestroyed tx' cw then
-                    if List.length tx'.pInputs - List.length tx.pInputs = cw.inputsLength && 
-                       List.length tx'.outputs - List.length tx.outputs = cw.outputsLength then
-                        let rec popContractsLocksOf cHash tx pInputs =
-                            match pInputs with
-                            | [] -> [] 
-                            | (input, output) :: tail ->
-                                match output.lock with 
-                                | Contract cHash' when cHash' = cHash ->
-                                    popContractsLocksOf cHash' tx tail
-                                | _ -> (input, output) :: tail
-                        Ok (tx', popContractsLocksOf cw.cHash tx' pInputs)
+            let contractWallet = getContractWallet tx inputs cw.cHash
+            
+            match Contract.run contract "" contractWallet inputTx with 
+            | Ok outputTx ->
+                if checkIssuedAndDestroyed outputTx cw then                                   
+                    if List.length outputTx.pInputs - List.length inputTx.pInputs = cw.inputsLength && 
+                       List.length outputTx.outputs - List.length inputTx.outputs = cw.outputsLength then
+                        
+                        Ok (outputTx, popContractsLocksOf cw.cHash pInputs)
                     else GeneralError "input/output length mismatch"
                 else GeneralError "illegal creation/destruction of tokens"
             | Error err -> GeneralError ("contract witness validation error:" + err)
@@ -183,7 +190,7 @@ let validateBasic =
     >=> checkDuplicateInputs
     >=> checkInputsStructure
 
-let validateInputs getUTXO getWallet acs set contractWallets txHash =
+let validateInputs getUTXO acs set txHash =
     checkOrphan getUTXO set txHash
-    >=> checkWitnesses getWallet acs contractWallets
+    >=> checkWitnesses acs
     >=> checkAmounts
