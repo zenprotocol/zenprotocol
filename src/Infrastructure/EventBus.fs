@@ -53,6 +53,29 @@ module Broker =
             poller=poller;
         }
             
+module Subscriber = 
+    type Subscriber<'event> = 
+        | Subscriber of Socket.T
+        interface System.IDisposable with 
+            member x.Dispose () =
+                let (Subscriber subscriber) = x
+                (subscriber :> System.IDisposable).Dispose ()
+    
+    let create<'event> name : Subscriber<'event> = 
+        let subscriber = Socket.sub ()
+        Socket.subscribe subscriber ""
+        Socket.connect subscriber (getPublisherAddress name)
+                
+        Subscriber subscriber
+    
+    let recv<'event> (Subscriber subscriber:Subscriber<'event>) : 'event = 
+        SingleFrame.recv subscriber
+        |> binarySerializer.UnPickle<'event>
+        
+    let tryRecv<'event> (Subscriber subscriber:Subscriber<'event>) timeout : 'event option =
+        SingleFrame.tryRecv subscriber timeout 
+        |> Option.map (binarySerializer.UnPickle<'event>)
+                                         
 module Agent =    
     type Agent<'a> = {
         subscriber: Socket.T;        
@@ -74,8 +97,8 @@ module Agent =
     let create<'a> poller name =
                
         let subscriber = Socket.sub ()
-        Socket.connect subscriber (getPublisherAddress name)
         Socket.subscribe subscriber ""
+        Socket.connect subscriber (getPublisherAddress name)        
         
         let observable = 
             Poller.addSocket poller subscriber
