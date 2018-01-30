@@ -85,9 +85,7 @@ module Broker =
             | Message.Request r ->                               
                 sendToService server services r.service (Message.RelayRequest {sender=routingId;payload=r.payload})
                                 
-            | Message.Response r ->
-                sendAck server routingId
-                                            
+            | Message.Response r ->                                                            
                 Frame.sendMore server r.sender
                 Message.send server (Message.RelayResponse {payload=r.payload}) 
                 services 
@@ -118,11 +116,8 @@ module Agent =
             Message.send socket (Message.Response {
                sender=sender;                
                payload=binarySerializer.Pickle msg;
-            }) 
-            
-            waitForAck socket 
-            
-    
+            })                         
+                
     type Message<'command,'request> = 
         | Command of 'command
         | Request of RequestId * 'request 
