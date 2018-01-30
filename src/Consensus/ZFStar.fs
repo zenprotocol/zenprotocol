@@ -50,6 +50,7 @@ let private fstToFsLock (outputLock:lock) : Types.Lock =
     //TODO:
     | ContractLock pkHash ->
         Contract (Hash.Hash pkHash)
+    | DestroyLock -> Destroy
     //| ContractLock (pkHash, _, _) ->
         //Types.Lock.Contract (Hash.Hash pkHash, [||])
     //| ContractLock (pkHash, _, data) ->

@@ -45,9 +45,10 @@ let sign keyPairs tx =
     //// TODO: Should we also use sighash and not sign entire transaction?
     addWitnesses tx pkWitnesses
 
-let addContractWitness cHash initialTxSkelton finalTxSkeleton tx =
+let addContractWitness cHash command initialTxSkelton finalTxSkeleton tx =
     addWitnesses tx [ ContractWitness {
         cHash = cHash 
+        command = command
         beginInputs = List.length initialTxSkelton.pInputs
         beginOutputs = List.length initialTxSkelton.outputs
         inputsLength = List.length finalTxSkeleton.pInputs - List.length initialTxSkelton.pInputs

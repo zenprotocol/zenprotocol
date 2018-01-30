@@ -97,7 +97,7 @@ let private checkWitnesses acs (Hash.Hash txHash, tx, inputs) =
         | Some contract ->
             let contractWallet = getContractWallet tx inputs cw.cHash
             
-            match Contract.run contract "" contractWallet inputTx with 
+            match Contract.run contract cw.command contractWallet inputTx with 
             | Ok outputTx ->
                 if checkIssuedAndDestroyed outputTx cw then                                   
                     if List.length outputTx.pInputs - List.length inputTx.pInputs = cw.inputsLength && 

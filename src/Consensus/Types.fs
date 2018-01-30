@@ -27,6 +27,7 @@ type PointedOutput = Outpoint * Output
 
 type ContractWitness = {
     cHash: Hash
+    command:string
     beginInputs: int
     beginOutputs: int
     inputsLength: int
