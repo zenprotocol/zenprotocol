@@ -58,7 +58,7 @@ let compileRunAndValidate code =
         |> Result.bind (TxSkeleton.checkPrefix sampleInputTx)
         |> Result.map (fun finalTxSkeleton ->
             let tx = Transaction.fromTxSkeleton finalTxSkeleton
-            Transaction.addContractWitness contract.hash sampleInputTx finalTxSkeleton tx)        
+            Transaction.addContractWitness contract.hash "" sampleInputTx finalTxSkeleton tx)        
         |> Result.map (Transaction.sign [ sampleKeyPair ])
         |> Result.bind (validateInputs contract utxoSet))        
 
@@ -87,6 +87,7 @@ let ``Contract should not be able to create tokens other than its own``() =
          open Zen.Cost
 
          module ET = Zen.ErrorT
+         module Tx = Zen.TxSkeleton
 
          val cf: txSkeleton -> string -> #l:nat -> wallet l -> cost nat 1
          let cf _ _ #l _ = ret 149
@@ -106,8 +107,8 @@ let ``Contract should not be able to create tokens other than its own``() =
                index = 0ul
            }, output in
 
-           let txSkeleton1 = addInput pInput txSkeleton in
-           let txSkeleton2 = txSkeleton1 >>= lockToContract spend.asset spend.amount contractHash in
+           let txSkeleton1 = Tx.addInput pInput txSkeleton in
+           let txSkeleton2 = txSkeleton1 >>= Tx.lockToContract spend.asset spend.amount contractHash in
            ET.retT txSkeleton2
            """
     , (Error "illegal creation/destruction of tokens" : Result<Transaction, string>))

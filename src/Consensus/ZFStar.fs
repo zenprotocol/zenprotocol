@@ -5,7 +5,8 @@ open Operators.Checked
 open Consensus.Types
 open Consensus.TxSkeleton
 open Zen.Types.Extracted
-open Zen.Types.TxSkeleton
+open Zen.Types.Realized
+open Zen.TxSkeleton
 open FStar.Pervasives
 open Zen.Vector
 

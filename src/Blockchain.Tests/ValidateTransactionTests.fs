@@ -383,7 +383,7 @@ let ``Valid contract should execute``() =
     |> Result.map (fun tx ->
         Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
         |> Writer.unwrap)
-    |> Result.map (fun (_, state) ->
+    |> Result.bind (fun (_, state) ->
         ActiveContractSet.containsContract sampleContractHash state.memoryState.activeContractSet
         |> should equal true
 
@@ -404,14 +404,18 @@ let ``contract using wallet``() =
     open FStar.Mul
     
     module ET = Zen.ErrorT
+    module Tx = Zen.TxSkeleton
     
-    val cf: txSkeleton -> string -> #l:nat -> wallet l -> cost nat 5
-    let cf _ _ #l _ = ret (l * 128 + 134) 
+    val cf: txSkeleton -> string -> #l:nat -> wallet l -> cost nat 9
+    let cf _ _ #l _ = ret (l * 128 + 192 + 13 + 64) 
     
-    val main: txSkeleton -> hash -> string -> #l:nat -> wallet l -> cost (result txSkeleton) (l * 128 + 134)
+    val main: txSkeleton -> hash -> string -> #l:nat -> wallet l -> cost (result txSkeleton) (l * 128 + 192 + 13 + 64)
     let main txSkeleton contractHash command #l wallet =
-      let result = getInputs zenAsset 1UL wallet txSkeleton in
-      ET.of_optionT "not enough Zens" result              
+      let result =
+        Tx.lockToPubKey zenAsset 1UL (hashFromBase64 "DYggLLPq6eXj1YxjiPQ5dSvb/YVqAVNf8Mjnpc9P9BI=") txSkeleton 
+        >>= Tx.fromWallet zenAsset 1UL contractHash wallet in
+                
+      ET.of_optionT "not enough Zens" result
       """
     
     let cHash = code |> System.Text.Encoding.UTF8.GetBytes |> Hash.compute
@@ -428,11 +432,16 @@ let ``contract using wallet``() =
         |> Result.map (fun tx ->
             Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
             |> Writer.unwrap)
-        |> Result.map (fun (_, state) ->
+        |> Result.bind (fun (_, state) ->
             ActiveContractSet.containsContract cHash state.memoryState.activeContractSet
             |> should equal true
     
-            TransactionHandler.executeContract session sampleInputTx cHash "" state.memoryState
-            )
+            TransactionHandler.executeContract session TxSkeleton.empty cHash "" state.memoryState
+            |> Result.map (fun tx ->
+                let _, state = Handler.handleCommand chain (ValidateTransaction tx) session 1UL state |> Writer.unwrap
+                
+                Map.containsKey (Transaction.hash tx) state.memoryState.mempool |> should equal true                                
+            )                            
+        )
         |> Result.mapError failwith
         |> ignore
