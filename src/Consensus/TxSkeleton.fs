@@ -67,10 +67,10 @@ let isSkeletonOutpoint outpoint =
     outpoint.txHash = Hash.zero 
     && outpoint.index = 0ul
 
-let isSkeletonOf txSkeleton tx =
-    tx.inputs = (
-        txSkeleton.pInputs
-        |> List.filter (fun (input, _) -> 
-            not <| isSkeletonOutpoint input)
-        |> List.map fst)
+let isSkeletonOf txSkeleton tx inputs =
+    let withoutSkeletonInputs = 
+        txSkeleton.pInputs |> List.filter (fst >> isSkeletonOutpoint >> not)
+
+    tx.inputs = (withoutSkeletonInputs |> List.map fst)
+    && inputs = (withoutSkeletonInputs |> List.map snd) // Check that the contract didn't change the inputs
     && tx.outputs = txSkeleton.outputs

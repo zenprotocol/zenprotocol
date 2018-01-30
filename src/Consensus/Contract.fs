@@ -10,7 +10,8 @@ open Zen.Types.Extracted
 open FStar.Pervasives
 open Microsoft.FSharp.Core
 open Zen.Cost.Realized
-open Zen.Types.TxSkeleton
+open Zen.Types.Extracted
+open Zen.Types.Realized
 open Exception
 open Consensus.Types
 

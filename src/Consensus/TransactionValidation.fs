@@ -32,23 +32,14 @@ let private foldSpends =
 let private checkSpends m = 
     Map.exists (fun _ v -> Option.isNone v) m |> not
 
-let private checkAmounts (tx, inputs) =
-    let cHashes = 
-        tx.witnesses
-        |> List.choose (function | ContractWitness cw -> Some cw.cHash | _ -> None)
+let private checkAmounts (txSkeleton:TxSkeleton,tx) = 
+    let inputs, outputs = foldSpends (txSkeleton.pInputs |> List.map snd), foldSpends txSkeleton.outputs
 
-    
-    let outputs =
-        tx.outputs
-        |> List.filter (fun output -> not <| List.contains output.spend.asset cHashes)
-
-    let outputs', inputs' = foldSpends outputs, foldSpends inputs
-
-    if not <| checkSpends outputs' then
+    if not <| checkSpends outputs then
         GeneralError "outputs overflow"
-    else if not <| checkSpends inputs' then
+    else if not <| checkSpends inputs then
         GeneralError "inputs overflow"
-    else if outputs' <> inputs' then
+    else if outputs <> inputs then
         GeneralError "invalid amounts"
     else
         Ok tx
@@ -74,11 +65,11 @@ let private checkWitnesses acs (Hash.Hash txHash, tx, inputs) =
 
     let checkContractWitness inputTx acs cw pInputs =
         let checkIssuedAndDestroyed txSkeleton cw =
-            txSkeleton.pInputs.[cw.beginInputs - 1 .. cw.beginInputs + cw.inputsLength - 1]
+            txSkeleton.pInputs.[cw.beginInputs .. cw.beginInputs + cw.inputsLength - 1]
             |> List.forall (fun (outpoint, {spend=spend}) ->
                 not <| TxSkeleton.isSkeletonOutpoint outpoint || spend.asset = cw.cHash) 
             &&
-            txSkeleton.outputs.[cw.beginOutputs - 1 .. cw.beginOutputs + cw.outputsLength - 1]
+            txSkeleton.outputs.[cw.beginOutputs .. cw.beginOutputs + cw.outputsLength - 1]
             |> List.forall (
                 function
                 | {lock=Destroy; spend=spend} -> spend.asset = cw.cHash
@@ -97,7 +88,7 @@ let private checkWitnesses acs (Hash.Hash txHash, tx, inputs) =
         | Some contract ->
             let contractWallet = getContractWallet tx inputs cw.cHash
             
-            match Contract.run contract "" contractWallet inputTx with 
+            match Contract.run contract cw.command contractWallet inputTx with 
             | Ok outputTx ->
                 if checkIssuedAndDestroyed outputTx cw then                                   
                     if List.length outputTx.pInputs - List.length inputTx.pInputs = cw.inputsLength && 
@@ -138,10 +129,10 @@ let private checkWitnesses acs (Hash.Hash txHash, tx, inputs) =
         fun (tx', pInputs) -> 
             if not <| List.isEmpty pInputs then
                 GeneralError "missing witness(s)"
-            else if not <| TxSkeleton.isSkeletonOf tx' tx then
+            else if not <| TxSkeleton.isSkeletonOf tx' tx inputs then
                 GeneralError "contract validation failed"
             else 
-                Ok (tx, inputs)
+                Ok (tx',tx)
     )
 
 let private checkInputsNotEmpty tx = 

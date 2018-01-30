@@ -5,7 +5,8 @@ open Operators.Checked
 open Consensus.Types
 open Consensus.TxSkeleton
 open Zen.Types.Extracted
-open Zen.Types.TxSkeleton
+open Zen.Types.Realized
+open Zen.TxSkeleton
 open FStar.Pervasives
 open Zen.Vector
 
@@ -50,6 +51,7 @@ let private fstToFsLock (outputLock:lock) : Types.Lock =
     //TODO:
     | ContractLock pkHash ->
         Contract (Hash.Hash pkHash)
+    | DestroyLock -> Destroy
     //| ContractLock (pkHash, _, _) ->
         //Types.Lock.Contract (Hash.Hash pkHash, [||])
     //| ContractLock (pkHash, _, data) ->

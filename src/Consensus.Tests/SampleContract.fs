@@ -15,6 +15,7 @@ open Zen.Base
 open Zen.Cost
 
 module ET = Zen.ErrorT
+module Tx = Zen.TxSkeleton
 
 val cf: txSkeleton -> string -> #l:nat -> wallet l -> cost nat 1
 let cf _ _ #l _ = ret 146
@@ -31,8 +32,8 @@ let main txSkeleton contractHash command #l wallet =
       index = 0ul
   }, output in
 
-  let txSkeleton1 = addInput pInput txSkeleton in
-  let txSkeleton2 = txSkeleton1 >>= lockToContract contractHash 1000UL contractHash in
+  let txSkeleton1 = Tx.addInput pInput txSkeleton in
+  let txSkeleton2 = txSkeleton1 >>= Tx.lockToContract contractHash 1000UL contractHash in
   ET.retT txSkeleton2
   """
 
@@ -85,7 +86,7 @@ let sampleOutputTx =
 
 let sampleExpectedResult =
     let tx = Transaction.fromTxSkeleton sampleOutputTx    
-    Transaction.addContractWitness sampleContractHash sampleInputTx sampleOutputTx tx
+    Transaction.addContractWitness sampleContractHash "" sampleInputTx sampleOutputTx tx
     |> Transaction.sign [ sampleKeyPair ]
 
 let getSampleUtxoset utxos =

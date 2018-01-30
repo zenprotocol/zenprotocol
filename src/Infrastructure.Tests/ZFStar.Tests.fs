@@ -5,7 +5,8 @@ open Infrastructure
 open TestsInfrastructure.Nunit
 open Exception
 open Zen.Types.Extracted
-open Zen.Types.TxSkeleton
+open Zen.Types.Realized
+open Zen.TxSkeleton
 open FStar.Pervasives
 open Microsoft.FSharp.Core
 open Zen.Cost.Realized

@@ -138,7 +138,7 @@ let executeContract session txSkeleton cHash command state =
         |> Result.map (fun finalTxSkeleton ->            
             let tx = Transaction.fromTxSkeleton finalTxSkeleton
             
-            Transaction.addContractWitness contract.hash txSkeleton finalTxSkeleton tx)
+            Transaction.addContractWitness contract.hash command txSkeleton finalTxSkeleton tx)
             
             
     | None -> Error "Contract not active"

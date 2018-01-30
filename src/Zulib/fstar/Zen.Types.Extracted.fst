@@ -33,6 +33,7 @@ type output =
     { lock: lock;
       spend: spend }
 
+type pointedOutput = outpoint * output
 
 unopteq type blockHeader = {
     version: U32.t;
@@ -83,4 +84,4 @@ noeq type data : nat -> Type =
 
 type inputData (n:nat) = data n
 
-type utxo = outpoint -> option output
+type wallet (n:nat) = pointedOutput `V.t` n
