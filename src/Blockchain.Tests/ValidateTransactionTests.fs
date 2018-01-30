@@ -391,6 +391,53 @@ let ``Valid contract should execute``() =
         )
     |> Result.mapError failwith
     |> ignore
+    
+[<Test>]
+let ``contract activation arrived, running orphan transaction``() =
+    let getResult = function
+        | Ok r -> r
+        | Error error -> failwithf "%A" error
+    
+    use databaseContext = DatabaseContext.createEmpty "test"
+
+    use session = DatabaseContext.createSession databaseContext
+    let account = Account.createRoot ()
+    
+    let activationTransaction = 
+        Account.createActivateContractTransaction account sampleContractCode
+        |> getResult
+    let activationTxHash = Transaction.hash activationTransaction  
+    
+    let state = { state with memoryState = { state.memoryState with utxoSet = getSampleUtxoset utxoSet } }      
+           
+    let _, stateWithContract = 
+        Handler.handleCommand chain (ValidateTransaction activationTransaction) session 1UL state
+        |> Writer.unwrap  
+        
+    let tx = 
+        TransactionHandler.executeContract session sampleInputTx sampleContractHash "" stateWithContract.memoryState
+        |> getResult
+    let txHash = Transaction.hash tx        
+    
+    let events, state = 
+        Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
+        |> Writer.unwrap      
+                
+    // Checking that both transaction added to mempool and published
+    events |> should haveLength 0
+    OrphanPool.containsTransaction txHash state.memoryState.orphanPool |> should equal true
+    
+    // This will actually fail and the transaction will not pass, however it is enough for our test 
+    // to see that the transaction was run and removed from orphan pool as it is not valid
+    let events, state = 
+        Handler.handleCommand chain (ValidateTransaction activationTransaction) session 1UL state
+        |> Writer.unwrap                    
+        
+    events |> should haveLength 1
+    OrphanPool.containsTransaction txHash state.memoryState.orphanPool |> should equal false
+    MemPool.containsTransaction activationTxHash state.memoryState.mempool |> should equal true
+    MemPool.containsTransaction txHash state.memoryState.mempool |> should equal false    
+    events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (activationTxHash,activationTransaction)))
 
 [<Test>]
 let ``contract using wallet``() = 

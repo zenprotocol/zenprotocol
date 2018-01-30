@@ -50,7 +50,8 @@ let private validateOrphanTransaction chain session contractPath state txHash tx
                             mempool=mempool;
                             utxoSet=utxoSet; 
                             orphanPool=orphanPool}
-            | Error (Orphan _) ->
+            | Error Orphan 
+            | Error ContractNotActive ->
                 // transacation is still orphan, nothing to do
                 return state
             | Error error ->
@@ -82,6 +83,12 @@ let validateInputs chain session contractPath txHash tx (state:MemoryState) shou
                 Log.info "Transaction %s is orphan, adding to orphan pool" (Hash.toString txHash)
 
                 return {state with orphanPool = orphanPool}
+            | Error ContractNotActive ->
+                let orphanPool = OrphanPool.add txHash tx state.orphanPool
+                
+                Log.info "Transaction %s try to run inactive contract, adding to orphan pool" (Hash.toString txHash)
+
+                return {state with orphanPool = orphanPool} 
             | Error error ->
                  Log.info "Transacation %s failed inputs validation: %A" (Hash.toString txHash) error
 
