@@ -10,6 +10,7 @@ let private (>=>) f1 f2 x = Result.bind f2 (f1 x)
 type ValidationError =
     | Orphan
     | DoubleSpend
+    | ContractNotActive
     | General of string
 
 let private GeneralError msg =
@@ -98,7 +99,7 @@ let private checkWitnesses acs (Hash.Hash txHash, tx, inputs) =
                     else GeneralError "input/output length mismatch"
                 else GeneralError "illegal creation/destruction of tokens"
             | Error err -> GeneralError ("contract witness validation error:" + err)
-        | None -> GeneralError "contract is not active"
+        | None -> Error ContractNotActive
 
     let witnessesFolder state witness =
         state 
