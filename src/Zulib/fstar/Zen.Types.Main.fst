@@ -1,8 +1,7 @@
 module Zen.Types.Main
 
-open Zen.Types.TxSkeleton
-open Zen.Types.Wallet
 open Zen.Types.Extracted
+open Zen.Types.Realized
 open Zen.Cost
 
 

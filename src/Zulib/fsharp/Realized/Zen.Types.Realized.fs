@@ -1,13 +1,14 @@
 #light "off"
 module Zen.Types.Realized
 
-type lockCore = {version: uint32; lockData: byte[] list}
+open Zen.Types.Extracted
 
-
-type contract = {code: byte[]; bounds: byte[]; hint: byte[]}
-
-type extendedContract =
-    | Contract of contract
-    | HighVContract of version : uint32 * data : byte[]
-
-type extraData = byte[] list
+type txSkeleton =
+    { inputs : uint64 * // The number of elements in the map
+               // the uint64 field in the map codomain represents cumulative asset amount totals
+               // the uint64 field in the list in the map codomain represents the insertion index of each pointedOutput
+               Collections.Map<asset, uint64 * list<uint64 * pointedOutput>>;
+      outputs : uint64 * // The number of elements in the map
+                // the uint64 field in the map codomain represents cumulative asset amount totals
+                // the uint64 field in the list in the map codomain represents the insertion index of each output
+                Collections.Map<asset, uint64 * list<uint64 * output>> }

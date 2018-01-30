@@ -1,16 +1,11 @@
-module Zen.Types.TxSkeleton
+module Zen.TxSkeleton
 
 open Zen.Cost
-open Zen.Types.Extracted
+open Zen.Types
 
 module M = FStar.Mul
 module V = Zen.Vector
 module U64 = FStar.UInt64
-
-type pointedOutput = outpoint * output
-
-assume type txSkeleton
-assume TxSkeleton_hasEq: hasEq txSkeleton
 
 val getAvailableTokens: asset -> txSkeleton -> U64.t `cost` 64
 
@@ -59,5 +54,13 @@ val destroy:
   -> contractHash
   -> txSkeleton
   -> txSkeleton `cost` 64
+  
+val fromWallet(#n:nat):
+  asset ->
+  amount:U64.t ->
+  contractHash -> 
+  wallet n ->  
+  txSkeleton ->
+  option txSkeleton `cost` M.(n * 128 + 192)   
 
 val isValid: txSkeleton -> bool `cost` 64

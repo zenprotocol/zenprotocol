@@ -1,24 +1,15 @@
-module Zen.Types.TxSkeleton
+module Zen.TxSkeleton
 
 open FSharpx.Collections.Map
 open Microsoft.FSharp.Core.Operators.Checked
 open Zen.Types.Extracted
+open Zen.Types.Realized
+open Zen.Wallet
 
 module Cost = Zen.Cost.Realized
 module V = Zen.Vector
 module U64 = FStar.UInt64
-
-type pointedOutput = outpoint * output
-
-type txSkeleton =
-    { inputs : uint64 * // The number of elements in the map
-               // the uint64 field in the map codomain represents cumulative asset amount totals
-               // the uint64 field in the list in the map codomain represents the insertion index of each pointedOutput
-               Collections.Map<asset, uint64 * list<uint64 * pointedOutput>>;
-      outputs : uint64 * // The number of elements in the map
-                // the uint64 field in the map codomain represents cumulative asset amount totals
-                // the uint64 field in the list in the map codomain represents the insertion index of each output
-                Collections.Map<asset, uint64 * list<uint64 * output>> }
+module Native = FStar.Pervasives.Native
 
 let emptyTxSkeleton : txSkeleton =
     { inputs = 0UL, Map.empty
@@ -77,10 +68,10 @@ let rec addInputs (_ : Prims.nat) (pointedOutputs : V.t<pointedOutput, unit>)
               |> addInputs n pointedOutputs
               |> Cost.__force)
     |> Cost.C
-
+                                
 let addOutput (output : output) (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
     lazy (insertOutput output txSkeleton) |> Cost.C
-
+                             
 let lockToContract (asset : asset) (amount:uint64) (contractHash : hash)
     (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
     lazy (let lock = ContractLock contractHash
@@ -145,6 +136,30 @@ let destroy (amount : U64.t) (contractHash : contractHash)
 
           addOutput destroyOutput txSkeleton |> Cost.__force)
     |> Cost.C
+    
+   
+let fromWallet (_: Prims.nat) (asset:asset) (amount:U64.t) 
+                (contractHash:hash) (wallet:wallet<Prims.unit>) (txSkeleton:txSkeleton) =
+                
+    lazy (                
+        let n,inputs,collectedAmount = collect asset amount wallet 0I V.VNil 0UL
+        
+        match inputs with
+        | V.VNil -> Native.None
+        | _ ->
+            let txSkeleton = addInputs n inputs txSkeleton |> Cost.__force
+            
+            // Do we need a change?
+            if collectedAmount > amount then 
+                lockToContract asset (collectedAmount - amount) contractHash txSkeleton
+                |> Cost.__force
+                |> Native.Some
+            else
+                txSkeleton
+                |> Native.Some   
+                        
+    ) |> Cost.C
+             
 
 let isValid (txSkeleton : txSkeleton) : Cost.t<bool, unit> =
     let _, inputMap = txSkeleton.inputs
