@@ -110,9 +110,9 @@ let main argv =
                     | code,_ -> printfn "Failed %d with binary response" code
     | Some (Execute args) ->
         let address,command,asset,amount = args.GetResult <@ ExecuteContract_Arguments @>
-        let activate = new ContractExecuteRequestJson.Root(address,command, [| new ContractExecuteRequestJson.Spend(asset, amount) |])
+        let execute = new ContractExecuteRequestJson.Root(address,command, [| new ContractExecuteRequestJson.Spend(asset, amount) |])
 
-        let response = activate.JsonValue.Request (getUri "wallet/contract/execute")
+        let response = execute.JsonValue.Request (getUri "wallet/contract/execute")
 
         match response.StatusCode, response.Body with
             | 200,_ -> printfn "Success"

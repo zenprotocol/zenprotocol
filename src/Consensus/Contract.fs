@@ -69,7 +69,9 @@ let private wrap (mainMethodInfo, costMethodInfo) =
         
         invokeMainFn mainMethodInfo cHash command contractWallet' txSkeleton'
         |> Result.bind castMainFnOutput
-        |> Result.bind ZFStar.convertResult
+        |> Result.map ZFStar.unCost
+        |> Result.bind ZFStar.toResult
+        |> Result.map ZFStar.convertResult
     ,
     fun command contractWallet txSkeleton ->
         let txSkeleton' = ZFStar.convertInput txSkeleton

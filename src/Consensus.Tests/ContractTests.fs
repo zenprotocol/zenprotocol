@@ -16,31 +16,31 @@ let contractsPath = "./test"
 
 let getUTXO _ = UtxoSet.NoOutput
 
-let compile code = 
+let compile code =
     Contract.recordHints code
     |> Result.map (fun hints -> (code, hints))
     |> Result.bind (Contract.compile contractsPath)
 
-let compileRunAndCompare code =
+let compileAndCheck code =
     compile code
-    |> Result.bind (fun contract ->
+    |> Result.map (fun contract ->
         // check hash validity
         (Hash.isValid contract.hash, true)
         |> shouldEqual
-        (contract.hash, sampleContractHash)
+        (System.Text.Encoding.UTF8.GetBytes(code:string) |> Hash.compute, contract.hash)
         |> shouldEqual
-        Contract.run contract "" List.empty sampleInputTx)
+        contract)
 
 [<Test>]
-let ``Should get contract function``() =
-    (compileRunAndCompare sampleContractCode
-    , (Ok sampleOutputTx : Result<TxSkeleton, string>))
-    |> shouldEqual
+let ``Should compile``() =
+    compileAndCheck sampleContractCode
+    |> Result.mapError (fun error -> failwith error)
+    |> ignore
 
 [<Test>]
-let ``Should get 'elaborate' error for invalid תcode``() =
-    (compileRunAndCompare (sampleContractCode + "###")
-    , (Error "elaborate" : Result<TxSkeleton, string>))
+let ``Should get 'elaborate' error for invalid code``() =
+    (compileAndCheck (sampleContractCode + "###")
+    , (Error "elaborate" : Result<Contract.T, string>))
     |> shouldEqual
 
 let validateInputs (contract:Contract.T) utxos tx  =
@@ -51,16 +51,16 @@ let validateInputs (contract:Contract.T) utxos tx  =
         | other -> other.ToString())
 
 let compileRunAndValidate code =
-    compile code
+    compileAndCheck code
     |> Result.bind (fun contract ->
         let utxoSet = getSampleUtxoset (UtxoSet.asDatabase)
         Contract.run contract "" List.empty sampleInputTx
         |> Result.bind (TxSkeleton.checkPrefix sampleInputTx)
         |> Result.map (fun finalTxSkeleton ->
             let tx = Transaction.fromTxSkeleton finalTxSkeleton
-            Transaction.addContractWitness contract.hash "" sampleInputTx finalTxSkeleton tx)        
+            Transaction.addContractWitness contract.hash "" sampleInputTx finalTxSkeleton tx)
         |> Result.map (Transaction.sign [ sampleKeyPair ])
-        |> Result.bind (validateInputs contract utxoSet))        
+        |> Result.bind (validateInputs contract utxoSet))
 
 [<Test>]
 let ``Contract generated transaction should be valid``() =
@@ -71,7 +71,7 @@ let ``Contract generated transaction should be valid``() =
 [<Test>]
 let ``Should get expected contract cost``() =
     (compile sampleContractCode
-     |> Result.bind (fun contract -> 
+     |> Result.bind (fun contract ->
         Contract.getCost contract "" List.empty sampleInputTx)
     , (Ok 146I : Result<bigint, string>))
     |> shouldEqual
