@@ -133,4 +133,9 @@ let createEmpty pathToFolder =
     create pathToFolder       
     
     
-    
+let createChildSession (session:Session) =
+    let childSession = DataAccess.DatabaseContext.createChildSession session.session
+    {
+        session=childSession
+        context=session.context
+    }

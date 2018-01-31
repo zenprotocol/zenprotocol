@@ -14,6 +14,15 @@ let createSession (context:DatabaseContext) : Session =
     
     {tx=tx;env=context.environment}
 
+// Create child session
+let createChildSession (parent:Session) : Session =
+    let mutable tx = IntPtr.Zero
+
+    mdb_txn_begin(parent.env, parent.tx, 0ul, &tx)
+    |> checkErrorCode
+
+    {tx=tx; env=parent.env}
+
 let create pathToFolder : DatabaseContext =             
     let mutable environment = IntPtr.Zero       
             

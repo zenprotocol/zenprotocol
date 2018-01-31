@@ -121,17 +121,6 @@ let validate chain =
         BlockHeader.validate chain block.header
         |> Result.map (fun _ -> block)  
         
-    //let checkTxBasic (block:Block) = 
-        //if isGenesis chain block then
-        //    Ok block
-        //else             
-            //List.fold (fun state tx->
-                //match state with
-                //| Error e -> Error e
-                //| ok -> 
-                    //match TransactionValidation.validateBasic tx with
-                    //| Error err -> Error (sprintf "transaction %A failed validation due to %A" (Transaction.hash tx) err)
-                    //| _ -> ok) (Ok block) block.transactions
     
     let checkTxBasic (block:Block) = result {
         // skip if genesis block

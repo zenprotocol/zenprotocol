@@ -53,7 +53,7 @@ let private validateOrphanTransaction session contractPath state txHash tx  =
                     return {state with orphanPool = orphanPool}
             | Error Orphan 
             | Error ContractNotActive ->
-                // transacation is still orphan, nothing to do
+                // transaction is still orphan, nothing to do
                 return state
             | Error error ->
                 Log.info "Orphan transaction %s failed validation: %A" (Hash.toString txHash) error
