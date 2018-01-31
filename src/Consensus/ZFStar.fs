@@ -144,4 +144,6 @@ let fstTofsMainFunction
                      command 
                      (vectorLength wallet) 
                      wallet
-        |> convertResult
+        |> unCost
+        |> toResult
+        |> Result.map convertResult
