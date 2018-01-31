@@ -40,6 +40,7 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="SimpleWalletContractTests.fs" />
+    <Compile Include="MintingContractTests.fs" />
     <Compile Include="ValidateBlockTests.fs" />
     <Compile Include="ValidateTransactionTests.fs" />
     <ProjectReference Include="..\Blockchain\Blockchain.fsproj">
