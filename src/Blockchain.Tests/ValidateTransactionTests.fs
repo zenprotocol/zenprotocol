@@ -17,8 +17,7 @@ open Infrastructure
 open Consensus.Tests.ContractTests
 open Blockchain.State
 open Consensus.Tests.SampleContract
-
-open TestsInfrastructure.Nunit
+open TestsInfrastructure.Constraints
 
 type TransactionResult = Messaging.Services.TransactionResult
 
@@ -371,25 +370,6 @@ let ``Invalid contract should not be added to ActiveContractSet``() =
 
     // Checking that the transaction was not added to orphans
     OrphanPool.containsTransaction txHash state'.memoryState.orphanPool |> should equal false
-
-[<Test>]
-let ``Valid contract should execute``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
-
-    use session = DatabaseContext.createSession databaseContext
-    let account = Account.createRoot ()
-    let state = { state with memoryState = { state.memoryState with utxoSet = getSampleUtxoset utxoSet } }
-    Account.createActivateContractTransaction account sampleContractCode
-    |> Result.map (fun tx ->
-        Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
-        |> Writer.unwrap)
-    |> Result.bind (fun (_, state) ->
-        ActiveContractSet.containsContract sampleContractHash state.memoryState.activeContractSet
-        |> should equal true
-        TransactionHandler.executeContract session sampleInputTx sampleContractHash "" state.memoryState
-        )
-    |> Result.mapError failwith
-    |> ignore
     
 [<Test>]
 let ``contract activation arrived, running orphan transaction``() =
@@ -437,57 +417,3 @@ let ``contract activation arrived, running orphan transaction``() =
     MemPool.containsTransaction activationTxHash state.memoryState.mempool |> should equal true
     MemPool.containsTransaction txHash state.memoryState.mempool |> should equal false    
     events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (activationTxHash,activationTransaction)))
-
-[<Test>]
-let ``contract using wallet``() = 
-    let code = """
-    open Zen.Types
-    open Zen.Vector
-    open Zen.Util
-    open Zen.Base
-    open Zen.Cost
-    open Zen.Assets
-    open FStar.Mul
-    
-    module ET = Zen.ErrorT
-    module Tx = Zen.TxSkeleton
-    
-    val cf: txSkeleton -> string -> #l:nat -> wallet l -> cost nat 9
-    let cf _ _ #l _ = ret (l * 128 + 192 + 13 + 64) 
-    
-    val main: txSkeleton -> hash -> string -> #l:nat -> wallet l -> cost (result txSkeleton) (l * 128 + 192 + 13 + 64)
-    let main txSkeleton contractHash command #l wallet =
-      let result =
-        Tx.lockToPubKey zenAsset 1UL (hashFromBase64 "DYggLLPq6eXj1YxjiPQ5dSvb/YVqAVNf8Mjnpc9P9BI=") txSkeleton 
-        >>= Tx.fromWallet zenAsset 1UL contractHash wallet in
-                
-      ET.of_optionT "not enough Zens" result
-      """
-    
-    let cHash = code |> System.Text.Encoding.UTF8.GetBytes |> Hash.compute
-    use databaseContext = DatabaseContext.createEmpty "test"
-    use session = DatabaseContext.createSession databaseContext
-    let account = Account.createRoot ()
-    
-    let output = {lock=Contract cHash;spend={asset=Hash.zero;amount=1UL}}
-    let utxoSet = Map.add {txHash=Hash.zero;index=1ul} (UtxoSet.Unspent output) utxoSet
-    
-    let state = { state with memoryState = { state.memoryState with utxoSet = utxoSet } }
-    
-    Account.createActivateContractTransaction account code
-        |> Result.map (fun tx ->
-            Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
-            |> Writer.unwrap)
-        |> Result.bind (fun (_, state) ->
-            ActiveContractSet.containsContract cHash state.memoryState.activeContractSet
-            |> should equal true
-    
-            TransactionHandler.executeContract session TxSkeleton.empty cHash "" state.memoryState
-            |> Result.map (fun tx ->
-                let _, state = Handler.handleCommand chain (ValidateTransaction tx) session 1UL state |> Writer.unwrap
-                
-                Map.containsKey (Transaction.hash tx) state.memoryState.mempool |> should equal true                                
-            )                            
-        )
-        |> Result.mapError failwith
-        |> ignore
