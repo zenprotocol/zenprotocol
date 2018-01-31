@@ -356,8 +356,8 @@ let ``Invalid contract should not be added to ActiveContractSet``() =
 
     let events, state' = Writer.unwrap result
 
-    // Checking that the contract is in not the ACS
-    ActiveContractSet.containsContract cHash acs |> should equal false
+    // Checking that the contract is not in the ACS
+    ActiveContractSet.containsContract cHash state'.memoryState.activeContractSet |> should equal false
 
     //TODO: TBD following
 
@@ -386,7 +386,6 @@ let ``Valid contract should execute``() =
     |> Result.bind (fun (_, state) ->
         ActiveContractSet.containsContract sampleContractHash state.memoryState.activeContractSet
         |> should equal true
-
         TransactionHandler.executeContract session sampleInputTx sampleContractHash "" state.memoryState
         )
     |> Result.mapError failwith
