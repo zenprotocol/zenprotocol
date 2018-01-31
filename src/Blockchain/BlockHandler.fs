@@ -131,7 +131,7 @@ let rec private removeBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:Exte
             
             let fullBlock = BlockRepository.getFullBlock session tip
             
-            do! publish (BlockRemoved fullBlock)
+            do! publish (BlockRemoved (tip.hash, fullBlock))
             
             return ()
         }
@@ -148,7 +148,7 @@ let rec private addBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:Extende
             
             let fullBlock = BlockRepository.getFullBlock session tip
 
-            do! publish (BlockAdded fullBlock)
+            do! publish (BlockAdded (tip.hash, fullBlock))
             
             return ()
         }
@@ -243,7 +243,7 @@ let private handleGenesisBlock chain contractPath session timestamp (state:State
             UtxoSetRepository.save session utxoSet                        
                            
             // Pulishing event of the new block
-            do! publish (BlockAdded block)
+            do! publish (BlockAdded (blockHash, block))
                                                             
             return! rollForwardChain chain contractPath timestamp state session block extendedHeader acs ema               
     }
@@ -271,7 +271,7 @@ let private handleMainChain chain contractPath session timestamp (state:State) (
             UtxoSetRepository.save session utxoSet                        
                                                             
             // Pulishing event of the new block
-            do! publish (BlockAdded block)
+            do! publish (BlockAdded (blockHash, block))
 
             return! rollForwardChain chain contractPath timestamp state session block extendedHeader acs ema
     }                   

@@ -10,9 +10,11 @@ open ServiceBus.Agent
 let eventHandler event account = 
     match event with 
     | TransactionAddedToMemPool (txHash,tx) ->
-        Account.handleTransaction txHash tx account
-    | BlockAdded block ->
-        Account.handleBlock block account
+        Account.addTransaction txHash tx account
+    | BlockAdded (blockHash,block) ->
+        Account.handleBlock blockHash block account
+    | BlockRemoved (_,block) ->
+        Account.undoBlock block account            
     | _ -> account 
 
 let commandHandler command wallet = wallet
@@ -55,9 +57,22 @@ let requestHandler chain client (requestId:RequestId) request wallet =
     wallet
 
 let main busName chain root =
-    Actor.create<Command,Request,Event, Account.T> busName serviceName (fun poller sbObservable ebObservable ->                       
-        let wallet = if root then Account.createRoot () else Account.create ()
-        let client = ServiceBus.Client.create busName
+    Actor.create<Command,Request,Event, Account.T> busName serviceName (fun poller sbObservable ebObservable ->                                                             
+        let client = ServiceBus.Client.create busName                 
+        let account = 
+            let account = if root then Account.createRoot () else Account.create ()
+            match Blockchain.getTip client with
+            | Some (blockHash,header) ->
+                                     
+                let account =
+                    Account.sync chain blockHash                    
+                        (Blockchain.getBlockHeader client >> Option.get)
+                        (Blockchain.getBlock client >> Option.get)
+                        account
+                    
+                Log.info "Account synced to block #%d %A" header.blockNumber blockHash
+                account                      
+            | _ -> account               
 
         let sbObservable = 
             sbObservable
@@ -72,7 +87,7 @@ let main busName chain root =
            
         let observable =             
             Observable.merge sbObservable ebObservable
-            |> Observable.scan (fun state handler -> handler state) wallet             
+            |> Observable.scan (fun state handler -> handler state) account             
     
         Disposables.empty, observable
     )
