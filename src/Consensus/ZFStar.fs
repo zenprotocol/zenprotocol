@@ -16,6 +16,11 @@ module Cost = Zen.Cost.Realized
 
 let unCost (Cost.C inj:Zen.Cost.Realized.cost<'Aa, 'An>) : 'Aa = inj.Force()
 
+let toResult = function
+    | ERR err -> Error err
+    | EX err -> Error err.Message //TODO: remove EX
+    | OK value -> Ok value
+
 let private throwNotImplemented s1 s2 =
     sprintf "%s %s" s1 s2
     |> System.NotImplementedException
@@ -87,23 +92,18 @@ let private listToVector (ls:List<'Aa>) : Zen.Vector.t<'Aa, _> =
     let lsIndexed = List.mapi (fun i elem -> bigint (len - i - 1), elem) ls // vectors are reverse-zero-indexed
     List.fold (fun acc (i,x) -> Zen.Vector.VCons (i, x, acc)) Zen.Vector.VNil lsIndexed
 
-let convertResult (txSkeleton : Cost.t<result<txSkeleton>,unit>)
-    : Result<TxSkeleton, string> =
-    match unCost txSkeleton with
-    | ERR err -> Error err
-    | EX err -> Error err.Message //TODO: remove EX
-    | OK {inputs=_,inputMap; outputs=_,outputMap} ->
-        let inputs =
-            Map.toList inputMap
-            |> List.collect(fun (_, (_, inputs)) -> inputs)
-            |> List.sortBy fst
-            |> List.map (snd >> fstToFsPointedOutput)
-        let outputs =
-            Map.toList outputMap
-            |> List.collect(fun (_, (_, outputs)) -> outputs)
-            |> List.sortBy fst
-            |> List.map (snd >> fstToFsOutput)
-        Ok {pInputs=inputs; outputs=outputs}
+let convertResult {inputs=_,inputMap; outputs=_,outputMap} =
+    let inputs =
+        Map.toList inputMap
+        |> List.collect(fun (_, (_, inputs)) -> inputs)
+        |> List.sortBy fst
+        |> List.map (snd >> fstToFsPointedOutput)
+    let outputs =
+        Map.toList outputMap
+        |> List.collect(fun (_, (_, outputs)) -> outputs)
+        |> List.sortBy fst
+        |> List.map (snd >> fstToFsOutput)
+    {pInputs=inputs; outputs=outputs}
 
 let convetWallet (wallet:PointedOutput list) =     
     List.map fsToFstPointedOutput wallet

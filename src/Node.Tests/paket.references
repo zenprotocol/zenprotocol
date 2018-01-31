@@ -1,0 +1,13 @@
+﻿FsNetMQ
+FSharp.Core
+System.Reactive.Linq
+zen_secp256k1_linux
+zen_z3_linux
+zen_secp256k1_osx
+zen_z3_osx
+FSharp.Compiler.Tools
+ZFStar
+NUnit
+FsUnit
+System.Reflection.Metadata
+FSharp.Data

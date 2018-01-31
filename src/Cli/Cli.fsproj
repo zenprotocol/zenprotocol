@@ -43,7 +43,6 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Program.fs" />
-    <Content Include="packages.config" />
     <Content Include="paket.references" />
     <None Include="App.config" />
   </ItemGroup>
