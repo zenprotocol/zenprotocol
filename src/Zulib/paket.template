@@ -1,8 +1,10 @@
 type file
 id Zulib
-version 0.0.1
+version 0.0.1.3
 authors ZenProtocol
 description
 	Zen Protocol ZFStar standard library
 files
 	bin/Zulib.dll ==> lib
+	Zulib.targets ==> build
+        fstar/**/* ==> output/Zulib
