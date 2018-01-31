@@ -40,12 +40,12 @@ let mutable state = {
 
 let account = Account.createRoot ()
 
-let ensureResultOk result =
+let shouldBeOk result =
     result
     |> Result.mapError failwith
     |> ignore
 
-let ensureResultErrorMessage message =
+let shouldBeErrorMessage message =
     function
     | Ok _ -> failwithf "Expected '%A' error message, got ok" message
     | Error err -> err |> should equal message
@@ -65,10 +65,8 @@ let activateContract code account session state =
     )
     
 let dataPath = ".data"
-
-use databaseContext = DatabaseContext.createEmpty dataPath
-
-use session = DatabaseContext.createSession databaseContext
+let databaseContext = DatabaseContext.createEmpty dataPath
+let session = DatabaseContext.createSession databaseContext
 
 let mutable cHash = Hash.zero
 
@@ -119,7 +117,7 @@ let ``Wallet using contract should execute``() =
     let utxoSet = Map.add {txHash=Hash.zero;index=10ul} (UtxoSet.Unspent output) utxoSet
 
     TransactionHandler.executeContract session sampleInputTx cHash "" { state.memoryState with utxoSet = utxoSet } 
-    |> ensureResultOk
+    |> shouldBeOk
 
 [<Test>]
 let ``Contract should not be able to lock more token than available``() =
@@ -127,13 +125,13 @@ let ``Contract should not be able to lock more token than available``() =
     let utxoSet = Map.add {txHash=Hash.zero;index=1ul} (UtxoSet.Unspent output) utxoSet
 
     TransactionHandler.executeContract session sampleInputTx cHash "" { state.memoryState with utxoSet = utxoSet } 
-    |> ensureResultErrorMessage "not enough Zens"
+    |> shouldBeErrorMessage "not enough Zens"
 
 [<Test>]
 let ``Contract should not have enough tokens when output is missing``() =
     
     TransactionHandler.executeContract session sampleInputTx cHash "" state.memoryState
-    |> ensureResultErrorMessage "not enough Zens"
+    |> shouldBeErrorMessage "not enough Zens"
 
 [<Test>]
 let ``Contract should not have enough tokens when output locked to PK address``() =
@@ -141,7 +139,7 @@ let ``Contract should not have enough tokens when output locked to PK address``(
     let utxoSet = Map.add {txHash=Hash.zero;index=10ul} (UtxoSet.Unspent output) utxoSet
 
     TransactionHandler.executeContract session sampleInputTx cHash "" { state.memoryState with utxoSet = utxoSet } 
-    |> ensureResultErrorMessage "not enough Zens"
+    |> shouldBeErrorMessage "not enough Zens"
 
 [<Test>]
 let ``Contract should not have enough tokens when output is spent``() =
@@ -149,5 +147,5 @@ let ``Contract should not have enough tokens when output is spent``() =
     let utxoSet = Map.add {txHash=Hash.zero;index=10ul} UtxoSet.Spent utxoSet
 
     TransactionHandler.executeContract session sampleInputTx cHash "" { state.memoryState with utxoSet = utxoSet } 
-    |> ensureResultErrorMessage "not enough Zens"
+    |> shouldBeErrorMessage "not enough Zens"
 
