@@ -3,3 +3,4 @@ FSharp.Control.Reactive
 FSharp.Core
 FsBech32
 FSharp.Compiler.Tools
+FsPickler
