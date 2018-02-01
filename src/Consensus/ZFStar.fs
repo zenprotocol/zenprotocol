@@ -36,6 +36,8 @@ let private fsToFstLock (outputLock:Types.Lock) : lock =
         //ContractLock (pkHash, 0I, Empty)
     | Contract (Hash.Hash pkHash) ->
         ContractLock pkHash
+    | Destroy -> 
+        DestroyLock
 
 
     //TODO:
