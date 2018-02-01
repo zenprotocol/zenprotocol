@@ -1,4 +1,4 @@
-module Blockchain.Tests.ContractTests
+module Blockchain.Tests.SimpleWalletContractTests
 
 open NUnit.Framework
 open FsUnit
