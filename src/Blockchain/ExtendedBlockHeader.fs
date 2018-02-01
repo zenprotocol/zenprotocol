@@ -11,6 +11,7 @@ open Infrastructure
 type BlockStatus = 
     | Orphan 
     | Connected
+    | MainChain
     | Invalid
 
 [<NoComparisonAttribute>]
@@ -58,32 +59,42 @@ let createOrphan blockHash (block:Block) =
    
 let createGenesis blockHash (block:Block) = 
     let chainWork = getChainWork 0I block.header 
+    
     {     
         hash = blockHash
         header = block.header
-        status = Connected            
+        status = MainChain            
         chainWork = Some chainWork 
         txMerkleRoot = block.txMerkleRoot
         witnessMerkleRoot = block.witnessMerkleRoot
         activeContractSetMerkleRoot = block.activeContractSetMerkleRoot  
         commitments = block.commitments
     }
-        
-let createConnected prevBlock blockHash (block:Block) =
+    
+let private create status prevBlock blockHash (block:Block) =     
     match prevBlock.chainWork with
-        | None -> failwith "prevBlock doesn't have chainWork"
-        | Some prevChainWork -> 
-            let chainWork = getChainWork prevChainWork block.header  
-            {     
-                hash = blockHash
-                header = block.header
-                status = Connected                
-                chainWork = Some chainWork
-                txMerkleRoot = block.txMerkleRoot
-                witnessMerkleRoot = block.witnessMerkleRoot
-                activeContractSetMerkleRoot = block.activeContractSetMerkleRoot
-                commitments = block.commitments   
-            }                     
+    | None -> failwith "prevBlock doesn't have chainWork"
+    | Some prevChainWork -> 
+        let chainWork = getChainWork prevChainWork block.header  
+        
+        {     
+            hash = blockHash
+            header = block.header
+            status = status                
+            chainWork = Some chainWork
+            txMerkleRoot = block.txMerkleRoot
+            witnessMerkleRoot = block.witnessMerkleRoot
+            activeContractSetMerkleRoot = block.activeContractSetMerkleRoot
+            commitments = block.commitments   
+        }    
+        
+let createConnected  = create Connected
+                                         
+let createMain = create MainChain
+
+let markAsMain extendedHeader = {extendedHeader with status = MainChain}
+
+let unmarkAsMain extendedHeader = {extendedHeader with status = Connected}
 
 let unorphan extendedHeader chainWork = 
     { extendedHeader with status = Connected;chainWork= Some chainWork }        
