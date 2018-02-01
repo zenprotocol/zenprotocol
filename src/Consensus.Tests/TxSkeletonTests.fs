@@ -10,7 +10,7 @@ open FsCheck.NUnit
 let testHash = Hash (Array.create 32 1uy)
 
 [<Property>]
-let ``Transaction with less inputs or outputs should not be a prefix of another`` (tx1:TxSkeleton) (tx2:TxSkeleton) =
+let ``Transaction with less inputs or outputs should not be a prefix of another`` (tx1:TxSkeleton.T) (tx2:TxSkeleton.T) =
     (
         List.length tx1.pInputs > List.length tx2.pInputs || 
         List.length tx1.outputs > List.length tx2.outputs
@@ -19,7 +19,7 @@ let ``Transaction with less inputs or outputs should not be a prefix of another`
     )
 
 [<Property>]
-let ``Transaction with additional single output should be a prefix of another`` (tx:TxSkeleton) =
+let ``Transaction with additional single output should be a prefix of another`` (tx:TxSkeleton.T) =
     let output = {
         lock = PK testHash
         spend = {asset = Hash.zero; amount = 1UL } 
@@ -28,7 +28,7 @@ let ``Transaction with additional single output should be a prefix of another`` 
     TxSkeleton.checkPrefix tx tx' = Ok tx'
 
 [<Property>]
-let ``Transaction with additional single input should be a prefix of another`` (tx:TxSkeleton) =
+let ``Transaction with additional single input should be a prefix of another`` (tx:TxSkeleton.T) =
     let input = { 
         txHash = testHash
         index = 0ul 
@@ -41,7 +41,7 @@ let ``Transaction with additional single input should be a prefix of another`` (
     TxSkeleton.checkPrefix tx tx' = Ok tx'
 
 [<Property>]
-let ``Transactions with different leading first input should not be a prefix of one another`` (tx:TxSkeleton) =
+let ``Transactions with different leading first input should not be a prefix of one another`` (tx:TxSkeleton.T) =
     (List.length tx.pInputs > 0) ==> lazy (
         let input, output = tx.pInputs.[0]
         let pInput = { input with index = input.index + 1ul }, output

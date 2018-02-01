@@ -32,7 +32,7 @@ module Blockchain =
         | ValidateMinedBlock of Types.Block
 
     type Request = 
-        | ExecuteContract of TxSkeleton * string * Hash.Hash
+        | ExecuteContract of TxSkeleton.T * string * Hash.Hash
         | GetBlockTemplate
         | GetTip
         | GetBlock of Hash.Hash

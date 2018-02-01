@@ -33,7 +33,7 @@ let private foldSpends =
 let private checkSpends m = 
     Map.exists (fun _ v -> Option.isNone v) m |> not
 
-let private checkAmounts (txSkeleton:TxSkeleton,tx) = 
+let private checkAmounts (txSkeleton:TxSkeleton.T,tx) = 
     let inputs, outputs = foldSpends (txSkeleton.pInputs |> List.map snd), foldSpends txSkeleton.outputs
 
     if not <| checkSpends outputs then

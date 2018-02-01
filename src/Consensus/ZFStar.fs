@@ -111,7 +111,7 @@ let convetWallet (wallet:PointedOutput list) =
     List.map fsToFstPointedOutput wallet
     |> listToVector
 
-let convertInput (txSkeleton:TxSkeleton) : txSkeleton =
+let convertInput (txSkeleton:TxSkeleton.T) : txSkeleton =
     
     let insertPointedOutput txSkeleton pointedOutput = 
         insertPointedOutput pointedOutput txSkeleton
@@ -132,11 +132,11 @@ let vectorLength v =
     
 let fstTofsMainFunction
         (MainFunc (_, mainFunction): mainFunction)
-        : TxSkeleton 
+        : TxSkeleton.T 
           -> Hash 
           -> string
           -> list<PointedOutput>
-          -> Result<TxSkeleton, string> =
+          -> Result<TxSkeleton.T, string> =
     fun txSkel contractHash command wallet ->
         let txSkel = convertInput txSkel
         let wallet = convetWallet wallet

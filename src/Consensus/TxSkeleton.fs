@@ -2,7 +2,7 @@
 
 open Consensus.Types
 
-type TxSkeleton = {
+type T = {
     pInputs: PointedOutput list
     outputs: Output list
 }
@@ -13,10 +13,10 @@ let empty =
         outputs = []
     }
     
-let addInputs inputs (txSkeleton:TxSkeleton) =     
+let addInputs inputs (txSkeleton:T) =     
     {txSkeleton with pInputs=List.append txSkeleton.pInputs inputs}
     
-let addOutput output (txSkeleton:TxSkeleton) = 
+let addOutput output (txSkeleton:T) = 
     {txSkeleton with outputs=List.append txSkeleton.outputs [output]}    
     
 let addChange asset inputsAmount outputsAmount pkHash txSkeleton = 
