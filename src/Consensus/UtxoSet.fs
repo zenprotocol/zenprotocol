@@ -77,7 +77,7 @@ let undoBlock getOutput getUTXO block set =
             ) set
 
     // remove all outputs
-    List.fold (fun utxoSet tx ->
+    List.foldBack (fun tx utxoSet ->
         let txHash = Transaction.hash tx
 
         tx.outputs
@@ -86,5 +86,5 @@ let undoBlock getOutput getUTXO block set =
             let outpoint = {txHash=txHash; index=uint32 i}
                                     
             Map.add outpoint NoOutput utxoSet    
-            ) utxoSet) utxoSet block.transactions
+            ) utxoSet) block.transactions utxoSet
         

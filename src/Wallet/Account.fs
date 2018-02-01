@@ -1,16 +1,24 @@
 ﻿module Wallet.Account
 
 open Consensus
+open Consensus.ChainParameters
 open Consensus.Hash
 open Consensus.Crypto
 open Consensus.Types
+open Infrastructure
 
 type TransactionResult = Messaging.Services.TransactionResult
 
+type OutputStatus = 
+    | Spent of Output
+    | Unspent of Output
+
 type T = {
-    outpoints: Map<Outpoint, Output>
+    outputs: Map<Outpoint, OutputStatus>
+    mempool: (Hash.Hash*Transaction) list
     keyPair: KeyPair
     publicKeyHash: Hash
+    tip: Hash.Hash
 }
 
 let rootSecretKey = SecretKey [|189uy; 140uy; 82uy; 12uy; 79uy; 140uy; 35uy; 59uy; 11uy; 41uy; 199uy;
@@ -21,52 +29,177 @@ let create () =
     let secretKey, publicKey = KeyPair.create ()
 
     {
-        outpoints = Map.empty
+        outputs = Map.empty
         keyPair = (secretKey, publicKey)
         publicKeyHash = PublicKey.hash publicKey
-    }                   
-        
-let handleTransaction txHash (tx:Transaction) account =
+        mempool = List.empty
+        tip = Hash.zero
+    }
+
+// update the outputs with transaction                                        
+let private handleTransaction txHash (tx:Transaction) account outputs =
     
-    let handleOutput outpoints (index,output) = 
+    let handleOutput outputs (index,output) = 
         match output.lock with
-        | PK pkHash -> 
-            match pkHash = account.publicKeyHash with
-            | false -> outpoints
-            | true -> 
-                let outpoint = {txHash=txHash;index=index;}
-                Map.add outpoint output outpoints            
-        | _ -> outpoints
+        | PK pkHash when pkHash = account.publicKeyHash ->              
+            let outpoint = {txHash=txHash;index=index;}
+            Map.add outpoint (Unspent output) outputs
+        | _ -> outputs
+        
+    let handleInput outputs outpoint = 
+        match Map.tryFind outpoint outputs with
+        | Some (Unspent output) -> 
+            Map.add outpoint (Spent output) outputs
+        | _ -> outputs
            
-    let outpoints = List.fold (fun state o -> Map.remove o state) account.outpoints tx.inputs         
+    let outputs = List.fold handleInput outputs tx.inputs         
     
     let outputsWithIndex = List.mapi (fun i output -> (uint32 i,output)) tx.outputs
-    let outpoints' = List.fold handleOutput outpoints outputsWithIndex
-        
-    {account with outpoints = outpoints'}
+    List.fold handleOutput outputs outputsWithIndex          
     
-let handleBlock block account = 
-    List.fold (fun account tx ->
+let handleBlock blockHash block account =
+    let txHashes = List.map (fun tx -> Transaction.hash tx) block.transactions     
+    let transactions = List.zip txHashes block.transactions        
+ 
+    let outputs = 
+        List.fold (fun outputs (txHash,tx) -> handleTransaction txHash tx account outputs) 
+            account.outputs transactions
+    
+    // remove all transactions from list        
+    let set = Set.ofList txHashes   
+    let mempool = List.reject (fun (txHash,_) -> Set.contains txHash set) account.mempool            
+                                        
+    {account with tip = blockHash; mempool=mempool;outputs = outputs}     
+    
+let undoBlock block account = 
+    let undoTransaction tx (outputs,mempool) = 
         let txHash = Transaction.hash tx
-        handleTransaction txHash tx account) account block.transactions
+        
+        let handleOutput outputs (index,output) = 
+            match output.lock with
+            | PK pkHash when pkHash = account.publicKeyHash ->
+                let outpoint = {txHash=txHash;index=index;}
+                Map.remove outpoint outputs                
+            | _ -> outputs                 
+            
+        let handleInput outputs input = 
+            match Map.tryFind input outputs with
+            | Some (Spent output) -> Map.add input (Unspent output) outputs
+            | _ -> outputs
+            
+        let outputs' = List.fold handleInput outputs tx.inputs         
+            
+        let outputsWithIndex = List.mapi (fun i output -> (uint32 i,output)) tx.outputs
+        let outputs' = List.fold handleOutput outputs' outputsWithIndex        
+        
+        let mempool = 
+            // adding the transaction back to mempool only if the transaction affected the account
+            if outputs' <> outputs then                                
+                (txHash,tx) :: mempool
+            else 
+                mempool
+        
+        outputs',mempool
+        
+    let outputs,mempool = List.foldBack undoTransaction block.transactions (account.outputs,account.mempool) 
+    
+    {account with tip=block.header.parent;outputs=outputs;mempool = mempool} 
+   
+let sync chain tipBlockHash (getHeader:Hash.Hash -> BlockHeader) (getBlock:Hash.Hash -> Block) account= 
+    let accountTipBlockNumber = 
+        if account.tip <> Hash.zero then 
+            (getHeader account.tip).blockNumber
+        else 
+            0ul
+    
+    // In case the account is not in the main chain, we are looking for the fork block
+    // between the account chain and main chain, undo from account chain up to the fork block and then 
+    // redo main chain up to the tip
+    let rec reorg currentBlockHash account = 
+        if account.tip = currentBlockHash then
+            // we found the fork block
+            account
+        else 
+            let oldBlock = getBlock account.tip
+            let newBlock = getBlock currentBlockHash
+                            
+            account                            
+            |> undoBlock oldBlock 
+            |> reorg newBlock.header.parent
+            |> handleBlock currentBlockHash newBlock
+                
+    let rec sync' currentBlockHash =
+        // If new account and genesis block handle genesis block      
+        if account.tip = Hash.zero && currentBlockHash = ChainParameters.getGenesisHash chain then
+            let block = getBlock currentBlockHash    
+            handleBlock currentBlockHash block account          
+        // If we found the account tip we stop the recursion and start syncing up      
+        elif currentBlockHash = account.tip then
+            account
+        else 
+            let block = getBlock currentBlockHash
+                                                  
+            if block.header.blockNumber = accountTipBlockNumber then
+                // The account is not in the main chain, we have to start a reorg
+                reorg currentBlockHash account
+            else 
+                // continue looking for the account tip in the chain and then handling the current block              
+                sync' block.header.parent            
+                |> handleBlock currentBlockHash block
+                
+    sync' tipBlockHash
+
+let getUnspentOutputs account = 
+    // we first update the account according to the mempool transactions
+    List.fold (fun outputs (txHash,tx) -> 
+        handleTransaction txHash tx account outputs) account.outputs account.mempool
+    |> Map.filter (fun _ output ->
+        match output with
+        | Unspent _-> true
+        | _ -> false)
+    |> Map.map (fun _ output ->
+        match output with 
+        | Unspent output -> output
+        | _ -> failwith "unexpected")   
+               
+let addTransaction txHash (tx:Transaction) account =    
+    // check if the transaction relevant to the account
+    let anyOutput = List.exists (fun output -> 
+        match output.lock with
+        | PK pkHash when pkHash = account.publicKeyHash -> true
+        | _ -> false) tx.outputs
+    
+    let unspentOutputs = getUnspentOutputs account
+    let anyInputs = List.exists (fun input -> Map.containsKey input unspentOutputs) tx.inputs
+ 
+    if anyInputs || anyOutput then 
+        let mempool = List.add (txHash,tx) account.mempool
+    
+        {account with mempool = mempool}
+    else
+        account
            
 let getBalance account =
-    Map.fold (fun balance _ output -> 
+    let unspent = getUnspentOutputs account
+                
+    Map.fold (fun balance _ output ->                 
         match Map.tryFind output.spend.asset balance with
         | Some amount -> Map.add output.spend.asset (amount+output.spend.amount) balance
-        | None -> Map.add output.spend.asset output.spend.amount balance) Map.empty account.outpoints
+        | None -> Map.add output.spend.asset output.spend.amount balance) Map.empty unspent
      
 let getAddress chain account = 
     Address.encode chain (Address.PK account.publicKeyHash)
 
-let private getInputs account spend = 
+let private getInputs account spend =
+    let unspent = getUnspentOutputs account
+ 
     let collectInputs ((inputs, keys), collectedAmount) outpoint output =
         if spend.amount > collectedAmount && spend.asset = output.spend.asset then
             (((outpoint,output) :: inputs, account.keyPair :: keys), output.spend.amount + collectedAmount)
         else 
             ((inputs, keys), collectedAmount)
             
-    let (inputs, keys), collectedAmount = Map.fold collectInputs (([],[]),0UL) account.outpoints
+    let (inputs, keys), collectedAmount = Map.fold collectInputs (([],[]),0UL) unspent
      
     if collectedAmount >= spend.amount then
         Ok (inputs,keys,collectedAmount)
@@ -91,24 +224,14 @@ let createTransaction chain account pkHash spend =
         Ok (Transaction.sign keys {inputs=inputs; outputs=outputs; witnesses=[]; contract = None})
             
 let createActivateContractTransaction account code =
+    let unspent = getUnspentOutputs account
+
     Contract.recordHints code
     |> Result.map (fun hints ->
-        let input, output = Map.toSeq account.outpoints |> Seq.head
+        let input, output = Map.toSeq unspent |> Seq.head
         let output' = {output with lock=PK account.publicKeyHash}
         { inputs=[ input ]; outputs=[ output' ]; witnesses=[]; contract = Some (code, hints) })
-    |> Result.map (Transaction.sign [ account.keyPair ])
-
-let createRoot () =                
-    let account = 
-        {
-            outpoints = Map.empty
-            keyPair = KeyPair.fromSecretKey rootSecretKey
-            publicKeyHash = Transaction.rootPKHash
-        }
-        
-    account
-        
-    handleTransaction Transaction.rootTxHash Transaction.rootTx account             
+    |> Result.map (Transaction.sign [ account.keyPair ])             
 
 let createExecuteContractTransaction account executeContract cHash command spends =
      
@@ -133,6 +256,15 @@ let createExecuteContractTransaction account executeContract cHash command spend
             Transaction.sign keys tx
             |> Ok         
         | TransactionResult.Error e -> Error e)
-    //TODO: use contract lock instead
-    //TODO: sign the transaction
-    //TODO: send publish command
+        
+let createRoot () =                
+    let account = 
+        {
+            outputs = Map.empty
+            keyPair = KeyPair.fromSecretKey rootSecretKey
+            publicKeyHash = Transaction.rootPKHash
+            tip = Hash.zero
+            mempool= List.empty
+        }
+          
+    addTransaction Transaction.rootTxHash Transaction.rootTx account        

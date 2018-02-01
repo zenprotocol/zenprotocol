@@ -96,7 +96,26 @@ let handleRequest (requestId:RequestId) request session timestamp state =
         
             let block = Block.createTemplate state.tipState.tip.header (Timestamp.now ()) state.tipState.ema state.memoryState.activeContractSet transactions
             
-            requestId.reply<Types.Block option> (Some block)            
+            requestId.reply<Types.Block option> (Some block)
+    | GetBlock blockHash -> 
+        match BlockRepository.tryGetHeader session blockHash with
+        | Some header ->
+            BlockRepository.getFullBlock session header
+            |> Some 
+            |> requestId.reply<Types.Block option>  
+        | None -> requestId.reply<Types.Block option> None
+    | GetBlockHeader blockHash -> 
+        match BlockRepository.tryGetHeader session blockHash with
+        | Some header ->            
+            Some header.header
+            |> requestId.reply<Types.BlockHeader option>   
+        | None -> requestId.reply<Types.BlockHeader option> None
+    | GetTip -> 
+        if state.tipState.tip <> ExtendedBlockHeader.empty then
+            Some (state.tipState.tip.hash, state.tipState.tip.header)            
+            |> requestId.reply<(Hash.Hash*Types.BlockHeader) option>                 
+        else 
+            requestId.reply<(Hash.Hash*Types.BlockHeader) option> None                       
     | _ -> ()
     ret state
     

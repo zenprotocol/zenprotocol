@@ -30,7 +30,7 @@ let ``received tokens``() =
     
     let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
     
-    let account' = Account.handleTransaction (Transaction.hash tx) tx account 
+    let account' = Account.addTransaction (Transaction.hash tx) tx account 
     
     let balances = Account.getBalance account'    
     
@@ -48,10 +48,10 @@ let ``tokens spent``() =
     let tx' = {inputs=[{txHash=txHash; index=0ul}];outputs=[];witnesses=[];contract=None}
     
     let account' = 
-        Account.handleTransaction txHash tx account 
+        Account.addTransaction txHash tx account 
 
     let account'' = 
-        Account.handleTransaction (Transaction.hash tx') tx' account'        
+        Account.addTransaction (Transaction.hash tx') tx' account'        
             
     account' |> balanceShouldBe Hash.zero 20UL            
     account'' |> balanceShouldBe Hash.zero 10UL
@@ -64,7 +64,7 @@ let ``creating, not enough tokens``() =
     
     let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
     
-    let account' = Account.handleTransaction (Transaction.hash tx) tx account 
+    let account' = Account.addTransaction (Transaction.hash tx) tx account 
 
     let result = Account.createTransaction chain account account.publicKeyHash { asset = Hash.zero; amount = 11UL }
     
@@ -80,7 +80,7 @@ let ``creating, no change``() =
     // giving some money to bob
     let output = {lock = PK bob.publicKeyHash; spend={asset=Hash.zero;amount=10UL}}    
     let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
-    let bob' = Account.handleTransaction (Transaction.hash tx) tx bob
+    let bob' = Account.addTransaction (Transaction.hash tx) tx bob
 
     // sending money to alice
     let result = Account.createTransaction chain bob' alice.publicKeyHash { asset = Hash.zero; amount = 10UL }
@@ -88,8 +88,8 @@ let ``creating, no change``() =
     match result with 
     | Error x -> failwithf "expected transaction %s" x
     | Ok tx -> 
-        let alice' = Account.handleTransaction (Transaction.hash tx) tx alice
-        let bob'' = Account.handleTransaction (Transaction.hash tx) tx bob
+        let alice' = Account.addTransaction (Transaction.hash tx) tx alice
+        let bob'' = Account.addTransaction (Transaction.hash tx) tx bob
         
         alice' |> balanceShouldBe Hash.zero 10UL
         bob'' |> balanceShouldBe Hash.zero 0UL
@@ -102,7 +102,7 @@ let ``creating, with change``() =
     // giving some money to bob
     let output = {lock = PK bob.publicKeyHash; spend={asset=Hash.zero;amount=10UL}}    
     let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
-    let bob' = Account.handleTransaction (Transaction.hash tx) tx bob
+    let bob' = Account.addTransaction (Transaction.hash tx) tx bob
 
     // sending money to alice
     let result = Account.createTransaction chain bob' alice.publicKeyHash { asset = Hash.zero; amount = 7UL }
@@ -110,8 +110,8 @@ let ``creating, with change``() =
     match result with 
     | Error x -> failwithf "expected transaction %s" x
     | Ok tx -> 
-        let alice' = Account.handleTransaction (Transaction.hash tx) tx alice
-        let bob'' = Account.handleTransaction (Transaction.hash tx) tx bob
+        let alice' = Account.addTransaction (Transaction.hash tx) tx alice
+        let bob'' = Account.addTransaction (Transaction.hash tx) tx bob
         
         alice' |> balanceShouldBe Hash.zero 7UL
         bob'' |> balanceShouldBe Hash.zero 3UL
@@ -126,9 +126,9 @@ let ``picking the correct asset``() =
     let output2 = {lock = PK bob.publicKeyHash; spend={asset=Hash.zero;amount=10UL}}    
         
     let tx = {inputs=[];outputs=[output; output2];witnesses=[];contract=None}
-    let bob' = Account.handleTransaction (Transaction.hash tx) tx bob
+    let bob' = Account.addTransaction (Transaction.hash tx) tx bob
     
-    Map.count bob'.outpoints |> should equal 2
+    Account.getUnspentOutputs bob' |> should haveCount 2
     bob' |> balanceShouldBe anotherAsset 10UL
 
     // sending money to alice
@@ -139,8 +139,8 @@ let ``picking the correct asset``() =
     | Ok tx -> 
         List.length tx.inputs |> should equal 1
     
-        let alice' = Account.handleTransaction (Transaction.hash tx) tx alice
-        let bob'' = Account.handleTransaction (Transaction.hash tx) tx bob'                        
+        let alice' = Account.addTransaction (Transaction.hash tx) tx alice
+        let bob'' = Account.addTransaction (Transaction.hash tx) tx bob'                        
                 
         alice' |> balanceShouldBe Hash.zero 7UL
         bob'' |> balanceShouldBe Hash.zero 3UL 
@@ -158,7 +158,7 @@ let ``picking from multiple inputs``() =
     let output2 = {lock = PK bob.publicKeyHash; spend={asset=Hash.zero;amount=7UL}}    
         
     let tx = {inputs=[];outputs=[output; output2];witnesses=[];contract=None}
-    let bob' = Account.handleTransaction (Transaction.hash tx) tx bob    
+    let bob' = Account.addTransaction (Transaction.hash tx) tx bob    
 
     // sending money to alice
     let result = Account.createTransaction chain bob' alice.publicKeyHash { asset = Hash.zero; amount = 10UL }
@@ -166,8 +166,8 @@ let ``picking from multiple inputs``() =
     match result with 
     | Error x -> failwithf "expected transaction %s" x
     | Ok tx ->             
-        let alice' = Account.handleTransaction (Transaction.hash tx) tx alice
-        let bob'' = Account.handleTransaction (Transaction.hash tx) tx bob'                        
+        let alice' = Account.addTransaction (Transaction.hash tx) tx alice
+        let bob'' = Account.addTransaction (Transaction.hash tx) tx bob'                        
                 
         alice' |> balanceShouldBe Hash.zero 10UL
         bob'' |> balanceShouldBe Hash.zero 2UL
@@ -197,6 +197,178 @@ let ``create execute contract transaction``() =
     
     tx.inputs |> should haveLength 1    
     
+    
+[<Test>]
+let ``account sync up``() =        
+    let startBlockHeader = {
+        version = 0ul
+        parent = ChainParameters.getGenesisHash Chain.Test
+        blockNumber = 2ul
+        commitments = Hash.zero
+        timestamp = 0UL
+        difficulty = 0ul
+        nonce = 0UL,0UL
+    }
+    
+    let account = 
+        {Account.create () with tip = BlockHeader.hash startBlockHeader}
+    
+    let output = {lock = PK account.publicKeyHash; spend={asset=Hash.zero;amount=10UL}}        
+    let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
+    let txHash = Transaction.hash tx
+        
+    let account = Account.addTransaction txHash tx account
+                
+    List.exists (fst >> (=) txHash) account.mempool |> should equal true             
+                
+    let header = {
+        version = 0ul
+        parent = BlockHeader.hash startBlockHeader
+        blockNumber = 3ul
+        commitments = Hash.zero
+        timestamp = 0UL
+        difficulty = 0ul
+        nonce = 0UL,0UL
+    }
+            
+    let block = {
+        header = header
+        transactions = [tx]
+        txMerkleRoot = Hash.zero
+        witnessMerkleRoot = Hash.zero
+        activeContractSetMerkleRoot= Hash.zero
+        commitments= []
+    }
+    
+    let blockHash = Block.hash block
+    
+    let account' = Account.sync Chain.Test blockHash (fun _ -> startBlockHeader) (fun _ -> block) account 
+    
+    account'.tip |> should equal blockHash
+    account'.mempool |> should haveLength 0
+    
+[<Test>]
+let ``sync up from empty wallet``() =             
+    let account = Account.create () 
+            
+    let output = {lock = PK account.publicKeyHash; spend={asset=Hash.zero;amount=10UL}}        
+    let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
+         
+    let header = {
+        version = 0ul
+        parent = ChainParameters.getGenesisHash Chain.Test
+        blockNumber = 2ul
+        commitments = Hash.zero
+        timestamp = 0UL
+        difficulty = 0ul
+        nonce = 0UL,0UL
+    }
+            
+    let block = {
+        header = header
+        transactions = [tx]
+        txMerkleRoot = Hash.zero
+        witnessMerkleRoot = Hash.zero
+        activeContractSetMerkleRoot= Hash.zero
+        commitments = []
+    }
+    
+    let blockHash = Block.hash block
+    
+    let account = Account.sync Chain.Test blockHash (fun _ -> failwith "unexpected") 
+                    (fun blockHash ->
+                        if blockHash = ChainParameters.getGenesisHash Chain.Test then 
+                            Block.createGenesis chain [Transaction.rootTx] (0UL,0UL)
+                        else
+                            block) account 
+    
+    account.tip |> should equal blockHash
+    account.mempool |> should haveLength 0
+    Account.getUnspentOutputs account |> should haveCount 1    
+    
+[<Test>]
+let ``account reorg``() = 
+    let startBlockHeader = {
+        version = 0ul
+        parent = ChainParameters.getGenesisHash Chain.Test
+        blockNumber = 2ul
+        commitments = Hash.zero
+        timestamp = 0UL
+        difficulty = 0ul
+        nonce = 0UL,0UL
+    }
+    
+    let account = 
+        {Account.create () with tip = BlockHeader.hash startBlockHeader}
+    
+    let output = {lock = PK account.publicKeyHash; spend={asset=Hash.zero;amount=10UL}}        
+    let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
+    let txHash = Transaction.hash tx
+        
+    let account = Account.addTransaction txHash tx account
+    
+    let header = {
+        version = 0ul
+        parent = BlockHeader.hash startBlockHeader
+        blockNumber = 3ul
+        commitments = Hash.zero
+        timestamp = 0UL
+        difficulty = 0ul
+        nonce = 0UL,0UL
+    }
+            
+    let block = {
+        header = header
+        transactions = [tx]
+        txMerkleRoot = Hash.zero
+        witnessMerkleRoot = Hash.zero
+        activeContractSetMerkleRoot= Hash.zero
+        commitments= []
+    }
+    
+    let blockHash = Block.hash block
+    
+    let account = Account.sync Chain.Test blockHash (fun _ -> startBlockHeader) (fun _ -> block) account 
+    account.tip |> should equal blockHash
+    
+    let header2 = {
+       version = 0ul
+       parent = BlockHeader.hash startBlockHeader
+       blockNumber = 3ul
+       commitments = Hash.zero
+       timestamp = 0UL
+       difficulty = 0ul
+       nonce = 1UL,0UL
+    }
+               
+    let block2 = {
+       header = header2
+       transactions = []
+       txMerkleRoot = Hash.zero
+       witnessMerkleRoot = Hash.zero
+       activeContractSetMerkleRoot= Hash.zero
+       commitments= []
+    }
+    
+    let blockHash2 = Block.hash block2
+    
+    let account = Account.sync Chain.Test blockHash2 (fun _ -> block.header) 
+                        (fun bh -> 
+                            if bh = blockHash then
+                                block
+                            else if bh = blockHash2 then
+                                block2
+                            else 
+                                failwithf "unexpected %A" bh) account
+        
+    account.tip |> should equal blockHash2
+    account.mempool |> should haveLength 1
+    List.exists (fst >> (=) txHash) account.mempool |> should equal true             
+    
+                
+        
+ 
+        
     
     
                   

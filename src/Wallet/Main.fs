@@ -6,18 +6,36 @@ open Messaging.Services
 open Messaging.Events
 open Wallet
 open ServiceBus.Agent
+open DataAccess
+open MBrace.FsPickler
 
-let eventHandler event account = 
+type AccountCollection = Collection<string, Account.T>
+
+[<Literal>]
+let MainAccountName = "MAIN"
+
+
+let binarySerializer = FsPickler.CreateBinarySerializer()  
+
+let eventHandler collection event session account = 
     match event with 
     | TransactionAddedToMemPool (txHash,tx) ->
-        Account.handleTransaction txHash tx account
-    | BlockAdded block ->
-        Account.handleBlock block account
+        let account = Account.addTransaction txHash tx account
+        Collection.put collection session MainAccountName account
+        account 
+    | BlockAdded (blockHash,block) ->
+        let account = Account.handleBlock blockHash block account
+        Collection.put collection session MainAccountName account
+        account 
+    | BlockRemoved (_,block) ->
+        let account = Account.undoBlock block account
+        Collection.put collection session MainAccountName account
+        account
     | _ -> account 
 
-let commandHandler command wallet = wallet
+let commandHandler command session wallet = wallet
 
-let requestHandler chain client (requestId:RequestId) request wallet =
+let requestHandler chain client (requestId:RequestId) request session wallet =
     let reply =
         requestId.reply
     let getTransactionResult =
@@ -54,10 +72,53 @@ let requestHandler chain client (requestId:RequestId) request wallet =
 
     wallet
 
-let main busName chain root =
-    Actor.create<Command,Request,Event, Account.T> busName serviceName (fun poller sbObservable ebObservable ->                       
-        let wallet = if root then Account.createRoot () else Account.create ()
-        let client = ServiceBus.Client.create busName
+let main dataPath busName chain root =
+    Actor.create<Command,Request,Event, Account.T> busName serviceName (fun poller sbObservable ebObservable ->
+        let databaseContext = DatabaseContext.create (Platform.combine dataPath "wallet")
+    
+        let collection : AccountCollection = 
+            use session = DatabaseContext.createSession databaseContext
+            let collection = Collection.create session "accounts" 
+                                (fun (name:string) -> System.Text.Encoding.UTF8.GetBytes (name)) 
+                                binarySerializer.Pickle<Account.T>
+                                binarySerializer.UnPickle<Account.T> 
+            Session.commit session
+            collection
+                                                                    
+        let client = ServiceBus.Client.create busName                 
+        let account = 
+            use session = DatabaseContext.createSession databaseContext
+            let account =                                             
+                match Collection.tryGet collection session MainAccountName with
+                | Some account ->
+                    Log.info "Account Loaded" 
+                    account
+                | None -> 
+                    Log.info "Creating new account"
+                    if root then 
+                        Account.createRoot ()
+                    else 
+                        Account.create ()
+                     
+            match Blockchain.getTip client with
+            | Some (blockHash,header) ->
+
+                if blockHash <> account.tip then                                      
+                    let account =
+                        Account.sync chain blockHash                    
+                            (Blockchain.getBlockHeader client >> Option.get)
+                            (Blockchain.getBlock client >> Option.get)
+                            account
+                            
+                    Collection.put collection session MainAccountName account
+                    Session.commit session
+                        
+                    Log.info "Account synced to block #%d %A" header.blockNumber blockHash
+                    account
+                else                    
+                    account
+                                          
+            | _ -> account               
 
         let sbObservable = 
             sbObservable
@@ -68,12 +129,18 @@ let main busName chain root =
         
         let ebObservable = 
             ebObservable
-            |> Observable.map eventHandler
+            |> Observable.map (eventHandler collection)
            
         let observable =             
             Observable.merge sbObservable ebObservable
-            |> Observable.scan (fun state handler -> handler state) wallet             
+            |> Observable.scan (fun state handler -> 
+                use session = DatabaseContext.createSession databaseContext                           
+                let state = handler session state
+                Session.commit session
+                state) account             
     
-        Disposables.empty, observable
+        Disposables.fromFunction (fun () -> 
+            Disposables.dispose collection
+            Disposables.dispose databaseContext), observable
     )
                     
