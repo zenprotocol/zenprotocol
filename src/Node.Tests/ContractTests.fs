@@ -33,17 +33,17 @@ let createBroker () =
         Poller.run poller           
     )
 
-let clean =
+let clean () =
     if System.IO.Directory.Exists dataPath then 
         System.IO.Directory.Delete (dataPath, true)
 
 [<OneTimeSetUp>]
 let setUp = fun () ->
-    clean
+    clean ()
     
     createBroker () |> ignore
     Blockchain.Main.main dataPath chain busName |> ignore
-    Wallet.Main.main busName chain true |> ignore
+    Wallet.Main.main dataPath busName chain true |> ignore
     Api.Main.main chain busName apiUri |> ignore
     
     // initialize genesis block
@@ -53,7 +53,7 @@ let setUp = fun () ->
 
 [<TearDown>]
 let tearDown = fun () ->
-    clean
+    clean ()
   
 let rec waitForTx subscriber tx =
     match EventBus.Subscriber.recv subscriber with

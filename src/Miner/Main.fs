@@ -44,7 +44,7 @@ let minerTask chain busName (collection:Queue) =
             Log.info "new block mined"
         
             // We found a block            
-            Messaging.Services.Blockchain.validateBlock client block
+            Messaging.Services.Blockchain.validateMinedBlock client block
             ()
         | Result.Error _ ->
             // lets continue looking for a block, but first check if there is any message

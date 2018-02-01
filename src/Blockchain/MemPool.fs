@@ -29,5 +29,5 @@ let handleBlock block (mempool:T) =
 let undoBlock block (mempool:T) =
 
     // readd all transaction in the block to the mempool 
-    List.map (fun tx -> Transaction.hash tx, tx) block.transactions
-    |> List.fold (fun mempool (txHash,tx) -> Map.add txHash tx mempool) mempool
+    let transactions = List.map (fun tx -> Transaction.hash tx, tx) block.transactions
+    List.foldBack (fun (txHash,tx) mempool -> Map.add txHash tx mempool) transactions mempool

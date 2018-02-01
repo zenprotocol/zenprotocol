@@ -118,7 +118,7 @@ let main argv =
     use networkActor = 
         Network.Main.main busName config.externalIp config.listen config.bind config.seeds
         
-    use walletActor = Wallet.Main.main busName chain root
+    use walletActor = Wallet.Main.main dataPath busName chain root
     
     use minerActor =
         if config.miner then        

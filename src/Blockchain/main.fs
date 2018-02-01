@@ -37,7 +37,7 @@ let main dataPath chain busName =
             | None -> 
                 Log.info "No tip in db"
                 ExtendedBlockHeader.empty,ActiveContractSet.empty,EMA.create chain
-
+                         
         let tipState = 
             {
                 activeContractSet=acs                

@@ -161,7 +161,7 @@ let ``origin tx hit mempool, orphan tx should be added to mempool``() =
     let tx1Hash = Transaction.hash tx1
 
     let tx2 =
-        Account.handleTransaction tx1Hash tx1 account1
+        Account.addTransaction tx1Hash tx1 account1
         |> createTransaction account2.publicKeyHash 1UL
     let tx2Hash = Transaction.hash tx2
 
@@ -204,7 +204,7 @@ let ``orphan transaction is eventually invalid``() =
 
     let tx2 =
         let tx =
-            Account.handleTransaction tx1Hash tx1 account1
+            Account.addTransaction tx1Hash tx1 account1
             |> createTransaction account2.publicKeyHash 2UL
         // let's change one of the outputs value and reassign to make invalid tx
         let output = tx.outputs.[0]
@@ -252,12 +252,12 @@ let ``two orphan transaction spending same input``() =
     let tx1Hash = Transaction.hash tx1
 
     let tx2 =
-        Account.handleTransaction tx1Hash tx1 account1
+        Account.addTransaction tx1Hash tx1 account1
         |> createTransaction account2.publicKeyHash 1UL
     let tx2Hash = Transaction.hash tx2
 
     let tx3 =
-        Account.handleTransaction tx1Hash tx1 account1
+        Account.addTransaction tx1Hash tx1 account1
         |> createTransaction account3.publicKeyHash 1UL
     let tx3Hash = Transaction.hash tx3
 
@@ -343,7 +343,7 @@ let ``Invalid contract should not be added to ActiveContractSet``() =
     let cHash = getStringHash contractCode
 
     let tx =
-        let input, output = Map.toSeq rootAccount.outpoints |> Seq.head
+        let input, output = Account.getUnspentOutputs rootAccount |> Map.toSeq |> Seq.head
         let output' = {output with lock=PK rootAccount.publicKeyHash}
         { inputs=[ input ]; outputs=[ output' ]; witnesses=[]; contract = Some (contractCode, "") }
         |> (Transaction.sign [ rootAccount.keyPair ])
