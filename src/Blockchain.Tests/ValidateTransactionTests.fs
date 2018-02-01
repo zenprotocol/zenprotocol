@@ -7,6 +7,7 @@
 
 open NUnit.Framework
 open FsUnit
+open DataAccess
 open Blockchain
 open Consensus
 open Consensus.Types
@@ -417,3 +418,92 @@ let ``contract activation arrived, running orphan transaction``() =
     MemPool.containsTransaction activationTxHash state.memoryState.mempool |> should equal true
     MemPool.containsTransaction txHash state.memoryState.mempool |> should equal false    
     events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (activationTxHash,activationTransaction)))
+    
+[<Test>]    
+let ``Transaction already in db but not part of the main chain``() = 
+    use databaseContext = DatabaseContext.createEmpty "test"
+    use session = DatabaseContext.createSession databaseContext
+    
+    // we need to fake some information
+    let header = 
+        {
+            version = 0ul
+            parent = Hash.zero
+            blockNumber = 2ul
+            commitments = Hash.zero
+            timestamp = 0UL
+            difficulty = 0ul
+            nonce = 0UL,0UL
+        }
+    let extendedHeader : ExtendedBlockHeader.T =        
+        {
+            hash = BlockHeader.hash header
+            header = header
+            status = ExtendedBlockHeader.Connected
+            chainWork = None
+            txMerkleRoot = Hash.zero
+            activeContractSetMerkleRoot = Hash.zero
+            witnessMerkleRoot = Hash.zero
+            commitments = []
+        }    
+    
+    Collection.put session.context.blocks session.session extendedHeader.hash extendedHeader
+    MultiCollection.put session.context.transactionBlocks session.session txHash extendedHeader.hash 
+                
+    let result = Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
+
+    let events, state' = Writer.unwrap result
+
+    // Checking that the event raised
+    events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (txHash, tx)))
+
+    // Checking only 1 event raised
+    events |> should haveLength 1
+
+    // Checking the tx is in the mempool
+    MemPool.containsTransaction txHash state'.memoryState.mempool |> should equal true
+
+    // Checking the tx is in the utxoset
+    UtxoSet.getUtxos (UtxoSetRepository.get session) txOutpoints state'.memoryState.utxoSet
+    |> should equal (Some tx.outputs)
+    
+[<Test>]    
+let ``Transaction already in db and part of the main chain is ignored``() = 
+    use databaseContext = DatabaseContext.createEmpty "test"
+    use session = DatabaseContext.createSession databaseContext
+    
+    // we need to fake some information
+    let header = 
+        {
+            version = 0ul
+            parent = Hash.zero
+            blockNumber = 2ul
+            commitments = Hash.zero
+            timestamp = 0UL
+            difficulty = 0ul
+            nonce = 0UL,0UL
+        }
+    let extendedHeader : ExtendedBlockHeader.T =        
+        {
+            hash = BlockHeader.hash header
+            header = header
+            status = ExtendedBlockHeader.MainChain
+            chainWork = None
+            txMerkleRoot = Hash.zero
+            activeContractSetMerkleRoot = Hash.zero
+            witnessMerkleRoot = Hash.zero
+            commitments = []
+        }    
+    
+    Collection.put session.context.blocks session.session extendedHeader.hash extendedHeader
+    MultiCollection.put session.context.transactionBlocks session.session txHash extendedHeader.hash 
+                
+    let result = Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
+
+    let events, state' = Writer.unwrap result
+
+    // Checking only 1 event raised
+    events |> should haveLength 0
+
+    // Checking the tx is in the mempool
+    MemPool.containsTransaction txHash state'.memoryState.mempool |> should equal false

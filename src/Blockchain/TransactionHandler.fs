@@ -2,6 +2,7 @@ module Blockchain.TransactionHandler
 
 open Blockchain
 open Blockchain
+open Blockchain
 open Blockchain.EffectsWriter
 open Messaging.Events
 open Infrastructure
@@ -19,9 +20,7 @@ let private activateContract chain contractPath acs (tx : Types.Transaction) sho
             match tx.contract with
             | Some code ->
                 match Contract.compile contractPath code with
-                | Ok contract ->
-                    Log.warning "activating contract: %A" (Address.encode chain (Address.Contract contract.hash))
-
+                | Ok contract ->                    
                     return ActiveContractSet.add contract.hash contract acs
                 | Error err ->
                     Log.info "handle contract error: %A" err
@@ -118,7 +117,9 @@ let validateTransaction chain session contractPath tx (state:MemoryState) =
     effectsWriter {
         let txHash = Transaction.hash tx
 
-        if MemPool.containsTransaction txHash state.mempool || OrphanPool.containsTransaction txHash state.orphanPool then
+        if MemPool.containsTransaction txHash state.mempool || 
+           OrphanPool.containsTransaction txHash state.orphanPool || 
+           TransactionRepository.isPartOfMainChain session txHash then
             return state
         else
             match TransactionValidation.validateBasic tx with

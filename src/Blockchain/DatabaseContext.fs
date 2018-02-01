@@ -25,17 +25,21 @@ type T =
         blocks:Collection<Hash.Hash,ExtendedBlockHeader.T>
         blockChildrenIndex: Index<Hash.Hash,ExtendedBlockHeader.T,Hash.Hash> 
         blockState:Collection<Hash.Hash,BlockState>
-        blockTransactions: Collection<Hash.Hash,Hash.Hash seq>                
+        blockTransactions: Collection<Hash.Hash, Hash.Hash seq>                                        
         transactions:Collection<Hash.Hash, Transaction>
+        transactionBlocks:MultiCollection<Hash.Hash, Hash.Hash>
         contractPath:string        
     }
     interface System.IDisposable with   
         member x.Dispose () =
-            Disposables.dispose x.blockChildrenIndex
-            Disposables.dispose x.blocks 
+            Disposables.dispose x.utxoSet
+            Disposables.dispose x.contractUtxo
+            Disposables.dispose x.blocks
+            Disposables.dispose x.blockChildrenIndex             
             Disposables.dispose x.blockState
             Disposables.dispose x.blockTransactions
             Disposables.dispose x.transactions
+            Disposables.dispose x.transactionBlocks
             Disposables.dispose x.databaseContext
     
 
@@ -86,7 +90,11 @@ let create dataPath =
     let blockTransactions = Collection.create session "blockTransactions" Hash.bytes serializeHashes deserializeHashes
     
     let transactions = Collection.create session "transactions" Hash.bytes 
-                        (Transaction.serialize Transaction.Full) (Transaction.deserialize >> Option.get)                                                                 
+                        (Transaction.serialize Transaction.Full) (Transaction.deserialize >> Option.get)
+                        
+    let transactionBlocks = MultiCollection.create session "transactionBlocks" 
+                                Hash.bytes Hash.bytes Hash.Hash
+                                                                                             
     let blocks = 
         blocks
         |> Collection.addIndex blockChildrenIndex
@@ -114,6 +122,7 @@ let create dataPath =
         blockState=blockState
         blockTransactions=blockTransactions
         transactions=transactions
+        transactionBlocks = transactionBlocks
         contractPath=(Platform.combine dataPath "contracts")
     }  
 
