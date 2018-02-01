@@ -3,10 +3,12 @@
 open Operators.Checked
 
 open Consensus.Types
+open Consensus.Hash
 open Consensus.TxSkeleton
 open Zen.Types.Extracted
 open Zen.Types.Realized
 open Zen.TxSkeleton
+open Zen.Types.Main
 open FStar.Pervasives
 open Zen.Vector
 
@@ -105,7 +107,7 @@ let convertResult {inputs=_,inputMap; outputs=_,outputMap} =
 
 let convetWallet (wallet:PointedOutput list) =     
     List.map fsToFstPointedOutput wallet
-    |> listToVector   
+    |> listToVector
 
 let convertInput (txSkeleton:TxSkeleton) : txSkeleton =
     
@@ -125,3 +127,23 @@ let vectorLength v =
     match v with 
     | VCons (l,_,_) -> l + 1I
     | VNil -> 0I
+    
+let fstTofsMainFunction
+        (MainFunc (_, mainFunction): mainFunction)
+        : TxSkeleton 
+          -> Hash 
+          -> string
+          -> list<PointedOutput>
+          -> Result<TxSkeleton, string> =
+    fun txSkel contractHash command wallet ->
+        let txSkel = convertInput txSkel
+        let wallet = convetWallet wallet
+        let contractHash = bytes contractHash
+        mainFunction txSkel 
+                     contractHash 
+                     command 
+                     (vectorLength wallet) 
+                     wallet
+        |> unCost
+        |> toResult
+        |> Result.map convertResult
