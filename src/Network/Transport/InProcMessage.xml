@@ -115,4 +115,8 @@
         <field name="peerId" type="octets" size="4">Peer Id</field>
     </message>
     
+    <message name="Publish Address To All" id="30">
+        <field name="address" type="longstr">Address</field>
+    </message>
+    
 </class>

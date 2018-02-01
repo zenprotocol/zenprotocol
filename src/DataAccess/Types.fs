@@ -29,8 +29,13 @@ type Collection<'key,'value> =
         member x.Dispose () =            
             mdb_dbi_close(x.environment,x.database)
             
-type MultiCollection<'key,'value> = MultiCollection of Collection<'key,'value>            
-            
+type MultiCollection<'key,'value> = 
+    | MultiCollection of Collection<'key,'value>
+    interface System.IDisposable with
+        member x.Dispose () =
+            let (MultiCollection collection) = x 
+            (collection :> IDisposable).Dispose()
+                          
 type DatabaseContext = 
     {
         environment: IntPtr

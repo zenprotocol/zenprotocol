@@ -129,8 +129,11 @@ let rec private removeBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:Exte
             
             do! removeBlocks session forkBlock parent
             
-            let fullBlock = BlockRepository.getFullBlock session tip
+            // Change status of the header from main to connected
+            ExtendedBlockHeader.unmarkAsMain tip
+            |> BlockRepository.saveHeader session
             
+            let fullBlock = BlockRepository.getFullBlock session tip            
             do! publish (BlockRemoved (tip.hash, fullBlock))
             
             return ()
@@ -146,9 +149,12 @@ let rec private addBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:Extende
             
             do! addBlocks session forkBlock parent
             
+            // Change status of the header to main chain
+            ExtendedBlockHeader.markAsMain tip
+            |> BlockRepository.saveHeader session
+            
             let fullBlock = BlockRepository.getFullBlock session tip
-
-            do! publish (BlockAdded (tip.hash, fullBlock))
+            do! publish (BlockAdded (tip.hash, fullBlock))                        
             
             return ()
         }
@@ -206,6 +212,8 @@ let rollForwardChain chain contractPath timestamp state session block persistent
         match chain' with
         | Some (tip,(utxoSet,acs,ema,mempool)) -> 
             Log.info "Rolling forward chain to #%d %A" tip.header.blockNumber tip.hash
+       
+            let tip = ExtendedBlockHeader.markAsMain tip
         
             // update tip
             BlockRepository.updateTip session tip.hash
@@ -261,7 +269,7 @@ let private handleMainChain chain contractPath session timestamp (state:State) (
         | Ok (block,utxoSet,acs,ema) ->  
             Log.info "New block #%d %A" block.header.blockNumber blockHash 
                                      
-            let extendedHeader = ExtendedBlockHeader.createConnected parent blockHash block
+            let extendedHeader = ExtendedBlockHeader.createMain parent blockHash block
                                     
             BlockRepository.saveHeader session extendedHeader
             BlockRepository.saveFullBlock session blockHash block
@@ -310,6 +318,8 @@ let private handleForkChain chain contractPath session timestamp (state:State) p
                 return state                                    
             | Some (tip,(utxoSet,acs,ema,mempool)) ->
                 Log.info "Reorg to #%d %A" tip.header.blockNumber tip.hash
+            
+                let tip = ExtendedBlockHeader.markAsMain tip
             
                 // update tip
                 BlockRepository.updateTip session tip.hash 
@@ -385,7 +395,8 @@ let validateBlock chain contractPath session timestamp block mined (state:State)
                             BlockRepository.saveHeader session extendedHeader
                             BlockRepository.saveFullBlock session blockHash block
 
-                            return state                        
+                            return state                  
+                        | ExtendedBlockHeader.MainChain                                  
                         | ExtendedBlockHeader.Connected ->
                             let! state' =
                                 if parent.hash = state.tipState.tip.hash then                        

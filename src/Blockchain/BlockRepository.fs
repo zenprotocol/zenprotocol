@@ -45,9 +45,14 @@ let saveFullBlock session blockHash (block:Block) =
     // Save all transactions
     List.iter (fun (tx,txHash) -> Collection.put session.context.transactions session.session txHash tx) transactions 
     
+    // Save reference from block to transactions
     List.map snd transactions 
     |> List.toSeq
     |> Collection.put session.context.blockTransactions session.session blockHash
+    
+    // Save reference from transactions to block
+    List.iter (fun (_,txHash) ->
+        MultiCollection.put session.context.transactionBlocks session.session txHash blockHash) transactions                  
 
 let saveBlockState session blockHash (acs:ActiveContractSet.T) ema = 
     let blockState = 
