@@ -5,7 +5,7 @@ miner: false
 dataPath: ./data 
 
 externalIp: null
-listen: false
+listen: true
 bind: 127.0.0.1:29555
 seeds: 
   - 127.0.0.1:29555

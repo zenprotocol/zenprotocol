@@ -806,6 +806,37 @@ let ``GetTip size fits stream ``() =
     messageSize |> should equal offset
 
 [<Test>]
+let ``send and recv PublishAddressToAll``() =
+    let msg = PublishAddressToAll "Life is short but Now lasts for ever"
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://PublishAddressToAll.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://PublishAddressToAll.test"
+
+    Network.Transport.InProcMessage.send server msg
+
+    let msg' = Network.Transport.InProcMessage.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``PublishAddressToAll size fits stream ``() =
+    let publishaddresstoall:PublishAddressToAll =
+        "Life is short but Now lasts for ever"
+
+    let messageSize = PublishAddressToAll.getMessageSize publishaddresstoall
+
+    let stream =
+        Stream.create messageSize
+        |> PublishAddressToAll.write publishaddresstoall
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
 let ``malformed message return None``() =
     use server = Socket.dealer ()
     Socket.bind server "inproc://InProcMessage.test"

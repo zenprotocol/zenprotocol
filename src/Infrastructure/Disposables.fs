@@ -10,4 +10,7 @@ let dispose (x:System.IDisposable) = x.Dispose ()
 
 let fromFunction f = 
      { new System.IDisposable with
-            member x.Dispose() = f() }            
+            member x.Dispose() = f() }
+            
+let fromList list = 
+    fromFunction (fun () -> List.iter dispose list)                         

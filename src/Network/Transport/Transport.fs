@@ -147,8 +147,9 @@ let private handleInprocMessage socket inproc msg (peers:Peers) =
             sendToPeer socket inproc peers routingId (Message.GetBlock blockHash)   
         | InProcMessage.SendTip {peerId=peerId; blockHeader=blockHeader} ->
             let routingId = RoutingId.fromBytes peerId        
-            sendToPeer socket inproc peers routingId (Message.Tip blockHeader)   
-
+            sendToPeer socket inproc peers routingId (Message.Tip blockHeader)  
+        | InProcMessage.PublishAddressToAll address ->
+            publishMessage socket inproc peers (Message.Address address) 
         | msg -> failwithf "unexpected inproc msg %A" msg
                 
 let private onError error = 
@@ -202,6 +203,10 @@ let sendTip transport peerId blockHeader =
                     
 let getBlock transport blockHash =                    
     InProcMessage.send transport.inproc (InProcMessage.GetBlock blockHash)
+    
+let publishAddressToAll transport ipAddress =
+    InProcMessage.PublishAddressToAll ipAddress 
+    |> InProcMessage.send transport.inproc    
                                 
 let recv transport =
     match InProcMessage.recv transport.inproc with
