@@ -70,13 +70,12 @@ let session = DatabaseContext.createSession databaseContext
 let mutable cHash = Hash.zero
 let mutable TestPK = Hash.zero
 
-let clean =
-    if System.IO.Directory.Exists dataPath then 
-        System.IO.Directory.Delete (dataPath, true)
+let clean() =
+    Platform.cleanDirectory dataPath
     
 [<OneTimeSetUp>]
 let setUp = fun () ->
-    clean
+    clean()
     activateContract """
     open Zen.Types
     open Zen.Vector
@@ -138,9 +137,7 @@ let setUp = fun () ->
     
 [<TearDown>]
 let tearDown = fun () ->
-    clean
-
-
+    clean()
 
 open Crypto
 open TxSkeleton
@@ -195,10 +192,10 @@ let ``Should buy``() =
         let cw = ContractWitness { 
              cHash = cHash
              command = "buy"
-             beginInputs = 1
-             beginOutputs = 0
-             inputsLength = 1
-             outputsLength = 2
+             beginInputs = 1u
+             beginOutputs = 0u
+             inputsLength = 1u
+             outputsLength = 2u
         }
         tx.witnesses |> should contain cw
     | Error error -> failwith error
@@ -252,10 +249,10 @@ let ``Should redeem``() =
         let cw = ContractWitness { 
              cHash = cHash
              command = "redeem"
-             beginInputs = 1
-             beginOutputs = 0
-             inputsLength = 1
-             outputsLength = 2
+             beginInputs = 1u
+             beginOutputs = 0u
+             inputsLength = 1u
+             outputsLength = 2u
         }
         tx.witnesses |> should contain cw
     | Error error -> failwith error

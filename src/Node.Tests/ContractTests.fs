@@ -33,9 +33,8 @@ let createBroker () =
         Poller.run poller           
     )
 
-let clean () =
-    if System.IO.Directory.Exists dataPath then 
-        System.IO.Directory.Delete (dataPath, true)
+let clean() =
+    Platform.cleanDirectory dataPath
 
 [<OneTimeSetUp>]
 let setUp = fun () ->
