@@ -343,10 +343,11 @@ let validateBlock chain contractPath session timestamp block mined (state:State)
         | false ->                                                        
             match Block.validate chain block with
             | Error error ->
-                Log.info "Block %A failed validation due to %A" (Block.hash block) error
+                Log.info "Block %A failed validation due to %A" blockHash error
                 return state
             | Ok block -> 
-                if blockRequest = Some NewBlock || mined then                                  
+                if blockRequest = Some NewBlock || mined then
+                    Log.info "Publishing new block %A" blockHash                                 
                     do! publishBlock block.header
                     
                 if Block.isGenesis chain block then 
