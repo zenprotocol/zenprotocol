@@ -188,12 +188,12 @@ let getMemoryState chain session contractPath mempool orphanPool acs =
     let memoryState = {utxoSet=UtxoSet.asDatabase;
                         activeContractSet=acs;mempool=MemPool.empty;orphanPool=orphanPool}
     
-    let memoryState = TransactionHandler.validateOrphanTransactions chain session contractPath memoryState
+    let memoryState = TransactionHandler.validateOrphanTransactions session contractPath memoryState
 
     Map.fold (fun writer txHash tx -> 
                       
         Writer.bind writer (fun memoryState ->
-            TransactionHandler.validateInputs chain session  contractPath txHash tx memoryState false)) memoryState mempool
+            TransactionHandler.validateInputs session contractPath txHash tx memoryState false)) memoryState mempool
                                             
 let rollForwardChain chain contractPath timestamp state session block persistentBlock acs ema =
     effectsWriter {   

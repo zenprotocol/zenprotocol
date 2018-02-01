@@ -182,30 +182,42 @@ let connect chain getUTXO contractsPath parent timestamp set acs ema =
                            
         
     let checkCommitments ((block:Block),ema) =
-        let acs =
-            // TODO: reject uncompiled contracts 
+        let contracts =            
             block.transactions
             |> List.choose (fun tx -> tx.contract)        
-            |> List.map (fun contract -> Contract.compile contractsPath contract)
-            |> List.choose (fun contract ->
-                match contract with
-                | Ok c -> Some c
-                | _ -> None)
-            |> List.fold (fun acs contract -> SparseMerkleTree.add (Contract.hash contract) contract acs) acs
-                          
-        let acsMerkleRoot = SparseMerkleTree.root acs
+            |> List.map (fun contract -> Contract.compile contractsPath contract)                
         
-        // we already validated txMerkleRoot and witness merkle root at the basic validation, re-calculate with acsMerkleRoot
-        let commitments = 
-            createCommitments block.txMerkleRoot block.witnessMerkleRoot acsMerkleRoot block.commitments 
-            |> computeCommitmentsRoot
-
-        // We ignore the known commitments in the block as we already calculated them
-        // Only check that the final commitment is correct                 
-        if commitments = block.header.commitments then                
-            Ok (block,acs,ema)
-        else
-            Error "commitments mismatch"
+        // Uncompiled contract are not allowed in block
+        let isAllContractValid = 
+            List.forall (fun contract ->
+                match contract with
+                | Ok _ -> true
+                | _ -> false) contracts
+        
+        if not <| isAllContractValid then
+            Error "invalid contract"        
+        else 
+            let acs =
+                contracts 
+                |> List.choose (fun contract ->
+                    match contract with
+                    | Ok c -> Some c
+                    | _ -> None)
+                |> List.fold (fun acs contract -> SparseMerkleTree.add (Contract.hash contract) contract acs) acs
+                              
+            let acsMerkleRoot = SparseMerkleTree.root acs
+            
+            // we already validated txMerkleRoot and witness merkle root at the basic validation, re-calculate with acsMerkleRoot
+            let commitments = 
+                createCommitments block.txMerkleRoot block.witnessMerkleRoot acsMerkleRoot block.commitments 
+                |> computeCommitmentsRoot
+    
+            // We ignore the known commitments in the block as we already calculated them
+            // Only check that the final commitment is correct                 
+            if commitments = block.header.commitments then                
+                Ok (block,acs,ema)
+            else
+                Error "commitments mismatch"
             
     let checkTxInputs (block,acs,ema) =
         if isGenesis chain block then

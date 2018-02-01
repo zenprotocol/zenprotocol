@@ -14,41 +14,43 @@ open Infrastructure.ServiceBus.Agent
 
 let getUTXO = UtxoSetRepository.get
 
-let private activateContract chain contractPath acs (tx : Types.Transaction) shouldPublishEvents =
-    effectsWriter
-        {
-            match tx.contract with
-            | Some code ->
-                match Contract.compile contractPath code with
-                | Ok contract ->                    
-                    return ActiveContractSet.add contract.hash contract acs
-                | Error err ->
-                    Log.info "handle contract error: %A" err
-                    return acs
-            | None ->
-                return acs
-        }
+let private activateContract contractPath acs (tx : Types.Transaction) =
+    match tx.contract with
+    | Some code ->
+        match Contract.compile contractPath code with
+        | Ok contract ->                    
+            ActiveContractSet.add contract.hash contract acs
+            |> Ok
+        | Error err -> Error err
+    | None ->
+        Ok acs
 
-let private validateOrphanTransaction chain session contractPath state txHash tx  =
+let private validateOrphanTransaction session contractPath state txHash tx  =
     effectsWriter 
         {            
             match TransactionValidation.validateInputs (getUTXO session)
                     state.activeContractSet state.utxoSet txHash tx with
-            | Ok tx ->
-                let utxoSet = UtxoSet.handleTransaction (getUTXO session) txHash tx state.utxoSet
-                let mempool = MemPool.add txHash tx state.mempool
+            | Ok tx ->                
+                match activateContract contractPath state.activeContractSet tx with
+                | Ok acs ->
+                    let utxoSet = UtxoSet.handleTransaction (getUTXO session) txHash tx state.utxoSet
+                    let mempool = MemPool.add txHash tx state.mempool
+    
+                    do! publish (TransactionAddedToMemPool (txHash, tx))
+                    Log.info "Orphan transaction %s added to mempool" (Hash.toString txHash)
 
-                do! publish (TransactionAddedToMemPool (txHash, tx))
-                Log.info "Orphan transaction %s added to mempool" (Hash.toString txHash)
-
-                let! acs = activateContract chain contractPath state.activeContractSet tx true
-
-                let orphanPool = OrphanPool.remove txHash state.orphanPool
-                return {state with 
-                            activeContractSet=acs;
-                            mempool=mempool;
-                            utxoSet=utxoSet; 
-                            orphanPool=orphanPool}
+                
+                    let orphanPool = OrphanPool.remove txHash state.orphanPool
+                    return {state with 
+                                activeContractSet=acs;
+                                mempool=mempool;
+                                utxoSet=utxoSet; 
+                                orphanPool=orphanPool}
+                | Error error ->
+                    Log.info "Orphan transacation %s contract failed activation %A" (Hash.toString txHash) error 
+                    
+                    let orphanPool = OrphanPool.remove txHash state.orphanPool
+                    return {state with orphanPool = orphanPool}
             | Error Orphan 
             | Error ContractNotActive ->
                 // transacation is still orphan, nothing to do
@@ -60,18 +62,18 @@ let private validateOrphanTransaction chain session contractPath state txHash tx
                 return {state with orphanPool = orphanPool}
         }
         
-let rec validateOrphanTransactions chain session contractPath state =      
+let rec validateOrphanTransactions session contractPath state =      
     effectsWriter {
-        let! state' = OrphanPool.foldWriter (validateOrphanTransaction chain session contractPath) state state.orphanPool
+        let! state' = OrphanPool.foldWriter (validateOrphanTransaction session contractPath) state state.orphanPool
         
         // if orphan pool changed we run again until there is no change
         if state'.orphanPool <> state.orphanPool then
-            return! validateOrphanTransactions chain session contractPath state'
+            return! validateOrphanTransactions session contractPath state'
         else
             return state'
     }
           
-let validateInputs chain session contractPath txHash tx (state:MemoryState) shouldPublishEvents =
+let validateInputs session contractPath txHash tx (state:MemoryState) shouldPublishEvents =
     effectsWriter
         {           
             match TransactionValidation.validateInputs (getUTXO session)
@@ -93,23 +95,27 @@ let validateInputs chain session contractPath txHash tx (state:MemoryState) shou
 
                  return state
             | Ok tx ->
-                let! acs = activateContract chain contractPath state.activeContractSet tx shouldPublishEvents
-
-                let utxoSet = UtxoSet.handleTransaction (getUTXO session) txHash tx state.utxoSet
-                let mempool = MemPool.add txHash tx state.mempool
-
-                if shouldPublishEvents then
-                    do! publish (TransactionAddedToMemPool (txHash,tx))
-
-                Log.info "Transaction %s added to mempool" (Hash.toString txHash)
-
-                let state = {state with 
-                                activeContractSet=acs;
-                                mempool=mempool;
-                                utxoSet=utxoSet;
-                             }   
-                
-                return! validateOrphanTransactions chain session contractPath state
+                match activateContract contractPath state.activeContractSet tx with
+                | Ok acs ->
+                    let utxoSet = UtxoSet.handleTransaction (getUTXO session) txHash tx state.utxoSet
+                    let mempool = MemPool.add txHash tx state.mempool
+    
+                    if shouldPublishEvents then
+                        do! publish (TransactionAddedToMemPool (txHash,tx))
+    
+                    Log.info "Transaction %s added to mempool" (Hash.toString txHash)
+    
+                    let state = {state with 
+                                    activeContractSet=acs;
+                                    mempool=mempool;
+                                    utxoSet=utxoSet;
+                                 }   
+                    
+                    return! validateOrphanTransactions session contractPath state
+                | Error error ->
+                     Log.info "Transacation %s contract failed activation: %A" (Hash.toString txHash) error
+                    
+                     return state
         }
 
 
@@ -128,7 +134,7 @@ let validateTransaction chain session contractPath tx (state:MemoryState) =
 
                 return state
             | Ok tx ->
-                return! validateInputs chain session contractPath txHash tx state true
+                return! validateInputs session contractPath txHash tx state true
     }
 
 let executeContract session txSkeleton cHash command state =
