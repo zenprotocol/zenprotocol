@@ -50,14 +50,14 @@ let fromTransaction tx outputs =
 
 let applyMask tx cw =
     let (=>) list length = 
-        List.length list >= length
+        List.length list |> uint32 >= length
 
     if tx.pInputs => cw.inputsLength &&
        tx.outputs => cw.outputsLength then
         Ok { 
             tx with 
-                pInputs = tx.pInputs.[0 .. cw.beginInputs - 1 ]
-                outputs = tx.outputs.[0 .. cw.beginOutputs - 1 ]
+                pInputs = tx.pInputs.[0 .. int cw.beginInputs - 1 ]
+                outputs = tx.outputs.[0 .. int cw.beginOutputs - 1 ]
         }
     else
         Error "could not apply mask"

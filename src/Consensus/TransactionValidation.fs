@@ -65,16 +65,29 @@ let private checkWitnesses acs (Hash.Hash txHash, tx, inputs) =
         | _ -> GeneralError "unexpected PK witness lock type"
 
     let checkContractWitness inputTx acs cw pInputs =
-        let checkIssuedAndDestroyed txSkeleton cw =
-            txSkeleton.pInputs.[cw.beginInputs .. cw.beginInputs + cw.inputsLength - 1]
-            |> List.forall (fun (outpoint, {spend=spend}) ->
-                not <| TxSkeleton.isSkeletonOutpoint outpoint || spend.asset = cw.cHash) 
-            &&
-            txSkeleton.outputs.[cw.beginOutputs .. cw.beginOutputs + cw.outputsLength - 1]
-            |> List.forall (
-                function
-                | {lock=Destroy; spend=spend} -> spend.asset = cw.cHash
-                | _ -> true)
+        let checkIssuedAndDestroyed cw txSkeleton =
+            let endInputs = cw.beginInputs + cw.inputsLength - 1u |> int
+            let endOutputs = cw.beginOutputs + cw.outputsLength - 1u |> int
+            
+            if  endInputs >= List.length txSkeleton.pInputs ||
+                endOutputs >= List.length txSkeleton.outputs
+            then 
+                GeneralError "invalid contract witness indices"
+            else if 
+                txSkeleton.pInputs.[int cw.beginInputs .. endInputs]
+                |> List.exists (fun (outpoint, {spend=spend}) ->
+                    TxSkeleton.isSkeletonOutpoint outpoint && spend.asset <> cw.cHash)
+            then 
+                GeneralError "illegal creation of tokens"
+            else if
+                txSkeleton.outputs.[int cw.beginOutputs .. endOutputs]
+                |> List.exists (function
+                    | {lock=Destroy; spend=spend} when spend.asset <> cw.cHash -> true
+                    | _ -> false)
+            then 
+                GeneralError "illegal destruction of tokens"
+            else 
+                Ok txSkeleton
                 
         let rec popContractsLocksOf cHash pInputs =
             match pInputs with
@@ -89,16 +102,15 @@ let private checkWitnesses acs (Hash.Hash txHash, tx, inputs) =
         | Some contract ->
             let contractWallet = getContractWallet tx inputs cw.cHash
             
-            match Contract.run contract cw.command contractWallet inputTx with 
-            | Ok outputTx ->
-                if checkIssuedAndDestroyed outputTx cw then                                   
-                    if List.length outputTx.pInputs - List.length inputTx.pInputs = cw.inputsLength && 
-                       List.length outputTx.outputs - List.length inputTx.outputs = cw.outputsLength then
-                        
-                        Ok (outputTx, popContractsLocksOf cw.cHash pInputs)
-                    else GeneralError "input/output length mismatch"
-                else GeneralError "illegal creation/destruction of tokens"
-            | Error err -> GeneralError ("contract witness validation error:" + err)
+            Contract.run contract cw.command contractWallet inputTx
+            |> Result.mapError General
+            |> Result.bind (checkIssuedAndDestroyed cw)
+            |> Result.bind (fun outputTx ->
+                if List.length outputTx.pInputs - List.length inputTx.pInputs = int cw.inputsLength && 
+                   List.length outputTx.outputs - List.length inputTx.outputs = int cw.outputsLength then
+                    
+                    Ok (outputTx, popContractsLocksOf cw.cHash pInputs)
+                else GeneralError "input/output length mismatch")
         | None -> Error ContractNotActive
 
     let witnessesFolder state witness =
@@ -123,7 +135,7 @@ let private checkWitnesses acs (Hash.Hash txHash, tx, inputs) =
 
     TxSkeleton.fromTransaction tx inputs 
     |> Result.bind applyMaskIfContract
-    |> Result.mapError (fun err -> General err)
+    |> Result.mapError General
     |> Result.bind (fun tx' -> 
         List.fold witnessesFolder (Ok (tx', tx'.pInputs)) tx.witnesses)
     |> Result.bind (

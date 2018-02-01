@@ -46,13 +46,15 @@ let sign keyPairs tx =
     addWitnesses tx pkWitnesses
 
 let addContractWitness cHash command initialTxSkelton finalTxSkeleton tx =
+    let length list = List.length list |> uint32
+    
     addWitnesses tx [ ContractWitness {
         cHash = cHash 
         command = command
-        beginInputs = List.length initialTxSkelton.pInputs
-        beginOutputs = List.length initialTxSkelton.outputs
-        inputsLength = List.length finalTxSkeleton.pInputs - List.length initialTxSkelton.pInputs
-        outputsLength = List.length finalTxSkeleton.outputs - List.length initialTxSkelton.outputs
+        beginInputs = length initialTxSkelton.pInputs
+        beginOutputs = length initialTxSkelton.outputs
+        inputsLength = length finalTxSkeleton.pInputs - length initialTxSkelton.pInputs
+        outputsLength = length finalTxSkeleton.outputs - length initialTxSkelton.outputs
     } ]
 
 let fromTxSkeleton tx =
