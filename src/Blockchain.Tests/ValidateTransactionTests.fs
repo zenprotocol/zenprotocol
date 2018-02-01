@@ -335,7 +335,7 @@ let ``Valid contract should be added to ActiveContractSet``() =
     OrphanPool.containsTransaction txHash state'.memoryState.orphanPool |> should equal false
 
 [<Test>]
-let ``Invalid contract should not be added to ActiveContractSet``() =
+let ``Invalid contract should not be added to ActiveContractSet or mempool``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
@@ -359,15 +359,10 @@ let ``Invalid contract should not be added to ActiveContractSet``() =
     // Checking that the contract is not in the ACS
     ActiveContractSet.containsContract cHash state'.memoryState.activeContractSet |> should equal false
 
-    //TODO: TBD following
+    events |> should haveLength 0
 
-    // Checking that TransactionAddedToMemPool was published
-
-    events |> should haveLength 1
-    events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (txHash, tx)))
-
-    // Checking that the transaction was added to mempool
-    MemPool.containsTransaction txHash state'.memoryState.mempool |> should equal true
+    // Checking that the transaction was not added to mempool
+    MemPool.containsTransaction txHash state'.memoryState.mempool |> should equal false
 
     // Checking that the transaction was not added to orphans
     OrphanPool.containsTransaction txHash state'.memoryState.orphanPool |> should equal false

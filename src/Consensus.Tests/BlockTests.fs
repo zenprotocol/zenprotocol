@@ -10,6 +10,7 @@ open Infrastructure
 open FsCheck
 open FsCheck.NUnit
 open FsUnit
+open TestsInfrastructure.Constraints
 
 let timestamp = 1515594186383UL + 1UL
 let difficulty = 0x20fffffful
@@ -192,9 +193,58 @@ let ``can connect valid block``() =
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate parent (timestamp+1UL) ema acs [tx]
     
-    let result = Block.connect Chain.Test getUTXO contractsPath parent timestamp utxoSet acs ema block
+    Block.connect Chain.Test getUTXO contractsPath parent timestamp utxoSet acs ema block
+    |> should be ok
+
+[<Test>]    
+let ``can connect block with a contract``() = 
+    let rootAccount = Account.createRoot ()    
+    let tx = 
+        Account.createActivateContractTransaction rootAccount SampleContract.sampleContractCode 
+        |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
+        
+    let contract : Contract.T = 
+        {
+            hash=Contract.computeHash SampleContract.sampleContractCode
+            fn= fun _ _ _ tx -> Ok tx
+            costFn = fun _ _ _ -> Ok 0I
+        }           
     
-    match result with 
-    | Ok _ -> ()
-    | Error error -> failwith error
+    let acs = ActiveContractSet.empty |> ActiveContractSet.add contract.hash contract
+    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO Transaction.rootTxHash Transaction.rootTx
+    let ema = EMA.create Chain.Test
     
+    let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
+    let block = Block.createTemplate parent (timestamp+1UL) ema acs [tx]
+    
+    Block.connect Chain.Test getUTXO contractsPath parent timestamp utxoSet acs ema block
+    |> should be ok
+         
+[<Test>]    
+let ``block with invalid contract failed connecting``() = 
+    let rootAccount = Account.createRoot ()    
+    let tx = 
+        Account.createTransaction 
+            Chain.Test rootAccount rootAccount.publicKeyHash {asset = Hash.zero; amount=1UL}
+            |> function | Ok x -> x | Error error -> failwith error
+
+    let tx = {tx with contract = Some ("ada","dasdas")}        
+        
+    let contract : Contract.T = 
+        {
+            hash=Contract.computeHash "ada"
+            fn= fun _ _ _ tx -> Ok tx
+            costFn = fun _ _ _ -> Ok 0I
+        } 
+            
+    let acs = ActiveContractSet.empty |> ActiveContractSet.add contract.hash contract
+    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO Transaction.rootTxHash Transaction.rootTx
+    let ema = EMA.create Chain.Test
+    
+    let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
+    let block = Block.createTemplate parent (timestamp+1UL) ema acs [tx]
+            
+    let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "invalid contract"
+    
+    Block.connect Chain.Test getUTXO contractsPath parent timestamp utxoSet acs ema block
+    |> should equal expected
