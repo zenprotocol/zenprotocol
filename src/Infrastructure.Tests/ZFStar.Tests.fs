@@ -16,14 +16,14 @@ open FsBech32
 
 let assemblyDirectory = "./test"
 
-let clean =
+let clean() =
     Platform.cleanDirectory assemblyDirectory
 
 [<SetUp>]
-    clean
+    clean()
 
 [<TearDown>]
-    clean
+    clean()
 
 let input : txSkeleton =
     emptyTxSkeleton

@@ -17,10 +17,10 @@ open Zen.Cost
 module ET = Zen.ErrorT
 module Tx = Zen.TxSkeleton
 
-val cf: txSkeleton -> string -> #l:nat -> wallet l -> cost nat 1
-let cf _ _ #l _ = ret 146
+val cf: txSkeleton -> string -> #l:nat -> wallet l -> cost nat 5
+let cf _ _ #l _ = ret (64 + 64 + 20)
 
-val main: txSkeleton -> hash -> string -> #l:nat -> wallet l -> cost (result txSkeleton) 146
+val main: txSkeleton -> hash -> string -> #l:nat -> wallet l -> cost (result txSkeleton) (64 + 64 + 20)
 let main txSkeleton contractHash command #l wallet =
   let spend = { asset=contractHash; amount=1000UL } in
   let lock = ContractLock contractHash in
@@ -33,7 +33,7 @@ let main txSkeleton contractHash command #l wallet =
   }, output in
 
   let txSkeleton1 = Tx.addInput pInput txSkeleton in
-  let txSkeleton2 = txSkeleton1 >>= Tx.lockToContract contractHash 1000UL contractHash in
+  let txSkeleton2 = txSkeleton1 >>= Tx.lockToContract spend.asset spend.amount contractHash in
   ET.retT txSkeleton2
   """
 

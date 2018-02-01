@@ -17,8 +17,8 @@ open Consensus.Types
 
 type ContractWallet = PointedOutput list
 
-type ContractFn = Hash -> string -> ContractWallet -> TxSkeleton -> Result<TxSkeleton,string>
-type ContractCostFn = string -> ContractWallet -> TxSkeleton -> Result<bigint,string>
+type ContractFn = Hash -> string -> ContractWallet -> TxSkeleton.T -> Result<TxSkeleton.T,string>
+type ContractCostFn = string -> ContractWallet -> TxSkeleton.T -> Result<bigint,string>
 
 type T = {
     hash: Hash

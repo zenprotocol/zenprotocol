@@ -70,13 +70,12 @@ let session = DatabaseContext.createSession databaseContext
 
 let mutable cHash = Hash.zero
 
-let clean =
-    if System.IO.Directory.Exists dataPath then 
-        System.IO.Directory.Delete (dataPath, true)
+let clean() =
+    Platform.cleanDirectory dataPath
     
 [<OneTimeSetUp>]
 let setUp = fun () ->
-    clean
+    clean()
     activateContract """
     open Zen.Types
     open Zen.Vector
@@ -109,7 +108,7 @@ let setUp = fun () ->
        
 [<TearDown>]
 let tearDown = fun () ->
-    clean
+    clean()
 
 [<Test>]
 let ``Wallet using contract should execute``() =
