@@ -45,11 +45,16 @@ let sign keyPairs tx =
     //// TODO: Should we also use sighash and not sign entire transaction?
     addWitnesses tx pkWitnesses
 
-let addContractWitness cHash command initialTxSkelton finalTxSkeleton tx =
+let addContractWitness cHash command returnAddress initialTxSkelton finalTxSkeleton tx =
     let length list = List.length list |> uint32
+    
+    let returnAddressIndex = 
+        List.tryFindIndex (fun output -> output.lock = returnAddress) tx.outputs
+        |> Option.map uint32
     
     addWitnesses tx [ ContractWitness {
         cHash = cHash 
+        returnAddressIndex = returnAddressIndex
         command = command
         beginInputs = length initialTxSkelton.pInputs
         beginOutputs = length initialTxSkelton.outputs

@@ -176,7 +176,7 @@ let ``picking from multiple inputs``() =
 let ``create execute contract transaction``() = 
     let account = Account.createRoot ()
     
-    let executeContract _ _ txSkeleton =             
+    let executeContract _ _ _ txSkeleton =             
         let tx = 
             txSkeleton
             |> TxSkeleton.addOutput {lock=Contract Hash.zero;spend={asset=Hash.zero;amount=1UL}} 

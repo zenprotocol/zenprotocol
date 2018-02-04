@@ -206,8 +206,8 @@ let ``can connect block with a contract``() =
     let contract : Contract.T = 
         {
             hash=Contract.computeHash SampleContract.sampleContractCode
-            fn= fun _ _ _ tx -> Ok tx
-            costFn = fun _ _ _ -> Ok 0I
+            fn= fun _ _ _ _ tx -> Ok tx
+            costFn = fun _ _ _ _ -> Ok 0I
         }           
     
     let acs = ActiveContractSet.empty |> ActiveContractSet.add contract.hash contract
@@ -233,8 +233,8 @@ let ``block with invalid contract failed connecting``() =
     let contract : Contract.T = 
         {
             hash=Contract.computeHash "ada"
-            fn= fun _ _ _ tx -> Ok tx
-            costFn = fun _ _ _ -> Ok 0I
+            fn= fun _ _ _ _ tx -> Ok tx
+            costFn = fun _ _ _ _ -> Ok 0I
         } 
             
     let acs = ActiveContractSet.empty |> ActiveContractSet.add contract.hash contract

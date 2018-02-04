@@ -33,7 +33,7 @@ val lockToPubKey:
 val lockToAddress:
   asset
   -> U64.t
-  -> address:hash
+  -> address:lock
   -> txSkeleton
   -> txSkeleton `cost` 64
 

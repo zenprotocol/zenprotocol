@@ -250,7 +250,7 @@ let createExecuteContractTransaction account executeContract cHash command spend
                 
                 Ok (txSkeleton,keys)) (Ok (TxSkeleton.empty,List.empty)) spends
     |> Result.bind (fun (txSkeleton,keys) ->                                                        
-        executeContract cHash command txSkeleton 
+        executeContract cHash command (PK account.publicKeyHash) txSkeleton 
         |> function
         | TransactionResult.Ok tx -> 
             Transaction.sign keys tx
