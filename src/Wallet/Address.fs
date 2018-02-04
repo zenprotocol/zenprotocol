@@ -19,6 +19,7 @@ let private getHash =
 let private getChainType =
     function
     | Main -> 'z'
+    | Local
     | Test -> 't'
 
 let private getAddressType =

@@ -18,7 +18,7 @@ open Consensus.Contract
 open TestsInfrastructure.Constraints
 
 let (>>=) = Writer.bind
-let chain = Chain.Test
+let chain = Chain.Local
 let timestamp = 1515594186383UL + 1UL
 
 let getTxOutpints tx = List.mapi (fun i _ -> 

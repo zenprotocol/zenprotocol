@@ -17,7 +17,7 @@ open Api.Types
 module Actor = FsNetMQ.Actor
 
 let busName = "test"
-let chain = Chain.Test
+let chain = Chain.Local
 let dataPath = ".data"
 let apiUri = "127.0.0.1:29555"
 

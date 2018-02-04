@@ -16,14 +16,14 @@ let ``validating block header with invalid proof of work``(header: BlockHeader) 
     
     let expected :Result<BlockHeader, string> = Error "proof of work failed"
     
-    BlockHeader.validate Chain.Test header = expected
+    BlockHeader.validate Chain.Local header = expected
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]  
 let ``validating block header with correct proof of work``(header:BlockHeader) = 
     // changing the difficulty to easiest one
     let header = {header with difficulty = 0x20fffffful }
   
-    BlockHeader.validate Chain.Test header = Ok header
+    BlockHeader.validate Chain.Local header = Ok header
     
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]  
 let ``seralizing and deserialing yield same header``(header:BlockHeader) = 
