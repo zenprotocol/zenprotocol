@@ -598,8 +598,8 @@ let ``block with a contract activation is added to chain``() =
                 
     let contract = {
         hash = cHash
-        fn = fun _ _ _ tx -> Ok tx
-        costFn = fun _ _ tx -> Ok 1I
+        fn = fun _ _ _ _ tx -> Ok tx
+        costFn = fun _ _ _ tx -> Ok 1I
     }
      
     let acs = ActiveContractSet.add cHash contract state.tipState.activeContractSet

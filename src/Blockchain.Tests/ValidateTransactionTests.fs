@@ -390,7 +390,7 @@ let ``contract activation arrived, running orphan transaction``() =
         |> Writer.unwrap  
         
     let tx = 
-        TransactionHandler.executeContract session sampleInputTx sampleContractHash "" stateWithContract.memoryState
+        TransactionHandler.executeContract session sampleInputTx sampleContractHash "" (PK Hash.zero) stateWithContract.memoryState
         |> getResult
     let txHash = Transaction.hash tx        
     

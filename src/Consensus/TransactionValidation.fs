@@ -102,7 +102,16 @@ let private checkWitnesses acs (Hash.Hash txHash, tx, inputs) =
         | Some contract ->
             let contractWallet = getContractWallet tx inputs cw.cHash
             
-            Contract.run contract cw.command contractWallet inputTx
+            let returnAddress = 
+                Option.bind (fun (index:uint32) ->
+                    let index = int index
+                 
+                    if index < List.length tx.outputs then
+                        Some tx.outputs.[index].lock
+                    else
+                        None) cw.returnAddressIndex
+            
+            Contract.run contract cw.command returnAddress contractWallet inputTx
             |> Result.mapError General
             |> Result.bind (checkIssuedAndDestroyed cw)
             |> Result.bind (fun outputTx ->

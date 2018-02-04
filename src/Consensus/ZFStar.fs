@@ -5,6 +5,7 @@ open Operators.Checked
 open Consensus.Types
 open Consensus.Hash
 open Consensus.TxSkeleton
+open FSharp.Compatibility.OCaml
 open Zen.Types.Extracted
 open Zen.Types.Realized
 open Zen.TxSkeleton
@@ -26,7 +27,12 @@ let private throwNotImplemented s1 s2 =
     |> System.NotImplementedException
     |> raise
 
-let private fsToFstLock (outputLock:Types.Lock) : lock =
+let fsToFstOption mapper value = 
+    match value with
+    | FSharp.Core.Some value -> mapper value |> FStar.Pervasives.Native.Some
+    | FSharp.Core.None -> FStar.Pervasives.Native.None
+
+let fsToFstLock (outputLock:Types.Lock) : lock =
     match outputLock with
     | PK (Hash.Hash pkHash) ->
         PKLock pkHash
@@ -135,15 +141,19 @@ let fstTofsMainFunction
         : TxSkeleton.T 
           -> Hash 
           -> string
+          -> Lock option
           -> list<PointedOutput>
           -> Result<TxSkeleton.T, string> =
-    fun txSkel contractHash command wallet ->
+    fun txSkel contractHash command returnAddress wallet ->
         let txSkel = convertInput txSkel
         let wallet = convetWallet wallet
         let contractHash = bytes contractHash
+        let returnAddress = fsToFstOption fsToFstLock returnAddress            
+
         mainFunction txSkel 
                      contractHash 
-                     command 
+                     command
+                     returnAddress 
                      (vectorLength wallet) 
                      wallet
         |> unCost

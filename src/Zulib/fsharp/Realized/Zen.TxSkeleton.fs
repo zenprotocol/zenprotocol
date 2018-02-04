@@ -91,8 +91,13 @@ let lockToPubKey (asset : asset) (amount:uint64) (pkHash : hash) (txSkeleton : t
           insertOutput output txSkeleton)
     |> Cost.C
 
-let lockToAddress (asset : asset) (amount:uint64) (address : hash) (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
-    lockToPubKey asset amount address txSkeleton
+let lockToAddress (asset : asset) (amount:uint64) (address : lock) (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
+    lazy (    
+          let output =
+              { lock = address;
+                spend = {asset=asset;amount=amount} }
+          insertOutput output txSkeleton)
+    |> Cost.C    
 
 let addChangeOutput (asset : asset) (contractHash : contractHash)
     (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
