@@ -22,7 +22,7 @@ open TestsInfrastructure.Constraints
 
 type TransactionResult = Messaging.Services.TransactionResult
 
-let chain = ChainParameters.Test
+let chain = ChainParameters.Local
 // Helper functions for the tests
 let getStringBytes (str : string) = System.Text.Encoding.UTF8.GetBytes str
 let getStringHash = getStringBytes >> Hash.compute

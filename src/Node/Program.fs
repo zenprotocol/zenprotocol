@@ -50,7 +50,7 @@ let createBroker () =
 let getChain (config:Config) = 
     match config.chain with
     | "main" -> Main
-    | _ -> Test
+    | _ -> Local
 
 [<EntryPoint>]
 let main argv = 
