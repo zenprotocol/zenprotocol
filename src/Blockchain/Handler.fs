@@ -111,7 +111,6 @@ let handleRequest (requestId:RequestId) request session timestamp state =
             |> requestId.reply<(Hash.Hash*Types.BlockHeader) option>                 
         else 
             requestId.reply<(Hash.Hash*Types.BlockHeader) option> None                       
-    | _ -> ()
     ret state
         
 let handleEvent event session timestamp state = 

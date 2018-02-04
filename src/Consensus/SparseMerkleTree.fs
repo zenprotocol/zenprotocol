@@ -165,7 +165,7 @@ let addMultiple tree keys =
     |> Array.map (fun (key,value) -> key,Value value) 
     |> updateMultiple tree         
                   
-let add key value tree = 
+let add<'a> key (value:'a) tree = 
     let data = Map.add key value tree.data    
     let root,cache = update' tree tree.cache (Map.toArray data) [| key, (Value value)|] N initialBase
     
@@ -238,7 +238,7 @@ let addToRoot tree auditPath key value root =
 let removeFromRoot tree auditPath key root =    
     verifyAuditPath tree key Empty auditPath N initialBase
 
-let tryFind key tree = 
+let tryFind<'a> key (tree:T<'a>) = 
     Map.tryFind key tree.data  
     
-let containsKey key tree = Map.containsKey key tree.data          
+let containsKey<'a> key (tree:T<'a>) = Map.containsKey key tree.data          

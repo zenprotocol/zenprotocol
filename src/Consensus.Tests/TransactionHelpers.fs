@@ -9,10 +9,12 @@ let getSignedTx tx keys =
     let txHash = Transaction.hash signedTx
     signedTx, txHash
 
+let private contractPath = "./test"
+
 let private inputsValidation acs utxos signedTx txHash =
     let getUTXO _ = UtxoSet.NoOutput
     
-    validateInputs getUTXO acs utxos txHash signedTx
+    validateInContext getUTXO contractPath acs utxos txHash signedTx |> Result.map fst
 
 let inputsValidationMsg msg acs utxos tx keys =
     let signedTx, txHash = getSignedTx tx keys

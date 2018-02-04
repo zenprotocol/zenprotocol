@@ -13,14 +13,16 @@ open Consensus
 open Consensus.UtxoSet
 open TestsInfrastructure.Nunit
 
-let contractsPath = "./test"
+let result = new Infrastructure.Result.ResultBuilder<string>()
+
+let contractPath = "./test"
 
 let getUTXO _ = UtxoSet.NoOutput
 
-let compile code =
-    Contract.recordHints code
-    |> Result.map (fun hints -> (code, hints))
-    |> Result.bind (Contract.compile contractsPath)
+let compile code = result {
+    let! hints = Contract.recordHints code
+    return! Contract.compile contractPath (code, hints)
+}
 
 let compileAndCheck code =
     compile code
@@ -46,7 +48,7 @@ let ``Should get 'elaborate' error for invalid code``() =
 
 let validateInputs (contract:Contract.T) utxos tx  =
     let acs = ActiveContractSet.add contract.hash contract ActiveContractSet.empty
-    TransactionValidation.validateInputs getUTXO acs utxos (Transaction.hash tx) tx
+    TransactionValidation.validateInContext getUTXO contractPath acs utxos (Transaction.hash tx) tx
     |> Result.mapError (function
         | TransactionValidation.ValidationError.General error -> error
         | other -> other.ToString())
@@ -61,6 +63,7 @@ let compileRunAndValidate inputTx utxoSet code =
             Transaction.addContractWitness contract.hash "" (PK Hash.zero) inputTx finalTxSkeleton tx)
         |> Result.map (Transaction.sign [ sampleKeyPair ])
         |> Result.bind (validateInputs contract utxoSet))
+        |> Result.map fst
 
 let utxoSet = 
     getSampleUtxoset (UtxoSet.asDatabase)
@@ -118,7 +121,7 @@ let ``Contract should not be able to create tokens other than its own``() =
     |> shouldEqual
 
 [<Test>]
-let ``Contract should be able to destroy it own tokens locked to it``() =
+let ``Contract should be able to destroy its own tokens locked to it``() =
     let sampleContractCode = """
     open Zen.Types
     open Zen.Vector
