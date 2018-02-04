@@ -17,7 +17,7 @@ let serialize mode tx =
         | Full -> tx
         | WithoutWitness -> {tx with witnesses=[]}
 
-    Binary.pickle pickler tx     
+    Binary.pickle pickler tx
 
 let deserialize tx =
     try
@@ -27,17 +27,17 @@ let deserialize tx =
 let hash =
     serialize WithoutWitness >> Hash.compute
 
-let witnessHash = 
+let witnessHash =
     //TODO: only serialize witness
-    serialize Full >> Hash.compute    
-   
-let addWitnesses tx witnesses = 
+    serialize Full >> Hash.compute
+
+let addWitnesses tx witnesses =
     { tx with witnesses = witnesses @ tx.witnesses }
-     
+
 let sign keyPairs tx =
     let txHash = hash tx
 
-    let pkWitnesses = 
+    let pkWitnesses =
         List.map (
             fun ((secretKey, publicKey)) -> PKWitness (PublicKey.serialize publicKey, Crypto.sign secretKey txHash)
         ) keyPairs
@@ -47,15 +47,16 @@ let sign keyPairs tx =
 
 let addContractWitness cHash command returnAddress initialTxSkelton finalTxSkeleton tx =
     let length list = List.length list |> uint32
-    
-    let returnAddressIndex = 
+
+    let returnAddressIndex =
         List.tryFindIndex (fun output -> output.lock = returnAddress) tx.outputs
         |> Option.map uint32
-    
+
     addWitnesses tx [ ContractWitness {
-        cHash = cHash 
+        cHash = cHash
         returnAddressIndex = returnAddressIndex
         command = command
+        message = message
         beginInputs = length initialTxSkelton.pInputs
         beginOutputs = length initialTxSkelton.outputs
         inputsLength = length finalTxSkeleton.pInputs - length initialTxSkelton.pInputs

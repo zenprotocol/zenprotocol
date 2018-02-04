@@ -23,19 +23,19 @@ let private GeneralError msg =
 
 let private addSpend s m =
     let (+) a b =
-        try 
-            Some (Operators.Checked.(+) a b) with 
+        try
+            Some (Operators.Checked.(+) a b) with
         | :? System.OverflowException -> None
     match Map.tryFind s.asset m with
     | Some (Some v) -> Map.add s.asset (v + s.amount) m
     | Some None -> m
     | None -> Map.add s.asset (0UL + s.amount) m
 
-let private foldSpends = 
-    List.map (fun o -> o.spend) 
+let private foldSpends =
+    List.map (fun o -> o.spend)
     >> List.fold (fun map s -> addSpend s map) Map.empty
 
-let private checkSpends m = 
+let private checkSpends m =
     Map.forall (fun _ v -> Option.isSome v) m
 
 let private activateContract contractPath acs (tx : Types.Transaction) = result {
@@ -47,7 +47,7 @@ let private activateContract contractPath acs (tx : Types.Transaction) = result 
         return acs
 }
 
-let private checkAmounts (txSkeleton:TxSkeleton.T) = 
+let private checkAmounts (txSkeleton:TxSkeleton.T) =
     let inputs, outputs = foldSpends (txSkeleton.pInputs |> List.map snd), foldSpends txSkeleton.outputs
 
     if not <| checkSpends outputs then
@@ -59,9 +59,9 @@ let private checkAmounts (txSkeleton:TxSkeleton.T) =
     else
         Ok ()
 
-let getContractWallet tx inputs cHash =     
+let getContractWallet tx inputs cHash =
     List.zip tx.inputs inputs
-    |> List.filter (fun (_,output) -> output.lock = Contract cHash)                                        
+    |> List.filter (fun (_,output) -> output.lock = Contract cHash)
 
 let private checkWitnesses acs (Hash.Hash txHash, tx, inputs) =
     let checkPKWitness inputTx pInputs serializedPublicKey signature =
@@ -79,10 +79,10 @@ let private checkWitnesses acs (Hash.Hash txHash, tx, inputs) =
         | _ -> GeneralError "unexpected PK witness lock type"
 
     let checkContractWitness inputTx acs cw pInputs =
-        let checkIssuedAndDestroyed cw (txSkeleton:TxSkeleton.T) =
+        let checkIssuedAndDestroyed cw (txSkeleton, message) =
             let endInputs = cw.beginInputs + cw.inputsLength - 1u |> int
             let endOutputs = cw.beginOutputs + cw.outputsLength - 1u |> int
-            
+
             if  endInputs >= List.length txSkeleton.pInputs ||
                 endOutputs >= List.length txSkeleton.outputs
             then
@@ -102,7 +102,7 @@ let private checkWitnesses acs (Hash.Hash txHash, tx, inputs) =
                 GeneralError "illegal destruction of tokens"
             else
                 Ok txSkeleton
-                
+
         let rec popContractsLocksOf cHash pInputs =
             match pInputs with
             | [] -> []
@@ -115,23 +115,23 @@ let private checkWitnesses acs (Hash.Hash txHash, tx, inputs) =
         match ActiveContractSet.tryFind cw.cHash acs with
         | Some contract ->
             let contractWallet = getContractWallet tx inputs cw.cHash
-            
-            let returnAddress = 
+
+            let returnAddress =
                 Option.bind (fun (index:uint32) ->
                     let index = int index
-                 
+
                     if index < List.length tx.outputs then
                         Some tx.outputs.[index].lock
                     else
                         None) cw.returnAddressIndex
-            
+
             Contract.run contract cw.command returnAddress contractWallet inputTx
             |> Result.mapError General
             |> Result.bind (checkIssuedAndDestroyed cw)
             |> Result.bind (fun outputTx ->
                 if List.length outputTx.pInputs - List.length inputTx.pInputs = int cw.inputsLength &&
                    List.length outputTx.outputs - List.length inputTx.outputs = int cw.outputsLength then
-                    
+
                     Ok (outputTx, popContractsLocksOf cw.cHash pInputs)
                 else GeneralError "input/output length mismatch")
         | None -> Error ContractNotActive
@@ -160,7 +160,7 @@ let private checkWitnesses acs (Hash.Hash txHash, tx, inputs) =
         let! txSkel = TxSkeleton.fromTransaction tx inputs |> Result.mapError General
         let! masked = applyMaskIfContract txSkel |> Result.mapError General
         let! (witnessedSkel, pInputs) =
-            List.fold witnessesFolder 
+            List.fold witnessesFolder
                     (Ok (masked, masked.pInputs))
                     tx.witnesses
         if not <| List.isEmpty pInputs then
@@ -171,7 +171,7 @@ let private checkWitnesses acs (Hash.Hash txHash, tx, inputs) =
             return witnessedSkel
     }
 
-let private checkInputsNotEmpty tx = 
+let private checkInputsNotEmpty tx =
     if List.isEmpty tx.inputs then GeneralError "inputs empty"
     else Ok tx
 
@@ -184,7 +184,7 @@ let private checkOutputsNotEmpty tx =
         Ok tx
 
 let private checkOutputsOverflow tx =
-    if tx.outputs 
+    if tx.outputs
           |> foldSpends
           |> checkSpends then Ok tx
     else GeneralError "outputs overflow"
@@ -206,7 +206,7 @@ let private tryGetUtxos getUTXO utxoSet (txHash:Hash.Hash) tx =
         if List.contains Spent errors then DoubleSpend else Orphan
     )
 
-let validateBasic = 
+let validateBasic =
     checkInputsNotEmpty
     >=> checkOutputsNotEmpty
     >=> checkOutputsOverflow

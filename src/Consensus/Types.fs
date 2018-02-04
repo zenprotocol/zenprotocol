@@ -25,9 +25,15 @@ type Output = {
 
 type PointedOutput = Outpoint * Output
 
+type Message = {
+    cHash: Hash
+    command: string
+    //TODO: data
+}
+
 type ContractWitness = {
     cHash: Hash
-    command : string
+    command: string
     returnAddressIndex : uint32 option
     beginInputs: uint32
     beginOutputs: uint32
@@ -35,7 +41,7 @@ type ContractWitness = {
     outputsLength: uint32
 }
 
-type Witness = 
+type Witness =
     | PKWitness of array<byte> * Signature
     | ContractWitness of ContractWitness
 
