@@ -1,5 +1,6 @@
 module Api.Server
 
+open System.Windows.Input
 open FSharp.Data
 open Consensus
 open Infrastructure
@@ -34,6 +35,20 @@ let handleRequest chain client (request,reply) =
             reply StatusCode.OK NoContent
 
     match request with
+    | Get ("/contract/hash", query) ->
+        match Map.tryFind "address" query with 
+        | None -> 
+              TextContent (sprintf "address is missing")
+              |> reply StatusCode.BadRequest   
+        | Some address ->         
+            match Address.decodeContract chain address with
+            | FSharp.Core.Ok cHash ->
+                TextContent (Hash.toString cHash)
+                |> reply StatusCode.OK
+            | FSharp.Core.Error _ ->
+                TextContent (sprintf "invalid address %A" query)
+                |> reply StatusCode.BadRequest            
+        
     | Get ("/wallet/balance", _) ->            
         let balances = Wallet.getBalance client
 
@@ -75,7 +90,7 @@ let handleRequest chain client (request,reply) =
         | Result.Error error -> replyError error
         | Result.Ok (cHash, command, spends) ->
             Wallet.executeContract client cHash command spends
-            |> validateTx
+            |> validateTx               
     | _ ->
         reply StatusCode.NotFound NoContent    
 

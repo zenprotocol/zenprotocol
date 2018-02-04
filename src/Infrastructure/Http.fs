@@ -15,7 +15,7 @@ type Content =
 type ReplyFunction = StatusCode -> Content -> unit
 
 type Request =
-    | Get of path : string * query : string 
+    | Get of path : string * query: Map<string,string> 
     | Post of path : string * Body
     
 type Context = Request * ReplyFunction    
@@ -97,8 +97,14 @@ module Server =
                     
                     match context.Request.HttpMethod with
                     | "GET" ->                     
+                        let nameValueCollection = System.Web.HttpUtility.ParseQueryString context.Request.Url.Query                        
+                        let queryParameters = 
+                            nameValueCollection.AllKeys
+                            |> Seq.map (fun key -> key, nameValueCollection.Get(key))
+                            |> Map.ofSeq
+                    
                         invokeOnNext poller observer 
-                            (Get (path, context.Request.Url.Query), reply)
+                            (Get (path, queryParameters), reply)
                     | "POST" -> 
                         let! body = getBody context.Request
                         match body with
