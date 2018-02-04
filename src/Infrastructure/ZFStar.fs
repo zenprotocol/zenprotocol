@@ -104,8 +104,12 @@ let private extract (code, hints, limits) moduleName =
                 "--max_ifuel"; maxIFuel.ToString()
                 ]
             |> wrapFStar "extract" extractedFile)
-    finally
+    finally    
+#if DEBUG    
+        ()
+#else 
         Directory.Delete (oDir, true)
+#endif    
 
 let calculateMetrics hints = 
     let oDir, file = initOutputDir "" //as for now, using the filesystem as temprary solution
@@ -135,7 +139,11 @@ let calculateMetrics hints =
         with _ as ex ->
             Exception.toError "limits" ex
     finally
+#if DEBUG    
+        ()
+#else 
         Directory.Delete (oDir, true)
+#endif        
 
 let recordHints code moduleName =
     let oDir, file = initOutputDir moduleName
@@ -153,8 +161,12 @@ let recordHints code moduleName =
                  "--no_default_includes"; elaboratedFile ]
             |> wrapFStar "record hints" hintsFile)
     finally
+#if DEBUG    
+        ()
+#else 
         Directory.Delete (oDir, true)
-
+#endif 
+   
 let compile path (code,hints) moduleName = 
     calculateMetrics hints
     |> Result.bind (fun limits -> extract (code,hints,limits) moduleName)
