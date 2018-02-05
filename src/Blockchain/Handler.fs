@@ -76,24 +76,19 @@ let handleCommand chain command session timestamp (state:State) =
                                 
                 return state          
         }
-                                                    
-let handleRequest (requestId:RequestId) request session timestamp state = 
+
+let private selectTransactions _ = id
+                                                            
+let handleRequest (requestId:RequestId) request session timestamp state =
     match request with
-    | ExecuteContract (txSkeleton,command, cHash) ->
-        TransactionHandler.executeContract session txSkeleton cHash command state.memoryState
-        |> function 
-        | Result.Ok tx -> TransactionResult.Ok tx
-        | Result.Error err -> TransactionResult.Error err
+    | ExecuteContract (cHash, command, returnAddress, txSkeleton) ->
+        TransactionHandler.executeContract session txSkeleton cHash command returnAddress state.memoryState
         |> requestId.reply
     | GetBlockTemplate ->
         if MemPool.isEmpty state.memoryState.mempool || state.tipState.tip = ExtendedBlockHeader.empty then 
             requestId.reply<Types.Block option> None
         else
-            let transactions = 
-                Map.toSeq state.memoryState.mempool 
-                |> Seq.map snd
-                |> List.ofSeq
-        
+            let transactions = state.memoryState.mempool |> MemPool.getTransactions |> selectTransactions session
             let block = Block.createTemplate state.tipState.tip.header (Timestamp.now ()) state.tipState.ema state.memoryState.activeContractSet transactions
             
             requestId.reply<Types.Block option> (Some block)
@@ -116,8 +111,7 @@ let handleRequest (requestId:RequestId) request session timestamp state =
             |> requestId.reply<(Hash.Hash*Types.BlockHeader) option>                 
         else 
             requestId.reply<(Hash.Hash*Types.BlockHeader) option> None                       
-    | _ -> ()
     ret state
-    
+        
 let handleEvent event session timestamp state = 
     ret state

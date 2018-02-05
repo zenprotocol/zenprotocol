@@ -18,7 +18,7 @@ open Consensus.Contract
 open TestsInfrastructure.Constraints
 
 let (>>=) = Writer.bind
-let chain = Chain.Test
+let chain = Chain.Local
 let timestamp = 1515594186383UL + 1UL
 
 let getTxOutpints tx = List.mapi (fun i _ -> 
@@ -38,7 +38,7 @@ let isAccountInSet session (account:Account.T) =
         
     areOutpointsInSet session outpoints
     
-let rootAccount = Account.createRoot ()
+let rootAccount = Account.createTestAccount ()
     
 let createTransaction account =
     match Account.createTransaction chain account account.publicKeyHash {asset=Hash.zero;amount=1UL} with
@@ -133,6 +133,7 @@ let ``genesis block accepted``() =
                            state'.tipState.activeContractSet,
                            state'.tipState.ema))
     
+    state'.tipState.tip.status |> should equal ExtendedBlockHeader.MainChain
     state'.tipState.tip.header |> should equal block.header
     state'.memoryState.utxoSet |> should equal UtxoSet.asDatabase 
     state'.tipState.activeContractSet |> should equal state'.memoryState.activeContractSet
@@ -186,6 +187,7 @@ let ``validate new valid block which extended main chain``() =
                            state'.tipState.activeContractSet,
                            state'.tipState.ema))
 
+    state'.tipState.tip.status |> should equal ExtendedBlockHeader.MainChain
     state'.tipState.tip.header |> should equal block.header
     state'.memoryState.utxoSet |> should equal UtxoSet.asDatabase
     state'.tipState.activeContractSet |> should equal state'.memoryState.activeContractSet
@@ -275,6 +277,7 @@ let ``validate new block which connect orphan chain which extend main chain``() 
                            state'.tipState.activeContractSet,
                            state'.tipState.ema))       
        
+    state'.tipState.tip.status |> should equal ExtendedBlockHeader.MainChain       
     state'.tipState.tip.header |> should equal block.header
     state'.memoryState.utxoSet |> should equal UtxoSet.asDatabase
     state'.tipState.activeContractSet |> should equal state'.memoryState.activeContractSet
@@ -320,11 +323,29 @@ let ``orphan chain become longer than main chain``() =
     // validate main chain first
     let _,state = validateChain session alternativeChain state
     
+    // Check that the alternative chain, which is now main, is marked as main
+    List.iter (fun block -> 
+        let blockHash = Block.hash block
+        let extendedHeader = BlockRepository.getHeader session blockHash
+        extendedHeader.status |> should equal ExtendedBlockHeader.MainChain) alternativeChain
+    
     // now validating orphan chain which is longer
     // we reverse the order of block in order to make it orphan first
     let events,state = validateChain session (List.rev mainChain) state
     
     let tip = List.last mainChain
+    
+    // Making sure all the alternative chain status changed to Connected
+    List.iter (fun block -> 
+        let blockHash = Block.hash block
+        let extendedHeader = BlockRepository.getHeader session blockHash
+        extendedHeader.status |> should equal ExtendedBlockHeader.Connected) alternativeChain
+    
+    // Making sure all the new main chain status changed to Main
+    List.iter (fun block -> 
+        let blockHash = Block.hash block
+        let extendedHeader = BlockRepository.getHeader session blockHash
+        extendedHeader.status |> should equal ExtendedBlockHeader.MainChain) mainChain        
     
     BlockRepository.tryGetTip session 
     |> should equal (Some (state.tipState.tip,
@@ -338,6 +359,7 @@ let ``orphan chain become longer than main chain``() =
     events.[3] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock mainChain.[1])))
     events.[4] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock mainChain.[2])))
 
+    state.tipState.tip.status |> should equal ExtendedBlockHeader.MainChain
     state.tipState.tip.header |> should equal tip.header
     state.memoryState.utxoSet |> should equal UtxoSet.asDatabase
     state.tipState.activeContractSet |> should equal state.memoryState.activeContractSet
@@ -576,8 +598,8 @@ let ``block with a contract activation is added to chain``() =
                 
     let contract = {
         hash = cHash
-        fn = fun _ _ _ tx -> Ok tx
-        costFn = fun _ _ tx -> Ok 1I
+        fn = fun _ _ _ _ tx -> Ok tx
+        costFn = fun _ _ _ tx -> Ok 1I
     }
      
     let acs = ActiveContractSet.add cHash contract state.tipState.activeContractSet

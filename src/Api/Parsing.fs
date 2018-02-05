@@ -59,3 +59,13 @@ let getContractActivate chain json =
             Ok json.Code
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
+        
+let getPublishBlock json = 
+    try 
+        let json = PublishBlockJson.Parse json
+        
+        match Block.fromHex json.Block with
+        | Some block -> Ok block
+        | None -> Error "invalid block"
+    with _ as ex ->
+        Error ("Json is invalid: " + ex.Message)            

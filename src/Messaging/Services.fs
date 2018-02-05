@@ -6,12 +6,9 @@ open Hash
 open TxSkeleton
 open Infrastructure.ServiceBus.Client
 
-// We are using custom result because fspicker cannot serialize result
-type TransactionResult =
-    | Ok of Transaction
-    | Error of string                             
 
-// We are using custom result because fspicker cannot serialize result
+type TransactionResult = Result<Transaction,string>
+
 type ActivateContractTransactionResult =
     | Ok of Transaction * Hash
     | Error of string                             
@@ -32,7 +29,7 @@ module Blockchain =
         | ValidateMinedBlock of Types.Block
 
     type Request = 
-        | ExecuteContract of TxSkeleton * string * Hash.Hash
+        | ExecuteContract of Hash.Hash * string * Lock * TxSkeleton.T 
         | GetBlockTemplate
         | GetTip
         | GetBlock of Hash.Hash
@@ -52,8 +49,8 @@ module Blockchain =
     let handleMemPool client peerId txHashes =
         Command.send client serviceName (HandleMemPool (peerId,txHashes))                                                
 
-    let executeContract client cHash command txSkeleton = 
-        ExecuteContract (txSkeleton,command, cHash)
+    let executeContract client cHash command returnAddress txSkeleton = 
+        ExecuteContract (cHash,command, returnAddress,txSkeleton)
         |> Request.send<Request, TransactionResult> client serviceName
         
     let validateBlock client block = 

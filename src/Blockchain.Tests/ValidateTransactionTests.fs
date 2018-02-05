@@ -1,4 +1,4 @@
-﻿module Blockchain.Tests.ValidateTransactionTests
+module Blockchain.Tests.ValidateTransactionTests
 
 // This tests only for ValidateTransaction command
 // We don't need to cover the entire outcome of transaction validation
@@ -7,6 +7,7 @@
 
 open NUnit.Framework
 open FsUnit
+open DataAccess
 open Blockchain
 open Consensus
 open Consensus.Types
@@ -21,7 +22,7 @@ open TestsInfrastructure.Constraints
 
 type TransactionResult = Messaging.Services.TransactionResult
 
-let chain = ChainParameters.Test
+let chain = ChainParameters.Local
 // Helper functions for the tests
 let getStringBytes (str : string) = System.Text.Encoding.UTF8.GetBytes str
 let getStringHash = getStringBytes >> Hash.compute
@@ -37,7 +38,7 @@ let areOutpointsInSet session outpoints set =
 
 // Some default transaction to work with during the tests
 let tx =
-    let account = Account.createRoot ()
+    let account = Account.createTestAccount ()
     createTransaction account.publicKeyHash 1UL account
 let txHash = Transaction.hash tx
 let txOutpoints = getTxOutpints txHash tx
@@ -153,7 +154,7 @@ let ``origin tx hit mempool, orphan tx should be added to mempool``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
-    let rootAccount = Account.createRoot ()
+    let rootAccount = Account.createTestAccount ()
     let account1 = Account.create ()
     let account2 = Account.create ()
 
@@ -195,7 +196,7 @@ let ``orphan transaction is eventually invalid``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
-    let rootAccount = Account.createRoot ()
+    let rootAccount = Account.createTestAccount ()
     let account1 = Account.create ()
     let account2 = Account.create ()
 
@@ -243,7 +244,7 @@ let ``two orphan transaction spending same input``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
-    let rootAccount = Account.createRoot ()
+    let rootAccount = Account.createTestAccount ()
     let account1 = Account.create ()
     let account2 = Account.create ()
     let account3 = Account.create ()
@@ -303,7 +304,7 @@ let ``Valid contract should be added to ActiveContractSet``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
-    let rootAccount = Account.createRoot ()
+    let rootAccount = Account.createTestAccount ()
     let cHash = getStringHash sampleContractCode
 
     let tx =
@@ -334,11 +335,11 @@ let ``Valid contract should be added to ActiveContractSet``() =
     OrphanPool.containsTransaction txHash state'.memoryState.orphanPool |> should equal false
 
 [<Test>]
-let ``Invalid contract should not be added to ActiveContractSet``() =
+let ``Invalid contract should not be added to ActiveContractSet or mempool``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
-    let rootAccount = Account.createRoot ()
+    let rootAccount = Account.createTestAccount ()
     let contractCode = "x"
     let cHash = getStringHash contractCode
 
@@ -358,15 +359,10 @@ let ``Invalid contract should not be added to ActiveContractSet``() =
     // Checking that the contract is not in the ACS
     ActiveContractSet.containsContract cHash state'.memoryState.activeContractSet |> should equal false
 
-    //TODO: TBD following
+    events |> should haveLength 0
 
-    // Checking that TransactionAddedToMemPool was published
-
-    events |> should haveLength 1
-    events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (txHash, tx)))
-
-    // Checking that the transaction was added to mempool
-    MemPool.containsTransaction txHash state'.memoryState.mempool |> should equal true
+    // Checking that the transaction was not added to mempool
+    MemPool.containsTransaction txHash state'.memoryState.mempool |> should equal false
 
     // Checking that the transaction was not added to orphans
     OrphanPool.containsTransaction txHash state'.memoryState.orphanPool |> should equal false
@@ -380,7 +376,7 @@ let ``contract activation arrived, running orphan transaction``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
-    let account = Account.createRoot ()
+    let account = Account.createTestAccount ()
     
     let activationTransaction = 
         Account.createActivateContractTransaction account sampleContractCode
@@ -394,7 +390,7 @@ let ``contract activation arrived, running orphan transaction``() =
         |> Writer.unwrap  
         
     let tx = 
-        TransactionHandler.executeContract session sampleInputTx sampleContractHash "" stateWithContract.memoryState
+        TransactionHandler.executeContract session sampleInputTx sampleContractHash "" (PK Hash.zero) stateWithContract.memoryState
         |> getResult
     let txHash = Transaction.hash tx        
     
@@ -417,3 +413,92 @@ let ``contract activation arrived, running orphan transaction``() =
     MemPool.containsTransaction activationTxHash state.memoryState.mempool |> should equal true
     MemPool.containsTransaction txHash state.memoryState.mempool |> should equal false    
     events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (activationTxHash,activationTransaction)))
+    
+[<Test>]    
+let ``Transaction already in db but not part of the main chain``() = 
+    use databaseContext = DatabaseContext.createEmpty "test"
+    use session = DatabaseContext.createSession databaseContext
+    
+    // we need to fake some information
+    let header = 
+        {
+            version = 0ul
+            parent = Hash.zero
+            blockNumber = 2ul
+            commitments = Hash.zero
+            timestamp = 0UL
+            difficulty = 0ul
+            nonce = 0UL,0UL
+        }
+    let extendedHeader : ExtendedBlockHeader.T =        
+        {
+            hash = BlockHeader.hash header
+            header = header
+            status = ExtendedBlockHeader.Connected
+            chainWork = None
+            txMerkleRoot = Hash.zero
+            activeContractSetMerkleRoot = Hash.zero
+            witnessMerkleRoot = Hash.zero
+            commitments = []
+        }    
+    
+    Collection.put session.context.blocks session.session extendedHeader.hash extendedHeader
+    MultiCollection.put session.context.transactionBlocks session.session txHash extendedHeader.hash 
+                
+    let result = Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
+
+    let events, state' = Writer.unwrap result
+
+    // Checking that the event raised
+    events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (txHash, tx)))
+
+    // Checking only 1 event raised
+    events |> should haveLength 1
+
+    // Checking the tx is in the mempool
+    MemPool.containsTransaction txHash state'.memoryState.mempool |> should equal true
+
+    // Checking the tx is in the utxoset
+    UtxoSet.getUtxos (UtxoSetRepository.get session) txOutpoints state'.memoryState.utxoSet
+    |> should equal (Some tx.outputs)
+    
+[<Test>]    
+let ``Transaction already in db and part of the main chain is ignored``() = 
+    use databaseContext = DatabaseContext.createEmpty "test"
+    use session = DatabaseContext.createSession databaseContext
+    
+    // we need to fake some information
+    let header = 
+        {
+            version = 0ul
+            parent = Hash.zero
+            blockNumber = 2ul
+            commitments = Hash.zero
+            timestamp = 0UL
+            difficulty = 0ul
+            nonce = 0UL,0UL
+        }
+    let extendedHeader : ExtendedBlockHeader.T =        
+        {
+            hash = BlockHeader.hash header
+            header = header
+            status = ExtendedBlockHeader.MainChain
+            chainWork = None
+            txMerkleRoot = Hash.zero
+            activeContractSetMerkleRoot = Hash.zero
+            witnessMerkleRoot = Hash.zero
+            commitments = []
+        }    
+    
+    Collection.put session.context.blocks session.session extendedHeader.hash extendedHeader
+    MultiCollection.put session.context.transactionBlocks session.session txHash extendedHeader.hash 
+                
+    let result = Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
+
+    let events, state' = Writer.unwrap result
+
+    // Checking only 1 event raised
+    events |> should haveLength 0
+
+    // Checking the tx is in the mempool
+    MemPool.containsTransaction txHash state'.memoryState.mempool |> should equal false

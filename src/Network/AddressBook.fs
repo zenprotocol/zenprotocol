@@ -22,9 +22,9 @@ let haveEnoughAddresses book =
 let take book exclude length =  
     let diff = Set.difference book exclude         
     
-    match Set.isEmpty diff with 
-    | true -> Seq.empty
-    | false ->
-        match Set.count diff >=length with
-        | true -> Seq.take length diff
-        | false -> Set.toSeq diff         
+    if Set.isEmpty diff then
+        Seq.empty
+    elif Set.count diff >=length then
+        Seq.take length diff
+    else
+        Set.toSeq diff         

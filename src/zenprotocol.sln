@@ -92,36 +92,36 @@ ProjectSection(SolutionItems) = preProject
 	Zulib\fsharp\Realized\Zen.UInt64.fs = Zulib\fsharp\Realized\Zen.UInt64.fs
 	Zulib\fsharp\Realized\Zen.Util.fs = Zulib\fsharp\Realized\Zen.Util.fs
 	Zulib\fsharp\Realized\prims.fs = Zulib\fsharp\Realized\prims.fs
-	Zulib\fstar\FStar.Int.fst = Zulib\fstar\FStar.Int.fst	
-	Zulib\fstar\FStar.Int64.fst = Zulib\fstar\FStar.Int64.fst	
-	Zulib\fstar\FStar.Mul.fst = Zulib\fstar\FStar.Mul.fst	
-	Zulib\fstar\FStar.Option.fsti = Zulib\fstar\FStar.Option.fsti	
-	Zulib\fstar\FStar.Pervasives.Native.fst = Zulib\fstar\FStar.Pervasives.Native.fst	
-	Zulib\fstar\FStar.Pervasives.fst = Zulib\fstar\FStar.Pervasives.fst	
-	Zulib\fstar\FStar.UInt.fst = Zulib\fstar\FStar.UInt.fst	
-	Zulib\fstar\FStar.UInt32.fst = Zulib\fstar\FStar.UInt32.fst	
-	Zulib\fstar\FStar.UInt64.fst = Zulib\fstar\FStar.UInt64.fst	
-	Zulib\fstar\FStar.UInt8.fst = Zulib\fstar\FStar.UInt8.fst	
+	Zulib\fstar\FStar.Int.fst = Zulib\fstar\FStar.Int.fst
+	Zulib\fstar\FStar.Int64.fst = Zulib\fstar\FStar.Int64.fst
+	Zulib\fstar\FStar.Mul.fst = Zulib\fstar\FStar.Mul.fst
+	Zulib\fstar\FStar.Option.fsti = Zulib\fstar\FStar.Option.fsti
+	Zulib\fstar\FStar.Pervasives.Native.fst = Zulib\fstar\FStar.Pervasives.Native.fst
+	Zulib\fstar\FStar.Pervasives.fst = Zulib\fstar\FStar.Pervasives.fst
+	Zulib\fstar\FStar.UInt.fst = Zulib\fstar\FStar.UInt.fst
+	Zulib\fstar\FStar.UInt32.fst = Zulib\fstar\FStar.UInt32.fst
+	Zulib\fstar\FStar.UInt64.fst = Zulib\fstar\FStar.UInt64.fst
+	Zulib\fstar\FStar.UInt8.fst = Zulib\fstar\FStar.UInt8.fst
 	Zulib\fstar\Zen.Array.Extracted.fst = Zulib\fstar\Zen.Array.Extracted.fst
 	Zulib\fstar\Zen.Array.Realized.fsti = Zulib\fstar\Zen.Array.Realized.fsti
 	Zulib\fstar\Zen.Array.fst = Zulib\fstar\Zen.Array.fst
 	Zulib\fstar\Zen.Base.fst = Zulib\fstar\Zen.Base.fst
-	Zulib\fstar\Zen.Cost.Extracted.fst = Zulib\fstar\Zen.Cost.Extracted.fst	
-	Zulib\fstar\Zen.Cost.Realized.fst = Zulib\fstar\Zen.Cost.Realized.fst	
-	Zulib\fstar\Zen.Cost.fst = Zulib\fstar\Zen.Cost.fst	
-	Zulib\fstar\Zen.Crypto.fsti = Zulib\fstar\Zen.Crypto.fsti	
-	Zulib\fstar\Zen.Error.fst = Zulib\fstar\Zen.Error.fst	
-	Zulib\fstar\Zen.ErrorT.fst = Zulib\fstar\Zen.ErrorT.fst	
-	Zulib\fstar\Zen.Merkle.fsti = Zulib\fstar\Zen.Merkle.fsti	
-	Zulib\fstar\Zen.Option.fst = Zulib\fstar\Zen.Option.fst	
-	Zulib\fstar\Zen.OptionT.fst = Zulib\fstar\Zen.OptionT.fst	
+	Zulib\fstar\Zen.Cost.Extracted.fst = Zulib\fstar\Zen.Cost.Extracted.fst
+	Zulib\fstar\Zen.Cost.Realized.fst = Zulib\fstar\Zen.Cost.Realized.fst
+	Zulib\fstar\Zen.Cost.fst = Zulib\fstar\Zen.Cost.fst
+	Zulib\fstar\Zen.Crypto.fsti = Zulib\fstar\Zen.Crypto.fsti
+	Zulib\fstar\Zen.Error.fst = Zulib\fstar\Zen.Error.fst
+	Zulib\fstar\Zen.ErrorT.fst = Zulib\fstar\Zen.ErrorT.fst
+	Zulib\fstar\Zen.Merkle.fsti = Zulib\fstar\Zen.Merkle.fsti
+	Zulib\fstar\Zen.Option.fst = Zulib\fstar\Zen.Option.fst
+	Zulib\fstar\Zen.OptionT.fst = Zulib\fstar\Zen.OptionT.fst
 	Zulib\fstar\Zen.Sha3.Realized.fsti = Zulib\fstar\Zen.Sha3.Realized.fsti
 	Zulib\fstar\Zen.Tuple.fst = Zulib\fstar\Zen.Tuple.fst
 	Zulib\fstar\Zen.TupleT.fst = Zulib\fstar\Zen.TupleT.fst
 	Zulib\fstar\Zen.Types.Extracted.fst = Zulib\fstar\Zen.Types.Extracted.fst
 	Zulib\fstar\Zen.Types.Main.fst = Zulib\fstar\Zen.Types.Main.fst
 	Zulib\fstar\Zen.Types.Realized.fsti = Zulib\fstar\Zen.Types.Realized.fsti
-	Zulib\fstar\Zen.TxSkeleton.fsti = Zulib\fstar\Zen.TxSkeleton.fsti	
+	Zulib\fstar\Zen.TxSkeleton.fsti = Zulib\fstar\Zen.TxSkeleton.fsti
 	Zulib\fstar\Zen.Types.fst = Zulib\fstar\Zen.Types.fst
 	Zulib\fstar\Zen.Util.fsti = Zulib\fstar\Zen.Util.fsti
 	Zulib\fstar\Zen.Vector.fst = Zulib\fstar\Zen.Vector.fst
@@ -130,6 +130,17 @@ ProjectSection(SolutionItems) = preProject
 	Zulib\fstar\Zen.Assets.fsti = Zulib\fstar\Zen.Assets.fsti
 	Zulib\fsharp\Realized\Zen.Assets.fs = Zulib\fsharp\Realized\Zen.Assets.fs
 	Zulib\fsharp\Realized\Zen.Wallet.fs = Zulib\fsharp\Realized\Zen.Wallet.fs
+EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ContractExamples", "ContractExamples", "{38137384-85D5-41FE-B40B-27E4F54898D0}"
+ProjectSection(SolutionItems) = preProject
+	ContractExamples\Faucet.fst = ContractExamples\Faucet.fst
+	ContractExamples\Token.fst = ContractExamples\Token.fst
+EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Scripts", "Scripts", "{594A4B19-5CA9-4940-94C8-3689D3FC5444}"
+ProjectSection(SolutionItems) = preProject
+	Scripts\createGenesis.fsx = Scripts\createGenesis.fsx
 EndProjectSection
 EndProject
 Global

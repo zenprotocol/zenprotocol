@@ -11,11 +11,11 @@ let set = Hash.compute "zenprotocol-activecontract"B |> Hash.bytes
 
 let empty:T = SparseMerkleTree.create cwt (fun _ -> set)
 
-let add = SparseMerkleTree.add
+let add : _ -> _ -> T -> T = SparseMerkleTree.add<Contract.T>
 
-let tryFind = SparseMerkleTree.tryFind  
+let tryFind : _ -> T -> _ = SparseMerkleTree.tryFind<Contract.T>
 
-let containsContract = SparseMerkleTree.containsKey
+let containsContract : _ -> T -> _ = SparseMerkleTree.containsKey<Contract.T>
     
 let getContractHashes (acs:T) =
     acs.data |> Map.toSeq |> Seq.map fst

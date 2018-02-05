@@ -27,11 +27,12 @@ type PointedOutput = Outpoint * Output
 
 type ContractWitness = {
     cHash: Hash
-    command:string
-    beginInputs: int
-    beginOutputs: int
-    inputsLength: int
-    outputsLength: int
+    command : string
+    returnAddressIndex : uint32 option
+    beginInputs: uint32
+    beginOutputs: uint32
+    inputsLength: uint32
+    outputsLength: uint32
 }
 
 type Witness = 

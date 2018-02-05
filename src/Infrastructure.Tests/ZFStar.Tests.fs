@@ -16,14 +16,14 @@ open FsBech32
 
 let assemblyDirectory = "./test"
 
-let clean =
+let clean() =
     Platform.cleanDirectory assemblyDirectory
 
 [<SetUp>]
-    clean
+    clean()
 
 [<TearDown>]
-    clean
+    clean()
 
 let input : txSkeleton =
     emptyTxSkeleton
@@ -85,11 +85,11 @@ let fstCode = """
     open Zen.Cost
     open Zen.ErrorT
 
-    val cf: txSkeleton -> string -> #l:nat -> wallet l -> cost nat 1
-    let cf _ _ #l _ = ~!2
+    val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 1
+    let cf _ _ _ #l _ = ~!2
 
-    val main: txSkeleton -> hash -> string -> #l:nat -> wallet l -> cost (result txSkeleton) 2
-    let main tx chash command #l _ =
+    val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result txSkeleton) 2
+    let main tx chash command returnAddress #l _ =
         ret @ tx
     """
 
@@ -104,7 +104,7 @@ let ``Should record hints``() =
 [<Test>]
 let ``Should invoke compiled``() =
     (compileAndInvoke fstCode
-    [| input; null; null; 0I; null |]
+    [| input; null; null; null; 0I; null |]
     , (Ok input : Result<txSkeleton,string>))
     |> shouldEqual
 
@@ -118,14 +118,14 @@ let ``Should throw with command's value``() =
         open Zen.Cost
         open Zen.ErrorT
 
-        val cf: txSkeleton -> string -> #l:nat -> wallet l -> cost nat 1
-        let cf _ _#l _ = ~!1
+        val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 1
+        let cf _ _ _ #l _ = ~!1
 
-        val main: txSkeleton -> hash -> string -> #l:nat -> wallet l -> cost (result txSkeleton) 1
-        let main tx chash command #l _ =
+        val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result txSkeleton) 1
+        let main tx chash command returnAddress #l _ =
             failw command
         """
-    [| null; null; "test command";0I;null |]
+    [| null; null; "test command";null;0I;null |]
     , (Error "test command" : Result<txSkeleton,string>))
     |> shouldEqual
 

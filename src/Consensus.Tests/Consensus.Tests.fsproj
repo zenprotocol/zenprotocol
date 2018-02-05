@@ -51,7 +51,6 @@
     <Compile Include="BlockHeaderTests.fs" />
     <Compile Include="DifficultyTests.fs" />
     <Compile Include="CryptoTests.fs" />
-    <Compile Include="BlockTests.fs" />
     <Content Include="MerkleMountainRangeTests.fs" />
     <Compile Include="MerkleTreeTests.fs" />
     <Compile Include="SparseMerkleTreeTests.fs" />
@@ -65,6 +64,7 @@
     </ProjectReference>
     <Compile Include="SampleContract.fs" />
     <Compile Include="ContractTests.fs" />
+    <Compile Include="BlockTests.fs" />
     <ProjectReference Include="..\Infrastructure\Infrastructure.fsproj">
       <Project>{81161f64-d019-422c-a3cf-321cde6ca209}</Project>
       <Name>Infrastructure</Name>

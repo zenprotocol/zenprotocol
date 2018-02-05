@@ -48,6 +48,7 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="paket.references" />
+    <Content Include="scheme.yaml" />
     <Content Include="zen-cli">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

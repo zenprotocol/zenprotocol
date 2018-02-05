@@ -54,6 +54,8 @@ let SendBlockMessageId = 27uy
 let SendTipMessageId = 28uy
 [<LiteralAttribute>]
 let GetTipMessageId = 29uy
+[<LiteralAttribute>]
+let PublishAddressToAllMessageId = 30uy
 
 type Connect =
         string
@@ -149,6 +151,9 @@ type SendTip = {
 type GetTip =
         byte[]
 
+type PublishAddressToAll =
+        string
+
 type T =
     | Connect of Connect
     | Connected of Connected
@@ -174,6 +179,7 @@ type T =
     | SendBlock of SendBlock
     | SendTip of SendTip
     | GetTip of GetTip
+    | PublishAddressToAll of PublishAddressToAll
 
 module Connect =
     let getMessageSize (msg:Connect) =
@@ -667,6 +673,21 @@ module GetTip =
             return msg
         }
 
+module PublishAddressToAll =
+    let getMessageSize (msg:PublishAddressToAll) =
+            4 + String.length msg
+
+    let write (msg:PublishAddressToAll) stream =
+        stream
+        |> Stream.writeLongString msg
+
+    let read =
+        reader {
+            let! msg = Stream.readLongString
+
+            return msg
+        }
+
 
 let private decode stream =
     let readMessage messageId stream =
@@ -767,6 +788,10 @@ let private decode stream =
             match GetTip.read stream with
             | None,stream -> None,stream
             | Some msg, stream -> Some (GetTip msg), stream
+        | PublishAddressToAllMessageId ->
+            match PublishAddressToAll.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (PublishAddressToAll msg), stream
         | _ -> None, stream
 
     let r = reader {
@@ -822,6 +847,7 @@ let send socket msg =
         | SendBlock msg -> SendBlock.write msg
         | SendTip msg -> SendTip.write msg
         | GetTip msg -> GetTip.write msg
+        | PublishAddressToAll msg -> PublishAddressToAll.write msg
 
     let messageId =
         match msg with
@@ -849,6 +875,7 @@ let send socket msg =
         | SendBlock _ -> SendBlockMessageId
         | SendTip _ -> SendTipMessageId
         | GetTip _ -> GetTipMessageId
+        | PublishAddressToAll _ -> PublishAddressToAllMessageId
 
     let messageSize =
         match msg with
@@ -876,6 +903,7 @@ let send socket msg =
         | SendBlock msg -> SendBlock.getMessageSize msg
         | SendTip msg -> SendTip.getMessageSize msg
         | GetTip msg -> GetTip.getMessageSize msg
+        | PublishAddressToAll msg -> PublishAddressToAll.getMessageSize msg
 
     //  Signature + message ID + message size
     let frameSize = 2 + 1 + messageSize

@@ -1,14 +1,14 @@
-chain: test
+chain: local
 miner: false
 
 dataPath: ./data 
 
 externalIp: null
 listen: false
-bind: "*:29555"
+bind: 127.0.0.1:29555
 seeds: 
-  - 52.36.171.220:29555
+  - 127.0.0.1:29555
 
 api:
-  enabled: true
+  enabled: false
   bind: 127.0.0.1:31567

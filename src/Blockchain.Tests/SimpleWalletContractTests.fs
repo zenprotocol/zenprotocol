@@ -14,7 +14,7 @@ open Blockchain.State
 open TestsInfrastructure.Constraints
 open Consensus.Tests.SampleContract
 
-let chain = ChainParameters.Test
+let chain = ChainParameters.Local
 
 let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction (fun _ -> UtxoSet.NoOutput) Transaction.rootTxHash Transaction.rootTx
 let mempool = MemPool.empty |> MemPool.add Transaction.rootTxHash Transaction.rootTx
@@ -38,7 +38,7 @@ let mutable state = {
     blockRequests= Map.empty
 }
 
-let account = Account.createRoot ()
+let account = Account.createTestAccount ()
 
 let shouldBeOk result =
     result
@@ -70,13 +70,12 @@ let session = DatabaseContext.createSession databaseContext
 
 let mutable cHash = Hash.zero
 
-let clean =
-    if System.IO.Directory.Exists dataPath then 
-        System.IO.Directory.Delete (dataPath, true)
+let clean() =
+    Platform.cleanDirectory dataPath
     
 [<OneTimeSetUp>]
 let setUp = fun () ->
-    clean
+    clean()
     activateContract """
     open Zen.Types
     open Zen.Vector
@@ -89,11 +88,11 @@ let setUp = fun () ->
     module ET = Zen.ErrorT
     module Tx = Zen.TxSkeleton
 
-    val cf: txSkeleton -> string -> #l:nat -> wallet l -> cost nat 9
-    let cf _ _ #l _ = ret (l * 128 + 192 + 13 + 64)
+    val cf: txSkeleton -> string ->  option lock -> #l:nat -> wallet l -> cost nat 9
+    let cf _ _ _ #l _ = ret (l * 128 + 192 + 13 + 64)
 
-    val main: txSkeleton -> hash -> string -> #l:nat -> wallet l -> cost (result txSkeleton) (l * 128 + 192 + 13 + 64)
-    let main txSkeleton contractHash command #l wallet =
+    val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result txSkeleton) (l * 128 + 192 + 13 + 64)
+    let main txSkeleton contractHash command returnAddress #l wallet =
     let result =
     Tx.lockToPubKey zenAsset 10UL (hashFromBase64 "DYggLLPq6eXj1YxjiPQ5dSvb/YVqAVNf8Mjnpc9P9BI=") txSkeleton
     >>= Tx.fromWallet zenAsset 10UL contractHash wallet in
@@ -109,14 +108,14 @@ let setUp = fun () ->
        
 [<TearDown>]
 let tearDown = fun () ->
-    clean
+    clean()
 
 [<Test>]
 let ``Wallet using contract should execute``() =
     let output = {lock=Contract cHash;spend={asset=Hash.zero;amount=10UL}}
     let utxoSet = Map.add {txHash=Hash.zero;index=10ul} (UtxoSet.Unspent output) utxoSet
 
-    TransactionHandler.executeContract session sampleInputTx cHash "" { state.memoryState with utxoSet = utxoSet } 
+    TransactionHandler.executeContract session sampleInputTx cHash "" (PK Hash.zero) { state.memoryState with utxoSet = utxoSet } 
     |> shouldBeOk
 
 [<Test>]
@@ -124,13 +123,13 @@ let ``Contract should not be able to lock more token than available``() =
     let output = {lock=Contract cHash;spend={asset=Hash.zero;amount=9UL}}
     let utxoSet = Map.add {txHash=Hash.zero;index=1ul} (UtxoSet.Unspent output) utxoSet
 
-    TransactionHandler.executeContract session sampleInputTx cHash "" { state.memoryState with utxoSet = utxoSet } 
+    TransactionHandler.executeContract session sampleInputTx cHash "" (PK Hash.zero) { state.memoryState with utxoSet = utxoSet } 
     |> shouldBeErrorMessage "not enough Zens"
 
 [<Test>]
 let ``Contract should not have enough tokens when output is missing``() =
     
-    TransactionHandler.executeContract session sampleInputTx cHash "" state.memoryState
+    TransactionHandler.executeContract session sampleInputTx cHash "" (PK Hash.zero) state.memoryState
     |> shouldBeErrorMessage "not enough Zens"
 
 [<Test>]
@@ -138,7 +137,7 @@ let ``Contract should not have enough tokens when output locked to PK address``(
     let output = {lock=PK cHash;spend={asset=Hash.zero;amount=10UL}}
     let utxoSet = Map.add {txHash=Hash.zero;index=10ul} (UtxoSet.Unspent output) utxoSet
 
-    TransactionHandler.executeContract session sampleInputTx cHash "" { state.memoryState with utxoSet = utxoSet } 
+    TransactionHandler.executeContract session sampleInputTx cHash "" (PK Hash.zero) { state.memoryState with utxoSet = utxoSet } 
     |> shouldBeErrorMessage "not enough Zens"
 
 [<Test>]
@@ -146,6 +145,6 @@ let ``Contract should not have enough tokens when output is spent``() =
     let output = {lock=PK cHash;spend={asset=Hash.zero;amount=10UL}}
     let utxoSet = Map.add {txHash=Hash.zero;index=10ul} UtxoSet.Spent utxoSet
 
-    TransactionHandler.executeContract session sampleInputTx cHash "" { state.memoryState with utxoSet = utxoSet } 
+    TransactionHandler.executeContract session sampleInputTx cHash "" (PK Hash.zero) { state.memoryState with utxoSet = utxoSet } 
     |> shouldBeErrorMessage "not enough Zens"
 
