@@ -338,7 +338,7 @@ let validateBlock chain contractPath session timestamp block mined (state:State)
     effectsWriter { 
         let blockHash = Block.hash block
         
-        let blockRequest = Map.tryFind blockHash state.blockRequests 
+        let blockRequest = Map.tryFind blockHash state.blockRequests
         
         let blockRequests = Map.remove blockHash state.blockRequests
         let state = {state with blockRequests = blockRequests}
@@ -346,68 +346,67 @@ let validateBlock chain contractPath session timestamp block mined (state:State)
         Log.info "Validating new block #%d %A" block.header.blockNumber blockHash
     
         // checking if block already exist
-        match BlockRepository.contains session blockHash with
-        | true -> 
+        if BlockRepository.contains session blockHash then
             // nothing to do, blocks already exist
             return state
-        | false ->                                                        
-            match Block.validate chain block with
-            | Error error ->
-                Log.info "Block %A failed validation due to %A" blockHash error
-                return state
-            | Ok block -> 
-                if blockRequest = Some NewBlock || mined then
-                    Log.info "Publishing new block %A" blockHash                                 
-                    do! publishBlock block.header
+        else
+        match Block.validate chain block with
+        | Error error ->
+            Log.info "Block %A failed validation due to %A" blockHash error
+            return state
+        | Ok block ->
+            if blockRequest = Some NewBlock || mined then
+                Log.info "Publishing new block %A" blockHash
+                do! publishBlock block.header
+                
+            if Block.isGenesis chain block then
+                let! state' = handleGenesisBlock chain contractPath session timestamp state blockHash block
+                 
+                if state'.tipState.tip <> state.tipState.tip then
+                    do! publish (TipChanged state'.tipState.tip.header)
+                         
+                return state'
+            else
+                // try to find parent block
+                match BlockRepository.tryGetHeader session block.header.parent with
+                | None ->
+                    Log.info "Adding block as orphan #%d %A" block.header.blockNumber blockHash
                     
-                if Block.isGenesis chain block then 
-                    let! state' = handleGenesisBlock chain contractPath session timestamp state blockHash block
-                     
-                    if state'.tipState.tip <> state.tipState.tip then
-                        do! publish (TipChanged state'.tipState.tip.header)
-                             
-                    return state'                                                                                                          
-                else
-                    // try to find parent block                               
-                    match BlockRepository.tryGetHeader session block.header.parent with
-                    | None ->
-                        Log.info "Adding block as orphan #%d %A" block.header.blockNumber blockHash
+                    let extendedHeader = ExtendedBlockHeader.createOrphan blockHash block
+                    BlockRepository.saveHeader session extendedHeader
+                    BlockRepository.saveFullBlock session blockHash block
+                    
+                    if not <| Map.containsKey block.header.parent state.blockRequests then
+                        // asking network for the parent block
+                        let blockRequests = Map.add block.header.parent ParentBlock state.blockRequests
+                        do! getBlock block.header.parent
                         
+                        return {state with blockRequests=blockRequests}
+                    else
+                        return state
+                | Some parent ->
+                    match ExtendedBlockHeader.status parent with
+                    | ExtendedBlockHeader.Invalid ->
+                        // Ignoring the block
+                        return state
+                    | ExtendedBlockHeader.Orphan ->
                         let extendedHeader = ExtendedBlockHeader.createOrphan blockHash block
                         BlockRepository.saveHeader session extendedHeader
                         BlockRepository.saveFullBlock session blockHash block
-                        
-                        if not <| Map.containsKey block.header.parent state.blockRequests then
-                            // asking network for the parent block
-                            let blockRequests = Map.add block.header.parent ParentBlock state.blockRequests
-                            do! getBlock block.header.parent
-                            
-                            return {state with blockRequests=blockRequests}
-                        else                            
-                            return state
-                    | Some parent ->
-                        match ExtendedBlockHeader.status parent with 
-                        | ExtendedBlockHeader.Invalid ->
-                            // Ignoring the block
-                            return state
-                        | ExtendedBlockHeader.Orphan ->
-                            let extendedHeader = ExtendedBlockHeader.createOrphan blockHash block
-                            BlockRepository.saveHeader session extendedHeader
-                            BlockRepository.saveFullBlock session blockHash block
 
-                            return state                  
-                        | ExtendedBlockHeader.MainChain                                  
-                        | ExtendedBlockHeader.Connected ->
-                            let! state' =
-                                if parent.hash = state.tipState.tip.hash then                        
-                                    handleMainChain chain contractPath session timestamp state parent blockHash block
-                                else
-                                    handleForkChain chain contractPath session timestamp state parent blockHash block
-                                    
-                            if state'.tipState.tip <> state.tipState.tip then
-                                do! publish (TipChanged state'.tipState.tip.header)
-                                        
-                            return state'
+                        return state
+                    | ExtendedBlockHeader.MainChain
+                    | ExtendedBlockHeader.Connected ->
+                        let! state' =
+                            if parent.hash = state.tipState.tip.hash then
+                                handleMainChain chain contractPath session timestamp state parent blockHash block
+                            else
+                                handleForkChain chain contractPath session timestamp state parent blockHash block
+                                
+                        if state'.tipState.tip <> state.tipState.tip then
+                            do! publish (TipChanged state'.tipState.tip.header)
+
+                        return state'
     }
 
 let handleNewBlockHeader chain session peerId header (state:State) =

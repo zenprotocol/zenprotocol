@@ -1,4 +1,4 @@
-﻿module Wallet.Account
+module Wallet.Account
 
 open Consensus
 open Consensus.ChainParameters
@@ -6,6 +6,8 @@ open Consensus.Hash
 open Consensus.Crypto
 open Consensus.Types
 open Infrastructure
+
+let result = new Infrastructure.Result.ResultBuilder<string>()
 
 type TransactionResult = Messaging.Services.TransactionResult
 
@@ -182,12 +184,12 @@ let addTransaction txHash (tx:Transaction) account =
 let getBalance account =
     let unspent = getUnspentOutputs account
                 
-    Map.fold (fun balance _ output ->                 
+    Map.fold (fun balance _ output ->
         match Map.tryFind output.spend.asset balance with
         | Some amount -> Map.add output.spend.asset (amount+output.spend.amount) balance
         | None -> Map.add output.spend.asset output.spend.amount balance) Map.empty unspent
      
-let getAddress chain account = 
+let getAddress chain account =
     Address.encode chain (Address.PK account.publicKeyHash)
 
 let private getInputs account spend =
@@ -206,57 +208,42 @@ let private getInputs account spend =
     else
         Error "Not enough tokens"        
      
-let createTransaction chain account pkHash spend =
-
-    match getInputs account spend with
-    | Error error -> Error error
-    | Ok (inputs,keys,amount) ->
-        let inputs = List.map fst inputs
-    
-        let outputs = 
-            {spend=spend;lock=PK pkHash} :: 
-            // checking if change is needed
-            match amount = spend.amount with
-                | true ->
-                    []
-                | false -> 
-                    [{spend={spend with amount=(amount - spend.amount)};lock=PK account.publicKeyHash}]
-        Ok (Transaction.sign keys {inputs=inputs; outputs=outputs; witnesses=[]; contract = None})
+let createTransaction chain account pkHash spend = result  {
+    let! (inputs, keys, amount) = getInputs account spend
+    let inputPoints = List.map fst inputs
+    let outputs =
+        {spend=spend;lock=PK pkHash}
+     :: if amount = spend.amount then [] else
+        // Create change if needed
+        [{
+            spend={spend with amount=(amount-spend.amount)};
+            lock=PK account.publicKeyHash
+        }]
+    return
+        Transaction.sign keys { inputs=inputPoints;
+                                outputs=outputs;
+                                witnesses=[];
+                                contract=None }
             
+    }
+                       
 let createActivateContractTransaction account code =
     let unspent = getUnspentOutputs account
+    result {
+    let! hints = Contract.recordHints code
+    let input, output = Map.toSeq unspent |> Seq.head
+    let output' = {output with lock=PK account.publicKeyHash}
+    return Transaction.sign
+        [ account.keyPair ]
+        {
+            inputs=[ input ];
+            outputs=[ output' ];
+            witnesses=[];
+            contract = Some (code, hints)
+        }
+    }
 
-    Contract.recordHints code
-    |> Result.map (fun hints ->
-        let input, output = Map.toSeq unspent |> Seq.head
-        let output' = {output with lock=PK account.publicKeyHash}
-        { inputs=[ input ]; outputs=[ output' ]; witnesses=[]; contract = Some (code, hints) })
-    |> Result.map (Transaction.sign [ account.keyPair ])             
 
-let createExecuteContractTransaction account executeContract cHash command spends =
-     
-    Map.fold (fun state asset amount ->
-        match state with
-        | Error error -> Error error 
-        | Ok (txSkeleton,keys) ->
-            match getInputs account {asset=asset;amount=amount} with
-            | Error error -> Error error
-            | Ok (inputs,keys',collectedAmount) ->
-                let txSkeleton = 
-                    TxSkeleton.addInputs inputs txSkeleton
-                    |> TxSkeleton.addChange asset collectedAmount amount account.publicKeyHash
-                                    
-                let keys = List.append keys keys'
-                
-                Ok (txSkeleton,keys)) (Ok (TxSkeleton.empty,List.empty)) spends
-    |> Result.bind (fun (txSkeleton,keys) ->                                                        
-        executeContract cHash command (PK account.publicKeyHash) txSkeleton 
-        |> function
-        | TransactionResult.Ok tx -> 
-            Transaction.sign keys tx
-            |> Ok         
-        | TransactionResult.Error e -> Error e)
-        
 let createRoot () =                
     let account = 
         {
@@ -267,4 +254,19 @@ let createRoot () =
             mempool= List.empty
         }
           
-    addTransaction Transaction.rootTxHash Transaction.rootTx account        
+    addTransaction Transaction.rootTxHash Transaction.rootTx account
+
+let createExecuteContractTransaction account executeContract cHash command spends = result {
+    let mutable txSkeleton = TxSkeleton.empty
+    let mutable keys = List.empty
+    for (asset, amount) in Map.toSeq spends do
+        let! inputs, keys', collectedAmount =
+            getInputs account {asset=asset;amount=amount}
+        txSkeleton <-
+            TxSkeleton.addInputs inputs txSkeleton
+            |> TxSkeleton.addChange asset collectedAmount amount account.publicKeyHash
+        keys <- List.append keys keys'
+    let! unsignedTx = executeContract cHash command (PK account.publicKeyHash) txSkeleton
+    return Transaction.sign keys unsignedTx
+    }
+                        

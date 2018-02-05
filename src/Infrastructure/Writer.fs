@@ -8,7 +8,7 @@ type Writer<'effect,'a> = Writer of 'effect list * 'a
 let unwrap (Writer (events,x)) = events,x
 
 let bind (Writer (events,x)) f =         
-    let events', x' = unwrap (f x)        
+    let (Writer (events', x')) = f x
     let events'' = List.append events events'
     
     Writer (events'', x')                        
