@@ -25,10 +25,10 @@ let runServer _ =
                 System.Threading.Thread.CurrentThread.ManagedThreadId |> should equal threadId
             
                 match request with             
-                | Get ("/hello", "") ->                                                            
+                | Get ("/hello", _) ->                                                            
                     reply StatusCode.OK (TextContent "get")
                     
-                | Get ("/json", "") ->                                    
+                | Get ("/json", _) ->                                    
                     reply StatusCode.OK (JsonContent (JsonValue.Parse """{"balance":100}"""))                                                                                                  
                                                            
                 | Post (path, body) ->                
