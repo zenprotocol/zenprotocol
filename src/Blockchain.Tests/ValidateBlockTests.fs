@@ -38,7 +38,7 @@ let isAccountInSet session (account:Account.T) =
         
     areOutpointsInSet session outpoints
     
-let rootAccount = Account.createRoot ()
+let rootAccount = Account.createTestAccount ()
     
 let createTransaction account =
     match Account.createTransaction chain account account.publicKeyHash {asset=Hash.zero;amount=1UL} with

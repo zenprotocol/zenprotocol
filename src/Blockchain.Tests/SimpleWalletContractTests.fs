@@ -38,7 +38,7 @@ let mutable state = {
     blockRequests= Map.empty
 }
 
-let account = Account.createRoot ()
+let account = Account.createTestAccount ()
 
 let shouldBeOk result =
     result
