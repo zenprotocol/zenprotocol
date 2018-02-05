@@ -133,8 +133,9 @@ let validate chain =
         if isGenesis chain block then
             return block
         else
+            // Fail if validateBasic fails on any transaction in the block.
             for tx in block.transactions do
-                let! validTx = 
+                let! _ =
                     TransactionValidation.validateBasic tx 
                     |> Result.mapError (sprintf "transaction %A failed validation due to %A" (Transaction.hash tx) )
                 ()
