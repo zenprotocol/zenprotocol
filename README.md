@@ -11,6 +11,7 @@ Zen Protocol
 
 ```
 ./paket restore
+chmod +x packages/zen_z3_linux/output/z3 
 pushd src/Zulib
 ./build.fsx
 popd
@@ -21,7 +22,16 @@ msbuild src
 
 1. Install Mono as in step 1 of the instructions for Linux.
 2. Install lmdb. You can get it via brew with `brew install lmdb`.
-3. Run the same commands as in step 3 of the instructions for Linux.
+3. Run the following:
+
+```
+./paket restore
+chmod +x packages/zen_z3_osx/output/z3 
+pushd src/Zulib
+./build.fsx
+popd
+msbuild src
+```
 
 ## Windows
 
