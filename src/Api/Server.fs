@@ -90,7 +90,13 @@ let handleRequest chain client (request,reply) =
         | Result.Error error -> replyError error
         | Result.Ok (cHash, command, spends) ->
             Wallet.executeContract client cHash command spends
-            |> validateTx               
+            |> validateTx
+    | Post ("/block/publish", Some body) ->
+            match getPublishBlock body with
+            | Result.Error error -> replyError error
+            | Result.Ok block ->
+                Blockchain.validateMinedBlock client block
+                reply StatusCode.OK NoContent
     | _ ->
         reply StatusCode.NotFound NoContent    
 

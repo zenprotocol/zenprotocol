@@ -17,7 +17,12 @@ type ExecuteContractArgs =
     | [<MainCommand("COMMAND");ExactlyOnce>] ExecuteContract_Arguments of address:string * command:string * asset:string * amount:int64 
     interface IArgParserTemplate with
         member arg.Usage = ""
-                                                                             
+
+type PublishBlockArgs = 
+    | [<MainCommand("COMMAND");ExactlyOnce>] Publish_Block_Arguments of block:string 
+    interface IArgParserTemplate with
+        member arg.Usage = ""
+                                                  
 type NoArgs = 
     | [<Hidden>] NoArg
     interface IArgParserTemplate with
@@ -32,6 +37,7 @@ type Arguments =
     | [<CliPrefix(CliPrefix.None)>] Spend of ParseResults<SpendArgs>
     | [<CliPrefix(CliPrefix.None)>] Activate of ParseResults<ActivateContractArgs>
     | [<CliPrefix(CliPrefix.None)>] Execute of ParseResults<ExecuteContractArgs>
+    | [<CliPrefix(CliPrefix.None)>] Publish_Block of ParseResults<PublishBlockArgs>
     interface IArgParserTemplate with
         member arg.Usage =
             match arg with
@@ -43,6 +49,7 @@ type Arguments =
             | Spend _ -> "send asset to an address" 
             | Activate _ -> "activate contract"
             | Execute _ -> "execute contract"
+            | Publish_Block _ -> "publish block to the network"
             
 
 [<EntryPoint>]
@@ -118,6 +125,15 @@ let main argv =
             | 200,_ -> printfn "Success"
             | code, HttpResponseBody.Text text -> printfn "Failed %d %s" code text
             | code,_ -> printfn "Failed %d with binary response" code
+    | Some (Publish_Block args) ->
+        let block = args.GetResult <@ Publish_Block_Arguments @>
+        let publishBlock = new PublishBlockJson.Root(block)
+        let response = publishBlock.JsonValue.Request (getUri "block/publish")
+        
+        match response.StatusCode, response.Body with
+        | 200,_ -> printfn "Success"
+        | code, HttpResponseBody.Text text -> printfn "Failed %d %s" code text
+        | code,_ -> printfn "Failed %d with binary response" code
     | _ -> ()
     
     printfn ""                                              

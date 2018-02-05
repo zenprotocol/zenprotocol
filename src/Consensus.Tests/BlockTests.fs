@@ -120,7 +120,7 @@ let ``block timestamp too early``() =
         (EMA.create Chain.Local) with delayed = [timestamp-5UL .. timestamp+5UL]
     }
         
-    let rootAccount = Account.createRoot ()
+    let rootAccount = Account.createTestAccount ()
     let account1 = Account.create ()
     let tx = 
         Account.createTransaction Chain.Local rootAccount account1.publicKeyHash {asset=Hash.zero;amount=1UL}
@@ -143,7 +143,7 @@ let ``block timestamp in the future``() =
         (EMA.create Chain.Local) with delayed = [timestamp-1UL;timestamp; timestamp+1UL]
     }
         
-    let rootAccount = Account.createRoot ()
+    let rootAccount = Account.createTestAccount ()
     let account1 = Account.create ()
     let tx = 
         Account.createTransaction Chain.Local rootAccount account1.publicKeyHash {asset=Hash.zero;amount=1UL}
@@ -162,7 +162,7 @@ let ``block timestamp in the future``() =
 
 [<Test>]    
 let ``block with mismatch commitments fail connecting``() = 
-    let rootAccount = Account.createRoot ()
+    let rootAccount = Account.createTestAccount ()
     let account1 = Account.create ()
     let tx = 
         Account.createTransaction Chain.Local rootAccount account1.publicKeyHash { asset = Hash.zero; amount = 1UL }
@@ -183,7 +183,7 @@ let ``block with mismatch commitments fail connecting``() =
     
 [<Test>]    
 let ``can connect valid block``() = 
-    let rootAccount = Account.createRoot ()
+    let rootAccount = Account.createTestAccount ()
     let account1 = Account.create ()
     let tx = 
         Account.createTransaction Chain.Local rootAccount account1.publicKeyHash { asset = Hash.zero; amount = 1UL }
@@ -201,7 +201,7 @@ let ``can connect valid block``() =
 
 [<Test>]    
 let ``can connect block with a contract``() = 
-    let rootAccount = Account.createRoot ()    
+    let rootAccount = Account.createTestAccount ()    
     let tx = 
         Account.createActivateContractTransaction rootAccount SampleContract.sampleContractCode 
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
@@ -225,7 +225,7 @@ let ``can connect block with a contract``() =
          
 [<Test>]    
 let ``block with invalid contract failed connecting``() = 
-    let rootAccount = Account.createRoot ()    
+    let rootAccount = Account.createTestAccount ()    
     
     let outpoint = Account.getUnspentOutputs rootAccount |> Map.toSeq |> Seq.head |> fst
     let output = Account.getUnspentOutputs rootAccount |> Map.toSeq |> Seq.head |> snd

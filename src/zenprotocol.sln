@@ -138,6 +138,11 @@ ProjectSection(SolutionItems) = preProject
 	ContractExamples\Token.fst = ContractExamples\Token.fst
 EndProjectSection
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Scripts", "Scripts", "{594A4B19-5CA9-4940-94C8-3689D3FC5444}"
+ProjectSection(SolutionItems) = preProject
+	Scripts\createGenesis.fsx = Scripts\createGenesis.fsx
+EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

@@ -38,7 +38,7 @@ let areOutpointsInSet session outpoints set =
 
 // Some default transaction to work with during the tests
 let tx =
-    let account = Account.createRoot ()
+    let account = Account.createTestAccount ()
     createTransaction account.publicKeyHash 1UL account
 let txHash = Transaction.hash tx
 let txOutpoints = getTxOutpints txHash tx
@@ -154,7 +154,7 @@ let ``origin tx hit mempool, orphan tx should be added to mempool``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
-    let rootAccount = Account.createRoot ()
+    let rootAccount = Account.createTestAccount ()
     let account1 = Account.create ()
     let account2 = Account.create ()
 
@@ -196,7 +196,7 @@ let ``orphan transaction is eventually invalid``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
-    let rootAccount = Account.createRoot ()
+    let rootAccount = Account.createTestAccount ()
     let account1 = Account.create ()
     let account2 = Account.create ()
 
@@ -244,7 +244,7 @@ let ``two orphan transaction spending same input``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
-    let rootAccount = Account.createRoot ()
+    let rootAccount = Account.createTestAccount ()
     let account1 = Account.create ()
     let account2 = Account.create ()
     let account3 = Account.create ()
@@ -304,7 +304,7 @@ let ``Valid contract should be added to ActiveContractSet``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
-    let rootAccount = Account.createRoot ()
+    let rootAccount = Account.createTestAccount ()
     let cHash = getStringHash sampleContractCode
 
     let tx =
@@ -339,7 +339,7 @@ let ``Invalid contract should not be added to ActiveContractSet or mempool``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
-    let rootAccount = Account.createRoot ()
+    let rootAccount = Account.createTestAccount ()
     let contractCode = "x"
     let cHash = getStringHash contractCode
 
@@ -376,7 +376,7 @@ let ``contract activation arrived, running orphan transaction``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
-    let account = Account.createRoot ()
+    let account = Account.createTestAccount ()
     
     let activationTransaction = 
         Account.createActivateContractTransaction account sampleContractCode

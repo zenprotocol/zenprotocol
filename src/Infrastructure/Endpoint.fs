@@ -3,10 +3,19 @@ module Infrastructure.Endpoint
 open System
 open System.Net
 
-let getPort address =     
-    let uri = new Uri(sprintf "tcp://%s" address)
+let getPort (address:string)  =     
+    let index = address.LastIndexOf(':')
     
-    uri.Port
+    if index = -1 then 
+        failwith "invalid address"
+    else 
+        let port = address.Substring(1 + index)
+        let isInteger, port = System.Int32.TryParse port
+        
+        if isInteger && port >= 1 && port <= 65535 then
+            port
+        else                      
+            failwith "invalid address"     
     
 let isValid (address:string) = 
     let index = address.LastIndexOf(':')

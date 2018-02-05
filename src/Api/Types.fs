@@ -52,3 +52,9 @@ type ContractExecuteRequestJson = JsonProvider<"""
     ]
 }
 """>
+
+type PublishBlockJson = JsonProvider<"""
+{
+    "block": "somehex"
+}
+""">

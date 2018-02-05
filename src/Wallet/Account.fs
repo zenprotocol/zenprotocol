@@ -243,18 +243,19 @@ let createActivateContractTransaction account code =
         }
     }
 
+let rootAccount =                     
+    {
+        outputs = Map.empty
+        keyPair = KeyPair.fromSecretKey rootSecretKey
+        publicKeyHash = Transaction.rootPKHash
+        tip = Hash.zero
+        mempool= List.empty
+    }  
 
-let createRoot () =                
-    let account = 
-        {
-            outputs = Map.empty
-            keyPair = KeyPair.fromSecretKey rootSecretKey
-            publicKeyHash = Transaction.rootPKHash
-            tip = Hash.zero
-            mempool= List.empty
-        }
-          
-    addTransaction Transaction.rootTxHash Transaction.rootTx account
+let createTestAccount () =                            
+    rootAccount
+    |> addTransaction Transaction.rootTxHash Transaction.rootTx
+                 
 
 let createExecuteContractTransaction account executeContract cHash command spends = result {
     let mutable txSkeleton = TxSkeleton.empty

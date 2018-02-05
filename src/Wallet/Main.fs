@@ -96,7 +96,7 @@ let main dataPath busName chain root =
                 | None -> 
                     Log.info "Creating new account"
                     if root then 
-                        Account.createRoot ()
+                        Account.rootAccount
                     else 
                         Account.create ()
                      

@@ -36,6 +36,12 @@ let deserialize block =
         Some (Binary.unpickle pickler block) with
     | _ -> None
 
+let toHex = serialize >> FsBech32.Base16.encode
+
+let fromHex hex = 
+    FsBech32.Base16.decode hex
+    |> Option.bind deserialize          
+
 let isGenesis chain block = 
     let blockHash = hash block
     

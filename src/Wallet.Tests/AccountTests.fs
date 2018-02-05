@@ -174,7 +174,7 @@ let ``picking from multiple inputs``() =
         
 [<Test>]
 let ``create execute contract transaction``() = 
-    let account = Account.createRoot ()
+    let account = Account.createTestAccount ()
     
     let executeContract _ _ _ txSkeleton =             
         let tx = 
