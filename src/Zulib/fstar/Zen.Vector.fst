@@ -93,16 +93,16 @@ let countWhere #_ #_ #_ f =
   foldl ctr 0
 
 val zip(#a #b:Type)(#l:nat):
-  vector a l -> vector b l -> cost (vector (a*b) l) M.(3*l+3)
+  vector a l -> vector b l -> cost (vector (a**b) l) M.(3*l+3)
 let rec zip #_ #_ #_ v1 v2 =
   match v1 with | VNil -> 3 +~! VNil
                 | VCons hd1 tl1 ->
   match v2 with | VCons hd2 tl2 -> 3 +! (VCons (hd1,hd2) <$> (zip tl1 tl2))
 
-val of2(#a:Type): a*a -> cost (vector a 2) 3
+val of2(#a:Type): a**a -> cost (vector a 2) 3
 let of2 #_ (x,y) = incRet 3 (VCons x (VCons y VNil))
 
-val of3(#a:Type): a*a*a -> cost (vector a 3) 4
+val of3(#a:Type): a**a**a -> cost (vector a 3) 4
 let of3 #_ (x,y,z) = incRet 4 (VCons x (VCons y (VCons z VNil)))
 (*)
 val vcons_length_pos(#a:Type)(#l:nat): v:(vector a l){VCons? v}

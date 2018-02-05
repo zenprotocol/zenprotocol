@@ -89,19 +89,19 @@ unfold val ($>) (#a #b:Type)(#n:nat): cost a n -> (a->b) -> cost b n
 unfold let ($>) #_ #_ #_ x f = map f x
 
 unfold val (<$$>) (#a #b #c:Type)(#m #n:nat):
-  (a->b->c) -> (cost a m * cost b n) -> cost c (m+n)
+  (a->b->c) -> (cost a m ** cost b n) -> cost c (m+n)
 unfold let (<$$>) #_ #_ #_ #_ #_ f (mx, my) = map2 f mx my
 
 unfold val ($$>) (#a #b #c:Type)(#m #n:nat):
-  (cost a m * cost b n) -> (a->b->c) -> cost c (m+n)
+  (cost a m ** cost b n) -> (a->b->c) -> cost c (m+n)
 unfold let ($$>) #_ #_ #_ #_ #_ (mx, my) f = f <$$> (mx, my)
 
 unfold val (<$$$>) (#a #b #c #d:Type)(#n1 #n2 #n3:nat):
-  (a->b->c->d) -> (cost a n1 * cost b n2 * cost c n3) -> cost d (n1+n2+n3)
+  (a->b->c->d) -> (cost a n1 ** cost b n2 ** cost c n3) -> cost d (n1+n2+n3)
 unfold let (<$$$>) #_ #_ #_ #_ #_ #_ #_ f (mx, my, mz) = map3 f mx my mz
 
 unfold val ($$$>) (#a #b #c #d:Type)(#n1 #n2 #n3:nat):
-  (cost a n1 * cost b n2 * cost c n3) -> (a->b->c->d) -> cost d (n1+n2+n3)
+  (cost a n1 ** cost b n2 ** cost c n3) -> (a->b->c->d) -> cost d (n1+n2+n3)
 unfold let ($$$>) #_ #_ #_ #_ #_ #_ #_ (mx, my, mz) f = f <$$$> (mx, my, mz)
 
 unfold val (<*>) (#a #b:Type)(#m #n:nat): cost (a->b) n -> cost a m -> cost b (n+m)
