@@ -182,47 +182,8 @@ let connect chain getUTXO contractsPath parent timestamp set acs ema =
             Error "block timestamp too far in the future"    
         else
             Ok (block,nextEma)  
-                           
-        
-    let checkCommitments ((block:Block),ema) =
-        let contracts =            
-            block.transactions
-            |> List.choose (fun tx -> tx.contract)        
-            |> List.map (fun contract -> Contract.compile contractsPath contract)                
-        
-        // Uncompiled contract are not allowed in block
-        let isAllContractValid = 
-            List.forall (fun contract ->
-                match contract with
-                | Ok _ -> true
-                | _ -> false) contracts
-        
-        if not <| isAllContractValid then
-            Error "invalid contract"        
-        else 
-            let acs =
-                contracts 
-                |> List.choose (fun contract ->
-                    match contract with
-                    | Ok c -> Some c
-                    | _ -> None)
-                |> List.fold (fun acs contract -> SparseMerkleTree.add (Contract.hash contract) contract acs) acs
-                              
-            let acsMerkleRoot = SparseMerkleTree.root acs
-            
-            // we already validated txMerkleRoot and witness merkle root at the basic validation, re-calculate with acsMerkleRoot
-            let commitments = 
-                createCommitments block.txMerkleRoot block.witnessMerkleRoot acsMerkleRoot block.commitments 
-                |> computeCommitmentsRoot
-    
-            // We ignore the known commitments in the block as we already calculated them
-            // Only check that the final commitment is correct                 
-            if commitments = block.header.commitments then                
-                Ok (block,acs,ema)
-            else
-                Error "commitments mismatch"
-            
-    let checkTxInputs (block,acs,ema) =
+                                                 
+    let checkTxInputs (block,ema) =
         if isGenesis chain block then
             let set = List.fold (fun set tx ->
                 let txHash = (Transaction.hash tx)
@@ -237,16 +198,31 @@ let connect chain getUTXO contractsPath parent timestamp set acs ema =
                 
                     match TransactionValidation.validateInContext getUTXO contractsPath acs set txHash tx with
                     | Error err -> Error (sprintf "transactions failed inputs validation due to %A" err)
-                    | Ok _ -> 
+                    | Ok (_,acs) -> 
                         let set = UtxoSet.handleTransaction getUTXO txHash tx set
                             
                         Ok (block,set,acs,ema) 
                     ) (Ok (block,set,acs,ema)) block.transactions
+                    
+    let checkCommitments (block,set,acs,ema) =                                   
+        let acsMerkleRoot = SparseMerkleTree.root acs
+        
+        // we already validated txMerkleRoot and witness merkle root at the basic validation, re-calculate with acsMerkleRoot
+        let commitments = 
+            createCommitments block.txMerkleRoot block.witnessMerkleRoot acsMerkleRoot block.commitments 
+            |> computeCommitmentsRoot
+        
+        // We ignore the known commitments in the block as we already calculated them
+        // Only check that the final commitment is correct                 
+        if commitments = block.header.commitments then                
+            Ok (block,set,acs,ema) 
+        else
+            Error "commitments mismatch"
 
     checkBlockNumber
-    >=> checkDifficulty
-    >=> checkCommitments
+    >=> checkDifficulty    
     >=> checkTxInputs
+    >=> checkCommitments
        
     
                 
