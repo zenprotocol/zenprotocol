@@ -11,7 +11,7 @@ type ValidationError =
     | Orphan
     | DoubleSpend
     | ContractNotActive
-    | BadContract of string
+    | BadContract
     | General of string
 
 let result = new Infrastructure.Result.ResultBuilder<ValidationError>()
@@ -39,7 +39,7 @@ let private checkSpends m =
 let private activateContract contractPath acs (tx : Types.Transaction) = result {
     match tx.contract with
     | Some code ->
-        let! contract = Contract.compile contractPath code |> Result.mapError (BadContract)
+        let! contract = Contract.compile contractPath code |> Result.mapError (fun _ -> BadContract)
         return ActiveContractSet.add contract.hash contract acs
     | None ->
         return acs

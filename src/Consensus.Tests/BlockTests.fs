@@ -81,7 +81,7 @@ let ``connecting block failed when block number is not successive``(parent:Block
     ==> (Block.connect Chain.Local getUTXO contractsPath parent 1UL utxoSet acs ema block = Error "blockNumber mismatch")  
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
-let ``connecting block should fail when commitments are wrong``(parent:BlockHeader) (NonEmptyTransactions transactions) = 
+let ``connecting block should fail when commitments are wrong``(parent:BlockHeader) = 
     
     let acs = ActiveContractSet.empty
     let utxoSet = UtxoSet.asDatabase
@@ -97,7 +97,9 @@ let ``connecting block should fail when commitments are wrong``(parent:BlockHead
         nonce = 0UL,0UL        
     }
     
-    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero;}
+    let block = {header=header;transactions=[];commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero;}
+    
+    printfn "%A" <| Block.connect Chain.Local getUTXO contractsPath parent (timestamp + 1UL) utxoSet acs ema block
     
     Block.connect Chain.Local getUTXO contractsPath parent (timestamp + 1UL) utxoSet acs ema block = Error "commitments mismatch"
 
@@ -224,12 +226,13 @@ let ``can connect block with a contract``() =
 [<Test>]    
 let ``block with invalid contract failed connecting``() = 
     let rootAccount = Account.createRoot ()    
-    let tx = 
-        Account.createTransaction 
-            Chain.Local rootAccount rootAccount.publicKeyHash {asset = Hash.zero; amount=1UL}
-            |> function | Ok x -> x | Error error -> failwith error
+    
+    let outpoint = Account.getUnspentOutputs rootAccount |> Map.toSeq |> Seq.head |> fst
+    let output = Account.getUnspentOutputs rootAccount |> Map.toSeq |> Seq.head |> snd
 
-    let tx = {tx with contract = Some ("ada","dasdas")}        
+    let tx = 
+        {contract = Some ("ada","dasdas"); inputs=[outpoint]; outputs=[output];witnesses=[]}
+        |> Transaction.sign [rootAccount.keyPair] 
         
     let contract : Contract.T = 
         {
@@ -245,7 +248,7 @@ let ``block with invalid contract failed connecting``() =
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate parent (timestamp+1UL) ema acs [tx]
             
-    let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "invalid contract"
-    
+    let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "transactions failed inputs validation due to BadContract"
+
     Block.connect Chain.Local getUTXO contractsPath parent timestamp utxoSet acs ema block
     |> should equal expected

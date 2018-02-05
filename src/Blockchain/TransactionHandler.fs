@@ -37,8 +37,8 @@ let private validateOrphanTransaction session contractPath state txHash tx  =
             | Error ContractNotActive ->
                 // transaction is still orphan, nothing to do
                 return state
-            | Error (BadContract str) ->
-                 Log.info "Previously orphaned transaction %s failed to activate its contract: %A" (Hash.toString txHash) str
+            | Error BadContract ->
+                 Log.info "Previously orphaned transaction %s failed to activate its contract" (Hash.toString txHash)
 
                  let orphanPool = OrphanPool.remove txHash state.orphanPool
                  return {state with orphanPool = orphanPool}
@@ -77,8 +77,8 @@ let validateInputs session contractPath txHash tx (state:MemoryState) shouldPubl
                 Log.info "Transaction %s tried to run an inactive contract. Adding to orphan pool." (Hash.toString txHash)
 
                 return {state with orphanPool = orphanPool}
-            | Error (BadContract str) ->
-                 Log.info "Transaction %s failed to activate its contract: %A" (Hash.toString txHash) str
+            | Error BadContract ->
+                 Log.info "Transaction %s failed to activate its contract" (Hash.toString txHash)
 
                  return state
             | Error error ->

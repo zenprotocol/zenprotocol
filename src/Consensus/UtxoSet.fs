@@ -53,30 +53,25 @@ let getUtxos getUTXO outpoints set =
                 | Unspent output -> Some (output :: list))                
         outpoints (Some [])
 
-let undoBlock getOutput getUTXO block set =
-
-    // unmark any spent output
-    let utxoSet  =
-        List.map (fun tx -> tx.inputs) block.transactions
-        |> List.concat
-        |> List.fold (fun set input ->
-            match get getUTXO input set with
-            | Spent -> 
-                let output = getOutput input
-                Map.add input (Unspent output) set
-            | NoOutput
-            | Unspent _ -> failwith "Expected output to be spent"            
-            ) set
+let undoBlock getOutput getUTXO block utxoSet =
 
     // remove all outputs
-    List.fold (fun utxoSet tx ->
+    List.foldBack (fun tx utxoSet ->
         let txHash = Transaction.hash tx
 
-        tx.outputs
-        |> List.mapi (fun i _ -> i)
+        let utxoSet = 
+            List.fold (fun utxoSet input ->
+                match get getUTXO input utxoSet with
+                | Spent -> 
+                    let output = getOutput input
+                    Map.add input (Unspent output) utxoSet
+                | NoOutput
+                | Unspent _ -> failwith "Expected output to be spent") utxoSet tx.inputs
+        
+        List.mapi (fun i _ -> i) tx.outputs
         |> List.fold (fun utxoSet i ->
             let outpoint = {txHash=txHash; index=uint32 i}
                                     
             Map.add outpoint NoOutput utxoSet    
-            ) utxoSet) utxoSet block.transactions
+            ) utxoSet) block.transactions utxoSet
         
