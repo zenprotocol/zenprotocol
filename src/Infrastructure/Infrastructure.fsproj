@@ -62,6 +62,7 @@
     <Compile Include="Platform.fs" />
     <Compile Include="ZFStar.fs" />
     <Compile Include="Result.fs" />
+    <Compile Include="Option.fs" />
   </ItemGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>

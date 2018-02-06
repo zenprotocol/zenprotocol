@@ -19,3 +19,30 @@ type ResultBuilder<'err>() =
                 (fun () -> it.MoveNext()),
                 (fun () -> f it.Current) )
         )
+
+let isOk<'res,'err> : Result<'res,'err> -> bool = function | Ok _ -> true | Error _ -> false
+let isError<'res,'err> : Result<'res,'err> -> bool = isOk >> not
+
+let traverseResultM f xs =
+    let (>>=) x f = Result.bind f x
+    let retn = Result.Ok
+    let initState = retn []
+    let folder h t =
+        f h >>= (fun h ->
+        t >>= (fun t ->
+        retn (h::t)))
+    List.foldBack folder xs initState
+
+let traverseResultA f xs : Result<'res list, 'err list> =
+    let (<*>) g x =
+        match g, x with
+        | Ok f, Ok y -> Ok (f y)
+        | Error es, Ok _ -> Error es
+        | Ok _, Error es -> Error es
+        | Error es, Error ees -> Error <| List.append es ees
+    let retn = Result.Ok
+    let cons h t = h::t
+    let initState = retn []
+    let folder head tail =
+        retn cons <*> (f head) <*> tail
+    List.foldBack folder xs initState
