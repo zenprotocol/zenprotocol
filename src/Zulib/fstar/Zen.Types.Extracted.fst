@@ -14,7 +14,7 @@ type key       = A.t U8.byte 64
 type asset = hash
 type contractHash = hash
 type witness (n:nat) = A.t byte n
-type nonce = U64.t * U64.t
+type nonce = U64.t ** U64.t
 
 type outpoint =
     { txHash: hash;
@@ -33,7 +33,7 @@ type output =
     { lock: lock;
       spend: spend }
 
-type pointedOutput = outpoint * output
+type pointedOutput = outpoint ** output
 
 unopteq type blockHeader = {
     version: U32.t;

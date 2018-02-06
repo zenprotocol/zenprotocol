@@ -113,7 +113,7 @@ let convertResult {inputs=_,inputMap; outputs=_,outputMap} =
         |> List.map (snd >> fstToFsOutput)
     {pInputs=inputs; outputs=outputs}
 
-let convetWallet (wallet:PointedOutput list) =     
+let convertWallet (wallet:PointedOutput list) =     
     List.map fsToFstPointedOutput wallet
     |> listToVector
 
@@ -146,16 +146,17 @@ let fstTofsMainFunction
           -> Result<TxSkeleton.T, string> =
     fun txSkel contractHash command returnAddress wallet ->
         let txSkel = convertInput txSkel
-        let wallet = convetWallet wallet
+        let wallet = convertWallet wallet
         let contractHash = bytes contractHash
         let returnAddress = fsToFstOption fsToFstLock returnAddress            
 
         mainFunction txSkel 
                      contractHash 
                      command
-                     returnAddress 
+                     returnAddress
                      (vectorLength wallet) 
                      wallet
+                     
         |> unCost
         |> toResult
         |> Result.map convertResult
