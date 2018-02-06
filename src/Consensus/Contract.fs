@@ -65,7 +65,7 @@ let private wrap (mainMethodInfo, costMethodInfo) =
     (
     fun (Hash.Hash cHash) command returnAddress contractWallet txSkeleton ->
         let txSkeleton' = ZFStar.convertInput txSkeleton
-        let contractWallet' = ZFStar.convetWallet contractWallet
+        let contractWallet' = ZFStar.convertWallet contractWallet
         let returnAddress' = ZFStar.fsToFstOption ZFStar.fsToFstLock returnAddress            
         
         invokeMainFn mainMethodInfo cHash command returnAddress' contractWallet' txSkeleton'
@@ -76,7 +76,7 @@ let private wrap (mainMethodInfo, costMethodInfo) =
     ,
     fun command returnAddress contractWallet txSkeleton ->
         let txSkeleton' = ZFStar.convertInput txSkeleton
-        let contractWallet' = ZFStar.convetWallet contractWallet
+        let contractWallet' = ZFStar.convertWallet contractWallet
         let returnAddress' = ZFStar.fsToFstOption ZFStar.fsToFstLock returnAddress            
         
         invokeCostFn costMethodInfo command returnAddress' contractWallet' txSkeleton'
