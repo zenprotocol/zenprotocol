@@ -89,6 +89,7 @@ let main argv =
             config.externalIp <- "127.0.0.1"
             config.api.enabled <- true
             config.api.bind <- "127.0.0.1:36000"
+            config.seeds.Clear()
             config.seeds.Add "127.0.0.1:29555"
         | Local2 ->
             config.dataPath <- "./data/l2"
@@ -98,6 +99,7 @@ let main argv =
             config.externalIp <- "127.0.0.1"
             config.api.enabled <- true
             config.api.bind <- "127.0.0.1:36001"
+            config.seeds.Clear()
             config.seeds.Add "127.0.0.1:29555"
         | Api address -> 
             config.api.enabled <- true
