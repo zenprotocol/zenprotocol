@@ -63,10 +63,13 @@ let private sendToPeers socket inproc peers routingIds msg =
     
 let private sendToNextPeer socket inproc peers msg = 
     // TODO: load balance peers
-    let random = 
-        ((new System.Random()).Next()) % (Map.count peers)
     
-    let routingId = Seq.item random (Map.toSeq peers) |> fst
+    let activePeers = peers |> Map.toSeq |> Seq.filter (fun (_,peer) -> Peer.isActive peer)
+        
+    let random = 
+        ((new System.Random()).Next()) % (Seq.length activePeers)
+    
+    let routingId = Seq.item random activePeers |> fst
     
     sendToPeer socket inproc peers routingId msg 
 
