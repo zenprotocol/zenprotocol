@@ -1,7 +1,7 @@
 RESTRICTION: == net462
 NUGET
   remote: https://www.nuget.org/api/v2
-    Argu (5.0)
+    Argu (5.0.1)
       FSharp.Core (>= 4.0.0.1)
     AsyncIO (0.1.40)
     Baseclass.Contrib.Nuget.Output (2.4.1)
@@ -24,7 +24,7 @@ NUGET
       System.ValueTuple (>= 4.4)
     FSharp.Control.Reactive (3.5)
       System.Reactive (>= 3.0)
-    FSharp.Core (4.3.2)
+    FSharp.Core (4.3.3)
     FSharp.Data (2.4.4)
     FSharpx.Async (1.13.2)
       FSharp.Control.AsyncSeq
@@ -37,7 +37,7 @@ NUGET
     FsNetMQ (0.2.7)
       FSharp.Core
       NetMQ (>= 4.0.0.156-pre)
-    FsPickler (5.0)
+    FsPickler (5.1)
       FSharp.Core (>= 3.1.2)
     FsUnit (3.0)
       FSharp.Core (>= 3.1.2.5)
@@ -76,5 +76,5 @@ NUGET
     zen_secp256k1_osx (0.1.0.25-v6ad5cdb42a1a)
     zen_z3_linux (4.5.1.7-v1f29cebd4df)
     zen_z3_osx (4.5.1.7-v1f29cebd4df6)
-    ZFS-Tools (0.0.8)
-    ZFStar (0.0.5)
+    ZFS-Tools (0.0.9)
+    ZFStar (0.0.7)

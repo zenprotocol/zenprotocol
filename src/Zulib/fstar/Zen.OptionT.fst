@@ -113,19 +113,19 @@ unfold val ( *>) (#a #b:Type)(#m #n:nat): cost (option a) n -> cost (option (a->
 unfold let ( *>) #_ #_ #_ #_ mx mf = ap mf mx
 
 unfold val (<$$>) (#a #b #c:Type)(#m #n:nat):
-  (a->b->c) -> (cost (option a) m * cost (option b) n) -> cost (option c) (m+n)
+  (a->b->c) -> (cost (option a) m ** cost (option b) n) -> cost (option c) (m+n)
 unfold let (<$$>) #_ #_ #_ #_ #_ f (mx, my) = map2 f mx my
 
 unfold val ( $$>) (#a #b #c:Type)(#m #n:nat):
-  (cost (option a) m * cost (option b) n) -> (a->b->c) -> cost (option c) (m+n)
+  (cost (option a) m ** cost (option b) n) -> (a->b->c) -> cost (option c) (m+n)
 unfold let ( $$>) #_ #_ #_ #_ #_ (mx, my) f = f <$$> (mx, my)
 
 unfold val (<$$$>) (#a #b #c #d:Type)(#n1 #n2 #n3:nat):
-  (a->b->c->d) -> (cost (option a) n1 * cost (option b) n2 * cost (option c) n3)
+  (a->b->c->d) -> (cost (option a) n1 ** cost (option b) n2 ** cost (option c) n3)
   -> cost (option d) (n1+n2+n3)
 unfold let (<$$$>) #_ #_ #_ #_ #_ #_ #_ f (mx, my, mz) = map3 f mx my mz
 
 unfold val ( $$$>) (#a #b #c #d:Type)(#n1 #n2 #n3:nat):
-  (cost (option a) n1 * cost (option b) n2 * cost (option c) n3) -> (a->b->c->d)
+  (cost (option a) n1 ** cost (option b) n2 ** cost (option c) n3) -> (a->b->c->d)
   -> cost (option d) (n1+n2+n3)
 unfold let ( $$$>) #_ #_ #_ #_ #_ #_ #_ (mx, my, mz) f = f <$$$> (mx, my, mz)

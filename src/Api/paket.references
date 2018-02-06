@@ -3,3 +3,4 @@ FsNetMQ
 FSharp.Control.Reactive
 FSharp.Data
 FSharp.Compiler.Tools
+FsBech32

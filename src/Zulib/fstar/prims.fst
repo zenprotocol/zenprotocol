@@ -223,6 +223,7 @@ assume val op_AmpAmp             : bool -> bool -> Tot bool
 assume val op_BarBar             : bool -> bool -> Tot bool
 assume val op_Negation           : bool -> Tot bool
 assume val op_Multiply           : int -> int -> Tot int
+let ( * ) = op_Multiply
 assume val op_Subtraction        : int -> int -> Tot int
 assume val op_Addition           : int -> int -> Tot int
 assume val op_Minus              : int -> Tot int
