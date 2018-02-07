@@ -5,10 +5,17 @@ const path = require('path');
 const nodePath = path.join(__dirname,'/Release/zen-node.exe');
 const workingDirectory = path.join(__dirname,'Release');
 
+const appData =
+    process.env.APPDATA ||
+    (process.platform == 'darwin' ? path.join(process.env.HOME,'Library/Application Support') : path.join(process.env.HOME, '.config'));
+const userData = path.join(appData, 'zen-node');
+
 function start(args) {
   if (args === undefined)
     args = [];
 
+  args.unshift('--data-path',userData);
+  
   let node;
 
   if (process.platform !== "win32") {
@@ -26,4 +33,4 @@ function start(args) {
   return node
 }
 
-module.exports = start
+module.exports = start;
