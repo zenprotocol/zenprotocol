@@ -334,6 +334,28 @@ let private handleForkChain chain contractPath session timestamp (state:State) p
                 return {state with tipState=tipState;memoryState=memoryState}
     }     
         
+// find orphan chain root
+let rec requestOrphanChainRoot session (header:ExtendedBlockHeader.T) (state:State) =
+    effectsWriter {      
+        match BlockRepository.tryGetHeader session header.header.parent with
+        | Some parent ->
+            return! requestOrphanChainRoot session parent state
+        | None ->
+            if not <| Map.containsKey header.header.parent state.blockRequests then
+            
+                Log.info "Request root of orphan chain from network block %d %A" 
+                            (header.header.blockNumber - 1ul) header.header.parent
+            
+                // asking network for the parent block
+                let blockRequests = Map.add header.header.parent ParentBlock state.blockRequests
+                do! getBlock header.header.parent
+                
+                return {state with blockRequests=blockRequests}
+            else
+                return state
+    } 
+                
+        
 let validateBlock chain contractPath session timestamp block mined (state:State) =
     effectsWriter { 
         let blockHash = Block.hash block
@@ -392,9 +414,9 @@ let validateBlock chain contractPath session timestamp block mined (state:State)
                     | ExtendedBlockHeader.Orphan ->
                         let extendedHeader = ExtendedBlockHeader.createOrphan blockHash block
                         BlockRepository.saveHeader session extendedHeader
-                        BlockRepository.saveFullBlock session blockHash block
-
-                        return state
+                        BlockRepository.saveFullBlock session blockHash block                                             
+                                
+                        return! requestOrphanChainRoot session parent state                                                                       
                     | ExtendedBlockHeader.MainChain
                     | ExtendedBlockHeader.Connected ->
                         let! state' =
@@ -409,45 +431,36 @@ let validateBlock chain contractPath session timestamp block mined (state:State)
                         return state'
     }
 
-let handleNewBlockHeader chain session peerId header (state:State) =
-    effectsWriter {            
-        let blockHash = BlockHeader.hash header
-       
-        if (not <| BlockRepository.contains session blockHash) && (not <| Map.containsKey blockHash state.blockRequests) then
-            match BlockHeader.validate chain header with
-            | Ok header ->
-                
-                Log.info "Request new block #%d %A from peers" header.blockNumber blockHash
-                
-                // TODO: mark request as request for new block so peer cannot trick as to think it is not a new block
-                let blockRequests = Map.add blockHash NewBlock state.blockRequests
-            
-                do! getNewBlock peerId blockHash
-                
-                return {state with blockRequests = blockRequests}
-            | Error _ -> 
-                return state
-        else 
-            return state
-    }
-
-let handleTip chain session header (state:State) =
+let private handleHeader chain session get reason header state = 
     effectsWriter {
         let blockHash = BlockHeader.hash header                       
     
-        if (not <| BlockRepository.contains session blockHash) && (not <| Map.containsKey blockHash state.blockRequests) then
-            match BlockHeader.validate chain header with
-            | Ok header ->
+        if (not <| Map.containsKey blockHash state.blockRequests) then
+            match BlockRepository.tryGetHeader session blockHash with
+            | Some extendedBlock ->
+                if extendedBlock.status = ExtendedBlockHeader.Orphan then
+                    return! requestOrphanChainRoot session extendedBlock state
+                else
+                    return state
+            | None ->        
+                match BlockHeader.validate chain header with
+                | Ok header ->
+                    
+                    Log.info "Request block #%d %A from peers due to %A" header.blockNumber blockHash reason
                 
-                Log.info "Request block #%d %A from peers" header.blockNumber blockHash
-            
-                let blockRequests = Map.add blockHash Tip state.blockRequests
-            
-                do! getBlock blockHash
+                    let blockRequests = Map.add blockHash reason state.blockRequests
                 
-                return {state with blockRequests = blockRequests}
-            | Error _ -> 
-                return state
+                    do! get blockHash
+                    
+                    return {state with blockRequests = blockRequests}
+                | Error _ -> 
+                    return state
         else 
-            return state
-    }
+            return state 
+    }    
+
+let handleNewBlockHeader chain session peerId header (state:State) =
+    handleHeader chain session (getNewBlock peerId) NewBlock header state    
+
+let handleTip chain session header (state:State) =
+    handleHeader chain session getBlock Tip header state
