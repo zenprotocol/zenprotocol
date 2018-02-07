@@ -17,10 +17,10 @@ type T = Map<Outpoint, OutputStatus>
 let asDatabase = Map.empty
 
 let get getUTXO outpoint set =
-    defaultArg
-        <| Map.tryFind outpoint set
-        <| getUTXO outpoint     // return value if outpoint isn't in set
-         
+    match Map.tryFind outpoint set with
+        | Some x-> x
+        | None -> getUTXO outpoint
+
 let handleTransaction getUTXO txHash tx set =
     let folder state input =
         match get getUTXO input state with
