@@ -299,3 +299,5 @@ src/Zulib/fsharp/Extracted
 
 # Directory of test data
 test/
+
+package/*.tgz

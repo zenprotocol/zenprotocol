@@ -7,23 +7,30 @@ open Network.Transport;
 type T = {
     maxConnections: int;
     connections: Set<string>;   
-    failed: Set<string>;
+    failing: Map<string, int>;
 }
 
-let create maxConnection = {maxConnections=maxConnection; connections = Set.empty; failed=Set.empty}
+[<LiteralAttribute>]
+let MaxAttemps = 10
+
+let create maxConnection = {maxConnections=maxConnection; connections = Set.empty; failing=Map.empty}
 
 let connected connector address =
-    let failed = Set.remove address connector.failed     
+    let failed = Map.remove address connector.failing     
      
-    {connector with failed = failed}
+    {connector with failing = failed}
         
-let disconnected connector address =
-    // TODO: add the address to fail, in order to try last 
- 
+let disconnected connector address =  
     let connections = Set.remove address connector.connections
-    let failed = Set.add address connector.failed
     
-    {connector with connections = connections}
+    let failing = 
+        match Map.tryFind address connector.failing with
+        | Some attempts ->                      
+            Map.add address (attempts + 1) connector.failing
+        | None ->
+            Map.add address 1 connector.failing             
+                
+    {connector with connections = connections; failing=failing}
     
 let connect transport addressBook connector =
         
@@ -40,6 +47,19 @@ let connect transport addressBook connector =
         
         {connector with connections = connections}     
         
+    let failing = 
+        connector.failing          
+        |> Map.toSeq 
+        |> Seq.map fst 
+        |> Set.ofSeq
+        
+    let failed = 
+        connector.failing 
+        |> Map.filter( fun _ attempts -> attempts = MaxAttemps) 
+        |> Map.toSeq 
+        |> Seq.map fst 
+        |> Set.ofSeq                        
+        
     // Try first without failed one
-    let connector = connectInternal transport addressBook connector (Set.union connector.connections connector.failed) 
-    connectInternal transport addressBook connector connector.connections 
+    let connector = connectInternal transport addressBook connector (Set.union connector.connections failing) 
+    connectInternal transport addressBook connector (Set.union connector.connections failed) 
