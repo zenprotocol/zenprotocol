@@ -68,10 +68,9 @@ let undoBlock getOutput getUTXO block utxoSet =
                 | NoOutput
                 | Unspent _ -> failwith "Expected output to be spent") utxoSet tx.inputs
         
-        List.mapi (fun i _ -> i) tx.outputs
-        |> List.fold (fun utxoSet i ->
-            let outpoint = {txHash=txHash; index=uint32 i}
-                                    
-            Map.add outpoint NoOutput utxoSet    
+        [0 .. List.length tx.outputs - 1]
+        |> List.map (fun i -> {txHash=txHash; index=uint32 i})
+        |> List.fold (fun utxoSet outpoint ->
+            Map.add outpoint NoOutput utxoSet
             ) utxoSet) block.transactions utxoSet
         
