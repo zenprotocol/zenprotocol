@@ -6,6 +6,7 @@ MinimumVisualStudioVersion = 10.0.0.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".paket", ".paket", "{3687651F-3E94-4443-9367-64C31CA13A48}"
 	ProjectSection(SolutionItems) = preProject
 		..\paket.dependencies = ..\paket.dependencies
+		..\paket.lock = ..\paket.lock
 	EndProjectSection
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Consensus", "Consensus\Consensus.fsproj", "{5EC4457B-615A-4BBD-B3D5-D0E311B9D5E9}"
@@ -141,6 +142,14 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Scripts", "Scripts", "{594A4B19-5CA9-4940-94C8-3689D3FC5444}"
 ProjectSection(SolutionItems) = preProject
 	Scripts\createGenesis.fsx = Scripts\createGenesis.fsx
+EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "package", "package", "{A4AF5018-B969-4944-9B85-6E33203591DB}"
+ProjectSection(SolutionItems) = preProject
+	..\package\build.sh = ..\package\build.sh
+	..\package\index.js = ..\package\index.js
+	..\package\package.json = ..\package\package.json
+	..\package\zen-node.js = ..\package\zen-node.js
 EndProjectSection
 EndProject
 Global
