@@ -34,7 +34,7 @@ let ``multiple peers connecting to host`` () =
 let ``peer reconnect when other peer is down``()=
     let host = startHost ()
     use peer = startPeer ()
-    let connector = Connector.create 1    
+    let connector = Connector.create (seq {yield address}) 1    
                            
     System.Threading.Thread.Sleep (100)
     

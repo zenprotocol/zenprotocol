@@ -251,9 +251,7 @@ let handleTick socket peer =
     | Connecting sent ->
         match (getNow ()) - sent > helloTimeout with
         | false -> peer
-        | true -> 
-            Log.info "Peer didn't reply to hello message"
-            
+        | true ->                         
             closePeer socket NoHelloAck peer
     | _ -> failwith "Dead peer should not receive any ticks requests"
 
