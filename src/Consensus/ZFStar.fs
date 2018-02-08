@@ -4,6 +4,7 @@ open Operators.Checked
 
 open Consensus.Types
 open Consensus.Hash
+open Consensus.SparseMerkleTree
 open Consensus.TxSkeleton
 open FSharp.Compatibility.OCaml
 open Zen.Types.Extracted
@@ -27,7 +28,7 @@ let private throwNotImplemented s1 s2 =
     |> System.NotImplementedException
     |> raise
 
-let fsToFstOption mapper value = 
+let fsToFstOption mapper value =
     match value with
     | FSharp.Core.Some value -> mapper value |> FStar.Pervasives.Native.Some
     | FSharp.Core.None -> FStar.Pervasives.Native.None
@@ -42,7 +43,7 @@ let fsToFstLock (outputLock:Types.Lock) : lock =
         //ContractLock (pkHash, 0I, Empty)
     | Contract (Hash.Hash pkHash) ->
         ContractLock pkHash
-    | Destroy -> 
+    | Destroy ->
         DestroyLock
 
 
@@ -100,63 +101,55 @@ let private listToVector (ls:List<'Aa>) : Zen.Vector.t<'Aa, _> =
     let lsIndexed = List.mapi (fun i elem -> bigint (len - i - 1), elem) ls // vectors are reverse-zero-indexed
     List.fold (fun acc (i,x) -> Zen.Vector.VCons (i, x, acc)) Zen.Vector.VNil lsIndexed
 
-let convertResult {inputs=_,inputMap; outputs=_,outputMap} =
-    let inputs =
-        Map.toList inputMap
-        |> List.collect(fun (_, (_, inputs)) -> inputs)
-        |> List.sortBy fst
-        |> List.map (snd >> fstToFsPointedOutput)
-    let outputs =
-        Map.toList outputMap
-        |> List.collect(fun (_, (_, outputs)) -> outputs)
-        |> List.sortBy fst
-        |> List.map (snd >> fstToFsOutput)
-    {pInputs=inputs; outputs=outputs}
+let private fstToFsTx : txSkeleton -> _ = function
+    | {inputs=_,inputMap; outputs=_,outputMap} ->
+        let inputs =
+            Map.toList inputMap
+            |> List.collect(fun (_, (_, inputs)) -> inputs)
+            |> List.sortBy fst
+            |> List.map (snd >> fstToFsPointedOutput)
+        let outputs =
+            Map.toList outputMap
+            |> List.collect(fun (_, (_, outputs)) -> outputs)
+            |> List.sortBy fst
+            |> List.map (snd >> fstToFsOutput)
+        Ok {pInputs=inputs; outputs=outputs}
+    | _ ->
+        Error "malformed txSkeleton"
 
-let convertWallet (wallet:PointedOutput list) =     
+let fstTofsMessage = function
+    | Native.option.Some { Zen.Types.Main.message.cHash = cHash; command = command } ->
+        Ok <| Some { Consensus.Types.Message.cHash = Hash.Hash cHash; command = command }
+    | Native.option.None ->
+        Ok None
+    | _ ->
+        Error "malformed message"
+
+let convertResult (tx, message : message Native.option) =
+    fstTofsMessage message
+    |> Result.bind (fun message ->
+        fstToFsTx tx
+        |> Result.map (fun tx' -> (tx', message))
+    )
+
+let convertWallet (wallet:PointedOutput list) =
     List.map fsToFstPointedOutput wallet
     |> listToVector
 
 let convertInput (txSkeleton:TxSkeleton.T) : txSkeleton =
-    
-    let insertPointedOutput txSkeleton pointedOutput = 
+    let insertPointedOutput txSkeleton pointedOutput =
         insertPointedOutput pointedOutput txSkeleton
-    let insertOutput txSkeleton output = 
+    let insertOutput txSkeleton output =
         insertOutput output txSkeleton
     let inputs = txSkeleton.pInputs |> List.map fsToFstPointedOutput
     let outputs= txSkeleton.outputs |> List.map fsToFstOutput
-    
-    let txSkeletonWithInputsOnly = 
+
+    let txSkeletonWithInputsOnly =
         List.fold insertPointedOutput emptyTxSkeleton inputs
-    
+
     List.fold insertOutput txSkeletonWithInputsOnly outputs
-    
-let vectorLength v = 
-    match v with 
+
+let vectorLength v =
+    match v with
     | VCons (l,_,_) -> l + 1I
     | VNil -> 0I
-    
-let fstTofsMainFunction
-        (MainFunc (_, mainFunction): mainFunction)
-        : TxSkeleton.T 
-          -> Hash 
-          -> string
-          -> Lock option
-          -> list<PointedOutput>
-          -> Result<TxSkeleton.T, string> =
-    fun txSkel contractHash command returnAddress wallet ->
-        let txSkel = convertInput txSkel
-        let wallet = convertWallet wallet
-        let contractHash = bytes contractHash
-        let returnAddress = fsToFstOption fsToFstLock returnAddress            
-
-        mainFunction txSkel 
-                     contractHash 
-                     command
-                     returnAddress
-                     (vectorLength wallet) 
-                     wallet
-                     
-        |> unCost
-        |> toResult
-        |> Result.map convertResult

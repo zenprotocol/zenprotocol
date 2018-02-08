@@ -39,6 +39,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="ContractMessageTests.fs" />
     <Compile Include="SimpleWalletContractTests.fs" />
     <Compile Include="MintingContractTests.fs" />
     <Compile Include="ValidateBlockTests.fs" />

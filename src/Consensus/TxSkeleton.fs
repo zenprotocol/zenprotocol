@@ -7,26 +7,26 @@ type T = {
     outputs: Output list
 }
 
-let empty = 
+let empty =
     {
         pInputs = []
         outputs = []
     }
-    
-let addInputs inputs (txSkeleton:T) =     
+
+let addInputs inputs (txSkeleton:T) =
     {txSkeleton with pInputs=List.append txSkeleton.pInputs inputs}
-    
-let addOutput output (txSkeleton:T) = 
-    {txSkeleton with outputs=List.append txSkeleton.outputs [output]}    
-    
-let addChange asset inputsAmount outputsAmount pkHash txSkeleton = 
+
+let addOutput output (txSkeleton:T) =
+    {txSkeleton with outputs=List.append txSkeleton.outputs [output]}
+
+let addChange asset inputsAmount outputsAmount pkHash txSkeleton =
     if inputsAmount > outputsAmount then
         addOutput {lock=PK pkHash;spend={amount=inputsAmount-outputsAmount;asset=asset}} txSkeleton
     else
-        txSkeleton                        
+        txSkeleton
 
-let checkPrefix txSub txSuper = 
-    let (=>) (super:List<'a>) (sub:List<'a>) = 
+let checkPrefix txSub txSuper =
+    let (=>) (super:List<'a>) (sub:List<'a>) =
         let subLen, superLen = List.length sub, List.length super
         superLen >= subLen && super.[0..subLen-1] = sub
 
@@ -49,13 +49,13 @@ let fromTransaction tx outputs =
         Error "could not construct txSkeleton"
 
 let applyMask tx cw =
-    let (=>) list length = 
+    let (=>) list length =
         List.length list |> uint32 >= length
 
     if tx.pInputs => cw.inputsLength &&
        tx.outputs => cw.outputsLength then
-        Ok { 
-            tx with 
+        Ok {
+            tx with
                 pInputs = tx.pInputs.[0 .. int cw.beginInputs - 1 ]
                 outputs = tx.outputs.[0 .. int cw.beginOutputs - 1 ]
         }
@@ -63,14 +63,31 @@ let applyMask tx cw =
         Error "could not apply mask"
 
 
-let isSkeletonOutpoint outpoint = 
-    outpoint.txHash = Hash.zero 
+let isSkeletonOutpoint outpoint =
+    outpoint.txHash = Hash.zero
     && outpoint.index = 0ul
 
 let isSkeletonOf txSkeleton tx inputs =
-    let withoutSkeletonInputs = 
+    let withoutSkeletonInputs =
         txSkeleton.pInputs |> List.filter (fst >> isSkeletonOutpoint >> not)
 
     tx.inputs = (withoutSkeletonInputs |> List.map fst)
     && inputs = (withoutSkeletonInputs |> List.map snd) // Check that the contract didn't change the inputs
     && tx.outputs = txSkeleton.outputs
+
+let getContractWitness cHash command returnAddress initialTxSkelton finalTxSkeleton =
+    let length list = List.length list |> uint32
+    
+    let returnAddressIndex = 
+        List.tryFindIndex (fun output -> output.lock = returnAddress) finalTxSkeleton.outputs
+        |> Option.map uint32
+
+    ContractWitness {
+        cHash = cHash
+        command = command
+        returnAddressIndex = returnAddressIndex
+        beginInputs = length initialTxSkelton.pInputs
+        beginOutputs = length initialTxSkelton.outputs
+        inputsLength = length finalTxSkeleton.pInputs - length initialTxSkelton.pInputs
+        outputsLength = length finalTxSkeleton.outputs - length initialTxSkelton.outputs
+    }

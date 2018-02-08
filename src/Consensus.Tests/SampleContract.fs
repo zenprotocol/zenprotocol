@@ -17,10 +17,10 @@ open Zen.Cost
 module ET = Zen.ErrorT
 module Tx = Zen.TxSkeleton
 
-val cf: txSkeleton -> string -> option lock ->  #l:nat -> wallet l -> cost nat 5
-let cf _ _ _ #l _ = ret (64 + 64 + 20)
+val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 7
+let cf _ _ _ #l _ = ret (64 + 64 + 0 + 23)
 
-val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result txSkeleton) (64 + 64 + 20)
+val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + 64 + 0 + 23)
 let main txSkeleton contractHash command returnAddress #l wallet =
   let spend = { asset=contractHash; amount=1000UL } in
   let lock = ContractLock contractHash in
@@ -32,9 +32,11 @@ let main txSkeleton contractHash command returnAddress #l wallet =
       index = 0ul
   }, output in
 
-  let txSkeleton1 = Tx.addInput pInput txSkeleton in
-  let txSkeleton2 = txSkeleton1 >>= Tx.lockToContract spend.asset spend.amount contractHash in
-  ET.retT txSkeleton2
+  let! txSkeleton =
+    Tx.addInput pInput txSkeleton
+    >>= Tx.lockToContract spend.asset spend.amount contractHash in
+
+  ET.ret (txSkeleton, None)
   """
 
 let sampleContractHash =
@@ -60,7 +62,7 @@ let private sampleContractTester txSkeleton hash =
 
     let outputs' = txSkeleton.outputs @ [ output ]
     let pInputs' = txSkeleton.pInputs @ [ pInput ]
-    { txSkeleton with outputs = outputs'; pInputs = pInputs' }
+    { txSkeleton with outputs = outputs'; pInputs = pInputs' }, None
 
 let sampleKeyPair = KeyPair.create()
 let samplePrivateKey, samplePublicKey = sampleKeyPair
@@ -81,12 +83,12 @@ let sampleInputTx =
         outputs = [ sampleOutput ]
     }
 
-let sampleOutputTx =
+let sampleOutputTx, _ =
     sampleContractTester sampleInputTx sampleContractHash
 
 let sampleExpectedResult =
-    let tx = Transaction.fromTxSkeleton sampleOutputTx    
-    Transaction.addContractWitness sampleContractHash "" (PK Hash.zero) sampleInputTx sampleOutputTx tx
+    Transaction.fromTxSkeleton sampleOutputTx
+    |> Transaction.addWitnesses [ TxSkeleton.getContractWitness sampleContractHash "" (PK Hash.zero) sampleInputTx sampleOutputTx ]
     |> Transaction.sign [ sampleKeyPair ]
 
 let getSampleUtxoset utxos =
