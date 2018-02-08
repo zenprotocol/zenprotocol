@@ -8,7 +8,7 @@ build:
  stage: build
  script:
  - mono .paket/paket.exe restore
- - chmod +x packages/zen_z3_linux/output/z3
+ - chmod +x packages/zen_z3_linux/output/z3-linux
  - pushd src/Zulib && ./build.sh && popd
  - msbuild src/zenprotocol.sln
  - cp packages/zen_secp256k1_linux/output/libsecp256k1.so /usr/lib 

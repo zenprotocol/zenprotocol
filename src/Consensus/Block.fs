@@ -5,6 +5,8 @@ open Consensus.Types
 
 open MBrace.FsPickler.Combinators
 
+open Infrastructure
+
 [<Literal>]
 let Version = 0ul
 
@@ -18,7 +20,7 @@ let pickler = Pickler.auto<Block>
 
 let private (>=>) f1 f2 x = Result.bind f2 (f1 x)
 
-let result = new Infrastructure.Result.ResultBuilder<string>()
+let result = new Result.ResultBuilder<string>()
 
 let private createCommitments txMerkleRoot witnessMerkleRoot acsMerkleRoot rest =
     [ txMerkleRoot; witnessMerkleRoot; acsMerkleRoot; ] @ rest
@@ -133,8 +135,9 @@ let validate chain =
         if isGenesis chain block then
             return block
         else
+            // Fail if validateBasic fails on any transaction in the block.
             for tx in block.transactions do
-                let! validTx = 
+                let! _ =
                     TransactionValidation.validateBasic tx 
                     |> Result.mapError (sprintf "transaction %A failed validation due to %A" (Transaction.hash tx) )
                 ()

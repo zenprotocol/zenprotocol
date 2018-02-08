@@ -13,7 +13,7 @@ extern uint16 GetShortPathName(
     StringBuilder lpszShortPath,
     uint16 cchBuffer)
 
-let private getPlatform =
+let platform =
     let platform = Environment.OSVersion.Platform
     if (platform = PlatformID.Unix 
         && Directory.Exists "/Applications"
@@ -24,7 +24,7 @@ let private getPlatform =
     else platform
 
 let private isUnix =
-    match getPlatform with
+    match platform with
     | PlatformID.Unix
     | PlatformID.MacOSX ->
         true
@@ -48,7 +48,7 @@ let workingDirectory =
 let combine a b = Path.Combine (a,b)
 
 let getFrameworkPath =
-    match getPlatform with
+    match platform with
     | PlatformID.Unix -> "/usr/lib/mono/4.6.2-api/"
     | PlatformID.MacOSX -> "/Library/Frameworks/Mono.framework/Versions/Current/lib/mono/4.6.2-api/"
     | _ -> @"C:\Windows\Microsoft.NET\Framework\v4.0.30319\"

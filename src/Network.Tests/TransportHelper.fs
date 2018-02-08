@@ -5,7 +5,7 @@ open Network.Transport
 open FsNetMQ
 
 let address = "127.0.0.1:5556"
-let addressBook = AddressBook.create (seq {yield address})
+let addressBook = AddressBook.empty
 
 let startHost () = 
     let transport = Transport.create true address

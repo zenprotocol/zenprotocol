@@ -27,7 +27,7 @@ let eventHandler transport event (connector,addressBook, ownAddress) =
         connector,addressBook,ownAddress
     | _ -> connector,addressBook,ownAddress
 
-let transportHandler transport client msg (connector,addressBook,ownAddress) =
+let transportHandler transport seeds client msg (connector,addressBook,ownAddress) =
     let requestAddresses peerId = 
          if not (AddressBook.haveEnoughAddresses addressBook) then
             Transport.getAddresses transport peerId             
@@ -54,6 +54,10 @@ let transportHandler transport client msg (connector,addressBook,ownAddress) =
         requestAddresses peerId 
         requestMemPool peerId
         requestTip peerId
+        
+        // TODO: we might want to publish an address only once?
+        if (AddressBook.contains addressBook address) then
+            Transport.publishAddress transport address
             
         (Connector.connected connector address),addressBook,ownAddress        
     | InProcMessage.Accepted peerId ->
@@ -76,11 +80,7 @@ let transportHandler transport client msg (connector,addressBook,ownAddress) =
             let handleAddress () =
                 Log.info "Received new address %s" address
                                              
-                if not (AddressBook.contains addressBook address) then
-                                    
-                    // TODO: don't publish to the sender?
-                    Transport.publishAddress transport address
-                    
+                if not (AddressBook.contains addressBook address) && not (Seq.contains address seeds) then                                                                            
                     let addressBook = AddressBook.add addressBook address
                     
                     // We might need more peers so lets try to connect to the new peer
@@ -227,7 +227,7 @@ let main busName externalIp listen bind seeds =
     Actor.create<Command, Request, Event, State> busName serviceName (fun poller sbObservable ebObservable ->           
         let transport = Transport.create listen bind
         
-        let addressBook = AddressBook.create seeds
+        let addressBook = AddressBook.empty
         
         let ownAddress = 
             if not (System.String.IsNullOrEmpty externalIp) && listen then 
@@ -238,7 +238,7 @@ let main busName externalIp listen bind seeds =
             else None
         
         let connector = 
-            Connector.create maxConnections
+            Connector.create seeds maxConnections
             |> Connector.connect transport addressBook
         
         let client = ServiceBus.Client.create busName
@@ -257,7 +257,7 @@ let main busName externalIp listen bind seeds =
         let transportObservable = 
             Transport.addToPoller poller transport            
             |> Observable.map (fun _ -> Transport.recv transport)            
-            |> Observable.map (transportHandler transport client)
+            |> Observable.map (transportHandler transport seeds client)
                           
         let discoverIpObservable, discoverIpDisposable = 
             if Option.isNone ownAddress && listen then

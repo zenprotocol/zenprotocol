@@ -60,8 +60,8 @@ let fromBigInt (b:bigint) =
     let h =
         match bs.Length with
         | n when n <= 32 ->
-            let ar = Array.zeroCreate (32 - n)
-            Array.rev (Array.append ar bs)
+            let ar = Array.zeroCreate (32 - n)            
+            Array.append ar <| Array.rev bs
         | 33 ->
             if bs.[32] <> 0uy then failwith "Negative difficulty target"
             else Array.rev bs.[..31]

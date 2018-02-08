@@ -1,0 +1,9 @@
+{
+  "author":"Zen Protocol",
+  "name":"@zen/zen-node",
+  "version":"0.1.15",
+  "main":"index.js",
+  "bin": {
+    "zen-node":"zen-node.js"
+  }
+}

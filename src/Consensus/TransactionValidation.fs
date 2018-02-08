@@ -4,6 +4,8 @@ open Consensus.Types
 open Consensus.UtxoSet
 open Consensus.Crypto
 
+open Infrastructure
+
 
 let private (>=>) f1 f2 x = Result.bind f2 (f1 x)
 
@@ -14,7 +16,7 @@ type ValidationError =
     | BadContract
     | General of string
 
-let result = new Infrastructure.Result.ResultBuilder<ValidationError>()
+let result = new Result.ResultBuilder<ValidationError>()
 
 let private GeneralError msg =
     msg |> General |> Error
@@ -198,15 +200,11 @@ let private checkInputsStructure tx =
     else
         Ok tx
 
-let private tryGetUtxos getUTXO set (txHash:Hash.Hash) tx =
-    match getUtxos getUTXO tx.inputs set with
-    | Some utxos -> 
-        Ok utxos
-    | None ->
-        match UtxoSet.isSomeSpent getUTXO tx.inputs set with
-        | true -> DoubleSpend
-        | false -> Orphan
-        |> Error
+let private tryGetUtxos getUTXO utxoSet (txHash:Hash.Hash) tx =
+    getUtxosResult getUTXO tx.inputs utxoSet
+    |> Result.mapError (fun errors ->
+        if List.contains Spent errors then DoubleSpend else Orphan
+    )
 
 let validateBasic = 
     checkInputsNotEmpty

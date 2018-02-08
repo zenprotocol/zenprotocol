@@ -29,8 +29,11 @@ let put (MultiCollection collection) session key value =
     
     let mutable keyData = byteArrayToData pinnedKey
     let mutable valueData = byteArrayToData pinnedValue
-    mdb_put(session.tx, collection.database, &keyData, &valueData, MDB_NODUPDATA)
-    |> checkErrorCode
+    let result = mdb_put(session.tx, collection.database, &keyData, &valueData, MDB_NODUPDATA)
+    
+    if result <> 0 && result <> MDB_KEYEXIST then
+        errorToString result 
+        |> failwith             
     
 let delete (MultiCollection collection) session key value =
     let keyBytes = collection.keySerializer key

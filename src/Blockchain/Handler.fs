@@ -77,9 +77,8 @@ let handleCommand chain command session timestamp (state:State) =
                 return state          
         }
 
-let private selectTransactions _ = id
                                                             
-let handleRequest (requestId:RequestId) request session timestamp state =
+let handleRequest chain (requestId:RequestId) request session timestamp state =
     match request with
     | ExecuteContract (cHash, command, returnAddress, txSkeleton) ->
         TransactionHandler.executeContract session txSkeleton cHash command returnAddress state.memoryState
@@ -88,8 +87,9 @@ let handleRequest (requestId:RequestId) request session timestamp state =
         if MemPool.isEmpty state.memoryState.mempool || state.tipState.tip = ExtendedBlockHeader.empty then 
             requestId.reply<Types.Block option> None
         else
-            let transactions = state.memoryState.mempool |> MemPool.getTransactions |> selectTransactions session
-            let block = Block.createTemplate state.tipState.tip.header (Timestamp.now ()) state.tipState.ema state.memoryState.activeContractSet transactions
+            let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList session state
+            let now = Timestamp.now ()
+            let block = Block.createTemplate state.tipState.tip.header (Timestamp.now ()) state.tipState.ema memState.activeContractSet validatedTransactions
             
             requestId.reply<Types.Block option> (Some block)
     | GetBlock blockHash -> 

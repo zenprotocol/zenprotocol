@@ -2,11 +2,10 @@ module Network.AddressBook
 
 type T = Set<string> 
 
-let create seeds = 
-    Seq.fold (fun set seed -> Set.add seed set) Set.empty seeds
+let empty = Set.empty
     
 // TODO: only return addresses from the last 3 hours?    
-let getValidAddresses = Set.toList        
+let getValidAddresses = Set.toList
     
 let addList book list = 
     Set.union book (Set.ofList list)    

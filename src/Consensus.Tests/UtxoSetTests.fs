@@ -32,8 +32,7 @@ let ``handling transaction add outputs to set``() =
         UtxoSet.asDatabase
         |> UtxoSet.handleTransaction getUTXO tx1Hash tx1        
     
-    UtxoSet.isSomeSpent getUTXO tx2.inputs set |> should equal false
-    UtxoSet.getUtxos getUTXO tx2.inputs set |> should equal (Some tx1.outputs)
+    UtxoSet.getUtxosResult getUTXO tx2.inputs set |> should equal (Ok tx1.outputs : Result<_,OutputStatus list>)
         
 [<Test>]
 let ``handling transaction mark inputs as spent``() = 
@@ -56,11 +55,13 @@ let ``handling transaction mark inputs as spent``() =
     let set = 
         UtxoSet.asDatabase
         |> UtxoSet.handleTransaction getUTXO tx1Hash tx1   
-        |> UtxoSet.handleTransaction getUTXO tx2Hash tx2     
-    
-    UtxoSet.getUtxos getUTXO tx2.inputs set |> should equal None
-    UtxoSet.isSomeSpent getUTXO tx2.inputs set |> should equal true
-        
+        |> UtxoSet.handleTransaction getUTXO tx2Hash tx2
+
+         
+    (match UtxoSet.getUtxosResult getUTXO tx2.inputs set with
+    | Error errors ->
+        List.contains Spent errors
+    | Ok _ -> false) |> should equal true
         
 [<Test>]
 let ``Should find Utxo``() =

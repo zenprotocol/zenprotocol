@@ -19,6 +19,7 @@ type Argument =
     | [<AltCommandLine("-l1")>] Local1
     | [<AltCommandLine("-l2")>] Local2
     | Seed
+    | Data_Path of string
     with
         interface IArgParserTemplate with
             member s.Usage =
@@ -32,6 +33,7 @@ type Argument =
                 | Local1 -> "run node with local1 settings, use for tests"
                 | Local2 -> "run node with local1 settings, use for tests"
                 | Seed -> "run node as a seed"
+                | Data_Path _ -> "path to data folder"
                                               
 
 type Config = YamlConfig<"scheme.yaml">
@@ -89,6 +91,7 @@ let main argv =
             config.externalIp <- "127.0.0.1"
             config.api.enabled <- true
             config.api.bind <- "127.0.0.1:36000"
+            config.seeds.Clear()
             config.seeds.Add "127.0.0.1:29555"
         | Local2 ->
             config.dataPath <- "./data/l2"
@@ -98,6 +101,7 @@ let main argv =
             config.externalIp <- "127.0.0.1"
             config.api.enabled <- true
             config.api.bind <- "127.0.0.1:36001"
+            config.seeds.Clear()
             config.seeds.Add "127.0.0.1:29555"
         | Api address -> 
             config.api.enabled <- true
@@ -113,6 +117,8 @@ let main argv =
             config.listen <- true
             config.seeds.Clear ()
             config.miner <- true  
+        | Data_Path dataPath ->
+            config.dataPath <- dataPath
                                                                                                    
     ) (results.GetAllResults())                 
             
