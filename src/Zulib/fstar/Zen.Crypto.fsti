@@ -2,7 +2,6 @@ module Zen.Crypto
 
 open Zen.Cost
 module  A = Zen.Array
-module  M = FStar.Mul
 module U8 = FStar.UInt8
 (*
   http://bench.cr.yp.to/results-hash.html :
@@ -16,19 +15,19 @@ type key       = Zen.Types.key
 
 val sha2_256: #n:nat
   -> msg: A.t U8.byte n
-  -> cost (A.t U8.byte n) M.(n*2 + 160)
+  -> cost (A.t U8.byte n) (n*2 + 160)
 
 val sha2_512: #n:nat
   -> msg: A.t U8.byte n
-  -> cost (A.t U8.byte n) M.(n*7 + 710)
+  -> cost (A.t U8.byte n) (n*7 + 710)
 
 val sha3_256: #n:nat
   -> msg: A.t U8.byte n
-  -> cost (A.t U8.byte n) M.(n*6 + 1050)
+  -> cost (A.t U8.byte n) (n*6 + 1050)
 
 val sha3_512: #n:nat
   -> msg: A.t U8.byte n
-  -> cost (A.t U8.byte n) M.(n*8 + 800)
+  -> cost (A.t U8.byte n) (n*8 + 800)
 
 val sign: #n:nat
   -> msg: A.t U8.byte n

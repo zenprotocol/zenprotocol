@@ -1,5 +1,4 @@
 module FStar.Int
-open FStar.Mul
 
 val pow2_values: x:nat -> Lemma
   (requires True)
