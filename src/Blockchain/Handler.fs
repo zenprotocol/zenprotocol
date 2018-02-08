@@ -89,8 +89,7 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
         else
             let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList session state
             let now = Timestamp.now ()
-            let ema = EMA.add chain now state.tipState.ema
-            let block = Block.createTemplate state.tipState.tip.header (Timestamp.now ()) ema memState.activeContractSet validatedTransactions
+            let block = Block.createTemplate state.tipState.tip.header (Timestamp.now ()) state.tipState.ema memState.activeContractSet validatedTransactions
             
             requestId.reply<Types.Block option> (Some block)
     | GetBlock blockHash -> 
