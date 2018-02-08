@@ -57,7 +57,7 @@ let activateContract code account session state =
         |> should equal true
         (state, cHash)
     )
-    
+
 let dataPath = ".data"
 let databaseContext = DatabaseContext.createEmpty dataPath
 let session = DatabaseContext.createSession databaseContext
@@ -66,7 +66,7 @@ let mutable cHash = Hash.zero
 
 let clean() =
     Platform.cleanDirectory dataPath
-    
+
 [<OneTimeSetUp>]
 let setUp = fun () ->
     clean()
@@ -77,55 +77,62 @@ let setUp = fun () ->
     open Zen.Base
     open Zen.Cost
     open Zen.Assets
-    open FStar.Mul
-            
+
     module ET = Zen.ErrorT
     module Tx = Zen.TxSkeleton
-            
-    val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 15
-    let cf _ _ _ #l _ = ret (64 + (64 + 64 + (l * 128 + 192)) + 19 + 22)
-    
-    let buy txSkeleton contractHash returnAddress = 
+    module M = FStar.Mul
+
+    val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 17
+    let cf _ _ _ #l _ =
+        let open M in
+        let res : nat = (64 + (64 + 64 + (l * 128 + 192) + 0) + 26 + 22) in
+        ret res
+
+    let buy txSkeleton contractHash returnAddress =
       let! tokens = Tx.getAvailableTokens zenAsset txSkeleton in
-            
-      let txSkeleton = 
+
+      let! txSkeleton =
         Tx.lockToContract zenAsset tokens contractHash txSkeleton
         >>= Tx.mint tokens contractHash
         >>= Tx.lockToAddress contractHash tokens returnAddress in
-             
-      ET.retT txSkeleton	
-        
-    let redeem #l txSkeleton contractHash returnAddress (wallet:wallet l) = 
+      ET.ret (txSkeleton, None)
+
+    let redeem #l txSkeleton contractHash returnAddress (wallet:wallet l) =
       let! tokens = Tx.getAvailableTokens contractHash txSkeleton in
-    
-      let txSkeleton = 
+
+      let! txSkeleton =
         Tx.destroy tokens contractHash txSkeleton
         >>= Tx.lockToAddress zenAsset tokens returnAddress
         >>= Tx.fromWallet zenAsset tokens contractHash wallet in
-    
-      ET.of_optionT "contract doesn't have enough zens to pay you" txSkeleton
-    
-    val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result txSkeleton) (64 + (64 + 64 + (l * 128 + 192)) + 19 + 22)
+
+      let result =
+          match txSkeleton with
+          | Some tx -> Some (tx, None)
+          | None -> None in
+
+      ET.of_option "contract doesn't have enough zens to pay you" result
+
+    val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (M.(64 + (64 + 64 + (l * 128 + 192) + 0) + 26 + 22) <: nat)
     let main txSkeleton contractHash command returnAddress #l wallet =
       match returnAddress with
       | Some returnAddress -> 
-          if command = "redeem" then
-            redeem txSkeleton contractHash returnAddress wallet
-          else if command = "" || command = "buy" then
-            buy txSkeleton contractHash returnAddress
-            |> autoInc    
-          else 
-            ET.autoFailw "unsupported command"
+        if command = "redeem" then
+          redeem txSkeleton contractHash returnAddress wallet
+        else if command = "" || command = "buy" then
+          buy txSkeleton contractHash returnAddress
+          |> autoInc    
+        else 
+          ET.autoFailw "unsupported command"
       | None ->
-          ET.autoFailw "returnAddress is required"
+        ET.autoFailw "returnAddress is required"
     """ account session state
     |> function
-    | Ok (state', cHash') -> 
+    | Ok (state', cHash') ->
         cHash <- cHash'
         state <- state'
     | Error error ->
         failwith error
-    
+
 [<TearDown>]
 let tearDown = fun () ->
     clean()
@@ -155,7 +162,7 @@ let ``Should buy``() =
         txHash = Hash.zero
         index = 1u
     }
-    
+
     let spend = { asset = Zen; amount = 5UL }
 
     let output = {
@@ -176,12 +183,12 @@ let ``Should buy``() =
     |> function
     | Ok tx ->
         tx.inputs |> should haveLength 1
-        tx.inputs |> should contain input 
+        tx.inputs |> should contain input
         tx.outputs |> should haveLength 2
         tx.outputs |> should contain { lock = Contract cHash; spend = spend }
         tx.outputs |> should contain { lock = PK samplePKHash; spend = { spend with asset = cHash } }
         tx.witnesses |> should haveLength 1
-        let cw = ContractWitness { 
+        let cw = ContractWitness {
              cHash = cHash
              command = "buy"
              returnAddressIndex = Some 1ul
@@ -199,7 +206,7 @@ let ``Should redeem``() =
         txHash = Hash.zero
         index = 1u
     }
-    
+
     let inputContractAsset = {
         txHash = Hash.zero
         index = 2u
@@ -212,7 +219,7 @@ let ``Should redeem``() =
         lock = Contract cHash
         spend = spendZen
     }
-    
+
     let outputContractAsset = {
         lock = PK samplePKHash
         spend = spendContractAsset
@@ -233,13 +240,13 @@ let ``Should redeem``() =
     |> function
     | Ok tx ->
         tx.inputs |> should haveLength 2
-        tx.inputs |> should contain inputContractAsset 
+        tx.inputs |> should contain inputContractAsset
         tx.inputs |> should contain inputZen
         tx.outputs |> should haveLength 2
         tx.outputs |> should contain { lock = Destroy; spend = spendContractAsset }
         tx.outputs |> should contain { lock = PK samplePKHash; spend = spendZen }
         tx.witnesses |> should haveLength 1
-        let cw = ContractWitness { 
+        let cw = ContractWitness {
              cHash = cHash
              command = "redeem"
              returnAddressIndex = Some 1ul

@@ -2,7 +2,7 @@
 
 open NUnit.Framework
 open Infrastructure
-open TestsInfrastructure.Nunit
+open FsUnit
 open Exception
 open Zen.Types.Extracted
 open Zen.Types.Realized
@@ -13,21 +13,36 @@ open Zen.Cost.Realized
 open System.Text
 open Org.BouncyCastle.Crypto.Digests
 open FsBech32
+open Zen.Types.Main
 
 let assemblyDirectory = "./test"
+
+type Message = {
+    cHash: byte[]
+    command: string
+}
 
 let clean() =
     Platform.cleanDirectory assemblyDirectory
 
 [<SetUp>]
-    clean()
+    let setup = fun () ->
+        clean()
 
 [<TearDown>]
-    clean()
+    let teadDown = fun () ->
+        clean()
+
+let shouldBeOk value = function
+    | Ok value' -> should equal value value'
+    | Error err -> failwith err
+
+let shouldBeError err = function
+    | Ok value' -> failwith (value'.ToString())
+    | Error err' -> should equal err err'
 
 let input : txSkeleton =
     emptyTxSkeleton
-
 
 let computeHash bytes =
     let hash = Array.zeroCreate 32
@@ -57,18 +72,18 @@ let compileAndInvoke fstCode args =
             .GetMethod("main"))
         with _ as ex ->
             Exception.toError "could not find method" ex)
-    |> Result.bind (fun methodInfo ->        
+    |> Result.bind (fun methodInfo ->
         try
             Ok (methodInfo.Invoke(null, args))
         with _ as ex ->
             Exception.toError "unable to invoke method" ex)
     |> Result.bind (fun result ->
         try
-            Ok (result :?> cost<result<txSkeleton>, unit>)
+            Ok (result :?> cost<result<txSkeleton * message Native.option>, unit>)
         with _ as ex ->
             Exception.toError "unexpected result" ex)
     |> Result.map (
-        fun (Zen.Cost.Realized.C inj:cost<result<txSkeleton>, unit>) ->
+        fun (Zen.Cost.Realized.C inj:cost<result<txSkeleton * message Native.option>, unit>) ->
             inj.Force()
     )
     |> Result.bind (function
@@ -79,40 +94,33 @@ let compileAndInvoke fstCode args =
 
 let fstCode = """
     open Zen.Types
-    open Zen.Vector
-    open Zen.Util
     open Zen.Base
     open Zen.Cost
     open Zen.ErrorT
 
     val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 1
-    let cf _ _ _ #l _ = ~!2
+    let cf _ _ _ #l _ = ~!4
 
-    val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result txSkeleton) 2
+    val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) 4
     let main tx chash command returnAddress #l _ =
-        ret @ tx
+        ret @ (tx, None)
     """
 
 [<Test>]
 let ``Should record hints``() =
-    (ZFStar.recordHints fstCode (getModuleName fstCode)
+    ZFStar.recordHints fstCode (getModuleName fstCode)
     |> Result.map (fun _ -> ())
-    |> Result.map (fun _ -> ())
-    , (Ok() : Result<unit, string>))
-    |> shouldEqual
+    |> shouldBeOk ()
 
 [<Test>]
 let ``Should invoke compiled``() =
-    (compileAndInvoke fstCode
-    [| input; null; null; null; 0I; null |]
-    , (Ok input : Result<txSkeleton,string>))
-    |> shouldEqual
+    compileAndInvoke fstCode [| input; null; null; null; 0I; null |]
+    |> shouldBeOk (input, Native.option<message>.None)
 
 [<Test>]
 let ``Should throw with command's value``() =
-    (compileAndInvoke """
+    compileAndInvoke """
         open Zen.Types
-        open Zen.Vector
         open Zen.Util
         open Zen.Base
         open Zen.Cost
@@ -121,17 +129,15 @@ let ``Should throw with command's value``() =
         val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 1
         let cf _ _ _ #l _ = ~!1
 
-        val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result txSkeleton) 1
+        val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) 1
         let main tx chash command returnAddress #l _ =
             failw command
-        """
-    [| null; null; "test command";null;0I;null |]
-    , (Error "test command" : Result<txSkeleton,string>))
-    |> shouldEqual
+        """ [| null; null; "test command";null;0I;null |]
+    |> shouldBeError "test command"
 
 [<Test>]
 let ``Should get some metrics from hints module``() =
-    (ZFStar.recordHints fstCode (getModuleName fstCode) 
-    |> Result.bind (ZFStar.calculateMetrics) 
+    ZFStar.recordHints fstCode (getModuleName fstCode)
+    |> Result.bind (ZFStar.calculateMetrics)
     |> Result.map (fun (maxFuel, maxIFuel) -> maxFuel > 0 && maxIFuel > 0)
-    , (Ok true : Result<bool, string>)) |> shouldEqual
+    |> shouldBeOk true

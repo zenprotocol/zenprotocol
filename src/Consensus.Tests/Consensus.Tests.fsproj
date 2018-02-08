@@ -65,6 +65,7 @@
     <Compile Include="SampleContract.fs" />
     <Compile Include="ContractTests.fs" />
     <Compile Include="BlockTests.fs" />
+    <Compile Include="ContractMessageTests.fs" />
     <ProjectReference Include="..\Infrastructure\Infrastructure.fsproj">
       <Project>{81161f64-d019-422c-a3cf-321cde6ca209}</Project>
       <Name>Infrastructure</Name>
