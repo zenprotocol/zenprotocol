@@ -19,7 +19,7 @@ let main dataPath chain busName =
                 match message with 
                 | ServiceBus.Agent.Command c -> Handler.handleCommand chain c 
                 | ServiceBus.Agent.Request (requestId, request) -> 
-                    Handler.handleRequest requestId request)                
+                    Handler.handleRequest chain requestId request)
         
         let ebObservable = 
             ebObservable

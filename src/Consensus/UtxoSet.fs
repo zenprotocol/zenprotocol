@@ -4,6 +4,7 @@ module Consensus.UtxoSet
 // So whenever something is not in the set we try to fetch it from db
 
 open Consensus.Types
+open Infrastructure
 
 type OutputStatus =
     | NoOutput
@@ -16,10 +17,10 @@ type T = Map<Outpoint, OutputStatus>
 let asDatabase = Map.empty
 
 let get getUTXO outpoint set =
-    defaultArg
-        <| Map.tryFind outpoint set
-        <| getUTXO outpoint     // return value if outpoint isn't in set
-         
+    match Map.tryFind outpoint set with
+        | Some x-> x
+        | None -> getUTXO outpoint
+
 let handleTransaction getUTXO txHash tx set =
     let folder state input =
         match get getUTXO input state with
@@ -38,20 +39,19 @@ let handleTransaction getUTXO txHash tx set =
         
     set
 
-let isSomeSpent getUTXO outpoints set =
-    List.exists (fun outpoint -> get getUTXO outpoint set = Spent) outpoints
+// Use an applicative traversable to collate the errors
+let getUtxosResult getUTXO outpoints utxoSet =
+    Result.traverseResultA
+        (fun outpoint ->
+            match get getUTXO outpoint utxoSet with
+            | Unspent output -> Ok output
+            | Spent -> Error [Spent]
+            | NoOutput -> Error [NoOutput])
+        outpoints
 
-let getUtxos getUTXO outpoints set =    
-    List.foldBack (fun outpoint state ->
-        match state with
-            | None -> None
-            | Some list ->
-                match get getUTXO outpoint set with
-                | NoOutput                 
-                | Spent ->
-                    None
-                | Unspent output -> Some (output :: list))                
-        outpoints (Some [])
+// Currently only used for tests
+let getUtxos getUTXO outpoints utxoSet =
+    getUtxosResult getUTXO outpoints utxoSet |> Option.ofResult
 
 let undoBlock getOutput getUTXO block utxoSet =
 
@@ -68,10 +68,9 @@ let undoBlock getOutput getUTXO block utxoSet =
                 | NoOutput
                 | Unspent _ -> failwith "Expected output to be spent") utxoSet tx.inputs
         
-        List.mapi (fun i _ -> i) tx.outputs
-        |> List.fold (fun utxoSet i ->
-            let outpoint = {txHash=txHash; index=uint32 i}
-                                    
-            Map.add outpoint NoOutput utxoSet    
+        [0 .. List.length tx.outputs - 1]
+        |> List.map (fun i -> {txHash=txHash; index=uint32 i})
+        |> List.fold (fun utxoSet outpoint ->
+            Map.add outpoint NoOutput utxoSet
             ) utxoSet) block.transactions utxoSet
         

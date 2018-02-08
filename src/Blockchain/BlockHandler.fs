@@ -368,10 +368,7 @@ let validateBlock chain contractPath session timestamp block mined (state:State)
         Log.info "Validating new block #%d %A" block.header.blockNumber blockHash
     
         // checking if block already exist
-        if BlockRepository.contains session blockHash then
-            // nothing to do, blocks already exist
-            return state
-        else
+        if BlockRepository.contains session blockHash then return state else
         match Block.validate chain block with
         | Error error ->
             Log.info "Block %A failed validation due to %A" blockHash error
