@@ -3,6 +3,9 @@ module Consensus.Types
 open Consensus.Hash
 open Consensus.Crypto
 
+[<LiteralAttribute>]
+let CoinbaseMaturity = 100ul
+
 type Outpoint = {
     txHash: Hash
     index: uint32
@@ -16,7 +19,8 @@ type Spend = {
 type Lock =
     | PK of Hash
     | Contract of Hash
-    | Destroy
+    | Coinbase of blockNumber:uint32 * pkHash:Hash
+    | Destroy       
 
 type Output = {
     lock: Lock

@@ -30,5 +30,5 @@ let ``Signed transaction validation result should be invalid witness``() =
         contract = None
     }
     let utxos = Map.ofSeq [ testInput1, Unspent output ]
-    inputsValidationMsg "PK witness mismatch" acs utxos tx keys
+    inputsValidationMsg  "PK witness mismatch" 1ul acs utxos tx keys
     |> shouldEqual

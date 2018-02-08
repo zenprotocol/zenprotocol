@@ -55,6 +55,7 @@
     <Compile Include="MerkleTreeTests.fs" />
     <Compile Include="SparseMerkleTreeTests.fs" />
     <Compile Include="TransactionTests.fs" />
+    <Compile Include="CoinbaseTests.fs" />
     <Compile Include="TransactionPropertyTests.fs" />
     <Compile Include="UtxoSetTests.fs" />
     <Content Include="paket.references" />

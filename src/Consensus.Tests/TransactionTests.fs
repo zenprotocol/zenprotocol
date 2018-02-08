@@ -32,7 +32,7 @@ let ``Transaction should be orphan``() =
         contract = None
     }
     let utxos = Map.ofSeq [ testInput1, Unspent output ]
-    inputsValidationOrphan acs utxos tx keys
+    inputsValidationOrphan 1ul acs utxos tx keys
     |> shouldEqual
 
 [<Test>]
@@ -93,7 +93,7 @@ let ``Signed transaction should be valid``() =
         contract = None
     }
     let utxos = Map.ofSeq [ testInput1, Unspent output ]
-    inputsValidationOk acs utxos tx keys
+    inputsValidationOk 1ul acs utxos tx keys
     |> shouldEqual
 
 [<Test>]
@@ -107,5 +107,5 @@ let ``Signed transaction validation result should be invalid witness``() =
         contract = None
     }
     let utxos = Map.ofSeq [ testInput1, Unspent output ]
-    inputsValidationMsg "PK witness mismatch" acs utxos tx keys
-    |> shouldEqual
+    inputsValidationMsg "PK witness mismatch" 1ul acs utxos tx keys
+    |> shouldEqual 

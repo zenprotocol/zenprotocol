@@ -20,6 +20,23 @@ let contractsPath = "./test"
 let getUTXO _ = UtxoSet.NoOutput
 let getWallet _ = Map.empty
 
+let coinbase blockNumber =
+    {
+        inputs=[];
+        outputs=
+            [
+                {
+                    lock= Coinbase (blockNumber,Hash.zero);
+                    spend=
+                        {
+                            amount=Block.getBlockReward blockNumber;asset=Hash.zero
+                        }
+                }
+            ]
+        witnesses=[]
+        contract=None
+    }
+
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``block with empty transactions failed validation``(header) =
 
@@ -30,6 +47,7 @@ let ``block with empty transactions failed validation``(header) =
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``block with invalid header failed validation``(header:BlockHeader) (NonEmptyTransactions transactions) =
     let header = {header with difficulty = 402690497ul}
+    let transactions = coinbase header.blockNumber :: transactions
 
     let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero;}
 
@@ -37,11 +55,14 @@ let ``block with invalid header failed validation``(header:BlockHeader) (NonEmpt
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``block with one invalid transaction fail validation``(header) (NonEmptyTransactions transactions) (NonNegativeInt index) =
-    let index = index % (List.length transactions)
+    let index = 1 + (index % (List.length transactions))
     let header = {header with difficulty = 0x20fffffful }
+
+    let transactions = coinbase header.blockNumber :: transactions
 
     // Making TX invalid by removing inputs
     let invalidTx = {transactions.[index] with inputs = []}
+
     let transactions = List.mapi (fun i tx -> if i = index then invalidTx else tx) transactions
 
     let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero;}
@@ -52,6 +73,8 @@ let ``block with one invalid transaction fail validation``(header) (NonEmptyTran
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``block with valid transactions pass validation``(header) (NonEmptyTransactions transactions) =
+    let transactions = coinbase header.blockNumber :: transactions
+
     let txMerkleRoot =
         transactions
         |> List.map Transaction.hash
@@ -97,7 +120,9 @@ let ``connecting block should fail when commitments are wrong``(parent:BlockHead
         nonce = 0UL,0UL
     }
 
-    let block = {header=header;transactions=[];commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero;}
+    let transactions = [coinbase header.blockNumber]
+
+    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero;}
 
     printfn "%A" <| Block.connect Chain.Local getUTXO contractsPath parent (timestamp + 1UL) utxoSet acs ema block
 
@@ -109,7 +134,7 @@ let ``connecting block should fail when transaction inputs are invalid``(parent:
     let utxoSet = UtxoSet.asDatabase
     let ema = EMA.create Chain.Local
 
-    let block = Block.createTemplate parent timestamp ema acs transactions
+    let block = Block.createTemplate parent timestamp ema acs transactions Hash.zero
 
     Block.connect Chain.Local getUTXO contractsPath parent (timestamp + 1UL) utxoSet acs ema block =
         Error "transactions failed inputs validation due to Orphan"
@@ -130,7 +155,7 @@ let ``block timestamp too early``() =
     let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO Transaction.rootTxHash Transaction.rootTx
 
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
-    let block = Block.createTemplate parent timestamp ema acs [tx]
+    let block = Block.createTemplate parent timestamp ema acs [tx] Hash.zero
 
     let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "block's timestamp is too early"
 
@@ -153,7 +178,7 @@ let ``block timestamp in the future``() =
     let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO Transaction.rootTxHash Transaction.rootTx
 
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
-    let block = Block.createTemplate parent (timestamp + Block.MaxTimeInFuture + 1UL) ema acs [tx]
+    let block = Block.createTemplate parent (timestamp + Block.MaxTimeInFuture + 1UL) ema acs [tx] Hash.zero
 
     let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "block timestamp too far in the future"
 
@@ -173,7 +198,7 @@ let ``block with mismatch commitments fail connecting``() =
     let ema = EMA.create Chain.Local
 
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0x20fffffful;nonce=0UL,0UL}
-    let block = Block.createTemplate parent (timestamp + 1UL) ema acs [tx]
+    let block = Block.createTemplate parent (timestamp + 1UL) ema acs [tx] Hash.zero
     let block = {block with commitments=[Hash.zero]}
 
     let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "commitments mismatch"
@@ -194,7 +219,22 @@ let ``can connect valid block``() =
     let ema = EMA.create Chain.Local
 
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
-    let block = Block.createTemplate parent (timestamp+1UL) ema acs [tx]
+    let block = Block.createTemplate parent (timestamp+1UL) ema acs [tx] Hash.zero
+
+    Block.connect Chain.Local getUTXO contractsPath parent timestamp utxoSet acs ema block
+    |> should be ok
+
+[<Test>]
+let ``can connect block with coinbase only``() =
+    let rootAccount = Account.createTestAccount ()
+    let account1 = Account.create ()
+
+    let acs = ActiveContractSet.empty
+    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO Transaction.rootTxHash Transaction.rootTx
+    let ema = EMA.create Chain.Local
+
+    let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
+    let block = Block.createTemplate parent (timestamp+1UL) ema acs [] Hash.zero
 
     Block.connect Chain.Local getUTXO contractsPath parent timestamp utxoSet acs ema block
     |> should be ok
@@ -209,7 +249,7 @@ let ``can connect block with a contract``() =
     let contract : Contract.T =
         {
             hash=Contract.computeHash SampleContract.sampleContractCode
-            fn= fun _ _ _ _ tx -> Ok (tx, None)
+            fn= fun _ _ _ _ tx -> Ok (tx,None)
             costFn = fun _ _ _ _ -> Ok 0I
         }
 
@@ -218,7 +258,7 @@ let ``can connect block with a contract``() =
     let ema = EMA.create Chain.Local
 
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
-    let block = Block.createTemplate parent (timestamp+1UL) ema acs [tx]
+    let block = Block.createTemplate parent (timestamp+1UL) ema acs [tx] Hash.zero
 
     Block.connect Chain.Local getUTXO contractsPath parent timestamp utxoSet acs ema block
     |> should be ok
@@ -237,7 +277,7 @@ let ``block with invalid contract failed connecting``() =
     let contract : Contract.T =
         {
             hash=Contract.computeHash "ada"
-            fn= fun _ _ _ _ tx -> Ok (tx, None)
+            fn= fun _ _ _ _ tx -> Ok (tx,None)
             costFn = fun _ _ _ _ -> Ok 0I
         }
 
@@ -246,9 +286,334 @@ let ``block with invalid contract failed connecting``() =
     let ema = EMA.create Chain.Local
 
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
-    let block = Block.createTemplate parent (timestamp+1UL) ema acs [tx]
+    let block = Block.createTemplate parent (timestamp+1UL) ema acs [tx] Hash.zero
 
     let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "transactions failed inputs validation due to BadContract"
+
+    Block.connect Chain.Local getUTXO contractsPath parent timestamp utxoSet acs ema block
+    |> should equal expected
+
+[<Test>]
+let ``block with coinbase lock within a regular transaction should fail``() =
+    let tx =
+        {
+            inputs = [{txHash=Hash.zero;index=1ul}];
+            outputs=[{lock= Coinbase (15ul,Hash.zero);spend={amount=1UL;asset=Hash.zero}}]
+            witnesses=[]
+            contract=None
+        }
+
+    let transactions  = [coinbase 15ul;tx]
+
+    let txMerkleRoot =
+            transactions
+            |> List.map Transaction.hash
+            |> MerkleTree.computeRoot
+
+    let witnessMerkleRoot =
+        transactions
+        |> List.map Transaction.witnessHash
+        |> MerkleTree.computeRoot
+
+    let commitments = MerkleTree.computeRoot [txMerkleRoot;witnessMerkleRoot;Hash.zero;]
+
+    let header =
+        {
+            version = Block.Version
+            parent = Hash.zero
+            blockNumber = 15ul
+            difficulty = 0x20fffffful;
+            commitments=commitments;
+            timestamp = timestamp
+            nonce = 0UL,0UL
+        }
+
+    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot; witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=Hash.zero;}
+
+    let expected : Result<Block,string> = Error (sprintf "transaction %A failed validation due to General \"coinbase lock is not allow within regular transaction\"" <| Transaction.hash tx)
+
+    Block.validate Chain.Local block |> should equal expected
+
+[<Test>]
+let ``block with wrong coinbase reward``() =
+    let tx =
+        {
+            inputs = [];
+            outputs=[{lock= Coinbase (15ul,Hash.zero);spend={amount=1UL;asset=Hash.zero}}]
+            witnesses=[]
+            contract=None
+        }
+
+    let transactions  = [tx]
+
+    let txMerkleRoot =
+            transactions
+            |> List.map Transaction.hash
+            |> MerkleTree.computeRoot
+
+    let witnessMerkleRoot =
+        transactions
+        |> List.map Transaction.witnessHash
+        |> MerkleTree.computeRoot
+
+    let commitments = MerkleTree.computeRoot [txMerkleRoot;witnessMerkleRoot;Hash.zero;]
+
+    let header =
+        {
+            version = Block.Version
+            parent = Hash.zero
+            blockNumber = 15ul
+            difficulty = 0x20fffffful;
+            commitments=commitments;
+            timestamp = timestamp
+            nonce = 0UL,0UL
+        }
+
+    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot; witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=Hash.zero;}
+
+    let expected : Result<Block,string> = Error "block reward is incorrect"
+
+    Block.validate Chain.Local block |> should equal expected
+
+[<Test>]
+let ``coinbase lock have wrong blockNumber``() =
+    let tx =
+        {
+            inputs = [];
+            outputs=[{lock= Coinbase (13ul,Hash.zero);spend={amount=1UL;asset=Hash.zero}}]
+            witnesses=[]
+            contract=None
+        }
+
+    let transactions  = [tx]
+
+    let txMerkleRoot =
+            transactions
+            |> List.map Transaction.hash
+            |> MerkleTree.computeRoot
+
+    let witnessMerkleRoot =
+        transactions
+        |> List.map Transaction.witnessHash
+        |> MerkleTree.computeRoot
+
+    let commitments = MerkleTree.computeRoot [txMerkleRoot;witnessMerkleRoot;Hash.zero;]
+
+    let header =
+        {
+            version = Block.Version
+            parent = Hash.zero
+            blockNumber = 15ul
+            difficulty = 0x20fffffful;
+            commitments=commitments;
+            timestamp = timestamp
+            nonce = 0UL,0UL
+        }
+
+    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot; witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=Hash.zero;}
+
+    let expected : Result<Block,string> =
+        Error  "Block failed coinbase validation due to General \"within coinbase transaction all outputs must use coinbase lock\""
+
+    Block.validate Chain.Local block |> should equal expected
+
+[<Test>]
+let ``block without coinbase``() =
+    let tx =
+        {
+            inputs = [];
+            outputs=[{lock= PK Hash.zero;spend={amount=1UL;asset=Hash.zero}}]
+            witnesses=[]
+            contract=None
+        }
+
+    let transactions  = [tx]
+
+    let txMerkleRoot =
+            transactions
+            |> List.map Transaction.hash
+            |> MerkleTree.computeRoot
+
+    let witnessMerkleRoot =
+        transactions
+        |> List.map Transaction.witnessHash
+        |> MerkleTree.computeRoot
+
+    let commitments = MerkleTree.computeRoot [txMerkleRoot;witnessMerkleRoot;Hash.zero;]
+
+    let header =
+        {
+            version = Block.Version
+            parent = Hash.zero
+            blockNumber = 15ul
+            difficulty = 0x20fffffful;
+            commitments=commitments;
+            timestamp = timestamp
+            nonce = 0UL,0UL
+        }
+
+    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot; witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=Hash.zero;}
+
+    let expected : Result<Block,string> =
+        Error  "Block failed coinbase validation due to General \"within coinbase transaction all outputs must use coinbase lock\""
+
+    Block.validate Chain.Local block |> should equal expected
+
+[<Test>]
+let ``block with coinbase with multiple asset as reward should fail``() =
+    let tx =
+        {
+            inputs = [];
+            outputs=
+                [
+                    {lock= Coinbase (15ul,Hash.zero);spend={amount=Block.getBlockReward 15ul;asset=Hash.zero}}
+                    {lock= Coinbase (15ul,Hash.zero);spend={amount=1UL;asset=Hash.Hash (Array.create 32 1uy)}}
+                ]
+            witnesses=[]
+            contract=None
+        }
+
+    let transactions  = [tx]
+
+    let txMerkleRoot =
+            transactions
+            |> List.map Transaction.hash
+            |> MerkleTree.computeRoot
+
+    let witnessMerkleRoot =
+        transactions
+        |> List.map Transaction.witnessHash
+        |> MerkleTree.computeRoot
+
+    let commitments = MerkleTree.computeRoot [txMerkleRoot;witnessMerkleRoot;Hash.zero;]
+
+    let header =
+        {
+            version = Block.Version
+            parent = Hash.zero
+            blockNumber = 15ul
+            difficulty = 0x20fffffful;
+            commitments=commitments;
+            timestamp = timestamp
+            nonce = 0UL,0UL
+        }
+
+    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot; witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=Hash.zero;}
+
+    let expected : Result<Block,string> =
+        Error "reward can only be in Zen asset"
+
+    Block.validate Chain.Local block |> should equal expected
+
+[<Test>]
+let ``coinbase reward split over multiple outputs``() =
+    let tx =
+        {
+            inputs = [];
+            outputs=
+                [
+                    {lock= Coinbase (15ul,Hash.zero);spend={amount=(Block.getBlockReward 15ul) / 2UL;asset=Hash.zero}}
+                    {lock= Coinbase (15ul,Hash.zero);spend={amount=(Block.getBlockReward 15ul) / 2UL;asset=Hash.zero}}
+                ]
+            witnesses=[]
+            contract=None
+        }
+
+    let transactions  = [tx]
+
+    let txMerkleRoot =
+            transactions
+            |> List.map Transaction.hash
+            |> MerkleTree.computeRoot
+
+    let witnessMerkleRoot =
+        transactions
+        |> List.map Transaction.witnessHash
+        |> MerkleTree.computeRoot
+
+    let commitments = MerkleTree.computeRoot [txMerkleRoot;witnessMerkleRoot;Hash.zero;]
+
+    let header =
+        {
+            version = Block.Version
+            parent = Hash.zero
+            blockNumber = 15ul
+            difficulty = 0x20fffffful;
+            commitments=commitments;
+            timestamp = timestamp
+            nonce = 0UL,0UL
+        }
+
+    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot; witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=Hash.zero;}
+
+    let expected : Result<Block,string> = Ok block
+
+    Block.validate Chain.Local block |> should equal expected
+
+[<Test>]
+let ``block spending mature transaction is valid``() =
+    let rootAccount =
+        {Account.rootAccount with blockNumber=101ul}
+    let account1 = Account.create ()
+
+    let origin =
+        {
+            inputs=[]
+            outputs=[{lock =  Coinbase (1ul, rootAccount.publicKeyHash); spend= {asset = Hash.zero;amount=100000000UL}}]
+            witnesses=[]
+            contract=None
+        }
+    let originHash = Transaction.hash origin
+
+    let rootAccount = Account.addTransaction originHash origin rootAccount
+
+    let tx =
+        Account.createTransaction Chain.Local rootAccount account1.publicKeyHash { asset = Hash.zero; amount = 1UL }
+        |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
+
+
+    let acs = ActiveContractSet.empty
+    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO originHash origin
+    let ema = EMA.create Chain.Local
+
+    let parent = {version=0ul; parent=Hash.zero; blockNumber=101ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
+    let block = Block.createTemplate parent (timestamp+1UL) ema acs [tx] Hash.zero
+
+    Block.connect Chain.Local getUTXO contractsPath parent timestamp utxoSet acs ema block
+    |> should be ok
+
+
+[<Test>]
+let ``block spending unmature transaction is invalid``() =
+    let rootAccount =
+        {Account.rootAccount with blockNumber=101ul}
+    let account1 = Account.create ()
+
+    let origin =
+        {
+            inputs=[]
+            outputs=[{lock =  Coinbase (1ul, rootAccount.publicKeyHash); spend= {asset = Hash.zero;amount=100000000UL}}]
+            witnesses=[]
+            contract=None
+        }
+    let originHash = Transaction.hash origin
+
+    let rootAccount = Account.addTransaction originHash origin rootAccount
+
+    let tx =
+        Account.createTransaction Chain.Local rootAccount account1.publicKeyHash { asset = Hash.zero; amount = 1UL }
+        |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
+
+
+    let acs = ActiveContractSet.empty
+    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO originHash origin
+    let ema = EMA.create Chain.Local
+
+    let parent = {version=0ul; parent=Hash.zero; blockNumber=100ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
+    let block = Block.createTemplate parent (timestamp+1UL) ema acs [tx] Hash.zero
+
+    let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> =
+        Error "transactions failed inputs validation due to General \"Coinbase not mature enough\""
 
     Block.connect Chain.Local getUTXO contractsPath parent timestamp utxoSet acs ema block
     |> should equal expected

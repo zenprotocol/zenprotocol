@@ -48,7 +48,7 @@ let ``Should get 'elaborate' error for invalid code``() =
 
 let validateInputs (contract:Contract.T) utxos tx  =
     let acs = ActiveContractSet.add contract.hash contract ActiveContractSet.empty
-    TransactionValidation.validateInContext getUTXO contractPath acs utxos (Transaction.hash tx) tx
+    TransactionValidation.validateInContext getUTXO contractPath 1ul acs utxos (Transaction.hash tx) tx
     |> Result.mapError (function
         | TransactionValidation.ValidationError.General error -> error
         | other -> other.ToString())

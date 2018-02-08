@@ -6,6 +6,11 @@ open System.IO
 open System.Text
 open Lmdb
 
+[<Literal>]
+let MegaByte = 1048576L
+
+let maxDbSize = MegaByte * 1024L * 1024L // One TERA 
+
 let createSession (context:DatabaseContext) : Session =
     let mutable tx = IntPtr.Zero  
  
@@ -37,6 +42,9 @@ let create pathToFolder : DatabaseContext =
     mdb_env_set_maxdbs(environment, 20ul)
     |> checkErrorCode
     
+    mdb_env_set_mapsize(environment, maxDbSize |> IntPtr)
+    |> checkErrorCode
+        
     mdb_env_open(environment,pathToFolder,MDB_NOSUBDIR,MDB_DEFAULT_MODE)
     |> checkErrorCode
    

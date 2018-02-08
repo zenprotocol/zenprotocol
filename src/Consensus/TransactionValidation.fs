@@ -63,11 +63,9 @@ let getContractWallet tx inputs cHash =
     List.zip tx.inputs inputs
     |> List.filter (fun (_,output) -> output.lock = Contract cHash)
 
-let private checkWitnesses acs (Hash.Hash txHash, tx, inputs) =
+let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =            
     let checkPKWitness inputTx pInputs serializedPublicKey signature =
-        match pInputs with
-        | [] -> GeneralError "missing PK witness input"
-        | (_, {lock=PK pkHash}) :: tail ->
+        let verifyPkHash pkHash tail = 
             match PublicKey.deserialize serializedPublicKey with
             | Some publicKey ->
                 if PublicKey.hashSerialized serializedPublicKey = pkHash then
@@ -76,6 +74,15 @@ let private checkWitnesses acs (Hash.Hash txHash, tx, inputs) =
                     | _ -> GeneralError "invalid PK witness signature"
                 else GeneralError "PK witness mismatch"
             | _ -> GeneralError "invalid PK witness"
+    
+        match pInputs with
+        | [] -> GeneralError "missing PK witness input"
+        | (_, {lock=Coinbase (coinbaseBlockNumber,pkHash)}) :: tail ->
+            if blockNumber - coinbaseBlockNumber < CoinbaseMaturity then
+                GeneralError "Coinbase not mature enough"
+            else
+                verifyPkHash pkHash tail                        
+        | (_, {lock=PK pkHash}) :: tail -> verifyPkHash pkHash tail           
         | _ -> GeneralError "unexpected PK witness lock type"
 
     let checkContractWitness inputTx acs cw message pInputs =
@@ -220,23 +227,73 @@ let private checkInputsStructure tx =
         GeneralError "inputs structurally invalid"
     else
         Ok tx
-
+        
+let private checkNoCoinbaseLock tx =
+    let anyCoinbase = 
+        List.exists (fun output -> 
+            match output.lock with
+            | Coinbase _ -> true
+            | _ -> false) tx.outputs        
+    
+    if anyCoinbase then 
+        GeneralError "coinbase lock is not allow within regular transaction"
+    else
+        Ok tx
+            
 let private tryGetUtxos getUTXO utxoSet (txHash:Hash.Hash) tx =
     getUtxosResult getUTXO tx.inputs utxoSet
     |> Result.mapError (fun errors ->
         if List.contains Spent errors then DoubleSpend else Orphan
     )
 
-let validateBasic =
-    checkInputsNotEmpty
+let validateBasic = 
+    checkInputsNotEmpty     
     >=> checkOutputsNotEmpty
+    >=> checkNoCoinbaseLock
     >=> checkOutputsOverflow
     >=> checkDuplicateInputs
     >=> checkInputsStructure
+    
+let validateCoinbase blockNumber =     
+    let checkOnlyCoinbaseLocks blockNumber tx =
+        let allCoinbase = 
+            List.forall (fun output -> 
+                match output.lock with
+                | Coinbase (blockNumber',_) when blockNumber' = blockNumber -> true
+                | _ -> false) tx.outputs        
+        
+        if allCoinbase then 
+            Ok tx
+        else
+            GeneralError "within coinbase transaction all outputs must use coinbase lock"                     
+           
+    let checkNoInputWithinCoinbaseTx tx = 
+        match tx.inputs with
+        | [] -> Ok tx
+        | _ -> GeneralError "coinbase transaction must not have any inputs"
+        
+    let checkNoContractInCoinbase tx = 
+        if Option.isSome tx.contract then
+            GeneralError "coinbase transaction cannot activate a contract"
+        else
+            Ok tx     
+       
+    let checkNoWitnesses tx =
+        match tx.witnesses with
+        | [] -> Ok tx
+        | _ -> GeneralError "coinbase transaction must not have any witnesses"
+                   
+       
+    checkOutputsNotEmpty
+    >=> checkNoInputWithinCoinbaseTx
+    >=> checkNoWitnesses    
+    >=> checkOnlyCoinbaseLocks blockNumber
+    >=> checkNoContractInCoinbase
+    >=> checkOutputsOverflow        
 
-let validateInContext getUTXO contractPath acs set txHash tx = result {
+let validateInContext getUTXO contractPath blockNumber acs set txHash tx = result {
     let! outputs = tryGetUtxos getUTXO set txHash tx
-    let! txSkel = checkWitnesses acs (txHash, tx, outputs)
+    let! txSkel = checkWitnesses blockNumber acs (txHash, tx, outputs)
     do! checkAmounts txSkel
     let! newAcs = activateContract contractPath acs tx
     return tx, newAcs

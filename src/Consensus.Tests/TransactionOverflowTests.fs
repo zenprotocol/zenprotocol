@@ -34,7 +34,7 @@ let ``Should produce outputs overflow error``() =
     }
 
     let utxos = addUtxo input keys.[0] 1UL utxos
-    inputsValidationMsg "outputs overflow" acs utxos tx keys
+    inputsValidationMsg "outputs overflow" 1ul acs utxos tx keys
     |> shouldEqual
 
 [<Test>]
@@ -54,5 +54,5 @@ let ``Should produce inputs overflow error``() =
 
     let utxos = addUtxo input1 keys.[0] 1UL utxos
     let utxos = addUtxo input2 keys.[1] UInt64.MaxValue utxos
-    inputsValidationMsg "inputs overflow" acs utxos tx keys
+    inputsValidationMsg "inputs overflow" 1ul acs utxos tx keys
     |> shouldEqual

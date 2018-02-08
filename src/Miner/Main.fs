@@ -58,23 +58,20 @@ let minerTask chain busName (collection:Queue) =
     async {     
         while not shouldStop do
             match collection.Take () with
-            | NewBlockTemplate block -> 
+            | NewBlockTemplate block ->                
                 let target = Difficulty.uncompress block.header.difficulty
                 findNonce target block
             | Stop -> () // do nothing, we will block on next take call and wait for new block
             | Exit -> shouldStop <- true
     }
                                                    
-let handleEvent chain client (collection:Queue) event =    
+let handleEvent chain pkHash client (collection:Queue) event =    
     match event with    
-    | TransactionAddedToMemPool _ ->                
-        match Blockchain.getBlockTemplate client with 
-        | Some block -> collection.Add (NewBlockTemplate block)
-        | None -> collection.Add (Stop)                
-    | TipChanged _ ->
-        match Blockchain.getBlockTemplate client with 
-        | Some block -> collection.Add (NewBlockTemplate block)
-        | None -> collection.Add (Stop) 
+    | TransactionAddedToMemPool _
+    | TipChanged _ ->                
+        Blockchain.getBlockTemplate client pkHash
+        |> NewBlockTemplate
+        |> collection.Add             
     | _ -> ()                         
             
 let main busName chain =
@@ -82,11 +79,16 @@ let main busName chain =
         let client = ServiceBus.Client.create busName
         let collection = new Queue()
         
+        let pkHash = Wallet.getAddressPKHash client
+        Blockchain.getBlockTemplate client pkHash
+            |> NewBlockTemplate
+            |> collection.Add    
+        
         Async.Start (minerTask chain busName collection)                              
         
         let observable = 
             ebObservable
-            |> Observable.map (handleEvent chain client collection)               
+            |> Observable.map (handleEvent chain pkHash client collection)               
                                                                                       
         Disposables.empty, observable
     )

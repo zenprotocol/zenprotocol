@@ -30,7 +30,7 @@ module Blockchain =
 
     type Request = 
         | ExecuteContract of Hash.Hash * string * Lock * TxSkeleton.T 
-        | GetBlockTemplate
+        | GetBlockTemplate of pkHash:Hash.Hash
         | GetTip
         | GetBlock of Hash.Hash
         | GetBlockHeader of Hash.Hash
@@ -77,8 +77,9 @@ module Blockchain =
         RequestTip peerId         
         |> Command.send client serviceName
         
-    let getBlockTemplate client = 
-        Request.send<Request,Block option> client serviceName GetBlockTemplate // TODO: we return an option because for now we cannot mine empty blocks        
+    let getBlockTemplate client pkHash = 
+        GetBlockTemplate pkHash
+        |> Request.send<Request,Block> client serviceName        
         
     let getBlockHeader client blockHash = 
         Request.send<Request,BlockHeader option> client serviceName (GetBlockHeader blockHash)
@@ -110,6 +111,7 @@ module Wallet =
     type Command = unit
     
     type Request = 
+        | GetAddressPKHash 
         | GetAddress
         | GetBalance
         | Spend of Hash * Spend
@@ -120,6 +122,9 @@ module Wallet =
     
     let getBalance client =
         Request.send<Request, Map<Hash.Hash,uint64>> client serviceName GetBalance
+
+    let getAddressPKHash client =
+        Request.send<Request, Hash.Hash> client serviceName GetAddressPKHash
         
     let getAddress client =
         Request.send<Request, string> client serviceName GetAddress

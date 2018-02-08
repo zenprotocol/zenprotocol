@@ -78,7 +78,7 @@ let setup = fun () ->
 
 [<Property>]
 let ``Transaction should be valid`` ({ utxos = utxos; tx = tx; keys = keys })=
-    inputsValidationOk acs utxos tx keys
+    inputsValidationOk 1ul acs utxos tx keys
     |> shouldEqual
 
 [<Property>]
@@ -87,7 +87,7 @@ let ``Transaction should have invalid amounts`` ({ utxos = utxos; tx = tx; keys 
     | outputsHead :: outputsTail ->
         let outputsHead = { outputsHead with spend = { outputsHead.spend with amount = outputsHead.spend.amount - 1UL } }
         let tx = { tx with outputs = outputsHead :: outputsTail }
-        inputsValidationMsg "invalid amounts" acs utxos tx keys
+        inputsValidationMsg "invalid amounts" 1ul acs utxos tx keys
         |> shouldEqual
     | _ -> true
 

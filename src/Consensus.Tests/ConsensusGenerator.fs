@@ -13,11 +13,68 @@ type LeadingZerosHash = LeadingZerosHash of Hash.Hash
 type NonEmptyTransactions = NonEmptyTransactions of list<Transaction> with
     static member op_Explicit(NonEmptyTransactions txs) = txs   
 
-type ConsensusGenerator = 
+type ConsensusGenerator =          
+    static member Block() =
+        gen { 
+            let! transactions = 
+                Arb.generate<Transaction list>
+                |> Gen.map (fun txs -> List.distinct txs)
+                        
+            let! parentHash = Arb.generate<Hash.Hash>
+            let! timestamp = Arb.generate<uint64>
+            let! coinbasePkHash = Arb.generate<Hash.Hash>                                    
+            let! blockNumber = Arb.generate<uint32> |> Gen.filter(fun n -> n > 1ul) 
+            let reward = Block.getBlockReward blockNumber
+                
+            let coinbase = {
+                inputs=[]
+                outputs=
+                    [
+                        {
+                            lock=Coinbase (blockNumber, coinbasePkHash)
+                            spend={asset=Hash.zero;amount=reward}
+                        }
+                    ]
+                contract = None
+                witnesses=[]
+            }
+            
+            let transactions = coinbase :: transactions
+         
+            let txMerkleRoot = 
+                transactions
+                |> List.map Transaction.hash
+                |> MerkleTree.computeRoot                
+                
+            let witnessMerkleRoot = 
+                transactions
+                |> List.map Transaction.witnessHash
+                |> MerkleTree.computeRoot
+                
+            let acsMerkleRoot = SparseMerkleTree.root ActiveContractSet.empty                                   
+                                       
+            let commitments = 
+                [ txMerkleRoot; witnessMerkleRoot; acsMerkleRoot; ]             
+                |> MerkleTree.computeRoot
+            
+            let header = 
+                {
+                    version=Block.Version;
+                    parent=parentHash;
+                    blockNumber=blockNumber;
+                    commitments=commitments;
+                    timestamp=timestamp;
+                    difficulty=0x20fffffful;
+                    nonce=0UL,0UL;
+                }
+                
+            return {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot;witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot}
+        } 
+   
     static member Transactions() = 
         Arb.from<Transaction list>
         |> Arb.mapFilter (fun txs -> List.distinct txs) (fun txs -> List.length txs > 0)
-        |> Arb.convert NonEmptyTransactions NonEmptyTransactions.op_Explicit
+        |> Arb.convert NonEmptyTransactions NonEmptyTransactions.op_Explicit           
         
     static member Hashes() = 
         Arb.from<Hash.Hash list>
@@ -65,7 +122,12 @@ type ConsensusGenerator =
             
         let outputGenerator =
             gen {
-                let! lock = Arb.generate<Lock>
+                let notCoinbaseLock lock =
+                    match lock with
+                    | Coinbase _ -> false
+                    | _ -> true                     
+            
+                let! lock = Arb.generate<Lock> |> Gen.filter notCoinbaseLock 
                 let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
                 let asset = Hash.Hash asset
                 let! amount = Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
