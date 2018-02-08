@@ -8,7 +8,7 @@ type T  = {
     delayed: uint64 list;
 }
 
-let clamp lower upper x = min upper (max lower x)
+let clamp lower upper x = max upper (min lower x)
 
 let create chain =
     let difficulty = Difficulty.compress (ChainParameters.proofOfWorkLimit chain)
@@ -36,7 +36,7 @@ let add chain header ema =
     let currentTarget = Hash.toBigInt <| Difficulty.uncompress ema.difficulty
     let nextTarget = clamp  (Hash.toBigInt <| ChainParameters.proofOfWorkLimit chain)
                             (Hash.toBigInt <| Difficulty.maximum)
-                            currentTarget * bigint nextEstimatedInterval / bigint (ChainParameters.blockInterval chain)
+                            (currentTarget * bigint nextEstimatedInterval / bigint (ChainParameters.blockInterval chain))
     let nextDifficulty = Difficulty.compress <| Hash.fromBigInt nextTarget
     {ema with delayed = newDelayed; interval = nextEstimatedInterval; difficulty = nextDifficulty}
 
