@@ -78,7 +78,6 @@ let setUp = fun () ->
         open Zen.Base
         open Zen.Cost
         open Zen.Assets
-        open FStar.Mul
                 
         module ET = Zen.ErrorT
         module Tx = Zen.TxSkeleton
