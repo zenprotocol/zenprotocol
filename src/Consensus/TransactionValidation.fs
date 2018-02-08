@@ -78,8 +78,14 @@ let private checkWitnesses acs (Hash.Hash txHash, tx, inputs) =
             | _ -> GeneralError "invalid PK witness"
         | _ -> GeneralError "unexpected PK witness lock type"
 
-    let checkContractWitness inputTx acs cw pInputs =
-        let checkIssuedAndDestroyed cw (txSkeleton, message) =
+    let checkContractWitness inputTx acs cw message pInputs =
+        let checkMessage (txSkeleton, resultMessage) =
+            if message = resultMessage then
+                Ok txSkeleton
+            else
+                GeneralError "invalid message"
+
+        let checkIssuedAndDestroyed (txSkeleton : TxSkeleton.T) =
             let endInputs = cw.beginInputs + cw.inputsLength - 1u |> int
             let endOutputs = cw.beginOutputs + cw.outputsLength - 1u |> int
 
@@ -127,7 +133,8 @@ let private checkWitnesses acs (Hash.Hash txHash, tx, inputs) =
 
             Contract.run contract cw.command returnAddress contractWallet inputTx
             |> Result.mapError General
-            |> Result.bind (checkIssuedAndDestroyed cw)
+            |> Result.bind checkMessage
+            |> Result.bind checkIssuedAndDestroyed
             |> Result.bind (fun outputTx ->
                 if List.length outputTx.pInputs - List.length inputTx.pInputs = int cw.inputsLength &&
                    List.length outputTx.outputs - List.length inputTx.outputs = int cw.outputsLength then
@@ -136,14 +143,14 @@ let private checkWitnesses acs (Hash.Hash txHash, tx, inputs) =
                 else GeneralError "input/output length mismatch")
         | None -> Error ContractNotActive
 
-    let witnessesFolder state witness =
+    let witnessesFolder state (witness, message) =
         state
         |> Result.bind (fun (tx', (pInputs:(Outpoint * Output) list)) ->
             match witness with
             | PKWitness (serializedPublicKey, signature) ->
                 checkPKWitness tx' pInputs serializedPublicKey signature
             | ContractWitness cw ->
-                checkContractWitness tx' acs cw pInputs
+                checkContractWitness tx' acs cw message pInputs
         )
 
     let applyMaskIfContract pTx =
@@ -159,10 +166,24 @@ let private checkWitnesses acs (Hash.Hash txHash, tx, inputs) =
     result {
         let! txSkel = TxSkeleton.fromTransaction tx inputs |> Result.mapError General
         let! masked = applyMaskIfContract txSkel |> Result.mapError General
+
         let! (witnessedSkel, pInputs) =
-            List.fold witnessesFolder
-                    (Ok (masked, masked.pInputs))
-                    tx.witnesses
+            List.mapi (fun i witness -> (i, witness)) tx.witnesses
+            |> List.map (fun (i, witness) ->
+                witness,
+                    match witness with
+                    | ContractWitness _ ->
+                        if i + 1 = List.length tx.witnesses then
+                            None
+                        else
+                            match tx.witnesses.[i+1] with
+                            | ContractWitness cw ->
+                                Some { cHash = cw.cHash; command = cw.command }
+                            | _ ->
+                                None
+                    | _ -> None)
+            |> List.fold witnessesFolder (Ok (masked, masked.pInputs))
+
         if not <| List.isEmpty pInputs then
             return! GeneralError "missing witness(es)"
         elif not <| TxSkeleton.isSkeletonOf witnessedSkel tx inputs then

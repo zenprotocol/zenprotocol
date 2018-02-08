@@ -31,7 +31,7 @@ let witnessHash =
     //TODO: only serialize witness
     serialize Full >> Hash.compute
 
-let addWitnesses tx witnesses =
+let addWitnesses witnesses tx =
     { tx with witnesses = witnesses @ tx.witnesses }
 
 let sign keyPairs tx =
@@ -43,25 +43,7 @@ let sign keyPairs tx =
         ) keyPairs
 
     //// TODO: Should we also use sighash and not sign entire transaction?
-    addWitnesses tx pkWitnesses
-
-let addContractWitness cHash command returnAddress initialTxSkelton finalTxSkeleton tx =
-    let length list = List.length list |> uint32
-
-    let returnAddressIndex =
-        List.tryFindIndex (fun output -> output.lock = returnAddress) tx.outputs
-        |> Option.map uint32
-
-    addWitnesses tx [ ContractWitness {
-        cHash = cHash
-        returnAddressIndex = returnAddressIndex
-        command = command
-        message = message
-        beginInputs = length initialTxSkelton.pInputs
-        beginOutputs = length initialTxSkelton.outputs
-        inputsLength = length finalTxSkeleton.pInputs - length initialTxSkelton.pInputs
-        outputsLength = length finalTxSkeleton.outputs - length initialTxSkelton.outputs
-    } ]
+    addWitnesses pkWitnesses tx
 
 let fromTxSkeleton tx =
     {

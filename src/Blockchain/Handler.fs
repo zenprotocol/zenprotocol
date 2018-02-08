@@ -17,7 +17,7 @@ let handleCommand chain command session timestamp (state:State) =
     match command with
     | ValidateTransaction tx -> 
         effectsWriter {
-            let! memoryState = TransactionHandler.validateTransaction chain session contractPath tx state.memoryState
+            let! memoryState = TransactionHandler.validateTransaction session contractPath tx state.memoryState
             return {state with memoryState = memoryState}
         }
     | RequestMemPool peerId ->        
