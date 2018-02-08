@@ -17,7 +17,7 @@ type ChainParameters =
 let getChainParameters = function
     | Main -> {proofOfWorkLimit=Difficulty.uncompress 0x1d00fffful;blockInterval=240UL*1000UL;smoothingFactor=0.0055}
     | Test
-    | Local -> {proofOfWorkLimit=Difficulty.uncompress 0x20fffffful;blockInterval=240UL*1000UL;smoothingFactor=0.05}
+    | Local -> {proofOfWorkLimit=Difficulty.uncompress 0x20fffffful;blockInterval=60UL*1000UL;smoothingFactor=0.05}
     
 let proofOfWorkLimit chain =
     let p = getChainParameters chain

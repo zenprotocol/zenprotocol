@@ -65,13 +65,16 @@ let private sendToNextPeer socket inproc peers msg =
     // TODO: load balance peers
     
     let activePeers = peers |> Map.toSeq |> Seq.filter (fun (_,peer) -> Peer.isActive peer)
+    
+    if not <| Seq.isEmpty activePeers then        
+        let random = 
+            ((new System.Random()).Next()) % (Seq.length activePeers)
         
-    let random = 
-        ((new System.Random()).Next()) % (Seq.length activePeers)
-    
-    let routingId = Seq.item random activePeers |> fst
-    
-    sendToPeer socket inproc peers routingId msg 
+        let routingId = Seq.item random activePeers |> fst
+        
+        sendToPeer socket inproc peers routingId msg 
+    else
+        peers
 
 let private handleTimer socket inproc (peers:Peers) = 
     let peers = Map.map (fun _ peer -> Peer.handleTick socket peer) peers

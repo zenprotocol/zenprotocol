@@ -49,6 +49,8 @@ let requestHandler chain client (requestId:RequestId) request session wallet =
     | GetBalance -> 
         Account.getBalance wallet
         |> reply
+    | GetAddressPKHash ->
+        reply wallet.publicKeyHash
     | GetAddress ->
         Account.getAddress chain wallet
         |> reply

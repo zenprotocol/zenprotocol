@@ -56,7 +56,11 @@ let getChainWork (prevWork:bigint) header =
         
     let proof = bigint.Divide (TwoPow256, target + 1I)
     
-    prevWork + proof         
+    prevWork + proof
+    
+let getBlockReward blockNumber = 
+    //TODO: implement this method
+    50UL * 100000000UL             
 
 let createGenesis chain transactions nonce = 
     let txMerkleRoot = 
@@ -88,7 +92,25 @@ let createGenesis chain transactions nonce =
         
     {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot;witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot}
 
-let createTemplate (parent:BlockHeader) timestamp (ema:EMA.T) acs transactions = 
+let createTemplate (parent:BlockHeader) timestamp (ema:EMA.T) acs transactions coinbasePkHash =
+    let blockNumber = (parent.blockNumber + 1ul)
+    let reward = getBlockReward blockNumber
+    
+    let coinbase = {
+        inputs=[]
+        outputs=
+            [
+                {
+                    lock=Coinbase (blockNumber, coinbasePkHash)
+                    spend={asset=Hash.zero;amount=reward}
+                }
+            ]
+        contract = None
+        witnesses=[]
+    }
+
+    let transactions = coinbase :: transactions
+ 
     let txMerkleRoot = 
         transactions
         |> List.map Transaction.hash
@@ -112,7 +134,7 @@ let createTemplate (parent:BlockHeader) timestamp (ema:EMA.T) acs transactions =
         {
             version=Version;
             parent=parentHash;
-            blockNumber=parent.blockNumber + 1ul;
+            blockNumber=blockNumber;
             commitments=commitments;
             timestamp=timestamp;
             difficulty=ema.difficulty;
@@ -129,14 +151,41 @@ let validate chain =
         BlockHeader.validate chain block.header
         |> Result.map (fun _ -> block)  
         
-    
+    let checkCoinbase (block:Block) = 
+        if isGenesis chain block then 
+            Ok block
+        else
+            let coinbase = List.head block.transactions
+            
+            match TransactionValidation.validateCoinbase block.header.blockNumber coinbase with
+            | Error error -> Error <| sprintf "Block failed coinbase validation due to %A" error
+            | Ok _ ->
+                // checking the total reward
+                let totals = List.fold (fun totals output ->
+                    let amount = defaultArg (Map.tryFind output.spend.asset totals) 0UL            
+                    Map.add output.spend.asset (output.spend.amount + amount) totals) Map.empty coinbase.outputs 
+                    
+                let reward = getBlockReward block.header.blockNumber 
+                let totalZen = defaultArg (Map.tryFind Hash.zero totals) 0UL
+                
+                if totalZen <> reward then
+                    Error "block reward is incorrect"
+                else
+                    // TODO: we don't have fees yet, so anything else other than zen is not allowed
+                    if Map.exists (fun asset _ -> asset <> Hash.zero) totals then     
+                        Error "reward can only be in Zen asset"
+                    else
+                        Ok block
+                                                 
     let checkTxBasic (block:Block) = result {
         // skip if genesis block
         if isGenesis chain block then
             return block
         else
+            let withoutCoinbase = List.tail block.transactions
+        
             // Fail if validateBasic fails on any transaction in the block.
-            for tx in block.transactions do
+            for tx in withoutCoinbase do
                 let! _ =
                     TransactionValidation.validateBasic tx 
                     |> Result.mapError (sprintf "transaction %A failed validation due to %A" (Transaction.hash tx) )
@@ -169,6 +218,7 @@ let validate chain =
    
     checkTxNotEmpty    
     >=> checkHeader
+    >=> checkCoinbase
     >=> checkTxBasic
     >=> checkCommitments
 
@@ -198,20 +248,25 @@ let connect chain getUTXO contractsPath parent timestamp set acs ema =
                 let txHash = (Transaction.hash tx)
                 UtxoSet.handleTransaction getUTXO txHash tx set) set block.transactions
             Ok (block,set,acs,ema)
-        else                       
+        else        
+            let coinbase = List.head block.transactions
+            let withoutCoinbase = List.tail block.transactions 
+            
+            let set = UtxoSet.handleTransaction getUTXO (Transaction.hash coinbase) coinbase set
+                       
             List.fold (fun state tx->
                 match state with
                 | Error e -> Error e
                 | Ok (block,set,acs,ema) -> 
                     let txHash = (Transaction.hash tx) 
                 
-                    match TransactionValidation.validateInContext getUTXO contractsPath acs set txHash tx with
+                    match TransactionValidation.validateInContext getUTXO contractsPath (block.header.blockNumber - 1ul) acs set txHash tx with
                     | Error err -> Error (sprintf "transactions failed inputs validation due to %A" err)
                     | Ok (_,acs) -> 
                         let set = UtxoSet.handleTransaction getUTXO txHash tx set
                             
                         Ok (block,set,acs,ema) 
-                    ) (Ok (block,set,acs,ema)) block.transactions
+                    ) (Ok (block,set,acs,ema)) withoutCoinbase
                     
     let checkCommitments (block,set,acs,ema) =                                   
         let acsMerkleRoot = SparseMerkleTree.root acs

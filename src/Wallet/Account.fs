@@ -21,6 +21,7 @@ type T = {
     keyPair: KeyPair
     publicKeyHash: Hash
     tip: Hash.Hash
+    blockNumber:uint32
 }
 
 let rootSecretKey = SecretKey [|189uy; 140uy; 82uy; 12uy; 79uy; 140uy; 35uy; 59uy; 11uy; 41uy; 199uy;
@@ -36,6 +37,7 @@ let create () =
         publicKeyHash = PublicKey.hash publicKey
         mempool = List.empty
         tip = Hash.zero
+        blockNumber = 0ul
     }
 
 // update the outputs with transaction                                        
@@ -43,6 +45,9 @@ let private handleTransaction txHash (tx:Transaction) account outputs =
     
     let handleOutput outputs (index,output) = 
         match output.lock with
+        | Coinbase (_,pkHash) when pkHash = account.publicKeyHash ->
+             let outpoint = {txHash=txHash;index=index;}
+             Map.add outpoint (Unspent output) outputs
         | PK pkHash when pkHash = account.publicKeyHash ->              
             let outpoint = {txHash=txHash;index=index;}
             Map.add outpoint (Unspent output) outputs
@@ -71,7 +76,7 @@ let handleBlock blockHash block account =
     let set = Set.ofList txHashes   
     let mempool = List.reject (fun (txHash,_) -> Set.contains txHash set) account.mempool            
                                         
-    {account with tip = blockHash; mempool=mempool;outputs = outputs}     
+    {account with tip = blockHash; blockNumber = block.header.blockNumber; mempool=mempool;outputs = outputs}     
     
 let undoBlock block account = 
     let undoTransaction tx (outputs,mempool) = 
@@ -79,6 +84,9 @@ let undoBlock block account =
         
         let handleOutput outputs (index,output) = 
             match output.lock with
+            | Coinbase (_,pkHash) when pkHash = account.publicKeyHash ->
+                let outpoint = {txHash=txHash;index=index;}
+                Map.remove outpoint outputs                
             | PK pkHash when pkHash = account.publicKeyHash ->
                 let outpoint = {txHash=txHash;index=index;}
                 Map.remove outpoint outputs                
@@ -105,7 +113,7 @@ let undoBlock block account =
         
     let outputs,mempool = List.foldBack undoTransaction block.transactions (account.outputs,account.mempool) 
     
-    {account with tip=block.header.parent;outputs=outputs;mempool = mempool} 
+    {account with tip=block.header.parent;blockNumber=block.header.blockNumber - 1ul; outputs=outputs;mempool = mempool} 
    
 let sync chain tipBlockHash (getHeader:Hash.Hash -> BlockHeader) (getBlock:Hash.Hash -> Block) account= 
     let accountTipBlockNumber = 
@@ -169,6 +177,7 @@ let addTransaction txHash (tx:Transaction) account =
     let anyOutput = List.exists (fun output -> 
         match output.lock with
         | PK pkHash when pkHash = account.publicKeyHash -> true
+        | Coinbase (_,pkHash) when pkHash = account.publicKeyHash -> true
         | _ -> false) tx.outputs
     
     let unspentOutputs = getUnspentOutputs account
@@ -196,7 +205,12 @@ let private getInputs account spend =
     let unspent = getUnspentOutputs account
  
     let collectInputs ((inputs, keys), collectedAmount) outpoint output =
-        if spend.amount > collectedAmount && spend.asset = output.spend.asset then
+        let isMature = 
+            match output.lock with 
+            | Coinbase (blockNumber,_) -> account.blockNumber - blockNumber >= CoinbaseMaturity
+            | _ -> true 
+    
+        if isMature && spend.amount > collectedAmount && spend.asset = output.spend.asset then
             (((outpoint,output) :: inputs, account.keyPair :: keys), output.spend.amount + collectedAmount)
         else 
             ((inputs, keys), collectedAmount)
@@ -250,6 +264,7 @@ let rootAccount =
         publicKeyHash = Transaction.rootPKHash
         tip = Hash.zero
         mempool= List.empty
+        blockNumber=0ul
     }  
 
 let createTestAccount () =                            

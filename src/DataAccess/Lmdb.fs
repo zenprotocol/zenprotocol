@@ -57,6 +57,9 @@ extern int mdb_env_open(IntPtr env, string path, uint32 flags, uint32 mode)
 extern int mdb_env_set_maxdbs(IntPtr env, uint32 dbs)
 
 [<DllImport("lmdb", CallingConvention = CallingConvention.Cdecl)>]
+extern int mdb_env_set_mapsize(IntPtr env, IntPtr size)
+
+[<DllImport("lmdb", CallingConvention = CallingConvention.Cdecl)>]
 extern int mdb_dbi_open(IntPtr txn, string name, uint32 flags, uint32& db)
 
 [<DllImport("lmdb", CallingConvention = CallingConvention.Cdecl)>]

@@ -82,7 +82,7 @@ let createChain (length:int) nonce start ema account =
             let parent = List.head blocks
             let timestamp = timestamp + ((uint64 i) * 1000UL * 60UL * 10UL)
             let tx = createTransaction account
-            let block = Block.createTemplate parent.header timestamp ema acs [tx]
+            let block = Block.createTemplate parent.header timestamp ema acs [tx] Hash.zero
             let block = {block with header ={ block.header with nonce = nonce,0UL}}
 
             let account = Account.addTransaction (Transaction.hash tx) tx account
@@ -165,7 +165,7 @@ let ``validate new valid block which extended main chain``() =
         |> Writer.unwrap
 
     let tx = createTransaction rootAccount
-    let block = Block.createTemplate genesisBlock.header timestamp state.tipState.ema acs [tx]
+    let block = Block.createTemplate genesisBlock.header timestamp state.tipState.ema acs [tx] Hash.zero
     let blockHash = Block.hash block
 
 
@@ -204,7 +204,7 @@ let ``validate new invalid block which try to extended main chain``() =
         |> Writer.unwrap
 
     let tx = createTransaction rootAccount
-    let block = Block.createTemplate genesisBlock.header timestamp state.tipState.ema acs [tx]
+    let block = Block.createTemplate genesisBlock.header timestamp state.tipState.ema acs [tx] Hash.zero
     let block = {block with txMerkleRoot = Hash.zero}
 
     // Mark the block as new so we will also have network command
@@ -231,7 +231,7 @@ let ``validating orphan block yield a request for block from network``() =
     use session = DatabaseContext.createSession databaseContext
 
     let tx = createTransaction rootAccount
-    let block = Block.createTemplate genesisBlock.header timestamp state.tipState.ema acs [tx]
+    let block = Block.createTemplate genesisBlock.header timestamp state.tipState.ema acs [tx] Hash.zero
 
     let events, state' =
         BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state
@@ -255,7 +255,7 @@ let ``validate new block which connect orphan chain which extend main chain``() 
     let tx = createTransaction rootAccount
 
     let ema = EMA.add chain genesisBlock.header.timestamp ema
-    let block = Block.createTemplate genesisBlock.header timestamp ema acs [tx]
+    let block = Block.createTemplate genesisBlock.header timestamp ema acs [tx] Hash.zero
     let blockHash = Block.hash block
 
     // Sending orphan block first
@@ -598,13 +598,13 @@ let ``block with a contract activation is added to chain``() =
 
     let contract = {
         hash = cHash
-        fn = fun _ _ _ _ tx -> Ok (tx, None)
+        fn = fun _ _ _ _ tx -> Ok (tx,None)
         costFn = fun _ _ _ tx -> Ok 1I
     }
 
     let acs = ActiveContractSet.add cHash contract state.tipState.activeContractSet
 
-    let block = Block.createTemplate genesisBlock.header timestamp state.tipState.ema acs [tx]
+    let block = Block.createTemplate genesisBlock.header timestamp state.tipState.ema acs [tx] Hash.zero
 
     let events, state' =
             BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state

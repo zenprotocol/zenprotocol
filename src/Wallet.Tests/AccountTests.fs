@@ -365,11 +365,67 @@ let ``account reorg``() =
     account.mempool |> should haveLength 1
     List.exists (fst >> (=) txHash) account.mempool |> should equal true             
     
-                
-        
- 
-        
+[<Test>]
+let ``wallet won't spend coinbase if not mature enough``() = 
+    let rootAccount = {Account.rootAccount with blockNumber=100ul}
+    let origin = 
+            {
+                inputs=[]
+                outputs=[{lock =  Coinbase (1ul, rootAccount.publicKeyHash); spend= {asset = Hash.zero;amount=100000000UL}}]
+                witnesses=[]            
+                contract=None
+            }                                
+    let originHash = Transaction.hash origin
     
-    
-                  
+    let rootAccount = Account.addTransaction originHash origin rootAccount  
         
+    let expected: Result<Transaction,string>= Error "Not enough tokens"        
+        
+    Account.createTransaction Chain.Local rootAccount rootAccount.publicKeyHash { asset = Hash.zero; amount = 1UL }    
+    |> should equal expected       
+    
+[<Test>]
+let ``wallet spend coinbase with coinbase mature enough``() = 
+    let rootAccount = {Account.rootAccount with blockNumber=101ul}
+    let origin = 
+            {
+                inputs=[]
+                outputs=[{lock =  Coinbase (1ul, rootAccount.publicKeyHash); spend= {asset = Hash.zero;amount=100000000UL}}]
+                witnesses=[]            
+                contract=None
+            }                                
+    let originHash = Transaction.hash origin
+    
+    let rootAccount = Account.addTransaction originHash origin rootAccount  
+        
+    Account.createTransaction Chain.Local rootAccount rootAccount.publicKeyHash { asset = Hash.zero; amount = 1UL }    
+    |> should be ok
+    
+[<Test>]
+let ``wallet spend coinbase when come from block``() = 
+    let rootAccount = Account.rootAccount
+    let origin = 
+            {
+                inputs=[]
+                outputs=[{lock =  Coinbase (1ul, rootAccount.publicKeyHash); spend= {asset = Hash.zero;amount=100000000UL}}]
+                witnesses=[]            
+                contract=None
+            }                                                    
+    
+    let header = 
+        {
+            version = Block.Version
+            parent = Hash.zero
+            blockNumber = 101ul
+            difficulty = 0x20fffffful;
+            commitments=Hash.zero;    
+            timestamp = 0UL
+            nonce = 0UL,0UL
+        }             
+
+    let block = {header=header;transactions=[origin];commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero;}    
+    
+    let rootAccount = Account.handleBlock (Block.hash block) block rootAccount
+        
+    Account.createTransaction Chain.Local rootAccount rootAccount.publicKeyHash { asset = Hash.zero; amount = 1UL }    
+    |> should be ok    

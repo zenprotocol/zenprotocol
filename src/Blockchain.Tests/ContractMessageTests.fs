@@ -74,7 +74,7 @@ let setUp = fun () ->
 [<TearDown>]
 let tearDown = fun () ->
     clean()
-    
+
 let contract2Code = """
 // contract 2: this contract receives the remaining tx Zen tokens and locks them to itself
 
@@ -101,7 +101,7 @@ let main txSkeleton contractHash command returnAddress #l wallet =
             Tx.lockToContract zenAsset tokens contractHash txSkeleton in
         ET.ret (txSkeleton, None)
     end
-    else 
+    else
         ET.autoFailw "unsupported command"
     """
 let contract2Hash = Contract.computeHash contract2Code
@@ -130,13 +130,13 @@ let cf _ _ _ #l _ = ret (64 + (64 + 64 + 0) + 22)
 val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + 64 + 0) + 22)
 let main txSkeleton contractHash command returnAddress #l wallet =
     match returnAddress with
-    | Some returnAddress -> 
+    | Some returnAddress ->
         let! tokens = Tx.getAvailableTokens zenAsset txSkeleton in
         let! txSkeleton =
             Tx.mint tokens contractHash txSkeleton
             >>= Tx.lockToAddress contractHash tokens returnAddress in
 
-        let message = { 
+        let message = {
             cHash = hashFromBase64 "%s";
             command = "contract2_test"
         } in
@@ -171,7 +171,7 @@ let ``Should execute contract chain and get a valid transaction``() =
 
     let memoryState = { state.memoryState with utxoSet = utxoSet }
     let state = { state with memoryState = memoryState }
-    
+
     let inputTx =
         {
             pInputs = [ input, output ]
@@ -185,29 +185,29 @@ let ``Should execute contract chain and get a valid transaction``() =
 
         let tx = Transaction.sign [ sampleKeyPair ] tx
         let txHash = Transaction.hash tx
-        
+
         let events, memoryState =
-            TransactionHandler.validateTransaction session dataPath tx state.memoryState
+            TransactionHandler.validateTransaction session dataPath 1ul tx state.memoryState
             |> Writer.unwrap
-        
+
         //exptect the transaction to be valid
         events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (txHash,tx)))
         MemPool.containsTransaction txHash memoryState.mempool |> should equal true
 
         // meleate the last command
-        let witness = 
-            match List.last tx.witnesses with 
+        let witness =
+            match List.last tx.witnesses with
             | ContractWitness cw -> ContractWitness { cw with command = "x" }
             | _ -> failwith "unexpedted witness"
-            
+
         let witnesses = Infrastructure.List.add witness tx.witnesses.[0 .. List.length tx.witnesses - 2]
         let tx = { tx with witnesses = witnesses }
         let txHash = Transaction.hash tx
-        
+
         let events, memoryState =
-            TransactionHandler.validateTransaction session dataPath tx state.memoryState
+            TransactionHandler.validateTransaction session dataPath  1ul tx state.memoryState
             |> Writer.unwrap
-            
+
         //exptect the transaction to be invalid
         events |> should not' (contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (txHash,tx))))
         MemPool.containsTransaction txHash memoryState.mempool |> should equal false
