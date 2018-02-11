@@ -122,7 +122,6 @@ open Zen.Assets
 
 module ET = Zen.ErrorT
 module Tx = Zen.TxSkeleton
-module M = FStar.Mul
 
 val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 9
 let cf _ _ _ #l _ = ret (64 + (64 + 64 + 0) + 22)
