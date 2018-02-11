@@ -110,7 +110,7 @@ let setUp = fun () ->
 
       ET.of_option "contract doesn't have enough zens to pay you" result
 
-    val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (M.(64 + (64 + 64 + (l * 128 + 192) + 0) + 26 + 22) <: nat)
+    val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) ((64 + (64 + 64 + (l * 128 + 192) + 0) + 26 + 22) <: nat)
     let main txSkeleton contractHash command returnAddress #l wallet =
       match returnAddress with
       | Some returnAddress ->
