@@ -80,7 +80,6 @@ let setUp = fun () ->
 
     module ET = Zen.ErrorT
     module Tx = Zen.TxSkeleton
-    module M = FStar.Mul
 
     val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 17
     let cf _ _ _ #l _ =
