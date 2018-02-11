@@ -80,11 +80,9 @@ let setUp = fun () ->
 
     module ET = Zen.ErrorT
     module Tx = Zen.TxSkeleton
-    module M = FStar.Mul
 
     val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 17
     let cf _ _ _ #l _ =
-        let open M in
         let res : nat = (64 + (64 + 64 + (l * 128 + 192) + 0) + 26 + 22) in
         ret res
 
@@ -112,16 +110,16 @@ let setUp = fun () ->
 
       ET.of_option "contract doesn't have enough zens to pay you" result
 
-    val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (M.(64 + (64 + 64 + (l * 128 + 192) + 0) + 26 + 22) <: nat)
+    val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) ((64 + (64 + 64 + (l * 128 + 192) + 0) + 26 + 22) <: nat)
     let main txSkeleton contractHash command returnAddress #l wallet =
       match returnAddress with
-      | Some returnAddress -> 
+      | Some returnAddress ->
         if command = "redeem" then
           redeem txSkeleton contractHash returnAddress wallet
         else if command = "" || command = "buy" then
           buy txSkeleton contractHash returnAddress
-          |> autoInc    
-        else 
+          |> autoInc
+        else
           ET.autoFailw "unsupported command"
       | None ->
         ET.autoFailw "returnAddress is required"
@@ -198,7 +196,7 @@ let ``Should buy``() =
              outputsLength = 2u
         }
         tx.witnesses |> should contain cw
-    | Error error -> failwith error
+    | Error error -> failwithf "--> %A" error
 
 [<Test>]
 let ``Should redeem``() =

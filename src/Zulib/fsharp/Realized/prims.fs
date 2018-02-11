@@ -10,6 +10,7 @@ type nonzero  = int
 let ( + )     = Big_int_Z.add_big_int
 let ( - )     = Big_int_Z.sub_big_int
 let ( * )     = Big_int_Z.mult_big_int
+let op_Star = (*)
 let ( / )     = Big_int_Z.div_big_int
 let ( <= )    = Big_int_Z.le_big_int
 let ( >= )    = Big_int_Z.ge_big_int

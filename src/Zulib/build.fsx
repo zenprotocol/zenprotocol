@@ -56,7 +56,7 @@ Target "RecordHints" (fun _ ->
        "--cache_checked_modules" |]
 
   let exitCodes = Array.Parallel.map (fun file -> runFStar args [|file|]) zulibFiles
-  if not (Array.forall (fun exitCode -> exitCode = 0) exitCodes)
+  if not ( exitCodes |> Array.forall ((=) 0) )
     then failwith "recording Zulib hints failed"
 
 )
@@ -91,14 +91,17 @@ Target "Extract" (fun _ ->
        "--extract_module";"Zen.OptionT";
        "--extract_module";"Zen.Tuple";
        "--extract_module";"Zen.TupleT";
+       "--extract_module";"Zen.Optics";
        "--extract_module";"Zen.Vector";
        "--extract_module";"Zen.Array.Extracted";
        "--extract_module";"Zen.Cost.Extracted";
        "--codegen-lib";"Zen.Cost";
        "--codegen-lib";"Zen.Array";
-       "--extract_module";"Zen.Types.Extracted";       
+       "--extract_module";"Zen.Types.Extracted";
+       "--extract_module";"Zen.Types.Data";
        "--extract_module";"Zen.Types.Main";
        "--codegen-lib";"Zen.Types";
+       "--extract_module";"Zen.Data";
        "--odir";extractedDir |]
 
   let exitCode = runFStar args zulibFiles
@@ -112,7 +115,6 @@ Target "Build" (fun _ ->
   let files =
     [| "fsharp/Realized/prims.fs";
       "fsharp/Realized/FStar.Pervasives.fs";
-      "fsharp/Realized/FStar.Mul.fs";
       "fsharp/Realized/FStar.UInt.fs";
       "fsharp/Realized/FStar.UInt8.fs";
       "fsharp/Realized/FStar.UInt32.fs";
@@ -125,22 +127,22 @@ Target "Build" (fun _ ->
       "fsharp/Extracted/Zen.Tuple.fs";
       "fsharp/Realized/Zen.Cost.Realized.fs";
       "fsharp/Extracted/Zen.Cost.Extracted.fs";
+      "fsharp/Realized/Zen.Set.fs";
+      "fsharp/Realized/Zen.Dictionary.fs";
       "fsharp/Extracted/Zen.OptionT.fs";
       "fsharp/Extracted/Zen.ErrorT.fs";
       "fsharp/Extracted/Zen.TupleT.fs";
       "fsharp/Extracted/Zen.Vector.fs";
       "fsharp/Realized/Zen.Array.Realized.fs";
-      "fsharp/Extracted/Zen.Array.Extracted.fs";      
+      "fsharp/Extracted/Zen.Array.Extracted.fs";
       "fsharp/Extracted/Zen.Types.Extracted.fs";
       "fsharp/Realized/Zen.Types.Realized.fs";
       "fsharp/Realized/Zen.Crypto.fs";
-      "fsharp/Realized/Zen.Sha3.Realized.fs";
-      "fsharp/Realized/Zen.Merkle.fs";
-      "fsharp/Realized/Zen.Util.fs";      
+      "fsharp/Realized/Zen.Util.fs";
       "fsharp/Realized/Zen.Assets.fs";
       "fsharp/Extracted/Zen.Types.Main.fs";
       "fsharp/Realized/Zen.Wallet.fs";
-      "fsharp/Realized/Zen.TxSkeleton.fs";      
+      "fsharp/Realized/Zen.TxSkeleton.fs";
     |]
 
   let checker = FSharpChecker.Create()

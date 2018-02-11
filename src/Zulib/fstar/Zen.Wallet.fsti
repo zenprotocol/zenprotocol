@@ -6,5 +6,3 @@ open Zen.Cost
 
 module U64 = FStar.UInt64
 module V = Zen.Vector
-module M = FStar.Mul
-  

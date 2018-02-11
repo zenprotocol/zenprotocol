@@ -1,7 +1,6 @@
 module Zen.Vector
 
 open Zen.Cost
-module M = FStar.Mul
 
 type vector(a:Type): nat -> Type =
   | VNil : vector a 0
@@ -27,43 +26,43 @@ val tl(#a:Type)(#l:nat): v:vector a l{VCons? v} -> cost (vector a (l-1)) 2
 let tl #_ #_ (VCons _ tl) = 2 +~! tl
 
 (** [nth v i] returns the [i]th element of v, starting at 0. *)
-val nth(#a:Type)(#l:nat): vector a l -> i:nat{i<l} -> cost a M.(4*(i+1))
+val nth(#a:Type)(#l:nat): vector a l -> i:nat{i<l} -> cost a (4*(i+1))
 let rec nth #_ #_ (VCons hd tl) = function
   | 0 -> 4 +~! hd
   | i -> 4 +! (nth tl (i-1))
 
 (** [append v1 v2] appends the elements of [v2] to the end of [v1]. *)
 val append(#a:Type)(#l1 #l2:nat):
-  vector a l1 -> vector a l2 -> cost (vector a (l1+l2)) M.(4*l1+4)
+  vector a l1 -> vector a l2 -> cost (vector a (l1+l2)) (4*l1+4)
 let rec append #a #l1 #l2 v1 v2 =
   4 +! begin match v1 with
        | VCons hd tl ->
-           VCons hd <$> append tl v2 <: cost (vector a (l1+l2)) M.(4*l1)
+           VCons hd <$> append tl v2 <: cost (vector a (l1+l2)) (4*l1)
        | VNil -> ret v2
        end
 
 unfold val (@@) (#a:Type)(#l1 #l2:nat):
-  vector a l1 -> vector a l2 -> cost (vector a (l1+l2)) M.(4*l1+4)
+  vector a l1 -> vector a l2 -> cost (vector a (l1+l2)) (4*l1+4)
 unfold let (@@) #_ #_ #_ v1 v2 = append v1 v2
 
 (*
 (** [flatten v], where [v] is a vector of vectors of constant length,
     returns the vector of elements of vectors in [v], preserving their order. *)
 val flatten(#a:Type)(#l1 #l2:nat):
-  vector (vector a l2) l1 -> cost (vector a M.(l1*l2)) M.(4*l1*(l2+2)+4)
+  vector (vector a l2) l1 -> cost (vector a (l1*l2)) (4*l1*(l2+2)+4)
 let rec flatten #a #l1 #l2 v =
   4 +!
   begin match v with
   | VCons hd tl ->
     admit();
     append hd =<< flatten tl
-  | VNil -> ret (VNil <: vector a M.(l1*l2))
+  | VNil -> ret (VNil <: vector a (l1*l2))
   end
 *)
 
 (** [init l f] returns a vector of length l, for which the [i]th element is [f i]. *)
 val init(#a:Type)(#n:nat): l:nat -> (i:nat{i<l} -> cost a n)
-  -> cost (vector a l) M.(n*l+2)
+  -> cost (vector a l) (n*l+2)
 let rec init #_ #_ l f = match l with
   | 0 -> 2 +~! VNil
   | _ -> let l':nat = l-1 in
@@ -72,28 +71,28 @@ let rec init #_ #_ l f = match l with
 (** [map f v] returns a vector of length l,
     for which the [i]th element is the result of f applied to the [i]th element of v.*)
 val map(#a #b:Type)(#l #n:nat): (a -> cost b n) -> vector a l
-  -> cost (vector b l) M.((l*n)+(l*2)+2)
+  -> cost (vector b l) ((l*n)+(l*2)+2)
 let rec map #_ #b #l #n f = function
  | VNil -> 2 +~! VNil
  | VCons hd tl -> 2 +! (VCons <$> (f hd) <*> (map f tl))
 
 val foldl(#a #b:Type)(#l #n:nat):
   (a -> b -> cost a n) -> a -> vector b l
-  -> cost a M.((n+2)*l+2)
+  -> cost a ((n+2)*l+2)
 let rec foldl #_ #_ #_ #_ f acc = function
   | VNil -> 2 +~! acc
   | VCons hd tl -> 2 +! (f acc hd >>= (fun acc' -> foldl f acc' tl))
 
 (** [countWhere f v] returns the number of elements [e] in [v] for which [f e] is true. *)
 val countWhere(#a:Type)(#l #n:nat): (a -> cost bool n) -> vector a l
-  -> res: cost nat M.((n+2)*l+2){force res <= l}
+  -> res: cost nat ((n+2)*l+2){force res <= l}
 let countWhere #_ #_ #_ f =
   let ctr (acc:nat) hd = f hd $> (fun b -> if b then acc+1 <: nat else acc) in
   admit();
   foldl ctr 0
 
 val zip(#a #b:Type)(#l:nat):
-  vector a l -> vector b l -> cost (vector (a**b) l) M.(3*l+3)
+  vector a l -> vector b l -> cost (vector (a**b) l) (3*l+3)
 let rec zip #_ #_ #_ v1 v2 =
   match v1 with | VNil -> 3 +~! VNil
                 | VCons hd1 tl1 ->
@@ -114,32 +113,32 @@ val vlen(#a:Type)(#l:nat): vector a l -> nat
 let vlen #_ #l _ = l
 
 val for_all(#a:Type)(#l #n:nat):
-  (a -> cost bool n) -> vector a l -> cost bool M.(l*(n+2)+2)
+  (a -> cost bool n) -> vector a l -> cost bool (l*(n+2)+2)
 let rec for_all #_ #l #n f = function
   | VNil -> incRet 2 true
   | VCons hd tl -> 2 +! f hd >>= (fun x ->
       if x then for_all f tl else autoRet false)
 
-val mem: #a:eqtype -> #l:nat -> a -> vector a l -> cost bool M.((l+1)*2)
+val mem: #a:eqtype -> #l:nat -> a -> vector a l -> cost bool ((l+1)*2)
 let rec mem #a #l x = function
   | VNil -> incRet 2 false
-  | VCons hd tl -> if hd = x then incRet M.((l+1)*2) true else 2 +! mem x tl
+  | VCons hd tl -> if hd = x then incRet ((l+1)*2) true else 2 +! mem x tl
 
-val count: #a:eqtype -> #l:nat -> a -> vector a l -> cost nat M.((l+1)*2)
+val count: #a:eqtype -> #l:nat -> a -> vector a l -> cost nat ((l+1)*2)
 let rec count #a #l x = function
   | VNil -> incRet 2 0
   | VCons hd tl -> if hd = x then (fun (x:nat) -> incRet 2 (x + 1) <: cost nat 2) =<< count x tl
                    else 2 +! count x tl
 
 assume val foldl(#a #b:Type)(#n #l:nat):
-  (a -> b -> cost a n) -> a -> vector b l -> cost a M.((n+2)*l+2)
+  (a -> b -> cost a n) -> a -> vector b l -> cost a ((n+2)*l+2)
 
 (*)
 private val is_sorted: #a:Type -> #l:nat -> #n:nat -> (a -> cost int n) -> vector a l
-  -> cost bool M.((l*2)*(n+1)+2)
+  -> cost bool ((l*2)*(n+1)+2)
 private let rec is_sorted #a #l #n f = function
   | VNil -> incRet 2 true
-  | VCons _ VNil -> incRet M.(2*n+4) true
+  | VCons _ VNil -> incRet (2*n+4) true
   | VCons x (VCons y tl) ->
     let head_sorted = (<=) <$> f x <*> f y in
     2 +! ((&&) <$> head_sorted <*> is_sorted f (VCons y tl))
@@ -171,13 +170,13 @@ type permutation (#a:eqtype)(#l:nat)(v1:vector a l)(v2:vector a l) =
 
 assume val mergesort': #a:Type -> #l:nat -> #n:nat
   -> f:(a-> cost int n) -> vector a l
-  -> cost (sortedVector a l f) M.(l*n*2 * Math.log_2 (l + 1))
+  -> cost (sortedVector a l f) (l*n*2 * Math.log_2 (l + 1))
 assume val mergesort: #a:eqtype -> #l:nat -> #n:nat
   -> f:(a-> cost int n) -> v:vector a l
-  -> cost (res:sortedVector a l f{permutation res v}) M.(l*n*2 * Math.log_2 (l + 1))
+  -> cost (res:sortedVector a l f{permutation res v}) (l*n*2 * Math.log_2 (l + 1))
 
 val is_unique: #a:eqtype -> #l:nat -> #n:nat -> #f:(a -> cost int n)
-  -> sortedVector a l f -> cost bool M.((l+1)*2)
+  -> sortedVector a l f -> cost bool ((l+1)*2)
 let rec is_unique #a #l #n #f v = match v with
   | VNil -> incRet 2 true
   | VCons _ VNil  -> incRet 4 true
@@ -203,7 +202,7 @@ let rec is_unique_tail #a #l #n #f v = match v with
     force_inc 2 ((&&) (x<>y) <$> tail_unique)
 (*)
 val unique: #a:eqtype -> #l:nat -> #n:nat -> #f:(a -> cost int n)
-  -> sortedVector a l f -> cost (l2:nat & sortedVector a l2 f) M.((l+1)*2)
+  -> sortedVector a l f -> cost (l2:nat & sortedVector a l2 f) ((l+1)*2)
 let rec unique #a #l #n #f v = match v with
   | VNil -> incRet 2 (| 0, v |)
   | VCons _ VNil  -> incRet 4 (|1, v|)
@@ -221,7 +220,7 @@ private val vrev_help: #a:Type
   -> vector a l1
   -> #l2:nat
   -> vector a l2
-  -> Tot (cost (vector a (l1+l2)) (M.(3 * l1) + 2)) (decreases l1)
+  -> Tot (cost (vector a (l1+l2)) ((3 * l1) + 2)) (decreases l1)
 private let rec vrev_help #a #l1 v1 #l2 v2 =
   match v1 with
   | VNil -> ret v2 `inc` 2
@@ -230,7 +229,7 @@ private let rec vrev_help #a #l1 v1 #l2 v2 =
     >>= (fun v2' -> vrev_help tl #(l2+1) v2')
 
 // reverse a vector
-val vrev: #a:Type -> #l:nat -> vector a l -> cost (vector a l) M.(3*l + 3)
+val vrev: #a:Type -> #l:nat -> vector a l -> cost (vector a l) (3*l + 3)
 let vrev #a #l v = vrev_help v VNil `inc` 1
 
 

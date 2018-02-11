@@ -3,8 +3,7 @@ module FStar.UInt8
 let n = 8
 
 open FStar.UInt
-open FStar.Mul
-open FStar.Option
+open Zen.Option
 
 private type t' = | Mk: v:uint_t n -> t'
 type t = t'

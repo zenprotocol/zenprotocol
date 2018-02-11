@@ -18,8 +18,8 @@ let bind #_ #_ mx f = match mx with
 val map(#a #b:Type): (a -> b) -> option a -> option b
 let map #_ #_ f mx = bind mx (f >> Some)
 
-val ( >>? ) (#a #b #c:Type): (a->option b) -> (b->option c) -> a -> option c
-let ( >>? ) #_ #_ #_ f g x = (f x) `bind` g
+val ( >=> ) (#a #b #c:Type): (a->option b) -> (b->option c) -> (a -> option c)
+let ( >=> ) #_ #_ #_ f g x = (f x) `bind` g
 
 val ap(#a #b:Type): option (a->b) -> option a -> option b
 let ap #_ #_ mf mx = mf `bind` (fun f -> f `map` mx)
