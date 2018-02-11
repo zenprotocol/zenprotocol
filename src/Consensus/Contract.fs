@@ -14,11 +14,11 @@ open Zen.Types.Extracted
 open Zen.Types.Realized
 open Exception
 open Consensus.Types
+open Zen.Types.Main
 
 type ContractWallet = PointedOutput list
-
-type ContractFn = Hash -> string -> Lock option -> ContractWallet -> TxSkeleton.T -> Result<TxSkeleton.T,string>
-type ContractCostFn = string -> Lock option -> ContractWallet ->  TxSkeleton.T -> Result<bigint,string>
+type ContractFn = Hash -> string -> Lock option -> ContractWallet -> TxSkeleton.T -> Result<(TxSkeleton.T * Message Option),string>
+type ContractCostFn = string -> Lock option -> ContractWallet -> TxSkeleton.T -> Result<bigint,string>
 
 type T = {
     hash: Hash
@@ -51,7 +51,7 @@ let private invokeCostFn methodInfo command returnAddress contractWallet input =
 
 let private castMainFnOutput output =
     try
-        (output:System.Object) :?> cost<result<txSkeleton>, unit> |> Ok
+        (output:System.Object) :?> cost<result<(txSkeleton * message Native.option)>, unit> |> Ok
     with _ as ex ->
         Exception.toError "cast contract main fn output" ex
 
@@ -66,19 +66,19 @@ let private wrap (mainMethodInfo, costMethodInfo) =
     fun (Hash.Hash cHash) command returnAddress contractWallet txSkeleton ->
         let txSkeleton' = ZFStar.convertInput txSkeleton
         let contractWallet' = ZFStar.convertWallet contractWallet
-        let returnAddress' = ZFStar.fsToFstOption ZFStar.fsToFstLock returnAddress            
-        
+        let returnAddress' = ZFStar.fsToFstOption ZFStar.fsToFstLock returnAddress
+
         invokeMainFn mainMethodInfo cHash command returnAddress' contractWallet' txSkeleton'
         |> Result.bind castMainFnOutput
         |> Result.map ZFStar.unCost
         |> Result.bind ZFStar.toResult
-        |> Result.map ZFStar.convertResult
+        |> Result.bind ZFStar.convertResult
     ,
     fun command returnAddress contractWallet txSkeleton ->
         let txSkeleton' = ZFStar.convertInput txSkeleton
         let contractWallet' = ZFStar.convertWallet contractWallet
-        let returnAddress' = ZFStar.fsToFstOption ZFStar.fsToFstLock returnAddress            
-        
+        let returnAddress' = ZFStar.fsToFstOption ZFStar.fsToFstLock returnAddress
+
         invokeCostFn costMethodInfo command returnAddress' contractWallet' txSkeleton'
         |> Result.bind castCostFnOutput
         |> Result.map ZFStar.unCost
@@ -128,4 +128,3 @@ let getCost contract command =
 
 let run contract command wallet inputTx =
     contract.fn contract.hash command wallet inputTx
-

@@ -8,6 +8,10 @@ open Zen.Cost
 val maxCost: nat
 let maxCost = 200
 
+type message =
+    { cHash: hash;
+      command: string } //TODO: data
+
 noeq type costFunction =
     | CostFunc:
         #n:nat{n<=maxCost}
@@ -28,6 +32,6 @@ noeq type mainFunction =
                 -> returnAddress:option lock
                 -> #l:nat
                 -> wallet:wallet l
-                -> result txSkeleton `cost` force ((CostFunc?.f cf) txSkel command returnAddress wallet)
+                -> result (txSkeleton ** option message) `cost` force ((CostFunc?.f cf) txSkel command returnAddress wallet)
               )
         -> mainFunction

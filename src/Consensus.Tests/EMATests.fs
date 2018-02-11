@@ -7,6 +7,7 @@ open NUnit.Framework
 open FsCheck
 open FsCheck.NUnit
 open EMA
+open FsUnit
 
 let uniformRandomGen =
     Arb.generate<NormalFloat>
@@ -33,6 +34,13 @@ let timestampGen blocktime =
 
 type NormalIntervalTimestamps =
     static member TimestampArb() = Arb.fromGen (timestampGen 240.)
+
+[<Test>]
+let ``Clamp returns a value between lower and upper``() =
+    clamp 10 100 50 |> should equal 50
+    clamp 10 100 5 |> should equal 10
+    clamp 10 100 200 |> should equal 100
+    clamp 10I 100I 50I |> should equal 50I
 
 [<Property(Arbitrary = [|typeof<NormalIntervalTimestamps>|], StartSize=50)>]
 let ``Default difficulty for first 11 blocks``(tstamps:uint64 list) =

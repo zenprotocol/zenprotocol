@@ -179,7 +179,7 @@ let rec private undoBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:Extend
         undoBlocks session forkBlock parent utxoSet mempool                       
         
 // After applying block or blocks we must readd mempool transactions to the ACS and UTXO    
-let getMemoryState chain session contractPath mempool orphanPool acs =                                                
+let getMemoryState chain session contractPath blockNumber mempool orphanPool acs =                                                
     // We start with an empty mempool and current orphan pool
     // We first validate all orphan transactions according to the new state
     // We loop through existing mempool and adding it as we go to a new mempool
@@ -188,12 +188,12 @@ let getMemoryState chain session contractPath mempool orphanPool acs =
     let memoryState = {utxoSet=UtxoSet.asDatabase;
                         activeContractSet=acs;mempool=MemPool.empty;orphanPool=orphanPool}
     
-    let memoryState = TransactionHandler.validateOrphanTransactions session contractPath memoryState
+    let memoryState = TransactionHandler.validateOrphanTransactions session contractPath blockNumber memoryState
 
     Map.fold (fun writer txHash tx -> 
                       
         Writer.bind writer (fun memoryState ->
-            TransactionHandler.validateInputs session contractPath txHash tx memoryState false)) memoryState mempool
+            TransactionHandler.validateInputs session contractPath blockNumber txHash tx memoryState false)) memoryState mempool
                                             
 let rollForwardChain chain contractPath timestamp state session block persistentBlock acs ema =
     effectsWriter {   
@@ -221,13 +221,13 @@ let rollForwardChain chain contractPath timestamp state session block persistent
             UtxoSetRepository.save session utxoSet                        
                                                   
             let tipState = {activeContractSet=acs;ema=ema;tip=tip}
-            let! memoryState = getMemoryState chain session contractPath mempool state.memoryState.orphanPool acs                                                                                           
+            let! memoryState = getMemoryState chain session contractPath tip.header.blockNumber mempool state.memoryState.orphanPool acs                                                                                           
                                                                                      
             do! addBlocks session persistentBlock tip
             return {state with tipState=tipState;memoryState=memoryState}
         | None ->
             let tipState = {activeContractSet=acs;ema=ema;tip=persistentBlock}
-            let! memoryState = getMemoryState chain session contractPath mempool state.memoryState.orphanPool acs       
+            let! memoryState = getMemoryState chain session contractPath persistentBlock.header.blockNumber mempool state.memoryState.orphanPool acs       
                                                                      
             return {state with tipState=tipState;memoryState=memoryState}
     }
@@ -329,7 +329,7 @@ let private handleForkChain chain contractPath session timestamp (state:State) p
                 do! addBlocks session forkBlock tip
                 
                 let tipState = {activeContractSet=acs;ema=ema;tip=tip}
-                let! memoryState = getMemoryState chain session contractPath mempool state.memoryState.orphanPool acs  
+                let! memoryState = getMemoryState chain session contractPath tip.header.blockNumber mempool state.memoryState.orphanPool acs  
                 
                 return {state with tipState=tipState;memoryState=memoryState}
     }     

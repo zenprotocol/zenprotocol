@@ -14,24 +14,24 @@ open Infrastructure.ServiceBus.Agent
 
 let getUTXO = UtxoSetRepository.get
 
-let private validateOrphanTransaction session contractPath state txHash tx  =
-    effectsWriter 
-        {            
-            match TransactionValidation.validateInContext (getUTXO session) contractPath
+let private validateOrphanTransaction session contractPath blockNumber state txHash tx  =
+    effectsWriter
+        {
+            match TransactionValidation.validateInContext (getUTXO session) contractPath blockNumber
                     state.activeContractSet state.utxoSet txHash tx with
-            | Ok (tx, acs) ->                
+            | Ok (tx, acs) ->
                 let utxoSet = UtxoSet.handleTransaction (getUTXO session) txHash tx state.utxoSet
                 let mempool = MemPool.add txHash tx state.mempool
 
                 do! publish (TransactionAddedToMemPool (txHash, tx))
                 Log.info "Orphan transaction %s added to mempool" (Hash.toString txHash)
 
-            
+
                 let orphanPool = OrphanPool.remove txHash state.orphanPool
-                return {state with 
+                return {state with
                             activeContractSet=acs;
                             mempool=mempool;
-                            utxoSet=utxoSet; 
+                            utxoSet=utxoSet;
                             orphanPool=orphanPool}
             | Error Orphan
             | Error ContractNotActive ->
@@ -48,22 +48,22 @@ let private validateOrphanTransaction session contractPath state txHash tx  =
                 let orphanPool = OrphanPool.remove txHash state.orphanPool
                 return {state with orphanPool = orphanPool}
         }
-        
-let rec validateOrphanTransactions session contractPath state =      
+
+let rec validateOrphanTransactions session contractPath blockNumber state =
     effectsWriter {
-        let! state' = OrphanPool.foldWriter (validateOrphanTransaction session contractPath) state state.orphanPool
-        
+        let! state' = OrphanPool.foldWriter (validateOrphanTransaction session contractPath blockNumber) state state.orphanPool
+
         // if orphan pool changed we run again until there is no change
         if state'.orphanPool <> state.orphanPool then
-            return! validateOrphanTransactions session contractPath state'
+            return! validateOrphanTransactions session contractPath blockNumber state'
         else
             return state'
     }
-          
-let validateInputs session contractPath txHash tx (state:MemoryState) shouldPublishEvents =
+
+let validateInputs session contractPath blockNumber txHash tx (state:MemoryState) shouldPublishEvents =
     effectsWriter
-        {           
-            match TransactionValidation.validateInContext (getUTXO session) contractPath
+        {
+            match TransactionValidation.validateInContext (getUTXO session) contractPath blockNumber
                     state.activeContractSet state.utxoSet txHash tx with
             | Error Orphan ->
                 let orphanPool = OrphanPool.add txHash tx state.orphanPool
@@ -73,7 +73,7 @@ let validateInputs session contractPath txHash tx (state:MemoryState) shouldPubl
                 return {state with orphanPool = orphanPool}
             | Error ContractNotActive ->
                 let orphanPool = OrphanPool.add txHash tx state.orphanPool
-            
+
                 Log.info "Transaction %s tried to run an inactive contract. Adding to orphan pool." (Hash.toString txHash)
 
                 return {state with orphanPool = orphanPool}
@@ -94,17 +94,17 @@ let validateInputs session contractPath txHash tx (state:MemoryState) shouldPubl
 
                 Log.info "Transaction %s added to mempool" (Hash.toString txHash)
 
-                let state = {state with 
+                let state = {state with
                                 activeContractSet=acs;
                                 mempool=mempool;
                                 utxoSet=utxoSet;
-                             }   
-                
-                return! validateOrphanTransactions session contractPath state
+                             }
+
+                return! validateOrphanTransactions session contractPath blockNumber state
         }
 
 
-let validateTransaction chain session contractPath tx (state:MemoryState) =
+let validateTransaction session contractPath blockNumber tx (state:MemoryState) =
     effectsWriter {
         let txHash = Transaction.hash tx
 
@@ -119,25 +119,45 @@ let validateTransaction chain session contractPath tx (state:MemoryState) =
 
                 return state
             | Ok tx ->
-                return! validateInputs session contractPath txHash tx state true
+                return! validateInputs session contractPath blockNumber txHash tx state true
     }
 
 let executeContract session txSkeleton cHash command returnAddress state =
-    match ActiveContractSet.tryFind cHash state.activeContractSet with
-    | Some contract ->
-        let contractWallet = ContractUtxoRepository.getContractUtxo session cHash state.utxoSet
+    let checkACS cHash =
+        match ActiveContractSet.tryFind cHash state.activeContractSet with
+        | Some contract -> Ok contract
+        | None -> Error "Contract not active"
 
+    let contractWallet = ContractUtxoRepository.getContractUtxo session cHash state.utxoSet
+
+    checkACS cHash
+    |> Result.bind (fun contract ->
         Contract.getCost contract command (Some returnAddress) contractWallet txSkeleton
         |> Result.map (Log.info "Running contract with cost: %A")
         |> Result.mapError (Log.info "Error getting contract with cost: %A")
         |> ignore
-                
-        Contract.run contract command (Some returnAddress) contractWallet txSkeleton                
-        |> Result.bind (TxSkeleton.checkPrefix txSkeleton)
-        |> Result.map (fun finalTxSkeleton ->
-            let tx = Transaction.fromTxSkeleton finalTxSkeleton
-            
-            Transaction.addContractWitness contract.hash command returnAddress txSkeleton finalTxSkeleton tx)
-            
-            
-    | None -> Error "Contract not active"
+
+        let rec run contract command returnAddress contractWallet txSkeleton witnesses =
+            Contract.run contract command (Some returnAddress) contractWallet txSkeleton
+            |> Result.bind (fun (tx, message) ->
+                TxSkeleton.checkPrefix txSkeleton tx
+                |> Result.bind (fun finalTxSkeleton ->
+                    let witnesses = List.add (TxSkeleton.getContractWitness contract.hash command returnAddress txSkeleton finalTxSkeleton) witnesses
+
+                    match message with
+                    | Some {cHash=cHash; command=command} ->
+                        checkACS cHash
+                        |> Result.bind (fun contract ->
+                            run contract command returnAddress contractWallet finalTxSkeleton witnesses
+                        )
+                    | None ->
+                        Ok (finalTxSkeleton, witnesses)
+                )
+            )
+
+        run contract command returnAddress contractWallet txSkeleton []
+        |> Result.map (fun (finalTxSkeleton, witnesses) ->
+            Transaction.fromTxSkeleton finalTxSkeleton
+            |> Transaction.addWitnesses witnesses
+        )
+    )

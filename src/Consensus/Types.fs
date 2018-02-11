@@ -3,6 +3,9 @@ module Consensus.Types
 open Consensus.Hash
 open Consensus.Crypto
 
+[<LiteralAttribute>]
+let CoinbaseMaturity = 100ul
+
 type Outpoint = {
     txHash: Hash
     index: uint32
@@ -16,7 +19,8 @@ type Spend = {
 type Lock =
     | PK of Hash
     | Contract of Hash
-    | Destroy
+    | Coinbase of blockNumber:uint32 * pkHash:Hash
+    | Destroy       
 
 type Output = {
     lock: Lock
@@ -25,9 +29,15 @@ type Output = {
 
 type PointedOutput = Outpoint * Output
 
+type Message = {
+    cHash: Hash
+    command: string
+    //TODO: data
+}
+
 type ContractWitness = {
     cHash: Hash
-    command : string
+    command: string
     returnAddressIndex : uint32 option
     beginInputs: uint32
     beginOutputs: uint32
@@ -35,7 +45,7 @@ type ContractWitness = {
     outputsLength: uint32
 }
 
-type Witness = 
+type Witness =
     | PKWitness of array<byte> * Signature
     | ContractWitness of ContractWitness
 
