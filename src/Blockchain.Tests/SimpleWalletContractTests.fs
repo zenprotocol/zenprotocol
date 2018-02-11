@@ -86,7 +86,6 @@ let setUp = fun () ->
 
     module ET = Zen.ErrorT
     module Tx = Zen.TxSkeleton
-    module M = FStar.Mul
 
     val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 11
     let cf _ _ _ #l _ =
@@ -94,7 +93,7 @@ let setUp = fun () ->
         let res : nat = (64 + (l * 128 + 192) + 0 + 20) in
         ret res
 
-    val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (M.(64 + (l * 128 + 192) + 0 + 20) <: nat)
+    val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) ((64 + (l * 128 + 192) + 0 + 20) <: nat)
     let main txSkeleton contractHash command returnAddress #l wallet =
     let! result =
         Tx.lockToPubKey zenAsset 10UL (hashFromBase64 "DYggLLPq6eXj1YxjiPQ5dSvb/YVqAVNf8Mjnpc9P9BI=") txSkeleton
