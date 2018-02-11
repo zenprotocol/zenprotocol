@@ -89,7 +89,6 @@ let setUp = fun () ->
 
     val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 11
     let cf _ _ _ #l _ =
-        let open M in
         let res : nat = (64 + (l * 128 + 192) + 0 + 20) in
         ret res
 
