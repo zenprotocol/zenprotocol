@@ -72,48 +72,54 @@ val tryTuple : data -> option (data**data) `cost` 2
 let tryTuple = function | Tuple l -> OT.incSome 2 l
                         | _ -> OT.incNone 2
 
+val tryDict : data -> option dataDict `cost` 2
+let tryDict = function | Dict d -> OT.incSome 2 d
+                       | _ -> OT.incNone 2
 
-val tryFindI64 : string -> args -> option I64.t `cost` 66
-let tryFindI64 s args = Dict.tryFind s args `OT.bind` tryI64
+val tryFindI64 : string -> dataDict -> option I64.t `cost` 66
+let tryFindI64 s (DataDict d) = Dict.tryFind s d `OT.bind` tryI64
 
-val tryFindI64Array : string -> args -> option (l:nat & I64.t `A.t` l) `cost` 66
-let tryFindI64Array s args = Dict.tryFind s args `OT.bind` tryI64Array
+val tryFindI64Array : string -> dataDict -> option (l:nat & I64.t `A.t` l) `cost` 66
+let tryFindI64Array s (DataDict d) = Dict.tryFind s d `OT.bind` tryI64Array
 
-val tryFindByte : string -> args -> option U8.t `cost` 66
-let tryFindByte s args = Dict.tryFind s args `OT.bind` tryByte
+val tryFindByte : string -> dataDict -> option U8.t `cost` 66
+let tryFindByte s (DataDict d) = Dict.tryFind s d `OT.bind` tryByte
 
-val tryFindByteArray : string -> args -> option (l:nat & U8.t `A.t` l) `cost` 66
-let tryFindByteArray s args = Dict.tryFind s args `OT.bind` tryByteArray
+val tryFindByteArray : string -> dataDict -> option (l:nat & U8.t `A.t` l) `cost` 66
+let tryFindByteArray s (DataDict d) = Dict.tryFind s d `OT.bind` tryByteArray
 
-val tryFindU32 : string -> args -> option U32.t `cost` 66
-let tryFindU32 s args = Dict.tryFind s args `OT.bind` tryU32
+val tryFindU32 : string -> dataDict -> option U32.t `cost` 66
+let tryFindU32 s (DataDict d) = Dict.tryFind s d `OT.bind` tryU32
 
-val tryFindU32Array : string -> args -> option (l:nat & U32.t `A.t` l) `cost` 66
-let tryFindU32Array s args = Dict.tryFind s args `OT.bind` tryU32Array
+val tryFindU32Array : string -> dataDict -> option (l:nat & U32.t `A.t` l) `cost` 66
+let tryFindU32Array s (DataDict d) = Dict.tryFind s d `OT.bind` tryU32Array
 
-val tryFindU64 : string -> args -> option U64.t `cost` 66
-let tryFindU64 s args = Dict.tryFind s args `OT.bind` tryU64
+val tryFindU64 : string -> dataDict -> option U64.t `cost` 66
+let tryFindU64 s (DataDict d) = Dict.tryFind s d `OT.bind` tryU64
 
-val tryFindU64Array : string -> args -> option (l:nat & U64.t `A.t` l) `cost` 66
-let tryFindU64Array s args = Dict.tryFind s args `OT.bind` tryU64Array
+val tryFindU64Array : string -> dataDict -> option (l:nat & U64.t `A.t` l) `cost` 66
+let tryFindU64Array s (DataDict d) = Dict.tryFind s d `OT.bind` tryU64Array
 
-val tryFindString : string -> args -> option string `cost` 66
-let tryFindString s args = Dict.tryFind s args `OT.bind` tryString
+val tryFindString : string -> dataDict -> option string `cost` 66
+let tryFindString s (DataDict d) = Dict.tryFind s d `OT.bind` tryString
 
-val tryFindStringArray : string -> args -> option (l:nat & string `A.t` l) `cost` 66
-let tryFindStringArray s args = Dict.tryFind s args `OT.bind` tryStringArray
+val tryFindStringArray : string -> dataDict -> option (l:nat & string `A.t` l) `cost` 66
+let tryFindStringArray s (DataDict d) = Dict.tryFind s d `OT.bind` tryStringArray
 
-val tryFindHash : string -> args -> option hash `cost` 66
-let tryFindHash s args = Dict.tryFind s args `OT.bind` tryHash
+val tryFindHash : string -> dataDict -> option hash `cost` 66
+let tryFindHash s (DataDict d) = Dict.tryFind s d `OT.bind` tryHash
 
-val tryFindHashArray : string -> args -> option (l:nat & hash `A.t` l) `cost` 66
-let tryFindHashArray s args = Dict.tryFind s args `OT.bind` tryHashArray
+val tryFindHashArray : string -> dataDict -> option (l:nat & hash `A.t` l) `cost` 66
+let tryFindHashArray s (DataDict d) = Dict.tryFind s d `OT.bind` tryHashArray
 
-val tryFindLock : string -> args -> option lock `cost` 66
-let tryFindLock s args = Dict.tryFind s args `OT.bind` tryLock
+val tryFindLock : string -> dataDict -> option lock `cost` 66
+let tryFindLock s (DataDict d) = Dict.tryFind s d `OT.bind` tryLock
 
-val tryFindLockArray : string -> args -> option (l:nat & lock `A.t` l) `cost` 66
-let tryFindLockArray s args = Dict.tryFind s args `OT.bind` tryLockArray
+val tryFindLockArray : string -> dataDict -> option (l:nat & lock `A.t` l) `cost` 66
+let tryFindLockArray s (DataDict d) = Dict.tryFind s d `OT.bind` tryLockArray
 
-val tryFindTuple : string -> args -> option (data**data) `cost` 66
-let tryFindTuple s args = Dict.tryFind s args `OT.bind` tryTuple
+val tryFindTuple : string -> dataDict -> option (data**data) `cost` 66
+let tryFindTuple s (DataDict d) = Dict.tryFind s d `OT.bind` tryTuple
+
+val tryFindDict : string -> dataDict -> option dataDict `cost` 66
+let tryFindDict s (DataDict d) = Dict.tryFind s d `OT.bind` tryDict

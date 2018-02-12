@@ -2,8 +2,8 @@ module Zen.Set
 
 open Zen.Cost
 
-assume new type set : eqtype -> eqtype
-//assume Set_hasEq: forall (a:eqtype). hasEq (set a)
+assume new type set (t: Type u#a{hasEq t}) : Type u#a
+assume Set_hasEq: forall (a:eqtype). hasEq (set a)
 
 type t (a:eqtype) = set a
 

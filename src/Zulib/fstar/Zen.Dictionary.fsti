@@ -3,7 +3,7 @@ module Zen.Dictionary
 open Zen.Cost
 
 (* A dictionary is a map from `string` to some other type. *)
-assume new type dictionary : Type -> Type
+assume new type dictionary (t:Type u#a) : Type u#a
 assume Dictionary_hasEq: forall (a:eqtype). hasEq (dictionary a)
 
 type t (a:Type) = dictionary a
