@@ -151,9 +151,8 @@ module PublicKey =
         | _ -> failwith "failed to serialize public key"                   
         
     let deserialize bytes =             
-        match Array.length bytes = 33 with
-        | false -> None
-        | true -> 
+        if Array.length bytes <> 33 then None
+        else
             let publicKey = Array.create PublicKeyLength 0uy
             match Native.secp256k1_ec_pubkey_parse(context, publicKey, bytes, 33ul) with
             | Native.Result.Ok -> Some (PublicKey publicKey)

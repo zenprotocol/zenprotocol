@@ -103,8 +103,4 @@ let setChainWork chainWork extendedHeader = {extendedHeader with chainWork=Some 
 
 let invalid extendedHeader = {extendedHeader with status=Invalid}
 
-let isValid extendedHeader = 
-    match extendedHeader.status with 
-    | Invalid -> false
-    | _ -> true
-    
+let isValid extendedHeader = extendedHeader.status <> Invalid
