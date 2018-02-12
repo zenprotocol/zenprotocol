@@ -72,6 +72,10 @@ val tryTuple : data -> option (data**data) `cost` 2
 let tryTuple = function | Tuple l -> OT.incSome 2 l
                         | _ -> OT.incNone 2
 
+val tryDict : data -> option dataDict `cost` 2
+let tryDict = function | Dict d -> OT.incSome 2 d
+                       | _ -> OT.incNone 2
+(*)
 
 val tryFindI64 : string -> args -> option I64.t `cost` 66
 let tryFindI64 s args = Dict.tryFind s args `OT.bind` tryI64
