@@ -145,12 +145,12 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Scripts", "Scripts", "{594A
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "package", "package", "{A4AF5018-B969-4944-9B85-6E33203591DB}"
-ProjectSection(SolutionItems) = preProject
-	..\package\build.sh = ..\package\build.sh
-	..\package\index.js = ..\package\index.js
-	..\package\package.json = ..\package\package.json
-	..\package\zen-node.js = ..\package\zen-node.js
-EndProjectSection
+	ProjectSection(SolutionItems) = preProject
+		..\package\build.sh = ..\package\build.sh
+		..\package\index.js = ..\package\index.js
+		..\package\package.json = ..\package\package.json
+		..\package\zen-node.js = ..\package\zen-node.js
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

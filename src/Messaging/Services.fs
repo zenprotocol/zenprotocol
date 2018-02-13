@@ -9,9 +9,7 @@ open Infrastructure.ServiceBus.Client
 
 type TransactionResult = Result<Transaction,string>
 
-type ActivateContractTransactionResult =
-    | Ok of Transaction * Hash
-    | Error of string                             
+type ActivateContractTransactionResult = Result<Transaction * Hash, string>
 
 module Blockchain = 
     let serviceName = "blockchain"

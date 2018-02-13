@@ -34,9 +34,7 @@ let create<'k,'v when 'k : comparison> (serializer:'k -> 'v->Hash.Hash) =
     {tree=None;serializer=serializer; data = Map.empty }
 
 let isEmpty mmr =
-    match mmr.tree with
-    | None -> true
-    | Some _ -> false
+    Option.isNone mmr.tree
 
 let root mmr =
     Option.get mmr.tree |> getHash
