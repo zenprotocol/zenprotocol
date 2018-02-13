@@ -912,3 +912,30 @@ let ``Template builder uses two transactions in the same block which depend on e
     twoTxState.tipState.tip.hash |> should equal (Block.hash twoTxBlock)
     List.length twoTxBlock.transactions |> should equal 3       // includes coinbase tx
 
+[<Test>]
+let ``Out of order dependent transactions are rearranged``() =
+    use databaseContext = DatabaseContext.createEmpty "test"
+    use session = DatabaseContext.createSession databaseContext
+
+    let _, genesisState =
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state
+        |> Writer.unwrap
+    
+    let balances = Account.getBalance rootAccount
+    let asset, amount = balances |> Map.toList |> List.head
+    let firstTx =
+        Account.createTransaction chain rootAccount rootAccount.publicKeyHash {asset=asset;amount=amount}
+        |>  Result.get
+    let account = Account.addTransaction (Transaction.hash firstTx) firstTx rootAccount
+    let secondTx =
+        Account.createTransaction chain account rootAccount.publicKeyHash {asset=asset;amount=amount}
+        |>  Result.get
+    let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction firstTx) session (timestamp+1UL) genesisState
+    let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction secondTx) session (timestamp+1UL) updatedState
+    let blockNumber = updatedState.tipState.tip.header.blockNumber
+    let acs = updatedState.tipState.activeContractSet
+    let _, validatedTransactions = BlockTemplateBuilder.selectOrderedTransactions session blockNumber acs [firstTx;secondTx]
+    let _, validatedTransactions_ = BlockTemplateBuilder.selectOrderedTransactions session blockNumber acs [secondTx;firstTx]
+
+    List.length validatedTransactions |> should equal 2
+    validatedTransactions |> should equal validatedTransactions_

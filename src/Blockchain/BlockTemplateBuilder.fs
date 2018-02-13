@@ -7,10 +7,9 @@ open Consensus
 
 let getUTXO = UtxoSetRepository.get
 
-let makeTransactionList (session:DatabaseContext.Session) (state:State) =
+let selectOrderedTransactions (session:DatabaseContext.Session) blockNumber acs transactions =
     let contractPath = session.context.contractPath
-    let blockNumber = state.tipState.tip.header.blockNumber
-    
+
     let tryAddTransaction (state, added, notAdded, altered) (txHash,tx) =
         validateInContext (getUTXO session) contractPath blockNumber
             state.activeContractSet state.utxoSet txHash tx
@@ -32,19 +31,19 @@ let makeTransactionList (session:DatabaseContext.Session) (state:State) =
         let rec inner foldState txs =
             match foldOverTransactions foldState txs with
             | (s, added, notAdded, true) -> inner (s, added, [], false) notAdded
-            | (s, added, notAdded, false) -> (s, List.rev added)
+            | (s, added, _, false) -> (s, List.rev added)
         inner (state, [], [], false) txs
-   
-    let transactions = MemPool.getTransactions state.memoryState.mempool
    
     let initialState = {
         utxoSet = UtxoSet.asDatabase;
-        activeContractSet = state.tipState.activeContractSet;
+        activeContractSet = acs;
         orphanPool = OrphanPool.create();
         mempool = MemPool.empty
         }
+
+    foldUntilUnchanged initialState <| List.map (fun tx -> (Transaction.hash tx, tx)) transactions
    
-    let finalState, validTransactions =
-        foldUntilUnchanged initialState <| List.map (fun tx -> (Transaction.hash tx, tx)) transactions
-   
-    finalState, validTransactions
+
+let makeTransactionList (session:DatabaseContext.Session) (state:State) =
+    let txs = MemPool.getTransactions state.memoryState.mempool
+    selectOrderedTransactions session state.tipState.tip.header.blockNumber state.tipState.activeContractSet txs
