@@ -107,10 +107,10 @@ let addChangeOutput (asset : asset) (contractHash : contractHash)
           lockToContract asset tokensAvailable contractHash txSkeleton |> Cost.__force)
     |> Cost.C
 
-let mint (amount : U64.t) (contractHash : contractHash)
+let mint (amount : U64.t) ((contractHash, hash) : asset)
     (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
     lazy (let mintSpend =
-              { asset = contractHash;
+              { asset = contractHash, hash;
                 amount = amount }
 
           let mintLock = ContractLock contractHash
@@ -129,10 +129,10 @@ let mint (amount : U64.t) (contractHash : contractHash)
           addInput pointedOutput txSkeleton |> Cost.__force)
     |> Cost.C
 
-let destroy (amount : U64.t) (contractHash : contractHash)
+let destroy (amount : U64.t) (asset : asset)
     (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
     lazy (let destroySpend =
-              { asset = contractHash;
+              { asset = asset;
                 amount = amount }
 
           let destroyOutput =
