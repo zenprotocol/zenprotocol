@@ -46,7 +46,7 @@ let isAccountInSet session (account:Account.T) =
 let rootAccount = Account.createTestAccount ()
 
 let createTransaction account =
-    match Account.createTransaction chain account account.publicKeyHash {asset=Hash.zero;amount=1UL} with
+    match Account.createTransaction chain account account.publicKeyHash {asset=Constants.Zen;amount=1UL} with
     | Ok tx -> tx
     | Error error -> failwith error
 

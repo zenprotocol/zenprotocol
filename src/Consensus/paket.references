@@ -6,3 +6,4 @@ FsBech32
 FSharp.Compiler.Tools
 FSharp.Compatibility.OCaml
 FsNetMQ
+Newtonsoft.Json

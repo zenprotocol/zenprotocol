@@ -10,25 +10,25 @@ open Crypto
 let sampleContractCode = """
 open Zen.Types
 open Zen.Vector
-open Zen.Util
 open Zen.Base
 open Zen.Cost
 
 module ET = Zen.ErrorT
 module Tx = Zen.TxSkeleton
 
-val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 7
-let cf _ _ _ #l _ = ret (64 + 64 + 0 + 23)
+val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 9
+let cf _ _ _ #l _ = ret (64 + (64 + 64 + 0) + 24)
 
-val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + 64 + 0 + 23)
+val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + 64 + 0) + 24)
 let main txSkeleton contractHash command returnAddress #l wallet =
-  let spend = { asset=contractHash; amount=1000UL } in
+  let! asset = Zen.Asset.getDefault contractHash in
+  let spend = { asset=asset; amount=1000UL } in
   let lock = ContractLock contractHash in
 
   let output = { lock=lock; spend=spend } in
 
   let pInput = {
-      txHash = hashFromBase64 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+      txHash = Zen.Asset.zeroHash;
       index = 0ul
   }, output in
 
@@ -49,7 +49,7 @@ let private sampleContractTester txSkeleton hash =
         lock = Lock.Contract hash
         spend =
         {
-            asset = hash
+            asset = hash, Hash.zero
             amount = 1000UL
         }
     }
@@ -74,7 +74,7 @@ let sampleInput = {
 
 let sampleOutput = {
     lock = PK (PublicKey.hash samplePublicKey)
-    spend = { asset = Hash.zero; amount = 1UL }
+    spend = { asset = sampleContractHash, Hash.zero; amount = 1UL }
 }
 
 let sampleInputTx =

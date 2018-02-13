@@ -16,7 +16,7 @@ let ``handling transaction add outputs to set``() =
     let tx1 = {
         inputs = []
         witnesses = []
-        outputs = [{lock = PK Hash.zero; spend = {asset=Hash.zero; amount=1UL}}]
+        outputs = [{lock = PK Hash.zero; spend = {asset=Constants.Zen; amount=1UL}}]
         contract = None
     }    
     let tx1Hash = Transaction.hash tx1
@@ -39,7 +39,7 @@ let ``handling transaction mark inputs as spent``() =
     let tx1 = {
         inputs = []
         witnesses = []
-        outputs = [{lock = PK Hash.zero; spend = {asset=Hash.zero; amount=1UL}}]
+        outputs = [{lock = PK Hash.zero; spend = {asset=Constants.Zen; amount=1UL}}]
         contract = None
     }    
     let tx1Hash = Transaction.hash tx1
@@ -67,7 +67,7 @@ let ``handling transaction mark inputs as spent``() =
 let ``Should find Utxo``() =
     let hash = Hash [| 100uy |]
     let outpoint = { txHash = hash; index = 100u }
-    let output = { lock = PK hash; spend = { asset = hash; amount = 100UL }}
+    let output = { lock = PK hash; spend = { asset = hash, Hash.zero; amount = 100UL }}
     let utxos = Map.ofSeq [ (outpoint, Unspent output) ]
     let outputResult = UtxoSet.getUtxos getUTXO [ outpoint ] utxos
     

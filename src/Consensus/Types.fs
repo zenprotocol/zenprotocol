@@ -11,8 +11,10 @@ type Outpoint = {
     index: uint32
 }
 
+type Asset = Hash * Hash
+
 type Spend = {
-    asset: Hash
+    asset: Asset
     amount: uint64
 }
 

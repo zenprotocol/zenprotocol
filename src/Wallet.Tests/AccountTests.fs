@@ -20,13 +20,13 @@ let balanceShouldBe asset expected account =
          
     actual |> should equal expected
     
-let anotherAsset = Hash.compute "anotherasset"B    
+let anotherAsset = Hash.zero, Hash.compute "anotherasset"B    
 
 [<Test>]
 let ``received tokens``() =
     let account = Account.create()
     
-    let output = {lock = PK account.publicKeyHash; spend={asset=Hash.zero;amount=10UL}}
+    let output = {lock = PK account.publicKeyHash; spend={asset=Constants.Zen;amount=10UL}}
     
     let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
     
@@ -34,13 +34,13 @@ let ``received tokens``() =
     
     let balances = Account.getBalance account'    
     
-    account' |> balanceShouldBe Hash.zero 10UL        
+    account' |> balanceShouldBe Constants.Zen 10UL        
 
 [<Test>]        
 let ``tokens spent``() = 
     let account = Account.create()
         
-    let output = {lock = PK account.publicKeyHash; spend={asset=Hash.zero;amount=10UL}}
+    let output = {lock = PK account.publicKeyHash; spend={asset=Constants.Zen;amount=10UL}}
     
     let tx = {inputs=[];outputs=[output;output];witnesses=[];contract=None}
     let txHash = (Transaction.hash tx)
@@ -53,20 +53,20 @@ let ``tokens spent``() =
     let account'' = 
         Account.addTransaction (Transaction.hash tx') tx' account'        
             
-    account' |> balanceShouldBe Hash.zero 20UL            
-    account'' |> balanceShouldBe Hash.zero 10UL
+    account' |> balanceShouldBe Constants.Zen 20UL            
+    account'' |> balanceShouldBe Constants.Zen 10UL
                                 
 [<Test>]
 let ``creating, not enough tokens``() =
     let account = Account.create()
     
-    let output = {lock = PK account.publicKeyHash; spend={asset=Hash.zero;amount=10UL}}
+    let output = {lock = PK account.publicKeyHash; spend={asset=Constants.Zen;amount=10UL}}
     
     let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
     
     let account' = Account.addTransaction (Transaction.hash tx) tx account 
 
-    let result = Account.createTransaction chain account account.publicKeyHash { asset = Hash.zero; amount = 11UL }
+    let result = Account.createTransaction chain account account.publicKeyHash { asset = Constants.Zen; amount = 11UL }
     
     let expected:Result<Transaction,string> = Error "Not enough tokens" 
     
@@ -78,12 +78,12 @@ let ``creating, no change``() =
     let alice = Account.create ()               
         
     // giving some money to bob
-    let output = {lock = PK bob.publicKeyHash; spend={asset=Hash.zero;amount=10UL}}    
+    let output = {lock = PK bob.publicKeyHash; spend={asset=Constants.Zen;amount=10UL}}    
     let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
     let bob' = Account.addTransaction (Transaction.hash tx) tx bob
 
     // sending money to alice
-    let result = Account.createTransaction chain bob' alice.publicKeyHash { asset = Hash.zero; amount = 10UL }
+    let result = Account.createTransaction chain bob' alice.publicKeyHash { asset = Constants.Zen; amount = 10UL }
     
     match result with 
     | Error x -> failwithf "expected transaction %s" x
@@ -91,8 +91,8 @@ let ``creating, no change``() =
         let alice' = Account.addTransaction (Transaction.hash tx) tx alice
         let bob'' = Account.addTransaction (Transaction.hash tx) tx bob
         
-        alice' |> balanceShouldBe Hash.zero 10UL
-        bob'' |> balanceShouldBe Hash.zero 0UL
+        alice' |> balanceShouldBe Constants.Zen 10UL
+        bob'' |> balanceShouldBe Constants.Zen 0UL
         
 [<Test>]
 let ``creating, with change``() = 
@@ -100,12 +100,12 @@ let ``creating, with change``() =
     let alice = Account.create ()                
         
     // giving some money to bob
-    let output = {lock = PK bob.publicKeyHash; spend={asset=Hash.zero;amount=10UL}}    
+    let output = {lock = PK bob.publicKeyHash; spend={asset=Constants.Zen;amount=10UL}}    
     let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
     let bob' = Account.addTransaction (Transaction.hash tx) tx bob
 
     // sending money to alice
-    let result = Account.createTransaction chain bob' alice.publicKeyHash { asset = Hash.zero; amount = 7UL }
+    let result = Account.createTransaction chain bob' alice.publicKeyHash { asset = Constants.Zen; amount = 7UL }
     
     match result with 
     | Error x -> failwithf "expected transaction %s" x
@@ -113,8 +113,8 @@ let ``creating, with change``() =
         let alice' = Account.addTransaction (Transaction.hash tx) tx alice
         let bob'' = Account.addTransaction (Transaction.hash tx) tx bob
         
-        alice' |> balanceShouldBe Hash.zero 7UL
-        bob'' |> balanceShouldBe Hash.zero 3UL
+        alice' |> balanceShouldBe Constants.Zen 7UL
+        bob'' |> balanceShouldBe Constants.Zen 3UL
         
 [<Test>] 
 let ``picking the correct asset``() = 
@@ -123,7 +123,7 @@ let ``picking the correct asset``() =
         
     // giving some money to bob
     let output = {lock = PK bob.publicKeyHash; spend={asset=anotherAsset;amount=10UL}}
-    let output2 = {lock = PK bob.publicKeyHash; spend={asset=Hash.zero;amount=10UL}}    
+    let output2 = {lock = PK bob.publicKeyHash; spend={asset=Constants.Zen;amount=10UL}}    
         
     let tx = {inputs=[];outputs=[output; output2];witnesses=[];contract=None}
     let bob' = Account.addTransaction (Transaction.hash tx) tx bob
@@ -132,7 +132,7 @@ let ``picking the correct asset``() =
     bob' |> balanceShouldBe anotherAsset 10UL
 
     // sending money to alice
-    let result = Account.createTransaction chain bob' alice.publicKeyHash { asset = Hash.zero; amount = 7UL } 
+    let result = Account.createTransaction chain bob' alice.publicKeyHash { asset = Constants.Zen; amount = 7UL } 
     
     match result with 
     | Error x -> failwithf "expected transaction %s" x
@@ -142,8 +142,8 @@ let ``picking the correct asset``() =
         let alice' = Account.addTransaction (Transaction.hash tx) tx alice
         let bob'' = Account.addTransaction (Transaction.hash tx) tx bob'                        
                 
-        alice' |> balanceShouldBe Hash.zero 7UL
-        bob'' |> balanceShouldBe Hash.zero 3UL 
+        alice' |> balanceShouldBe Constants.Zen 7UL
+        bob'' |> balanceShouldBe Constants.Zen 3UL 
         
         alice' |> balanceShouldBe anotherAsset 0UL
         bob'' |> balanceShouldBe anotherAsset 10UL
@@ -154,14 +154,14 @@ let ``picking from multiple inputs``() =
     let alice = Account.create ()               
         
     // giving some money to bob
-    let output = {lock = PK bob.publicKeyHash; spend={asset=Hash.zero;amount=5UL}}
-    let output2 = {lock = PK bob.publicKeyHash; spend={asset=Hash.zero;amount=7UL}}    
+    let output = {lock = PK bob.publicKeyHash; spend={asset=Constants.Zen;amount=5UL}}
+    let output2 = {lock = PK bob.publicKeyHash; spend={asset=Constants.Zen;amount=7UL}}    
         
     let tx = {inputs=[];outputs=[output; output2];witnesses=[];contract=None}
     let bob' = Account.addTransaction (Transaction.hash tx) tx bob    
 
     // sending money to alice
-    let result = Account.createTransaction chain bob' alice.publicKeyHash { asset = Hash.zero; amount = 10UL }
+    let result = Account.createTransaction chain bob' alice.publicKeyHash { asset = Constants.Zen; amount = 10UL }
     
     match result with 
     | Error x -> failwithf "expected transaction %s" x
@@ -169,8 +169,8 @@ let ``picking from multiple inputs``() =
         let alice' = Account.addTransaction (Transaction.hash tx) tx alice
         let bob'' = Account.addTransaction (Transaction.hash tx) tx bob'                        
                 
-        alice' |> balanceShouldBe Hash.zero 10UL
-        bob'' |> balanceShouldBe Hash.zero 2UL
+        alice' |> balanceShouldBe Constants.Zen 10UL
+        bob'' |> balanceShouldBe Constants.Zen 2UL
         
 [<Test>]
 let ``create execute contract transaction``() = 
@@ -179,12 +179,12 @@ let ``create execute contract transaction``() =
     let executeContract _ _ _ txSkeleton =             
         let tx = 
             txSkeleton
-            |> TxSkeleton.addOutput {lock=Contract Hash.zero;spend={asset=Hash.zero;amount=1UL}} 
+            |> TxSkeleton.addOutput {lock=Contract Hash.zero;spend={asset=Constants.Zen;amount=1UL}} 
             |> Transaction.fromTxSkeleton 
 
         tx |> Messaging.Services.TransactionResult.Ok
     
-    let spends = Map.add Hash.zero 1UL Map.empty
+    let spends = Map.add Constants.Zen 1UL Map.empty
     
     let result = Account.createExecuteContractTransaction account executeContract Hash.zero "" spends
     
@@ -213,7 +213,7 @@ let ``account sync up``() =
     let account = 
         {Account.create () with tip = BlockHeader.hash startBlockHeader}
     
-    let output = {lock = PK account.publicKeyHash; spend={asset=Hash.zero;amount=10UL}}        
+    let output = {lock = PK account.publicKeyHash; spend={asset=Constants.Zen;amount=10UL}}        
     let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
     let txHash = Transaction.hash tx
         
@@ -251,7 +251,7 @@ let ``account sync up``() =
 let ``sync up from empty wallet``() =             
     let account = Account.create () 
             
-    let output = {lock = PK account.publicKeyHash; spend={asset=Hash.zero;amount=10UL}}        
+    let output = {lock = PK account.publicKeyHash; spend={asset=Constants.Zen;amount=10UL}}        
     let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
          
     let header = {
@@ -301,7 +301,7 @@ let ``account reorg``() =
     let account = 
         {Account.create () with tip = BlockHeader.hash startBlockHeader}
     
-    let output = {lock = PK account.publicKeyHash; spend={asset=Hash.zero;amount=10UL}}        
+    let output = {lock = PK account.publicKeyHash; spend={asset=Constants.Zen;amount=10UL}}        
     let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
     let txHash = Transaction.hash tx
         
@@ -371,7 +371,7 @@ let ``wallet won't spend coinbase if not mature enough``() =
     let origin = 
             {
                 inputs=[]
-                outputs=[{lock =  Coinbase (1ul, rootAccount.publicKeyHash); spend= {asset = Hash.zero;amount=100000000UL}}]
+                outputs=[{lock =  Coinbase (1ul, rootAccount.publicKeyHash); spend= {asset = Constants.Zen;amount=100000000UL}}]
                 witnesses=[]            
                 contract=None
             }                                
@@ -381,7 +381,7 @@ let ``wallet won't spend coinbase if not mature enough``() =
         
     let expected: Result<Transaction,string>= Error "Not enough tokens"        
         
-    Account.createTransaction Chain.Local rootAccount rootAccount.publicKeyHash { asset = Hash.zero; amount = 1UL }    
+    Account.createTransaction Chain.Local rootAccount rootAccount.publicKeyHash { asset = Constants.Zen; amount = 1UL }    
     |> should equal expected       
     
 [<Test>]
@@ -390,7 +390,7 @@ let ``wallet spend coinbase with coinbase mature enough``() =
     let origin = 
             {
                 inputs=[]
-                outputs=[{lock =  Coinbase (1ul, rootAccount.publicKeyHash); spend= {asset = Hash.zero;amount=100000000UL}}]
+                outputs=[{lock =  Coinbase (1ul, rootAccount.publicKeyHash); spend= {asset = Constants.Zen;amount=100000000UL}}]
                 witnesses=[]            
                 contract=None
             }                                
@@ -398,7 +398,7 @@ let ``wallet spend coinbase with coinbase mature enough``() =
     
     let rootAccount = Account.addTransaction originHash origin rootAccount  
         
-    Account.createTransaction Chain.Local rootAccount rootAccount.publicKeyHash { asset = Hash.zero; amount = 1UL }    
+    Account.createTransaction Chain.Local rootAccount rootAccount.publicKeyHash { asset = Constants.Zen; amount = 1UL }    
     |> should be ok
     
 [<Test>]
@@ -407,7 +407,7 @@ let ``wallet spend coinbase when come from block``() =
     let origin = 
             {
                 inputs=[]
-                outputs=[{lock =  Coinbase (1ul, rootAccount.publicKeyHash); spend= {asset = Hash.zero;amount=100000000UL}}]
+                outputs=[{lock =  Coinbase (1ul, rootAccount.publicKeyHash); spend= {asset = Constants.Zen;amount=100000000UL}}]
                 witnesses=[]            
                 contract=None
             }                                                    
@@ -427,5 +427,5 @@ let ``wallet spend coinbase when come from block``() =
     
     let rootAccount = Account.handleBlock (Block.hash block) block rootAccount
         
-    Account.createTransaction Chain.Local rootAccount rootAccount.publicKeyHash { asset = Hash.zero; amount = 1UL }    
+    Account.createTransaction Chain.Local rootAccount rootAccount.publicKeyHash { asset = Constants.Zen; amount = 1UL }    
     |> should be ok    

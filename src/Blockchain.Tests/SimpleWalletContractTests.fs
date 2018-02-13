@@ -82,7 +82,7 @@ let setUp = fun () ->
     open Zen.Util
     open Zen.Base
     open Zen.Cost
-    open Zen.Assets
+    open Zen.Asset
 
     module ET = Zen.ErrorT
     module Tx = Zen.TxSkeleton
@@ -118,7 +118,7 @@ let tearDown = fun () ->
 
 [<Test>]
 let ``Wallet using contract should execute``() =
-    let output = {lock=Contract cHash;spend={asset=Hash.zero;amount=10UL}}
+    let output = {lock=Contract cHash;spend={asset=Constants.Zen;amount=10UL}}
     let utxoSet = Map.add {txHash=Hash.zero;index=10ul} (UtxoSet.Unspent output) utxoSet
 
     TransactionHandler.executeContract session sampleInputTx cHash "" (PK Hash.zero) { state.memoryState with utxoSet = utxoSet }
@@ -126,7 +126,7 @@ let ``Wallet using contract should execute``() =
 
 [<Test>]
 let ``Contract should not be able to lock more token than available``() =
-    let output = {lock=Contract cHash;spend={asset=Hash.zero;amount=9UL}}
+    let output = {lock=Contract cHash;spend={asset=Constants.Zen;amount=9UL}}
     let utxoSet = Map.add {txHash=Hash.zero;index=1ul} (UtxoSet.Unspent output) utxoSet
 
     TransactionHandler.executeContract session sampleInputTx cHash "" (PK Hash.zero) { state.memoryState with utxoSet = utxoSet }
@@ -140,7 +140,7 @@ let ``Contract should not have enough tokens when output is missing``() =
 
 [<Test>]
 let ``Contract should not have enough tokens when output locked to PK address``() =
-    let output = {lock=PK cHash;spend={asset=Hash.zero;amount=10UL}}
+    let output = {lock=PK cHash;spend={asset=Constants.Zen;amount=10UL}}
     let utxoSet = Map.add {txHash=Hash.zero;index=10ul} (UtxoSet.Unspent output) utxoSet
 
     TransactionHandler.executeContract session sampleInputTx cHash "" (PK Hash.zero) { state.memoryState with utxoSet = utxoSet }
@@ -148,7 +148,7 @@ let ``Contract should not have enough tokens when output locked to PK address``(
 
 [<Test>]
 let ``Contract should not have enough tokens when output is spent``() =
-    let output = {lock=PK cHash;spend={asset=Hash.zero;amount=10UL}}
+    let output = {lock=PK cHash;spend={asset=Constants.Zen;amount=10UL}}
     let utxoSet = Map.add {txHash=Hash.zero;index=10ul} UtxoSet.Spent utxoSet
 
     TransactionHandler.executeContract session sampleInputTx cHash "" (PK Hash.zero) { state.memoryState with utxoSet = utxoSet }

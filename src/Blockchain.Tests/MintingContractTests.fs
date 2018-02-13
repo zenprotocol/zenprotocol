@@ -73,35 +73,34 @@ let setUp = fun () ->
     activateContract """
     open Zen.Types
     open Zen.Vector
-    open Zen.Util
     open Zen.Base
     open Zen.Cost
-    open Zen.Assets
+    open Zen.Asset
 
     module ET = Zen.ErrorT
     module Tx = Zen.TxSkeleton
 
-    val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 17
-    let cf _ _ _ #l _ =
-        let res : nat = (64 + (64 + 64 + (l * 128 + 192) + 0) + 26 + 22) in
-        ret res
+    val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 19
+    let cf _ _ _ #l _ = ret (64 + (64 + (64 + 64 + (l * 128 + 192) + 0)) + 28 + 22)
 
     let buy txSkeleton contractHash returnAddress =
-      let! tokens = Tx.getAvailableTokens zenAsset txSkeleton in
+      let! contractToken = Zen.Asset.getDefault contractHash in
+      let! amount = Tx.getAvailableTokens zenAsset txSkeleton in
 
       let! txSkeleton =
-        Tx.lockToContract zenAsset tokens contractHash txSkeleton
-        >>= Tx.mint tokens contractHash
-        >>= Tx.lockToAddress contractHash tokens returnAddress in
+        Tx.lockToContract zenAsset amount contractHash txSkeleton
+        >>= Tx.mint amount contractToken
+        >>= Tx.lockToAddress contractToken amount returnAddress in
       ET.ret (txSkeleton, None)
 
     let redeem #l txSkeleton contractHash returnAddress (wallet:wallet l) =
-      let! tokens = Tx.getAvailableTokens contractHash txSkeleton in
+      let! contractToken = Zen.Asset.getDefault contractHash in
+      let! amount = Tx.getAvailableTokens contractToken txSkeleton in
 
       let! txSkeleton =
-        Tx.destroy tokens contractHash txSkeleton
-        >>= Tx.lockToAddress zenAsset tokens returnAddress
-        >>= Tx.fromWallet zenAsset tokens contractHash wallet in
+        Tx.destroy amount contractToken txSkeleton
+        >>= Tx.lockToAddress zenAsset amount returnAddress
+        >>= Tx.fromWallet zenAsset amount contractHash wallet in
 
       let result =
           match txSkeleton with
@@ -110,7 +109,7 @@ let setUp = fun () ->
 
       ET.of_option "contract doesn't have enough zens to pay you" result
 
-    val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) ((64 + (64 + 64 + (l * 128 + 192) + 0) + 26 + 22) <: nat)
+    val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + (64 + 64 + (l * 128 + 192) + 0)) + 28 + 22)
     let main txSkeleton contractHash command returnAddress #l wallet =
       match returnAddress with
       | Some returnAddress ->
@@ -142,7 +141,7 @@ let sampleKeyPair = KeyPair.create()
 let samplePrivateKey, samplePublicKey = sampleKeyPair
 let samplePKHash = PublicKey.hash samplePublicKey
 
-let Zen = Hash.zero
+let Zen = Constants.Zen
 
 [<Test>]
 let ``Contract should detect unsupported command``() =
@@ -184,7 +183,7 @@ let ``Should buy``() =
         tx.inputs |> should contain input
         tx.outputs |> should haveLength 2
         tx.outputs |> should contain { lock = Contract cHash; spend = spend }
-        tx.outputs |> should contain { lock = PK samplePKHash; spend = { spend with asset = cHash } }
+        tx.outputs |> should contain { lock = PK samplePKHash; spend = { spend with asset = cHash, Hash.zero } }
         tx.witnesses |> should haveLength 1
         let cw = ContractWitness {
              cHash = cHash
@@ -211,7 +210,7 @@ let ``Should redeem``() =
     }
 
     let spendZen = { asset = Zen; amount = 5UL }
-    let spendContractAsset = { asset = cHash; amount = 5UL }
+    let spendContractAsset = { asset = cHash, Hash.zero; amount = 5UL }
 
     let outputZen = {
         lock = Contract cHash
