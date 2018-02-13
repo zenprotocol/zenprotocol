@@ -133,13 +133,14 @@ Target "Build" (fun _ ->
       "fsharp/Extracted/Zen.ErrorT.fs";
       "fsharp/Extracted/Zen.TupleT.fs";
       "fsharp/Extracted/Zen.Vector.fs";
+      "fsharp/Realized/Zen.String.Realized.fs";
       "fsharp/Realized/Zen.Array.Realized.fs";
       "fsharp/Extracted/Zen.Array.Extracted.fs";
       "fsharp/Extracted/Zen.Types.Extracted.fs";
       "fsharp/Realized/Zen.Types.Realized.fs";
       "fsharp/Realized/Zen.Crypto.fs";
       "fsharp/Realized/Zen.Util.fs";
-      "fsharp/Realized/Zen.Assets.fs";
+      "fsharp/Realized/Zen.Asset.fs";
       "fsharp/Extracted/Zen.Types.Main.fs";
       "fsharp/Realized/Zen.Wallet.fs";
       "fsharp/Realized/Zen.TxSkeleton.fs";
