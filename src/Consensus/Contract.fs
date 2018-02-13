@@ -126,5 +126,5 @@ let recordHints code =
 let getCost contract command =
     contract.costFn command
 
-let run contract command wallet inputTx =
-    contract.fn contract.hash command wallet inputTx
+let run contract command returnAddress wallet inputTx =
+    contract.fn contract.hash command returnAddress wallet inputTx

@@ -57,7 +57,7 @@ let compileRunAndValidate inputTx utxoSet code =
     compileAndCheck code
     |> Result.bind (fun contract ->
         Contract.run contract "" None List.empty inputTx
-        |> Result.bind (fun (tx, message) ->
+        |> Result.bind (fun (tx, _) ->
             tx
             |> TxSkeleton.checkPrefix inputTx
             |> Result.map (fun finalTxSkeleton ->
@@ -82,7 +82,7 @@ let ``Should get expected contract cost``() =
     (compile sampleContractCode
      |> Result.bind (fun contract ->
         Contract.getCost contract "" None List.empty sampleInputTx)
-    , (Ok 151I : Result<bigint, string>))
+    , (Ok 216I : Result<bigint, string>))
     |> shouldEqual
 
 [<Test>]
@@ -91,28 +91,27 @@ let ``Contract should not be able to create tokens other than its own``() =
          """
          open Zen.Types
          open Zen.Vector
-         open Zen.Util
          open Zen.Base
          open Zen.Cost
 
          module ET = Zen.ErrorT
          module Tx = Zen.TxSkeleton
 
-         val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 7
-         let cf _ _ _ #l _ = ret (64 + 64 + 0 + 24)
+         val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 9
+         let cf _ _ _ #l _ = ret (64 + (64 + 64 + 0) + 24)
 
-         val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + 64 + 0 + 24)
+         val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + 64 + 0) + 24)
          let main txSkeleton contractHash command returnAddress #l wallet =
+           let! asset = Zen.Asset.getDefault Zen.Asset.zeroHash in
+           let lock = ContractLock contractHash in
            let spend = {
-               asset=hashFromBase64 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+               asset=asset;
                amount=1000UL
                } in
-           let lock = ContractLock contractHash in
-
            let output = { lock=lock; spend=spend } in
 
            let pInput = {
-               txHash = hashFromBase64 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+               txHash = Zen.Asset.zeroHash;
                index = 0ul
            }, output in
 
@@ -130,19 +129,19 @@ let ``Contract should be able to destroy its own tokens locked to it``() =
     let sampleContractCode = """
     open Zen.Types
     open Zen.Vector
-    open Zen.Util
     open Zen.Base
     open Zen.Cost
 
     module ET = Zen.ErrorT
     module Tx = Zen.TxSkeleton
 
-    val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 5
-    let cf _ _ _ #l _ = ret (64 + 0 + 7)
+    val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 7
+    let cf _ _ _ #l _ = ret (64 + (64 + 0) + 9)
 
-    val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + 0 + 7)
+    val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + 0) + 9)
     let main txSkeleton contractHash returnAddress command #l wallet =
-        let! txSkeleton1 = Tx.destroy 1000UL contractHash txSkeleton in
+        let! asset = Zen.Asset.getDefault contractHash in
+        let! txSkeleton1 = Tx.destroy 1000UL asset txSkeleton in
         ET.ret (txSkeleton1, None)
     """
 
@@ -153,7 +152,7 @@ let ``Contract should be able to destroy its own tokens locked to it``() =
 
     let outputToDestroy = {
         lock = Contract sampleContractHash
-        spend = { asset = sampleContractHash; amount = 1000UL }
+        spend = { asset = sampleContractHash, Hash.zero; amount = 1000UL }
     }
 
     let sampleInput2 = {
@@ -176,7 +175,7 @@ let ``Contract should be able to destroy its own tokens locked to it``() =
             lock = Destroy
             spend =
             {
-                asset = cHash
+                asset = cHash, Hash.zero
                 amount = 1000UL
             }
         }
@@ -201,10 +200,9 @@ let ``Contract should not be able to destroy tokens other than its own - single 
     let contractCode = """
     open Zen.Types
     open Zen.Vector
-    open Zen.Util
     open Zen.Base
     open Zen.Cost
-    open Zen.Assets
+    open Zen.Asset
 
     module ET = Zen.ErrorT
     module Tx = Zen.TxSkeleton
@@ -225,7 +223,7 @@ let ``Contract should not be able to destroy tokens other than its own - single 
 
     let outputToDestroy = {
         lock = Contract contractHash
-        spend = { asset = contractHash; amount = 1000UL }
+        spend = { asset = contractHash, Hash.zero; amount = 1000UL }
     }
 
     let sampleInput2 = {
@@ -248,25 +246,25 @@ let ``Contract should not be able to destroy tokens other than its own - single 
     |> shouldEqual
 
 [<Test>]
-let ``Contract should not be able to destroy tokens other than its own - multiple (two) outputs``() =
+let ``Contract should not be able to destroy t4okens other than its own - multiple (two) outputs``() =
     let contractCode = """
     open Zen.Types
     open Zen.Vector
-    open Zen.Util
     open Zen.Base
     open Zen.Cost
-    open Zen.Assets
+    open Zen.Asset
 
     module ET = Zen.ErrorT
     module Tx = Zen.TxSkeleton
 
-    val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 7
-    let cf _ _ _ #l _ = ret (64 + 64 + 0 + 11)
+    val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 9
+    let cf _ _ _ #l _ = ret (64 + (64 + 64 + 0) + 13)
 
-    val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + 64 + 0 + 11)
+    val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + 64 + 0) + 13)
     let main txSkeleton contractHash command returnAddress #l wallet =
+        let! asset = Zen.Asset.getDefault contractHash in
         let txSkeleton1 = Tx.destroy 1000UL zenAsset txSkeleton in // should be impossible
-        let! txSkeleton2 = txSkeleton1 >>= Tx.destroy 1000UL contractHash in // should be possible
+        let! txSkeleton2 = txSkeleton1 >>= Tx.destroy 1000UL asset in // should be possible
         ET.ret (txSkeleton2, None)
     """
 
@@ -277,7 +275,7 @@ let ``Contract should not be able to destroy tokens other than its own - multipl
 
     let outputToDestroy = {
         lock = Contract contractHash
-        spend = { asset = contractHash; amount = 1000UL }
+        spend = { asset = contractHash, Hash.zero; amount = 1000UL }
     }
 
     let sampleInput2 = {

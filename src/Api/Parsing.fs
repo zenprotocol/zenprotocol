@@ -4,12 +4,21 @@ open FSharp.Data
 open Api.Types
 open Consensus
 open Consensus.Types
+open FsBech32
 
 let private getSpend' asset amount =
-    match Hash.fromString asset with
-    | Error err -> Error ("Asset invalid: " + err)
-    | Ok asset -> Ok { asset = asset; amount = uint64 amount }
-
+    match Base16.decode asset with
+    | None ->
+        Error "Could not decode asset"
+    | Some decoded when Array.length decoded = 64 -> 
+        match Hash.fromBytes decoded.[0..31], Hash.fromBytes decoded.[31..63] with
+        | Some assetContract, Some assetToken ->
+            Ok { asset = assetContract, assetToken; amount = uint64 amount }
+        | _ ->
+            Error ("Invalid asset hash length")
+    | _ ->
+        Error "Invalid asset data length"
+        
 let getSpend chain json =
     try
         let json = SpendRequestJson.Parse json
@@ -19,7 +28,8 @@ let getSpend chain json =
         | Error err -> 
             Error ("Address is invalid: " + err)
         | Ok pkHash ->
-            getSpend' json.Spend.Asset json.Spend.Amount
+            let s = json.Spend
+            getSpend' s.Asset s.Amount
             |> Result.map (fun spend -> (pkHash, spend))
     with _ as ex ->
         Error ("Json invalid: " + ex.Message)

@@ -121,7 +121,6 @@ let ``Should invoke compiled``() =
 let ``Should throw with command's value``() =
     compileAndInvoke """
         open Zen.Types
-        open Zen.Util
         open Zen.Base
         open Zen.Cost
         open Zen.ErrorT

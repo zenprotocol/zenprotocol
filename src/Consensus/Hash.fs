@@ -14,7 +14,7 @@ type Hash = Hash of byte[] with
     member x.AsString = x.ToString()
 
 let zero =
-    Hash (Array.create Length 0uy)
+    Hash (Array.zeroCreate Length)
 
 let compute bytes =
     let hash = Array.zeroCreate Length

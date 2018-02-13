@@ -42,23 +42,23 @@ let setup = fun () ->
     let contract2Code = """
     open Zen.Types
     open Zen.Vector
-    open Zen.Util
     open Zen.Base
     open Zen.Cost
     
     module ET = Zen.ErrorT
     module Tx = Zen.TxSkeleton
     
-    val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 7
-    let cf _ _ _ #l _ = ret (64 + 64 + 0 + 17)
+    val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 9
+    let cf _ _ _ #l _ = ret (64 + (64 + 64 + 0) + 19)
     
-    val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + 64 + 0 + 17)
+    val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + 64 + 0) + 19)
     let main txSkeleton contractHash command returnAddress #l wallet =
         if command = "contract2_test" then
         begin
+            let! contractToken = Zen.Asset.getDefault contractHash in
             let! txSkeleton =
-                Tx.mint 50UL contractHash txSkeleton
-                >>= Tx.lockToContract contractHash 50UL contractHash in
+                Tx.mint 50UL contractToken txSkeleton
+                >>= Tx.lockToContract contractToken 50UL contractHash in
             ET.ret (txSkeleton, None)
         end
         else 
@@ -80,16 +80,17 @@ let setup = fun () ->
             module ET = Zen.ErrorT
             module Tx = Zen.TxSkeleton
             
-            val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 7
-            let cf _ _ _ #l _ = ret (64 + 64 + 0 + 21)
+            val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 9
+            let cf _ _ _ #l _ = ret (64 + (64 + 64 + 0) + 23)
             
-            val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + 64 + 0 + 21)
+            val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + 64 + 0) + 23)
             let main txSkeleton contractHash command returnAddress #l wallet =
                 if command = "contract1_test" then
                 begin
+                    let! asset = Zen.Asset.getDefault contractHash in
                     let! txSkeleton =
-                        Tx.mint 25UL contractHash txSkeleton
-                        >>= Tx.lockToContract contractHash 25UL contractHash in
+                        Tx.mint 25UL asset txSkeleton
+                        >>= Tx.lockToContract asset 25UL contractHash in
                     let message = { 
                         cHash = hashFromBase64 "%s";
                         command = "contract2_test"
@@ -120,13 +121,13 @@ let ``Should produce execute contracts with message passed between them``() =
             {
                 pInputs = 
                     [
-                        (emptyOutpoint, {lock = Contract contract1.hash; spend = {asset = contract1.hash; amount = 25UL}})
-                        (emptyOutpoint, {lock = Contract contract2.hash; spend = {asset = contract2.hash; amount = 50UL}})
+                        (emptyOutpoint, {lock = Contract contract1.hash; spend = {asset = contract1.hash, Hash.zero; amount = 25UL}})
+                        (emptyOutpoint, {lock = Contract contract2.hash; spend = {asset = contract2.hash, Hash.zero; amount = 50UL}})
                     ]
                 outputs = 
                     [
-                        {lock = Contract contract1.hash; spend = {asset = contract1.hash; amount = 25UL}}
-                        {lock = Contract contract2.hash; spend = {asset = contract2.hash; amount = 50UL}}
+                        {lock = Contract contract1.hash; spend = {asset = contract1.hash, Hash.zero; amount = 25UL}}
+                        {lock = Contract contract2.hash; spend = {asset = contract2.hash, Hash.zero; amount = 50UL}}
                     ]
             }
         

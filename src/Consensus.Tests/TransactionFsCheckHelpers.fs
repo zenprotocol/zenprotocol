@@ -12,17 +12,22 @@ let hashGenerator =
         let! hash = Gen.arrayOfLength Hash.Length Arb.generate<byte>
         return hash |> Hash
     }
+let assetGenerator = 
+    gen {
+        let! contractHash = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+        let! tokenHash = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+        return Hash contractHash, Hash tokenHash 
+    }
 let pkKeyLockGenerator = 
     gen {
         let private', public' = KeyPair.create()
-        //let! hash = hashGenerator
         return (private', public'), PK (PublicKey.hash public')
     }
 let amountGenerator =
     Arb.generate<uint64>
 let spendGenerator = 
     gen {
-        let! asset = hashGenerator
+        let! asset = assetGenerator
         let! amount = amountGenerator
         return { asset = asset; amount = amount } 
     }

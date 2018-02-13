@@ -11,8 +11,8 @@ type opcode = U8.t
 type hash      = A.t U8.byte 32
 type signature = A.t U8.byte 64
 type key       = A.t U8.byte 64
-type asset = hash
 type contractHash = hash
+type asset = contractHash ** hash
 type witness (n:nat) = A.t byte n
 type nonce = U64.t ** U64.t
 

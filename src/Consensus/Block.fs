@@ -5,6 +5,9 @@ open Consensus.Types
 
 open MBrace.FsPickler.Combinators
 
+open Consensus
+open Consensus
+open Consensus
 open Infrastructure
 
 [<Literal>]
@@ -102,7 +105,7 @@ let createTemplate (parent:BlockHeader) timestamp (ema:EMA.T) acs transactions c
             [
                 {
                     lock=Coinbase (blockNumber, coinbasePkHash)
-                    spend={asset=Hash.zero;amount=reward}
+                    spend={asset=Constants.Zen;amount=reward}
                 }
             ]
         contract = None
@@ -166,13 +169,13 @@ let validate chain =
                     Map.add output.spend.asset (output.spend.amount + amount) totals) Map.empty coinbase.outputs 
                     
                 let reward = getBlockReward block.header.blockNumber 
-                let totalZen = defaultArg (Map.tryFind Hash.zero totals) 0UL
+                let totalZen = defaultArg (Map.tryFind Constants.Zen totals) 0UL
                 
                 if totalZen <> reward then
                     Error "block reward is incorrect"
                 else
                     // TODO: we don't have fees yet, so anything else other than zen is not allowed
-                    if Map.exists (fun asset _ -> asset <> Hash.zero) totals then     
+                    if Map.exists (fun asset _ -> asset <> Constants.Zen) totals then     
                         Error "reward can only be in Zen asset"
                     else
                         Ok block

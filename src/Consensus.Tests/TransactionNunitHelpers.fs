@@ -26,7 +26,7 @@ let addUtxo input ketPair amount =
         lock = getPkLock ketPair
         spend = 
         { 
-            asset = Hash.zero
+            asset = Constants.Zen
             amount = amount
         }
     }

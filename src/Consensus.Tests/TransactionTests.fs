@@ -24,7 +24,7 @@ let ``Transaction should be orphan``() =
         txHash = Hash (Array.create 32 100uy)
         index = 0ul
     }
-    let output = { lock = PK testHash; spend = { asset = Hash.zero; amount = 1UL } }
+    let output = { lock = PK testHash; spend = { asset = Constants.Zen; amount = 1UL } }
     let tx = {
         inputs = [ testInput1; orphanInput ]
         witnesses = []
@@ -37,7 +37,7 @@ let ``Transaction should be orphan``() =
 
 [<Test>]
 let ``Transaction basic validation should be Ok``() =
-    let output = { lock = PK testHash; spend = { asset = Hash.zero; amount = 1UL } }
+    let output = { lock = PK testHash; spend = { asset = Constants.Zen; amount = 1UL } }
     let tx = {  
         inputs = [ testInput1 ]
         witnesses = []
@@ -52,7 +52,7 @@ let ``Transaction validation should fail with outputs invalid error``() =
     let tx = {
         inputs = [ testInput1 ];
         witnesses = []
-        outputs = [ { lock = PK testHash; spend = { asset = Hash.zero; amount = 0UL } } ]
+        outputs = [ { lock = PK testHash; spend = { asset = Constants.Zen; amount = 0UL } } ]
         contract = None
     }
     basicValidationMsg "outputs invalid" tx
@@ -63,7 +63,7 @@ let ``Transaction validation should fail with duplicate inputs error``() =
     let tx = {
         inputs = [ testInput1; testInput1 ]
         witnesses = []
-        outputs = [ { lock = PK testHash; spend = { asset = Hash.zero; amount = 1UL } } ]
+        outputs = [ { lock = PK testHash; spend = { asset = Constants.Zen; amount = 1UL } } ]
         contract = None
     }
     basicValidationMsg "inputs duplicated" tx
@@ -75,7 +75,7 @@ let ``Transaction validation should fail with inputs structurally invalid error`
     let tx = {
         inputs = [ { txHash = invalidHash; index = 0ul } ]
         witnesses = []
-        outputs = [ { lock = PK testHash; spend = { asset = Hash.zero; amount = 1UL } } ]
+        outputs = [ { lock = PK testHash; spend = { asset = Constants.Zen; amount = 1UL } } ]
         contract = None
     }
     basicValidationMsg "inputs structurally invalid" tx
@@ -85,7 +85,7 @@ let ``Transaction validation should fail with inputs structurally invalid error`
 let ``Signed transaction should be valid``() =
     let _, publicKey = keys.[0]
     let outputLock = PK (PublicKey.hash publicKey)
-    let output = { lock = outputLock; spend = { asset = Hash.zero; amount = 1UL } }
+    let output = { lock = outputLock; spend = { asset = Constants.Zen; amount = 1UL } }
     let tx = {
         inputs = [ testInput1 ]
         witnesses = []
@@ -99,7 +99,7 @@ let ``Signed transaction should be valid``() =
 [<Test>]
 let ``Signed transaction validation result should be invalid witness``() =
     let outputLock = PK testHash // testHash will not match keypair
-    let output = { lock = outputLock; spend = { asset = Hash.zero; amount = 1UL } }
+    let output = { lock = outputLock; spend = { asset = Constants.Zen; amount = 1UL } }
     let tx = {
         inputs = [ testInput1 ]
         witnesses = []

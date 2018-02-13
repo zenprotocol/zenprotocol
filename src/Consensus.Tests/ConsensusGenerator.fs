@@ -32,7 +32,7 @@ type ConsensusGenerator =
                     [
                         {
                             lock=Coinbase (blockNumber, coinbasePkHash)
-                            spend={asset=Hash.zero;amount=reward}
+                            spend={asset=Constants.Zen;amount=reward}
                         }
                     ]
                 contract = None
@@ -129,7 +129,7 @@ type ConsensusGenerator =
             
                 let! lock = Arb.generate<Lock> |> Gen.filter notCoinbaseLock 
                 let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
-                let asset = Hash.Hash asset
+                let asset = Hash.Hash asset, Hash.zero
                 let! amount = Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
                 
                 return {lock=lock;spend={asset=asset;amount=amount}}

@@ -27,7 +27,7 @@ let chain = ChainParameters.Local
 let getStringBytes (str : string) = System.Text.Encoding.UTF8.GetBytes str
 let getStringHash = getStringBytes >> Hash.compute
 let createTransaction address amount account =
-    match Account.createTransaction chain account address { asset = Hash.zero; amount = amount } with
+    match Account.createTransaction chain account address { asset = Constants.Zen; amount = amount } with
     | Result.Ok tx -> tx
     | Result.Error error -> failwith error
 let getTxOutpoints txHash tx = [ for i in 0 .. List.length tx.outputs - 1 -> {txHash=txHash;index= uint32 i} ]

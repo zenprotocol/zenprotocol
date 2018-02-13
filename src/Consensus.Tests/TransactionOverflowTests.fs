@@ -27,8 +27,8 @@ let ``Should produce outputs overflow error``() =
         witnesses = []
         outputs = 
             [
-                { lock = PK testHash; spend = { asset = Hash.zero; amount = UInt64.MaxValue } };
-                { lock = PK testHash; spend = { asset = Hash.zero; amount = 1UL } }
+                { lock = PK testHash; spend = { asset = Constants.Zen; amount = UInt64.MaxValue } };
+                { lock = PK testHash; spend = { asset = Constants.Zen; amount = 1UL } }
             ]
         contract = None
     }
@@ -47,7 +47,7 @@ let ``Should produce inputs overflow error``() =
         witnesses = []
         outputs = 
             [
-                { lock = PK testHash; spend = { asset = Hash.zero; amount = 1UL } }
+                { lock = PK testHash; spend = { asset = Constants.Zen; amount = 1UL } }
             ]
         contract = None
     }

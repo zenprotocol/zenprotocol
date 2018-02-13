@@ -4,25 +4,27 @@ open Consensus.TxSkeleton
 open Consensus.Types
 open Consensus.Crypto
 open MBrace.FsPickler.Combinators
-
-let pickler = Pickler.auto<Transaction>
+open Newtonsoft.Json
 
 type SerializationMode =
     | Full
     | WithoutWitness
 
 let serialize mode tx =
-    let tx =
-        match mode with
-        | Full -> tx
-        | WithoutWitness -> {tx with witnesses=[]}
+    match mode with
+    | Full -> tx
+    | WithoutWitness -> {tx with witnesses=[]}
+    |> JsonConvert.SerializeObject
+    |> System.Text.Encoding.ASCII.GetBytes
 
-    Binary.pickle pickler tx
-
-let deserialize tx =
+let deserialize bytes =
     try
-        Some (Binary.unpickle pickler tx) with
-    | _ -> None
+        bytes
+        |> System.Text.Encoding.ASCII.GetString
+        |> JsonConvert.DeserializeObject<Transaction>
+        |> Some
+    with | _ ->
+        None
 
 let hash =
     serialize WithoutWitness >> Hash.compute
@@ -65,7 +67,7 @@ let rootPKHash = Hash.compute [| 3uy; 235uy; 227uy; 69uy; 160uy; 193uy; 130uy; 9
 let rootTx=
     {
         inputs=[];
-        outputs=[{lock = PK rootPKHash; spend= {asset = Hash.zero;amount=100000000UL}}];
+        outputs=[{lock = PK rootPKHash; spend= {asset = Constants.Zen;amount=100000000UL}}];
         witnesses=[]
         contract=None
     }
