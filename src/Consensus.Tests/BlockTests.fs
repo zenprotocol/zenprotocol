@@ -110,8 +110,6 @@ let ``connecting block should fail when commitments are wrong``(parent:BlockHead
 
     let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero;}
 
-    printfn "%A" <| Block.connect Chain.Local getUTXO contractsPath parent (timestamp + 1UL) utxoSet acs ema block
-
     Block.connect Chain.Local getUTXO contractsPath parent (timestamp + 1UL) utxoSet acs ema block = Error "commitments mismatch"
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
