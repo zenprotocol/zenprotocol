@@ -26,19 +26,16 @@ val ilist_tl(#a:Type): l:ilist a ->
 let ilist_tl #_ _ = ()
 
 (* gets the length of an ilist *)
-val length(#a:Type): ilist a -> nat `cost` 2
+val length(#a:Type): ilist a -> nat
 let length(#a:Type) = function
-    | [] -> 2 +~! 0
-    | (_,n)::_ -> 2 +~! n
+    | [] -> 0
+    | (_,n)::_ -> n
 
 
 val length_tl(#a:Type):
     l:ilist a{Cons? l}
     -> Lemma ( let tl = Cons?.tl l in
-               let length_l  = length l  |> force in
-               let length_tl = length tl |> force in
-               length_l == length_tl + 1
-             )
+               length l == length tl + 1)
 let length_tl #_ _ = ()
 
 val cons(#a:Type): a -> ilist a -> ilist a `cost` 2
@@ -50,22 +47,17 @@ let cons #_ x l =
 val cons_length(#a:Type):
     x:a
     -> ls:ilist a
-    -> Lemma ( let length_l = force (length ls) in
-               let length_result = force (length =<< cons x ls) in
-               length_result == length_l + 1 )
+    -> Lemma ( let result = force (cons x ls) in
+               length result == length ls + 1 )
 let cons_length #_ _ _ = ()
 
 val map(#a #b:Type):
     (a -> b)
     -> ls:ilist a
-    -> ilist b `cost` ( let length_ls = match ls with
-                                        | [] -> 0
-                                        | (_, n)::_ -> n in
-                        length_ls * 3 + 3 )
-let rec map #a #b f l =
-    match l with
+    -> ilist b `cost` ( length ls * 3 + 3 )
+let rec map #a #_ f = function
     | [] -> 3 +~! []
-    | (hd, n)::tl ->
+    | (hd, _)::tl ->
         let tl: ilist a = tl in
         let! tl = f `map` tl in
         1 +! cons (f hd) tl
@@ -73,28 +65,87 @@ let rec map #a #b f l =
 val map_length(#a #b:Type):
     f:(a -> b)
     -> ls:ilist a
-    -> Lemma ( let length_ls = force (length ls) in
-               let length_result = force (length =<< map f ls) in
-               length_result = length_ls )
+    -> Lemma ( let result = force (f `map` ls) in
+               length result = length ls )
 let rec map_length #_ #_ f = function
     | [] -> ()
     | _::tl -> map_length f tl
 
-(*)
-val test_cons: ls:cost (ilist bool) 12
-    { let l = force (length =<< ls) in
-      l = 6 }
-let test_cons =
-        cons true []
-        >>= cons true
-        >>= cons false
-        >>= cons true
-        >>= cons true
-        >>= cons false
-(*)
-val test_imap: ls:
+val mapT(#a #b:Type)(#n:nat):
+    (a -> b `cost` n)
+    -> ls:ilist a
+    -> ilist b `cost` ((3 + n) * length ls + 3)
+let rec mapT #a #_ #_ f = function
+    | [] -> 3 +~! []
+    | (hd,_)::tl ->
+        let tl: ilist a = tl in
+        let tl = f `mapT` tl in
+        1 +! (bind2 (f hd) tl cons)
 
+val mapT_cons(#a #b:Type)(#n:nat):
+    f:(a -> b `cost` n)
+    -> ls:ilist a
+    -> Lemma ( match ls with
+               | [] -> True
+               | (hd,_)::tl ->
+                    let hd = force (f hd) in
+                    let tl: ilist a = tl in
+                    let tl = force (f `mapT` tl) in
+                    force (f `mapT` ls) == force (cons hd tl) )
+let mapT_cons #a #_ #_ f ls = ()
 
+val mapT_length(#a #b:Type)(#n:nat):
+    f:(a -> b `cost` n)
+    -> ls:ilist a
+    -> Lemma ( let result = force (f `mapT` ls) in
+               length result = length ls )
+let rec mapT_length #a #_ #_ f ls =
+    match ls with
+    | [] -> ()
+    | (hd,_)::tl ->
+        let tl: ilist a = tl in
+        mapT_length f tl;
+        mapT_cons f ls
+
+val foldl(#a #b:Type):
+    (a -> b -> a)
+    -> a
+    -> ls:ilist b
+    -> Tot (a `cost` ( length ls * 3 + 3 ))
+    (decreases (length ls))
+let rec foldl #_ #b f acc = function
+    | [] -> 3 +~! acc
+    | (hd,_)::tl ->
+        let acc = f acc hd in
+        let tl : ilist b = tl in
+        3 +! foldl f acc tl
+
+val foldlT(#a #b:Type)(#n:nat):
+    (a -> b -> a `cost` n)
+    -> a
+    -> ls:ilist b
+    -> Tot (a `cost` ( (3 + n) * length ls + 3 ))
+    (decreases (length ls))
+let rec foldlT #_ #b #_ f acc = function
+    | [] -> 3 +~! acc
+    | (hd,_)::tl ->
+        let tl : ilist b = tl in
+        let! acc = f acc hd in
+        3 +! foldlT f acc tl
+
+val sumBy(#a:Type):
+    (a -> int)
+    -> ls:ilist a
+    -> int `cost` (3 * length ls + 3 )
+let sumBy #_ f =
+    foldl (fun acc x -> f x + acc) 0
+
+val sumByT(#a:Type)(#n:nat):
+    (a -> int `cost` n)
+    -> ls:ilist a
+    -> int `cost` ((3 + n) * length ls + 3 )
+let sumByT #_ #n f =
+    foldlT (fun acc x -> (+) acc `Cost.map` f x) 0
 (*)
 type ilist' (a:Type) =
     | INil : ilist' a
