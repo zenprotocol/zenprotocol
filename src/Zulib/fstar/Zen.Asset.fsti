@@ -10,13 +10,13 @@ open Zen.Types.Extracted
 val zeroHash:hash
 val zenAsset:asset
 
-val getDefault: 
+val getDefault:
     contractHash
     -> asset `cost` 64
     
 val fromString:
    contractHash
-   -> s:string { S.length s <= 29 }  
+   -> s:string { S.byteCount s <= 29 }
    -> asset `cost` 64
 
 val fromInt:
