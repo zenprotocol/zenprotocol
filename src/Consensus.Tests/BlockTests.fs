@@ -20,22 +20,8 @@ let contractsPath = "./test"
 let getUTXO _ = UtxoSet.NoOutput
 let getWallet _ = Map.empty
 
-let coinbase blockNumber =
-    {
-        inputs=[];
-        outputs=
-            [
-                {
-                    lock= Coinbase (blockNumber,Hash.zero);
-                    spend=
-                        {
-                            amount=Block.getBlockReward blockNumber;asset=Constants.Zen
-                        }
-                }
-            ]
-        witnesses=[]
-        contract=None
-    }
+let coinbase blockNumber transactions =
+    Block.getBlockCoinbase blockNumber transactions Hash.zero
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``block with empty transactions failed validation``(header) =
@@ -47,7 +33,7 @@ let ``block with empty transactions failed validation``(header) =
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``block with invalid header failed validation``(header:BlockHeader) (NonEmptyTransactions transactions) =
     let header = {header with difficulty = 402690497ul}
-    let transactions = coinbase header.blockNumber :: transactions
+    let transactions = coinbase header.blockNumber transactions :: transactions
 
     let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero;}
 
@@ -58,7 +44,7 @@ let ``block with one invalid transaction fail validation``(header) (NonEmptyTran
     let index = 1 + (index % (List.length transactions))
     let header = {header with difficulty = 0x20fffffful }
 
-    let transactions = coinbase header.blockNumber :: transactions
+    let transactions = coinbase header.blockNumber transactions :: transactions
 
     // Making TX invalid by removing inputs
     let invalidTx = {transactions.[index] with inputs = []}
@@ -73,7 +59,7 @@ let ``block with one invalid transaction fail validation``(header) (NonEmptyTran
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``block with valid transactions pass validation``(header) (NonEmptyTransactions transactions) =
-    let transactions = coinbase header.blockNumber :: transactions
+    let transactions = coinbase header.blockNumber transactions :: transactions
 
     let txMerkleRoot =
         transactions
@@ -120,11 +106,9 @@ let ``connecting block should fail when commitments are wrong``(parent:BlockHead
         nonce = 0UL,0UL
     }
 
-    let transactions = [coinbase header.blockNumber]
+    let transactions = [coinbase header.blockNumber []]
 
     let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero;}
-
-    printfn "%A" <| Block.connect Chain.Local getUTXO contractsPath parent (timestamp + 1UL) utxoSet acs ema block
 
     Block.connect Chain.Local getUTXO contractsPath parent (timestamp + 1UL) utxoSet acs ema block = Error "commitments mismatch"
 
@@ -303,7 +287,7 @@ let ``block with coinbase lock within a regular transaction should fail``() =
             contract=None
         }
 
-    let transactions  = [coinbase 15ul;tx]
+    let transactions  = [coinbase 15ul [tx];tx]
 
     let txMerkleRoot =
             transactions
@@ -501,7 +485,7 @@ let ``block with coinbase with multiple asset as reward should fail``() =
     let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot; witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=Hash.zero;}
 
     let expected : Result<Block,string> =
-        Error "reward can only be in Zen asset"
+        Error "block reward is incorrect"
 
     Block.validate Chain.Local block |> should equal expected
 

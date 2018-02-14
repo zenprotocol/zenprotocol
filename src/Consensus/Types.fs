@@ -22,7 +22,8 @@ type Lock =
     | PK of Hash
     | Contract of Hash
     | Coinbase of blockNumber:uint32 * pkHash:Hash
-    | Destroy       
+    | Fee
+    | Destroy
 
 type Output = {
     lock: Lock
@@ -37,15 +38,19 @@ type Message = {
     //TODO: data
 }
 
-type ContractWitness = {
-    cHash: Hash
-    command: string
-    returnAddressIndex : uint32 option
-    beginInputs: uint32
-    beginOutputs: uint32
-    inputsLength: uint32
-    outputsLength: uint32
-}
+type ContractWitness =
+    {
+        cHash: Hash
+        command: string
+        returnAddressIndex : uint32 option
+        beginInputs: uint32
+        beginOutputs: uint32
+        inputsLength: uint32
+        outputsLength: uint32
+    }
+    with
+        member x.endOutputs = x.beginOutputs + x.outputsLength - 1ul
+        member x.endInputs = x.beginInputs + x.inputsLength - 1ul
 
 type Witness =
     | PKWitness of array<byte> * Signature

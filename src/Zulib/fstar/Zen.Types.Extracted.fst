@@ -27,6 +27,7 @@ type spend =
 type lock =
     | PKLock of hash
     | ContractLock of contractHash
+    | FeeLock
     | DestroyLock
 
 type output =
