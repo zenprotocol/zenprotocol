@@ -1,11 +1,11 @@
 module Zen.IList
 
 // TODO: make this module more accurately recflect the elaborator cost model
-//open Zen.Base
+open Zen.Base
 open Zen.Cost
 
-private val is_ilist(#a:Type): list (a ** nat) -> Type0
-private let rec is_ilist #_ = function
+noextract val is_ilist(#a:Type): list (a ** nat) -> Type0
+noextract let rec is_ilist #_ = function
     | [] -> True
     | (_, m)::tl ->
         begin match tl with
@@ -47,9 +47,11 @@ let cons #_ x l =
     | [] -> 2 +~! [x,1]
     | (_,n)::_ -> 2 +~! (x, n+1)::l
 
-//let i = cons true [false;true;false;true]
-val i: i:(cost (ilist bool) 12){let l = i |> force in True}
-let i =
+(*)
+val test: i:(cost (ilist bool) 12)
+    { let l = force (length =<< i) in
+      l = 6 }
+let test =
         cons true []
         >>= cons true
         >>= cons false

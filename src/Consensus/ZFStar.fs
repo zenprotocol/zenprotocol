@@ -80,10 +80,12 @@ let private fstToFsLock (outputLock:lock) : Types.Lock =
         throwNotImplemented "fstToFsLock" (outputLock.ToString())
 
 let private fsToFstOutput (output:Types.Output) : output =
-    { lock = fsToFstLock output.lock; spend = { asset = Hash.bytes output.spend.asset; amount = output.spend.amount }}
+    let tokenContract, tokenHash = output.spend.asset
+    { lock = fsToFstLock output.lock; spend = { asset = Hash.bytes tokenContract, Hash.bytes tokenHash; amount = output.spend.amount }}
 
 let private fstToFsOutput (output:output) : Types.Output =
-    { lock = fstToFsLock output.lock; spend = { asset = Hash.Hash output.spend.asset; amount = output.spend.amount }}
+    let tokenContract, tokenHash = output.spend.asset
+    { lock = fstToFsLock output.lock; spend = { asset = Hash.Hash tokenContract, Hash.Hash tokenHash; amount = output.spend.amount }}
 
 let private fstToFsPointedOutput (outpoint, output) : PointedOutput =
     { txHash = Hash.Hash outpoint.txHash; index = outpoint.index }, fstToFsOutput output

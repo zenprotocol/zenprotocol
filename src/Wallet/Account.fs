@@ -216,12 +216,12 @@ let private getInputs account spend =
             ((inputs, keys), collectedAmount)
             
     let (inputs, keys), collectedAmount = Map.fold collectInputs (([],[]),0UL) unspent
-     
+
     if collectedAmount >= spend.amount then
         Ok (inputs,keys,collectedAmount)
     else
         Error "Not enough tokens"        
-     
+    
 let createTransaction chain account pkHash spend = result  {
     let! (inputs, keys, amount) = getInputs account spend
     let inputPoints = List.map fst inputs
@@ -240,7 +240,7 @@ let createTransaction chain account pkHash spend = result  {
                                 contract=None }
             
     }
-                       
+
 let createActivateContractTransaction account code =
     let unspent = getUnspentOutputs account
     result {

@@ -80,10 +80,9 @@ let contract2Code = """
 
 open Zen.Types
 open Zen.Vector
-open Zen.Util
 open Zen.Base
 open Zen.Cost
-open Zen.Assets
+open Zen.Asset
 
 module ET = Zen.ErrorT
 module Tx = Zen.TxSkeleton
@@ -118,22 +117,23 @@ open Zen.Vector
 open Zen.Util
 open Zen.Base
 open Zen.Cost
-open Zen.Assets
+open Zen.Asset
 
 module ET = Zen.ErrorT
 module Tx = Zen.TxSkeleton
 
-val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 9
-let cf _ _ _ #l _ = ret (64 + (64 + 64 + 0) + 22)
+val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 11
+let cf _ _ _ #l _ = ret (64 + (64 + (64 + 64 + 0)) + 24)
 
-val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + 64 + 0) + 22)
+val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + (64 + 64 + 0)) + 24)
 let main txSkeleton contractHash command returnAddress #l wallet =
     match returnAddress with
     | Some returnAddress ->
         let! tokens = Tx.getAvailableTokens zenAsset txSkeleton in
+        let! asset = Zen.Asset.getDefault contractHash in
         let! txSkeleton =
-            Tx.mint tokens contractHash txSkeleton
-            >>= Tx.lockToAddress contractHash tokens returnAddress in
+            Tx.mint tokens asset txSkeleton
+            >>= Tx.lockToAddress asset tokens returnAddress in
 
         let message = {
             cHash = hashFromBase64 "%s";
@@ -151,7 +151,7 @@ let ``Should execute contract chain and get a valid transaction``() =
     let _, samplePublicKey = sampleKeyPair
     let samplePKHash = PublicKey.hash samplePublicKey
 
-    let Zen = Hash.zero
+    let Zen = Constants.Zen
 
     let input = {
         txHash = Hash.zero

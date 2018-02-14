@@ -9,9 +9,7 @@ open Infrastructure.ServiceBus.Client
 
 type TransactionResult = Result<Transaction,string>
 
-type ActivateContractTransactionResult =
-    | Ok of Transaction * Hash
-    | Error of string                             
+type ActivateContractTransactionResult = Result<Transaction * Hash, string>
 
 module Blockchain = 
     let serviceName = "blockchain"
@@ -116,18 +114,19 @@ module Wallet =
         | GetBalance
         | Spend of Hash * Spend
         | ActivateContract of string
-        | ExecuteContract of Hash * string * Map<Hash.Hash, uint64>
+        | ExecuteContract of Hash * string * Map<Asset, uint64>
 
     let serviceName = "wallet"
     
     let getBalance client =
-        Request.send<Request, Map<Hash.Hash,uint64>> client serviceName GetBalance
+        Request.send<Request, Map<Asset,uint64>> client serviceName GetBalance
 
     let getAddressPKHash client =
         Request.send<Request, Hash.Hash> client serviceName GetAddressPKHash
         
     let getAddress client =
         Request.send<Request, string> client serviceName GetAddress
+        
         
     let createTransaction client address spend =
         Request.send<Request, TransactionResult> client serviceName (Spend (address, spend))

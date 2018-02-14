@@ -102,14 +102,14 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
                 GeneralError "invalid contract witness indices"
             else if
                 txSkeleton.pInputs.[int cw.beginInputs .. endInputs]
-                |> List.exists (fun (outpoint, {spend=spend}) ->
-                    TxSkeleton.isSkeletonOutpoint outpoint && spend.asset <> cw.cHash)
+                |> List.exists (fun (outpoint, {spend={asset=cHash,_;amount=_}}) ->
+                    TxSkeleton.isSkeletonOutpoint outpoint && cHash <> cw.cHash)
             then
                 GeneralError "illegal creation of tokens"
             else if
                 txSkeleton.outputs.[int cw.beginOutputs .. endOutputs]
                 |> List.exists (function
-                    | {lock=Destroy; spend=spend} when spend.asset <> cw.cHash -> true
+                    | {lock=Destroy; spend={asset=cHash,_;amount=_}} when cHash <> cw.cHash -> true
                     | _ -> false)
             then
                 GeneralError "illegal destruction of tokens"

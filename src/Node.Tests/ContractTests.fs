@@ -88,4 +88,4 @@ let ``Contract should activate and execute - API``() =
     let execute = new ContractExecuteRequestJson.Root(response'.Address,"", [| new ContractExecuteRequestJson.Spend("", int64 0) |])
     let response = execute.JsonValue.Request ("http://" + apiUri + "/wallet/contract/execute")
     response.StatusCode |> should equal 200
-    printfn "-->%A" response
+    true

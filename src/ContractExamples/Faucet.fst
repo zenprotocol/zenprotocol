@@ -1,9 +1,8 @@
 open Zen.Types
 open Zen.Vector
-open Zen.Util
 open Zen.Base
 open Zen.Cost
-open Zen.Assets
+open Zen.Asset
 open FStar.Mul
         
 module ET = Zen.ErrorT

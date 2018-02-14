@@ -93,7 +93,5 @@ let delete collection session key =
     if not <| List.isEmpty collection.indices then
         failwith "delete doesn't work with indices"
     
-let containsKey collection (session:Session) key = 
-    match tryGet collection session key with
-    | Some _ -> true
-    | None -> false     
+let containsKey collection (session:Session) key =
+    Option.isSome <| tryGet collection session key

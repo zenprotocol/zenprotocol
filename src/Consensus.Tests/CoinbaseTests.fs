@@ -23,7 +23,7 @@ let ``coinbase cannot have any locks other than coinbase lock``() =
     let tx = 
       {
          inputs = [];
-         outputs=[{lock= PK Hash.zero;spend={amount=1UL;asset=Hash.zero}}]
+         outputs=[{lock= PK Hash.zero;spend={amount=1UL;asset=Constants.Zen}}]
          witnesses=[]
          contract=None
       }
@@ -37,7 +37,7 @@ let ``coinbase with wrong block nubmer should fail``() =
     let tx = 
       {
          inputs = [];
-         outputs=[{lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Hash.zero}}]
+         outputs=[{lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Constants.Zen}}]
          witnesses=[]
          contract=None
       }
@@ -51,7 +51,7 @@ let ``coinbase with inputs should fail``() =
     let tx = 
       {
          inputs = [{txHash=Hash.zero;index=1ul}];
-         outputs=[{lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Hash.zero}}]
+         outputs=[{lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Constants.Zen}}]
          witnesses=[]
          contract=None
       }
@@ -65,7 +65,7 @@ let ``coinbase with witnesses fail``() =
     let tx = 
       {
          inputs = []
-         outputs=[{lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Hash.zero}}]
+         outputs=[{lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Constants.Zen}}]
          witnesses=[PKWitness (Array.empty,Signature Array.empty)]
          contract=None
       }
@@ -79,7 +79,7 @@ let ``coinbase with contract should fail``() =
     let tx = 
       {
          inputs = [];
-         outputs=[{lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Hash.zero}}]
+         outputs=[{lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Constants.Zen}}]
          witnesses=[]
          contract=Some("ad","ad")
       }
@@ -93,7 +93,7 @@ let ``valid coinbase should pass``() =
     let tx = 
       {
          inputs = [];
-         outputs=[{lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Hash.zero}}]
+         outputs=[{lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Constants.Zen}}]
          witnesses=[]
          contract=None
       }
@@ -109,8 +109,8 @@ let ``coinbase with two outputs should pass``() =
          inputs = [];
          outputs=
             [
-                {lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Hash.zero}}
-                {lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Hash.zero}}
+                {lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Constants.Zen}}
+                {lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Constants.Zen}}
             ]
          witnesses=[]
          contract=None
@@ -138,7 +138,7 @@ let ``coinbase with no outputs``() =
 let ``transaction spending coinbase with maturity should be valid``() =
     let _, publicKey = keys.[0]
     let outputLock = Coinbase (15ul,PublicKey.hash publicKey)
-    let output = { lock = outputLock; spend = { asset = Hash.zero; amount = 1UL } }
+    let output = { lock = outputLock; spend = { asset = Constants.Zen; amount = 1UL } }
     let tx = {
         inputs = [ testInput1 ]
         witnesses = []
@@ -154,7 +154,7 @@ let ``transaction spending coinbase with maturity should be valid``() =
 let ``transaction spending coinbase with no maturity should fail``() =
     let _, publicKey = keys.[0]
     let outputLock = Coinbase (15ul,PublicKey.hash publicKey)
-    let output = { lock = outputLock; spend = { asset = Hash.zero; amount = 1UL } }
+    let output = { lock = outputLock; spend = { asset = Constants.Zen; amount = 1UL } }
     let tx = {
         inputs = [ testInput1 ]
         witnesses = []

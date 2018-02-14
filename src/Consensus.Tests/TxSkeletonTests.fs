@@ -22,7 +22,7 @@ let ``Transaction with less inputs or outputs should not be a prefix of another`
 let ``Transaction with additional single output should be a prefix of another`` (tx:TxSkeleton.T) =
     let output = {
         lock = PK testHash
-        spend = {asset = Hash.zero; amount = 1UL } 
+        spend = {asset = Constants.Zen; amount = 1UL } 
     }
     let tx' = { tx with outputs = tx.outputs @ [ output ] }
     TxSkeleton.checkPrefix tx tx' = Ok tx'
@@ -35,7 +35,7 @@ let ``Transaction with additional single input should be a prefix of another`` (
     }
     let output = {
         lock = PK testHash
-        spend = {asset = Hash.zero; amount = 1UL } 
+        spend = {asset = Constants.Zen; amount = 1UL } 
     }
     let tx' = { tx with pInputs = tx.pInputs @ [ (input, output) ] }
     TxSkeleton.checkPrefix tx tx' = Ok tx'

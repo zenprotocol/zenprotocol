@@ -16,20 +16,25 @@ open Blockchain.DatabaseContext
 open Consensus.Tests.SampleContract
 open Consensus.Contract
 open TestsInfrastructure.Constraints
+open Messaging.Services
 
 let (>>=) = Writer.bind
 let chain = Chain.Local
 let timestamp = 1515594186383UL + 1UL
 
-let getTxOutpints tx = List.mapi (fun i _ ->
-    let txHash = Transaction.hash tx
-    {txHash=txHash;index= uint32 i}) tx.outputs
+module Result =
+    let get =
+        function
+        | Ok x -> x
+        | Error y -> failwithf "%A" y
 
-let rootTxOutpoints = getTxOutpints Transaction.rootTx
+let getTxOutpoints tx =
+    let txHash = Transaction.hash tx
+    [ for i in 0 .. List.length tx.outputs - 1 -> {txHash=txHash;index= uint32 i} ]
+
+let rootTxOutpoints = getTxOutpoints Transaction.rootTx
 let areOutpointsInSet session outpoints set =
-    match UtxoSet.getUtxos (UtxoSetRepository.get session) outpoints set with
-    | Some _ -> true
-    | None -> false
+    Option.isSome <| UtxoSet.getUtxos (UtxoSetRepository.get session) outpoints set
 let isAccountInSet session (account:Account.T) =
     let outpoints =
         Account.getUnspentOutputs account
@@ -41,7 +46,7 @@ let isAccountInSet session (account:Account.T) =
 let rootAccount = Account.createTestAccount ()
 
 let createTransaction account =
-    match Account.createTransaction chain account account.publicKeyHash {asset=Hash.zero;amount=1UL} with
+    match Account.createTransaction chain account account.publicKeyHash {asset=Constants.Zen;amount=1UL} with
     | Ok tx -> tx
     | Error error -> failwith error
 
@@ -83,7 +88,7 @@ let createChain (length:int) nonce start ema account =
             let timestamp = timestamp + ((uint64 i) * 1000UL * 60UL * 10UL)
             let tx = createTransaction account
             let block = Block.createTemplate parent.header timestamp ema acs [tx] Hash.zero
-            let block = {block with header ={ block.header with nonce = nonce,0UL}}
+            let block = {block with header ={ block.header with nonce = uint64 nonce,0UL}}
 
             let account = Account.addTransaction (Transaction.hash tx) tx account
             let ema = EMA.add chain timestamp ema
@@ -192,7 +197,7 @@ let ``validate new valid block which extended main chain``() =
     state'.memoryState.utxoSet |> should equal UtxoSet.asDatabase
     state'.tipState.activeContractSet |> should equal state'.memoryState.activeContractSet
     areOutpointsInSet session rootTxOutpoints UtxoSet.asDatabase |> should equal false // SHOULD be spent
-    areOutpointsInSet session (getTxOutpints tx) UtxoSet.asDatabase |> should equal true
+    areOutpointsInSet session (getTxOutpoints tx) UtxoSet.asDatabase |> should equal true
 
 [<Test>]
 let ``validate new invalid block which try to extended main chain``() =
@@ -222,7 +227,7 @@ let ``validate new invalid block which try to extended main chain``() =
     state'.memoryState.utxoSet |> should equal UtxoSet.asDatabase
     state'.tipState.activeContractSet |> should equal state'.memoryState.activeContractSet
     areOutpointsInSet session rootTxOutpoints UtxoSet.asDatabase |> should equal true
-    areOutpointsInSet session (getTxOutpints tx) UtxoSet.asDatabase |> should equal false
+    areOutpointsInSet session (getTxOutpoints tx) UtxoSet.asDatabase |> should equal false
 
 [<Test>]
 let ``validating orphan block yield a request for block from network``() =
@@ -244,7 +249,7 @@ let ``validating orphan block yield a request for block from network``() =
     state'.memoryState.utxoSet |> should equal UtxoSet.asDatabase
     state'.tipState.activeContractSet |> should equal state'.memoryState.activeContractSet
     areOutpointsInSet session rootTxOutpoints UtxoSet.asDatabase |> should equal false
-    areOutpointsInSet session (getTxOutpints tx) UtxoSet.asDatabase |> should equal false
+    areOutpointsInSet session (getTxOutpoints tx) UtxoSet.asDatabase |> should equal false
 
 [<Test>]
 let ``validate new block which connect orphan chain which extend main chain``() =
@@ -282,7 +287,7 @@ let ``validate new block which connect orphan chain which extend main chain``() 
     state'.memoryState.utxoSet |> should equal UtxoSet.asDatabase
     state'.tipState.activeContractSet |> should equal state'.memoryState.activeContractSet
     areOutpointsInSet session rootTxOutpoints UtxoSet.asDatabase |> should equal false
-    areOutpointsInSet session (getTxOutpints tx) UtxoSet.asDatabase |> should equal true
+    areOutpointsInSet session (getTxOutpoints tx) UtxoSet.asDatabase |> should equal true
 
 [<Test>]
 let ``validate new block which connect orphan chain which is not long enough to become main chain``() =
@@ -291,8 +296,8 @@ let ``validate new block which connect orphan chain which is not long enough to 
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session
 
-    let mainChain,account = createChainFromGenesis 3 0UL
-    let alternativeChain, sideChainAccount = createChainFromGenesis 2 1UL
+    let mainChain,account = createChainFromGenesis 3 0
+    let alternativeChain, sideChainAccount = createChainFromGenesis 2 1
 
     // validate main chain first
     let _,state = validateChain session mainChain state
@@ -317,8 +322,8 @@ let ``orphan chain become longer than main chain``() =
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session
 
-    let mainChain, account = createChainFromGenesis 3 0UL
-    let alternativeChain, sideChainAccount = createChainFromGenesis 2 1UL
+    let mainChain, account = createChainFromGenesis 3 0
+    let alternativeChain, sideChainAccount = createChainFromGenesis 2 1
 
     // validate main chain first
     let _,state = validateChain session alternativeChain state
@@ -373,8 +378,8 @@ let ``new block extend fork chain which become longest``() =
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session
 
-    let mainChain, account = createChainFromGenesis 2 0UL
-    let alternativeChain, sideChainAccount = createChainFromGenesis 1 1UL
+    let mainChain, account = createChainFromGenesis 2 0
+    let alternativeChain, sideChainAccount = createChainFromGenesis 1 1
 
     // validate main chain first
     let _,state = validateChain session alternativeChain state
@@ -405,14 +410,14 @@ let ``2 orphan chains, one become longer than main chain``() =
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session
     let orphanChain, orphanAccount =
-        createChainFromGenesis 1 1UL
+        createChainFromGenesis 1 1
     let orphanBlock = List.head orphanChain
 
     let orphanEMA = EMA.add chain orphanBlock.header.timestamp state.tipState.ema
 
-    let mainChain, account = createChainFromGenesis 2 0UL
-    let sideChain1, _ = createChain 1 2UL orphanBlock orphanEMA orphanAccount
-    let sideChain2, sideChainAccount = createChain 2 3UL orphanBlock orphanEMA orphanAccount
+    let mainChain, account = createChainFromGenesis 2 0
+    let sideChain1, _ = createChain 1 2 orphanBlock orphanEMA orphanAccount
+    let sideChain2, sideChainAccount = createChain 2 3 orphanBlock orphanEMA orphanAccount
 
     // validate all chains
     let _,state = validateChain session mainChain state
@@ -443,14 +448,14 @@ let ``2 orphan chains, two longer than main, one is longer``() =
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session
     let orphanChain, orphanAccount =
-        createChainFromGenesis 1 1UL
+        createChainFromGenesis 1 1
     let orphanBlock = List.head orphanChain
 
     let orphanEMA = EMA.add chain orphanBlock.header.timestamp state.tipState.ema
 
-    let mainChain, account = createChainFromGenesis 2 0UL
-    let sideChain1, _ = createChain 2 2UL orphanBlock orphanEMA orphanAccount
-    let sideChain2, sideChainAccount = createChain 3 3UL orphanBlock orphanEMA orphanAccount
+    let mainChain, account = createChainFromGenesis 2 0
+    let sideChain1, _ = createChain 2 2 orphanBlock orphanEMA orphanAccount
+    let sideChain2, sideChainAccount = createChain 3 3 orphanBlock orphanEMA orphanAccount
 
     // validate all chains
     let _,state = validateChain session mainChain state
@@ -482,16 +487,16 @@ let ``2 orphan chains, two longer than main, longest is invalid, shuld pick seco
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session
     let orphanChain, orphanAccount =
-        createChainFromGenesis 1 1UL
+        createChainFromGenesis 1 1
     let orphanBlock = List.head orphanChain
 
     let orphanEMA = EMA.add chain orphanBlock.header.timestamp state.tipState.ema
 
-    let mainChain, account = createChainFromGenesis 2 0UL
+    let mainChain, account = createChainFromGenesis 2 0
 
     // we are creatig invalid sidchain by giving sideChain1 the wrong account which will create invalid chain
-    let sideChain1, _ = createChain 3 2UL orphanBlock orphanEMA account
-    let sideChain2, sideChainAccount = createChain 2 3UL orphanBlock orphanEMA orphanAccount
+    let sideChain1, _ = createChain 3 2 orphanBlock orphanEMA account
+    let sideChain2, sideChainAccount = createChain 2 3 orphanBlock orphanEMA orphanAccount
 
     // validate all chains
     let _,state = validateChain session mainChain state
@@ -521,7 +526,7 @@ let ``transaction in mempool and not in next block stays in mempool``() =
 
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session
-    let chain,account = createChainFromGenesis 1 0UL
+    let chain,account = createChainFromGenesis 1 0
     let tx1 = createTransaction rootAccount
     let tx2 = createTransaction account
     let txHash1 = Transaction.hash tx1
@@ -545,10 +550,10 @@ let ``transaction in mempool and not in next block stays in mempool``() =
 
     Map.containsKey txHash2 state.memoryState.mempool  |> should equal true
     Map.containsKey txHash1 state.memoryState.mempool  |> should equal false
-    areOutpointsInSet session (getTxOutpints tx1) state.memoryState.utxoSet |> should equal false
-    areOutpointsInSet session (getTxOutpints tx2) state.memoryState.utxoSet |> should equal true
-    areOutpointsInSet session (getTxOutpints tx1) UtxoSet.asDatabase |> should equal true
-    areOutpointsInSet session (getTxOutpints tx2) UtxoSet.asDatabase |> should equal false
+    areOutpointsInSet session (getTxOutpoints tx1) state.memoryState.utxoSet |> should equal false
+    areOutpointsInSet session (getTxOutpoints tx2) state.memoryState.utxoSet |> should equal true
+    areOutpointsInSet session (getTxOutpoints tx1) UtxoSet.asDatabase |> should equal true
+    areOutpointsInSet session (getTxOutpoints tx2) UtxoSet.asDatabase |> should equal false
 
 [<Test>]
 let ``orphan transactions added to mempool after origin tx found in block``() =
@@ -556,7 +561,7 @@ let ``orphan transactions added to mempool after origin tx found in block``() =
 
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session
-    let chain,account = createChainFromGenesis 1 0UL
+    let chain,account = createChainFromGenesis 1 0
     let tx1 = createTransaction account
     let txHash1 = Transaction.hash tx1
     let tx2 =
@@ -578,10 +583,10 @@ let ``orphan transactions added to mempool after origin tx found in block``() =
     Map.containsKey txHash1 state.memoryState.mempool |> should equal true
     Map.containsKey txHash2 state.memoryState.mempool |> should equal true
     state.memoryState.orphanPool |> should haveCount 0
-    areOutpointsInSet session (getTxOutpints tx1) state.memoryState.utxoSet |> should equal false
-    areOutpointsInSet session (getTxOutpints tx1) UtxoSet.asDatabase |> should equal false
-    areOutpointsInSet session (getTxOutpints tx2) state.memoryState.utxoSet |> should equal true
-    areOutpointsInSet session (getTxOutpints tx2) UtxoSet.asDatabase |> should equal false
+    areOutpointsInSet session (getTxOutpoints tx1) state.memoryState.utxoSet |> should equal false
+    areOutpointsInSet session (getTxOutpoints tx1) UtxoSet.asDatabase |> should equal false
+    areOutpointsInSet session (getTxOutpoints tx2) state.memoryState.utxoSet |> should equal true
+    areOutpointsInSet session (getTxOutpoints tx2) UtxoSet.asDatabase |> should equal false
 
 [<Test>]
 let ``block with a contract activation is added to chain``() =
@@ -629,7 +634,7 @@ let ``validate new block header should ask for block``() =
     let state = getGenesisState session
 
     let block =
-        createChainFromGenesis 1 0UL
+        createChainFromGenesis 1 0
         |> fst
         |> List.head
 
@@ -648,7 +653,7 @@ let ``validate new block header which we already asked for``() =
     let state = getGenesisState session
 
     let block =
-        createChainFromGenesis 1 0UL
+        createChainFromGenesis 1 0
         |> fst
         |> List.head
 
@@ -669,7 +674,7 @@ let ``new block should publish to network``() =
     let state = getGenesisState session
 
     let block =
-        createChainFromGenesis 1 0UL
+        createChainFromGenesis 1 0
         |> fst
         |> List.head
 
@@ -690,7 +695,7 @@ let ``mined block should publish to network``() =
     let state = getGenesisState session
 
     let block =
-        createChainFromGenesis 1 0UL
+        createChainFromGenesis 1 0
         |> fst
         |> List.head
 
@@ -708,7 +713,7 @@ let ``validate new tip should ask for block``() =
     let state = getGenesisState session
 
     let block =
-        createChainFromGenesis 1 0UL
+        createChainFromGenesis 1 0
         |> fst
         |> List.head
 
@@ -727,7 +732,7 @@ let ``validate new tip which we already asked for``() =
     let state = getGenesisState session
 
     let block =
-        createChainFromGenesis 1 0UL
+        createChainFromGenesis 1 0
         |> fst
         |> List.head
 
@@ -748,7 +753,7 @@ let ``tip block should not be publish to network``() =
     let state = getGenesisState session
 
     let block =
-        createChainFromGenesis 1 0UL
+        createChainFromGenesis 1 0
         |> fst
         |> List.head
 
@@ -760,3 +765,177 @@ let ``tip block should not be publish to network``() =
         |> Writer.unwrap
 
     events |> should not' (contain (EffectsWriter.NetworkCommand (PublishBlock block.header)))
+
+[<Test>]
+let ``Valid template for two transactions which don't depend on each other``() =
+    use databaseContext = DatabaseContext.createEmpty "test"
+    use session = DatabaseContext.createSession databaseContext
+
+    let _, genesisState =
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state
+        |> Writer.unwrap
+    
+    let balances = Account.getBalance rootAccount
+    let asset, amount = balances |> Map.toList |> List.head
+    let firstAmount = amount / 4UL
+    let secondAmount = amount - firstAmount
+    let splitTx =
+        Account.createTransaction chain rootAccount rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        |>  Result.get
+    let ema' = EMA.add chain genesisBlock.header.timestamp ema
+    let splitBlock = Block.createTemplate genesisBlock.header timestamp ema' acs [splitTx] Hash.zero
+
+    let account = Account.addTransaction (Transaction.hash splitTx) splitTx rootAccount
+    let ema'' = EMA.add chain timestamp ema'
+    ema''.delayed.Length |> should equal 2
+  
+    let _, splitState =
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp splitBlock false genesisState
+        |> Writer.unwrap
+    let splitOutputs = Account.getUnspentOutputs account
+
+    let txOfPOutput (outpoint, output) =
+        let spend = output.spend
+        let outputs = [{spend=spend;lock=PK rootAccount.publicKeyHash}]
+        Transaction.sign
+            [ rootAccount.keyPair ]
+            {
+                inputs = [outpoint];
+                outputs = outputs;
+                witnesses=[];
+                contract=None
+            }
+    let tx1, tx2 =
+        splitOutputs |>
+        Map.toList |>
+        List.map txOfPOutput |>
+        function
+        | [t1;t2] -> (t1,t2)
+        | _ -> failwith "Wrong number of outputs"
+
+    let twoTxBlock = Block.createTemplate splitBlock.header (timestamp+100UL) splitState.tipState.ema acs [tx1;tx2] Hash.zero
+    let oldHash = splitState.tipState.tip.hash
+    let _, withTxsState =
+        BlockHandler.validateBlock chain session.context.contractPath session (timestamp+100UL) twoTxBlock false splitState
+        |> Writer.unwrap
+    withTxsState.tipState.tip.hash |> should not' (equal oldHash)
+    withTxsState.tipState.tip.hash |> should equal (Block.hash twoTxBlock)
+
+[<Test>]
+let ``Two transactions in the same block which depend on each other are valid``() =
+    use databaseContext = DatabaseContext.createEmpty "test"
+    use session = DatabaseContext.createSession databaseContext
+
+    let _, genesisState =
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state
+        |> Writer.unwrap
+    
+    let balances = Account.getBalance rootAccount
+    let asset, amount = balances |> Map.toList |> List.head
+    let firstAmount = amount
+    let firstTx =
+        Account.createTransaction chain rootAccount rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        |>  Result.get
+    let account = Account.addTransaction (Transaction.hash firstTx) firstTx rootAccount
+    let secondTx =
+        Account.createTransaction chain account rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        |>  Result.get
+    let ema' = EMA.add chain genesisBlock.header.timestamp ema
+    let twoTxBlock = Block.createTemplate genesisBlock.header timestamp ema' acs [firstTx;secondTx] Hash.zero
+    let oldHash = genesisState.tipState.tip.hash
+
+    let _, twoTxState =
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp twoTxBlock false genesisState
+        |> Writer.unwrap
+    twoTxState.tipState.tip.hash |> should not' (equal oldHash)
+    twoTxState.tipState.tip.hash |> should equal (Block.hash twoTxBlock)
+
+[<Test>]
+let ``Two transactions in the same block which depend on each other are invalid if in reversed order``() =
+    use databaseContext = DatabaseContext.createEmpty "test"
+    use session = DatabaseContext.createSession databaseContext
+
+    let _, genesisState =
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state
+        |> Writer.unwrap
+    
+    let balances = Account.getBalance rootAccount
+    let asset, amount = balances |> Map.toList |> List.head
+    let firstAmount = amount
+    let firstTx =
+        Account.createTransaction chain rootAccount rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        |>  Result.get
+    let account = Account.addTransaction (Transaction.hash firstTx) firstTx rootAccount
+    let secondTx =
+        Account.createTransaction chain account rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        |>  Result.get
+    let ema' = EMA.add chain genesisBlock.header.timestamp ema
+    let twoTxBlock = Block.createTemplate genesisBlock.header timestamp ema' acs [secondTx;firstTx] Hash.zero
+    let oldHash = genesisState.tipState.tip.hash
+
+    let _, twoTxState =
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp twoTxBlock false genesisState
+        |> Writer.unwrap
+    twoTxState.tipState.tip.hash |> should not' (equal (Block.hash twoTxBlock))
+    twoTxState.tipState.tip.hash |> should equal oldHash
+
+[<Test>]
+let ``Template builder uses two transactions in the same block which depend on each other``() =
+    use databaseContext = DatabaseContext.createEmpty "test"
+    use session = DatabaseContext.createSession databaseContext
+
+    let _, genesisState =
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state
+        |> Writer.unwrap
+    
+    let balances = Account.getBalance rootAccount
+    let asset, amount = balances |> Map.toList |> List.head
+    let firstAmount = amount
+    let firstTx =
+        Account.createTransaction chain rootAccount rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        |>  Result.get
+    let account = Account.addTransaction (Transaction.hash firstTx) firstTx rootAccount
+    let secondTx =
+        Account.createTransaction chain account rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        |>  Result.get
+    let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction firstTx) session (timestamp+1UL) genesisState
+    let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction secondTx) session (timestamp+1UL) updatedState
+    let ema' = EMA.add chain genesisBlock.header.timestamp ema
+    let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList session updatedState
+
+    let twoTxBlock = Block.createTemplate genesisBlock.header (timestamp+1UL) ema' memState.activeContractSet validatedTransactions Hash.zero
+    let oldHash = genesisState.tipState.tip.hash
+    let _, twoTxState =
+        BlockHandler.validateBlock chain session.context.contractPath session (timestamp+1UL) twoTxBlock false genesisState
+        |> Writer.unwrap
+    twoTxState.tipState.tip.hash |> should not' (equal oldHash)
+    twoTxState.tipState.tip.hash |> should equal (Block.hash twoTxBlock)
+    List.length twoTxBlock.transactions |> should equal 3       // includes coinbase tx
+
+[<Test>]
+let ``Out of order dependent transactions are rearranged``() =
+    use databaseContext = DatabaseContext.createEmpty "test"
+    use session = DatabaseContext.createSession databaseContext
+
+    let _, genesisState =
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state
+        |> Writer.unwrap
+    
+    let balances = Account.getBalance rootAccount
+    let asset, amount = balances |> Map.toList |> List.head
+    let firstTx =
+        Account.createTransaction chain rootAccount rootAccount.publicKeyHash {asset=asset;amount=amount}
+        |>  Result.get
+    let account = Account.addTransaction (Transaction.hash firstTx) firstTx rootAccount
+    let secondTx =
+        Account.createTransaction chain account rootAccount.publicKeyHash {asset=asset;amount=amount}
+        |>  Result.get
+    let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction firstTx) session (timestamp+1UL) genesisState
+    let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction secondTx) session (timestamp+1UL) updatedState
+    let blockNumber = updatedState.tipState.tip.header.blockNumber
+    let acs = updatedState.tipState.activeContractSet
+    let _, validatedTransactions = BlockTemplateBuilder.selectOrderedTransactions session blockNumber acs [firstTx;secondTx]
+    let _, validatedTransactions_ = BlockTemplateBuilder.selectOrderedTransactions session blockNumber acs [secondTx;firstTx]
+
+    List.length validatedTransactions |> should equal 2
+    validatedTransactions |> should equal validatedTransactions_

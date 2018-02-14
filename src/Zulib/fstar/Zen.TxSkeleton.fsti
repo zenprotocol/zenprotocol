@@ -67,13 +67,13 @@ val addChangeOutput:
 
 val mint:
   amount:U64.t
-  -> contractHash
+  -> asset
   -> txSkeleton
   -> txSkeleton `cost` 64
 
 val destroy:
   amount:U64.t
-  -> contractHash
+  -> asset
   -> txSkeleton
   -> txSkeleton `cost` 64
 
