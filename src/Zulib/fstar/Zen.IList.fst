@@ -34,12 +34,12 @@ let length(#a:Type) = function
 
 val length_tl(#a:Type):
     l:ilist a{Cons? l}
-    -> Lemma ( let length_l  = force (length l) in
-               let length_tl = force (length (Cons?.tl l)) in
+    -> Lemma ( let tl = Cons?.tl l in
+               let length_l  = length l  |> force in
+               let length_tl = length tl |> force in
                length_l == length_tl + 1
              )
 let length_tl #_ _ = ()
-
 
 val cons(#a:Type): a -> ilist a -> ilist a `cost` 2
 let cons #_ x l =
@@ -47,11 +47,44 @@ let cons #_ x l =
     | [] -> 2 +~! [x,1]
     | (_,n)::_ -> 2 +~! (x, n+1)::l
 
+val cons_length(#a:Type):
+    x:a
+    -> ls:ilist a
+    -> Lemma ( let length_l = force (length ls) in
+               let length_result = force (length =<< cons x ls) in
+               length_result == length_l + 1 )
+let cons_length #_ _ _ = ()
+
+val map(#a #b:Type):
+    (a -> b)
+    -> ls:ilist a
+    -> ilist b `cost` ( let length_ls = match ls with
+                                        | [] -> 0
+                                        | (_, n)::_ -> n in
+                        length_ls * 3 + 3 )
+let rec map #a #b f l =
+    match l with
+    | [] -> 3 +~! []
+    | (hd, n)::tl ->
+        let tl: ilist a = tl in
+        let! tl = f `map` tl in
+        1 +! cons (f hd) tl
+
+val map_length(#a #b:Type):
+    f:(a -> b)
+    -> ls:ilist a
+    -> Lemma ( let length_ls = force (length ls) in
+               let length_result = force (length =<< map f ls) in
+               length_result = length_ls )
+let rec map_length #_ #_ f = function
+    | [] -> ()
+    | _::tl -> map_length f tl
+
 (*)
-val test: i:(cost (ilist bool) 12)
-    { let l = force (length =<< i) in
+val test_cons: ls:cost (ilist bool) 12
+    { let l = force (length =<< ls) in
       l = 6 }
-let test =
+let test_cons =
         cons true []
         >>= cons true
         >>= cons false
@@ -59,30 +92,9 @@ let test =
         >>= cons true
         >>= cons false
 (*)
-val iCons_length(#a:Type): x:a -> l:ilist a ->
-    Lemma (ilength (iCons x l) == ilength l + 1)
-let iCons_length #_ _ _ = ()
+val test_imap: ls:
 
-val imap(#a #b:Type):
-    (a -> b)
-    -> l:ilist a
-    -> ilist b `cost` ilength l
-let rec imap #a #b f l =
-    match l with
-    | [] -> ret []
-    | (hd, n)::tl ->
-        let tl: ilist a = tl in
-        let! tl = f `imap` tl in
-        1 +~! iCons (f hd) tl
 
-val imap_length(#a #b:Type):
-    f:(a -> b)
-    -> l:ilist a
-    -> Lemma ( let l' = f `imap` l in
-               ilength (force l') = ilength l)
-let rec imap_length #_ #_ f = function
-    | [] -> ()
-    | hd::tl -> imap_length f tl
 (*)
 type ilist' (a:Type) =
     | INil : ilist' a
