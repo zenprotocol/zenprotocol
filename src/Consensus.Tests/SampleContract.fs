@@ -17,20 +17,16 @@ module ET = Zen.ErrorT
 module Tx = Zen.TxSkeleton
 
 val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 9
-let cf _ _ _ #l _ = ret (64 + (64 + 64 + 0) + 24)
+let cf _ _ _ #l _ = ret (64 + (64 + 64 + 0) + 21)
 
-val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + 64 + 0) + 24)
+val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + 64 + 0) + 21)
 let main txSkeleton contractHash command returnAddress #l wallet =
   let! asset = Zen.Asset.getDefault contractHash in
   let spend = { asset=asset; amount=1000UL } in
   let lock = ContractLock contractHash in
 
   let output = { lock=lock; spend=spend } in
-
-  let pInput = {
-      txHash = Zen.Asset.zeroHash;
-      index = 0ul
-  }, output in
+  let pInput = Mint spend in
 
   let! txSkeleton =
     Tx.addInput pInput txSkeleton
@@ -45,20 +41,17 @@ let sampleContractHash =
     |> Hash.compute
 
 let private sampleContractTester txSkeleton hash =
-    let output = {
-        lock = Lock.Contract hash
-        spend =
-        {
-            asset = hash, Hash.zero
-            amount = 1000UL
-        }
+    let spend = {
+        asset = hash, Hash.zero
+        amount = 1000UL
     }
 
-    let pInput =
-        {
-            txHash = Hash.zero
-            index = 0ul
-        }, output
+    let output = {
+        lock = Lock.Contract hash
+        spend = spend
+    }
+
+    let pInput = Mint spend
 
     let outputs' = txSkeleton.outputs @ [ output ]
     let pInputs' = txSkeleton.pInputs @ [ pInput ]
@@ -79,7 +72,7 @@ let sampleOutput = {
 
 let sampleInputTx =
     {
-        pInputs = [ sampleInput, sampleOutput ]
+        pInputs = [ PointedOutput (sampleInput, sampleOutput) ]
         outputs = [ sampleOutput ]
     }
 
