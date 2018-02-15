@@ -58,7 +58,7 @@ let ``Should generate assets from a string and from an int``() =
         let main txSkeleton contractHash command returnAddress #l wallet =
             let str = "Test" in
             
-            if S.length str < 29 then
+            if S.byteCount str < 29 then
             begin
                 let! assetString = Zen.Asset.fromString contractHash str in
                 let! assetInt = Zen.Asset.fromInt contractHash 9999999ul in
