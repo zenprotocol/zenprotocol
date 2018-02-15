@@ -41,7 +41,7 @@ let runFStar args files =
     "--no_default_includes";
     "--include";"fstar/"; |]
   //printfn "%s" (join (fstar ++ args ++ zulibFiles));
-  ProcessHelper.Shell.Exec (executable, join (fstar ++ args ++ files))
+  ProcessHelper.Shell.AsyncExec (executable, join (fstar ++ args ++ files))
 
 Target "Clean" (fun _ ->
   CleanDir extractedDir
@@ -55,11 +55,14 @@ Target "RecordHints" (fun _ ->
        "--record_hints"
        "--cache_checked_modules" |]
 
-  let exitCodes = Array.Parallel.map (fun file -> runFStar args [|file|]) zulibFiles
+  let exitCodes = zulibFiles |> Array.map (fun file -> runFStar args [|file|])
+                             |> Async.Parallel
+                             |> Async.RunSynchronously
   if not ( exitCodes |> Array.forall ((=) 0) )
     then failwith "recording Zulib hints failed"
 
 )
+
 Target "Verify" (fun _ ->
   let args =
     [| "--use_hints";
@@ -67,7 +70,9 @@ Target "Verify" (fun _ ->
        "--cache_checked_modules"
     |]
 
-  let exitCodes = Array.Parallel.map (fun file -> runFStar args [|file|]) zulibFiles
+  let exitCodes = zulibFiles |> Array.map (fun file -> runFStar args [|file|])
+                             |> Async.Parallel
+                             |> Async.RunSynchronously
   if not (Array.forall (fun exitCode -> exitCode = 0) exitCodes)
     then failwith "Verifying Zulib failed"
 )
@@ -106,6 +111,7 @@ Target "Extract" (fun _ ->
        "--odir";extractedDir |]
 
   let exitCode = runFStar args zulibFiles
+                 |> Async.RunSynchronously
 
   if exitCode <> 0 then
     failwith "extracting Zulib failed"
