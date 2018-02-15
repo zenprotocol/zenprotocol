@@ -37,17 +37,21 @@ let ``Transaction with additional single input should be a prefix of another`` (
         lock = PK testHash
         spend = {asset = Constants.Zen; amount = 1UL } 
     }
-    let tx' = { tx with pInputs = tx.pInputs @ [ (input, output) ] }
+    let tx' = { tx with pInputs = tx.pInputs @ [ PointedOutput (input, output) ] }
     TxSkeleton.checkPrefix tx tx' = Ok tx'
 
 [<Property>]
 let ``Transactions with different leading first input should not be a prefix of one another`` (tx:TxSkeleton.T) =
     (List.length tx.pInputs > 0) ==> lazy (
-        let input, output = tx.pInputs.[0]
-        let pInput = { input with index = input.index + 1ul }, output
+        let input = tx.pInputs.[0]
+        let pInput = 
+            match input with 
+            | PointedOutput (outpoint, output) -> PointedOutput ({ outpoint with index = outpoint.index + 1ul }, output)
+            | Mint spend -> Mint { spend with amount = spend.amount + 1UL }
+            
         let pInputs = tx.pInputs.[1..List.length tx.pInputs - 1]
         let tx' = { tx with pInputs = pInput :: pInputs }
 
         TxSkeleton.checkPrefix tx tx' = Error "invalid prefix" &&
-        TxSkeleton.checkPrefix tx tx' = Error "invalid prefix"
+        TxSkeleton.checkPrefix tx' tx = Error "invalid prefix"
     )

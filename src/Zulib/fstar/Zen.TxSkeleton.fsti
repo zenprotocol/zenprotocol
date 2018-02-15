@@ -8,7 +8,7 @@ module U64 = FStar.UInt64
 
 val getAvailableTokens: asset -> txSkeleton -> U64.t `cost` 64
 
-val addInput: pointedOutput -> txSkeleton -> txSkeleton `cost` 64
+val addInput: input -> txSkeleton -> txSkeleton `cost` 64
 
 val addInputs(#n:nat):
   pointedOutput `V.t` n

@@ -173,7 +173,7 @@ let ``Should execute contract chain and get a valid transaction``() =
 
     let inputTx =
         {
-            pInputs = [ input, output ]
+            pInputs = [ PointedOutput (input, output) ]
             outputs = [ ]
         }
 

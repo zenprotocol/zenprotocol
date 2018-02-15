@@ -2,8 +2,12 @@
 
 open Consensus.Types
 
+type Input =
+    | PointedOutput of PointedOutput
+    | Mint of Spend
+
 type T = {
-    pInputs: PointedOutput list
+    pInputs: Input list
     outputs: Output list
 }
 
@@ -42,7 +46,7 @@ let fromTransaction tx outputs =
 
     if tx.inputs == outputs then
         Ok {
-            pInputs = List.zip tx.inputs outputs
+            pInputs = List.zip tx.inputs outputs |> List.map PointedOutput
             outputs = tx.outputs
         }
     else
@@ -62,17 +66,15 @@ let applyMask tx cw =
     else
         Error "could not apply mask"
 
-
-let isSkeletonOutpoint outpoint =
-    outpoint.txHash = Hash.zero
-    && outpoint.index = 0ul
-
 let isSkeletonOf txSkeleton tx inputs =
-    let withoutSkeletonInputs =
-        txSkeleton.pInputs |> List.filter (fst >> isSkeletonOutpoint >> not)
+    let outpoints =
+        txSkeleton.pInputs 
+        |> List.choose (function 
+            | Mint _ -> None
+            | PointedOutput pointedOutput -> Some pointedOutput)
 
-    tx.inputs = (withoutSkeletonInputs |> List.map fst)
-    && inputs = (withoutSkeletonInputs |> List.map snd) // Check that the contract didn't change the inputs
+    tx.inputs = (outpoints |> List.map fst)
+    && inputs = (outpoints |> List.map snd) // Check that the contract didn't change the inputs
     && tx.outputs = txSkeleton.outputs
 
 let getContractWitness cHash command returnAddress initialTxSkelton finalTxSkeleton =

@@ -29,8 +29,6 @@ let compile code = result {
     return! Contract.compile contractPath (code, hints)
 }
 
-let emptyOutpoint = {txHash = Hash.zero; index = 0u}
-
 // Message passing 'artificial' test:
 // Contract1 mints 25 tokens, and passes a message to contract2 which expects it and mints 50 tokens
 
@@ -117,12 +115,15 @@ let ``Should produce execute contracts with message passed between them``() =
     result {
         let! (contract1, contract2) = contracts
 
+        let spend1 = {asset = contract1.hash, Hash.zero; amount = 25UL}
+        let spend2 = {asset = contract2.hash, Hash.zero; amount = 50UL}
+
         let expectedTx = 
             {
                 pInputs = 
                     [
-                        (emptyOutpoint, {lock = Contract contract1.hash; spend = {asset = contract1.hash, Hash.zero; amount = 25UL}})
-                        (emptyOutpoint, {lock = Contract contract2.hash; spend = {asset = contract2.hash, Hash.zero; amount = 50UL}})
+                        Mint spend1
+                        Mint spend2
                     ]
                 outputs = 
                     [
