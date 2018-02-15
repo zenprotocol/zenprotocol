@@ -31,8 +31,11 @@ let handleTransaction getUTXO txHash tx set =
     let outputsWithIndex = List.mapi (fun i output -> (uint32 i,output)) tx.outputs
 
     let set = 
-        let set = List.fold folder set tx.inputs
-        
+        let set = 
+            tx.inputs
+            |> List.choose (function | outpoint -> Some outpoint | _ -> None)
+            |> List.fold folder set 
+            
         List.fold (fun state (index,output) ->
             let outpoint = {txHash=txHash;index=index;}
             Map.add outpoint (Unspent output) state) set outputsWithIndex
@@ -50,8 +53,8 @@ let getUtxosResult getUTXO outpoints utxoSet =
         outpoints
 
 // Currently only used for tests
-let getUtxos getUTXO outpoints utxoSet =
-    getUtxosResult getUTXO outpoints utxoSet |> Option.ofResult
+let getUtxos getUTXO inputs utxoSet =
+    getUtxosResult getUTXO inputs utxoSet |> Option.ofResult
 
 let undoBlock getOutput getUTXO block utxoSet =
 
@@ -60,13 +63,14 @@ let undoBlock getOutput getUTXO block utxoSet =
         let txHash = Transaction.hash tx
 
         let utxoSet = 
-            List.fold (fun utxoSet input ->
+            tx.inputs
+            |> List.fold (fun utxoSet input ->
                 match get getUTXO input utxoSet with
                 | Spent -> 
                     let output = getOutput input
                     Map.add input (Unspent output) utxoSet
                 | NoOutput
-                | Unspent _ -> failwith "Expected output to be spent") utxoSet tx.inputs
+                | Unspent _ -> failwith "Expected output to be spent") utxoSet
         
         [0 .. List.length tx.outputs - 1]
         |> List.map (fun i -> {txHash=txHash; index=uint32 i})

@@ -49,10 +49,7 @@ let sign keyPairs tx =
 
 let fromTxSkeleton tx =
     {
-        inputs =
-            tx.pInputs
-            |> List.filter (fun (input, _) -> not (input.txHash = Hash.zero && input.index = 0ul) )
-            |> List.map fst
+        inputs = List.choose (function | PointedOutput (outpoint, _) -> Some outpoint | _ -> None) tx.pInputs
         outputs = tx.outputs
         witnesses = []
         contract = None

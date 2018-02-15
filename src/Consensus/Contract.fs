@@ -64,7 +64,7 @@ let private castCostFnOutput output =
 let private wrap (mainMethodInfo, costMethodInfo) =
     (
     fun (Hash.Hash cHash) command returnAddress contractWallet txSkeleton ->
-        let txSkeleton' = ZFStar.convertInput txSkeleton
+        let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
         let contractWallet' = ZFStar.convertWallet contractWallet
         let returnAddress' = ZFStar.fsToFstOption ZFStar.fsToFstLock returnAddress
 
@@ -75,7 +75,7 @@ let private wrap (mainMethodInfo, costMethodInfo) =
         |> Result.bind ZFStar.convertResult
     ,
     fun command returnAddress contractWallet txSkeleton ->
-        let txSkeleton' = ZFStar.convertInput txSkeleton
+        let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
         let contractWallet' = ZFStar.convertWallet contractWallet
         let returnAddress' = ZFStar.fsToFstOption ZFStar.fsToFstLock returnAddress
 
