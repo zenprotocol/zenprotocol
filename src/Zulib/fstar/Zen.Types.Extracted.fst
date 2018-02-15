@@ -36,6 +36,10 @@ type output =
 
 type pointedOutput = outpoint ** output
 
+type input =
+    | PointedOutput of pointedOutput
+    | Mint of spend
+
 unopteq type blockHeader = {
     version: U32.t;
     parent: hash;
@@ -43,7 +47,6 @@ unopteq type blockHeader = {
     commitments: hash;
     timestamp: U64.t;
     difficulty: U32.t;
-    nonce: nonce;
-    }
+    nonce: nonce }
 
 type wallet (n:nat) = pointedOutput `V.t` n
