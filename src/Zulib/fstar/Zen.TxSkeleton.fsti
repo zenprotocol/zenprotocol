@@ -11,6 +11,7 @@ val getAvailableTokens: asset -> txSkeleton -> U64.t `cost` 64
 
 val addInput: input -> txSkeleton -> txSkeleton `cost` 64
 
+(*
 val addInput_AvailableTokens:
     pOut:pointedOutput
     -> txSkel: txSkeleton
@@ -25,18 +26,20 @@ val addInput_AvailableTokens:
                                      |> force in
                availableTokens = previouslyAvailableTokens +%^ spend.amount
              )
-
+*)
 
 val addInputs(#n:nat):
   input `V.t` n
   -> txSkeleton
   -> txSkeleton `cost` (64 * n + 64)
 
+(*
 assume AddInputs_is_fold:
     forall (#n:nat) (inputs: input `V.t` n) (txSkel: txSkeleton).
         force (addInputs inputs txSkel)
         ==
         force (V.foldl (flip addInput) txSkel inputs)
+*)
 
 val lockToContract:
   asset
