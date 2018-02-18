@@ -79,18 +79,43 @@ let private fstToFsLock (outputLock:lock) : Types.Lock =
         //TODO
         throwNotImplemented "fstToFsLock" (outputLock.ToString())
 
+let private fsToFstSpend (spend:Types.Spend) : spend =
+    let tokenContract, tokenHash = spend.asset
+    { asset = Hash.bytes tokenContract, Hash.bytes tokenHash; amount = spend.amount }
+
+let private fstToFsSpend (spend:spend) : Types.Spend =
+    let tokenContract, tokenHash = spend.asset
+    { asset = Hash.Hash tokenContract, Hash.Hash tokenHash; amount = spend.amount }
+
 let private fsToFstOutput (output:Types.Output) : output =
-    let tokenContract, tokenHash = output.spend.asset
-    { lock = fsToFstLock output.lock; spend = { asset = Hash.bytes tokenContract, Hash.bytes tokenHash; amount = output.spend.amount }}
+    { lock = fsToFstLock output.lock; spend = fsToFstSpend output.spend }
 
 let private fstToFsOutput (output:output) : Types.Output =
     let tokenContract, tokenHash = output.spend.asset
-    { lock = fstToFsLock output.lock; spend = { asset = Hash.Hash tokenContract, Hash.Hash tokenHash; amount = output.spend.amount }}
+    { lock = fstToFsLock output.lock; spend = fstToFsSpend output.spend }
 
-let private fstToFsPointedOutput (outpoint, output) : PointedOutput =
-    { txHash = Hash.Hash outpoint.txHash; index = outpoint.index }, fstToFsOutput output
+let private fstToFsInput (input: input) : Input =
+    match input with
+    | PointedOutput (outpoint, output) ->
+        let outpoint = { Outpoint.txHash = Hash.Hash outpoint.txHash; index = outpoint.index }
+        let output = fstToFsOutput output
+        Input.PointedOutput <| (outpoint, output)
+    | Mint spend -> 
+        Input.Mint <| fstToFsSpend spend
 
-let private fsToFstPointedOutput (outpoint:Types.Outpoint, output) : pointedOutput =
+let private fsToFstInput (input: Input) : input =
+    match input with
+    | Input.PointedOutput (outpoint, output) ->
+        let outpoint = { txHash = Hash.bytes outpoint.txHash; index = outpoint.index }
+        let output = fsToFstOutput output
+        PointedOutput <| (outpoint, output)
+    | Input.Mint spend -> 
+        Mint <| fsToFstSpend spend
+
+let private fsToFstPointedOutput ((outpoint, output):PointedOutput) : pointedOutput =
+    { txHash = Hash.bytes outpoint.txHash; index = outpoint.index }, fsToFstOutput output
+
+let private fsToFstOutpointOutputTuple (outpoint:Types.Outpoint, output) : (outpoint * output) =
     { txHash = Hash.bytes outpoint.txHash; index = outpoint.index }, fsToFstOutput output
 
 let private vectorToList (z:Zen.Vector.t<'Aa, _>) : List<'Aa> =
@@ -109,7 +134,7 @@ let private fstToFsTx : txSkeleton -> _ = function
             Map.toList inputMap
             |> List.collect(fun (_, (_, inputs)) -> inputs)
             |> List.sortBy fst
-            |> List.map (snd >> fstToFsPointedOutput)
+            |> List.map (snd >> fstToFsInput)
         let outputs =
             Map.toList outputMap
             |> List.collect(fun (_, (_, outputs)) -> outputs)
@@ -138,16 +163,17 @@ let convertWallet (wallet:PointedOutput list) =
     List.map fsToFstPointedOutput wallet
     |> listToVector
 
-let convertInput (txSkeleton:TxSkeleton.T) : txSkeleton =
-    let insertPointedOutput txSkeleton pointedOutput =
-        insertPointedOutput pointedOutput txSkeleton
+let fsToFstTxSkeleton (txSkeleton:TxSkeleton.T) : txSkeleton =
+    let insertInput txSkeleton pointedOutput =
+        insertInput pointedOutput txSkeleton
     let insertOutput txSkeleton output =
         insertOutput output txSkeleton
-    let inputs = txSkeleton.pInputs |> List.map fsToFstPointedOutput
-    let outputs= txSkeleton.outputs |> List.map fsToFstOutput
+        
+    let inputs = txSkeleton.pInputs |> List.map fsToFstInput
+    let outputs = txSkeleton.outputs |> List.map fsToFstOutput
 
     let txSkeletonWithInputsOnly =
-        List.fold insertPointedOutput emptyTxSkeleton inputs
+        List.fold insertInput emptyTxSkeleton inputs
 
     List.fold insertOutput txSkeletonWithInputsOnly outputs
 

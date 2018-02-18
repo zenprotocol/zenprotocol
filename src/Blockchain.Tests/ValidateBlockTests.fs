@@ -800,7 +800,7 @@ let ``Valid template for two transactions which don't depend on each other``() =
         Transaction.sign
             [ rootAccount.keyPair ]
             {
-                inputs = [outpoint];
+                inputs = [ outpoint];
                 outputs = outputs;
                 witnesses=[];
                 contract=None

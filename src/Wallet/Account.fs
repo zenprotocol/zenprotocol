@@ -278,6 +278,7 @@ let createExecuteContractTransaction account executeContract cHash command spend
     for (asset, amount) in Map.toSeq spends do
         let! inputs, keys', collectedAmount =
             getInputs account {asset=asset;amount=amount}
+        let inputs = List.map TxSkeleton.Input.PointedOutput inputs
         txSkeleton <-
             TxSkeleton.addInputs inputs txSkeleton
             |> TxSkeleton.addChange asset collectedAmount amount account.publicKeyHash

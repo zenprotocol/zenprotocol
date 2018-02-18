@@ -32,8 +32,7 @@ let private addSpend s m =
     | None -> Map.add s.asset (0UL + s.amount) m
 
 let private foldSpends =
-    List.map (fun o -> o.spend)
-    >> List.fold (fun map s -> addSpend s map) Map.empty
+    List.fold (fun map s -> addSpend s map) Map.empty
 
 let private checkSpends m =
     Map.forall (fun _ v -> Option.isSome v) m
@@ -48,7 +47,8 @@ let private activateContract contractPath acs (tx : Types.Transaction) = result 
 }
 
 let private checkAmounts (txSkeleton:TxSkeleton.T) =
-    let inputs, outputs = foldSpends (txSkeleton.pInputs |> List.map snd), foldSpends txSkeleton.outputs
+    let inputs = List.map (function | TxSkeleton.Input.PointedOutput (_, output) -> output.spend | TxSkeleton.Input.Mint spend -> spend) txSkeleton.pInputs
+    let inputs, outputs = foldSpends inputs, foldSpends (List.map (fun o -> o.spend) txSkeleton.outputs)
 
     if not <| checkSpends outputs then
         GeneralError "outputs overflow"
@@ -61,7 +61,7 @@ let private checkAmounts (txSkeleton:TxSkeleton.T) =
 
 let getContractWallet tx inputs cHash =
     List.zip tx.inputs inputs
-    |> List.filter (fun (_,output) -> output.lock = Contract cHash)
+    |> List.filter (fun (_, output) -> output.lock = Contract cHash)
 
 let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =            
     let checkPKWitness inputTx pInputs serializedPublicKey signature =
@@ -77,12 +77,12 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
     
         match pInputs with
         | [] -> GeneralError "missing PK witness input"
-        | (_, {lock=Coinbase (coinbaseBlockNumber,pkHash)}) :: tail ->
+        | TxSkeleton.Input.PointedOutput (_, {lock=Coinbase (coinbaseBlockNumber,pkHash)}) :: tail ->
             if blockNumber - coinbaseBlockNumber < CoinbaseMaturity then
                 GeneralError "Coinbase not mature enough"
             else
                 verifyPkHash pkHash tail                        
-        | (_, {lock=PK pkHash}) :: tail -> verifyPkHash pkHash tail           
+        | TxSkeleton.Input.PointedOutput (_, {lock=PK pkHash}) :: tail -> verifyPkHash pkHash tail           
         | _ -> GeneralError "unexpected PK witness lock type"
 
     let checkContractWitness inputTx acs cw message pInputs =
@@ -93,6 +93,8 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
                 GeneralError "invalid message"
 
         let checkIssuedAndDestroyed (txSkeleton : TxSkeleton.T) =
+            let isMismatchedSpend ({asset=cHash,_;amount=_} : Spend) =
+                cHash <> cw.cHash
             let endInputs = cw.beginInputs + cw.inputsLength - 1u |> int
             let endOutputs = cw.beginOutputs + cw.outputsLength - 1u |> int
 
@@ -102,14 +104,15 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
                 GeneralError "invalid contract witness indices"
             else if
                 txSkeleton.pInputs.[int cw.beginInputs .. endInputs]
-                |> List.exists (fun (outpoint, {spend={asset=cHash,_;amount=_}}) ->
-                    TxSkeleton.isSkeletonOutpoint outpoint && cHash <> cw.cHash)
+                |> List.exists (function
+                    | TxSkeleton.Input.Mint spend when isMismatchedSpend spend -> true
+                    | _ -> false)
             then
                 GeneralError "illegal creation of tokens"
             else if
                 txSkeleton.outputs.[int cw.beginOutputs .. endOutputs]
                 |> List.exists (function
-                    | {lock=Destroy; spend={asset=cHash,_;amount=_}} when cHash <> cw.cHash -> true
+                    | {lock=Destroy; spend=spend} when isMismatchedSpend spend -> true
                     | _ -> false)
             then
                 GeneralError "illegal destruction of tokens"
@@ -119,11 +122,11 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
         let rec popContractsLocksOf cHash pInputs =
             match pInputs with
             | [] -> []
-            | (input, output) :: tail ->
+            | TxSkeleton.Input.PointedOutput (input, output) :: tail ->
                 match output.lock with
                 | Contract cHash' when cHash' = cHash ->
                     popContractsLocksOf cHash' tail
-                | _ -> (input, output) :: tail
+                | _ -> TxSkeleton.Input.PointedOutput (input, output) :: tail
 
         match ActiveContractSet.tryFind cw.cHash acs with
         | Some contract ->
@@ -152,7 +155,7 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
 
     let witnessesFolder state (witness, message) =
         state
-        |> Result.bind (fun (tx', (pInputs:(Outpoint * Output) list)) ->
+        |> Result.bind (fun (tx', pInputs) ->
             match witness with
             | PKWitness (serializedPublicKey, signature) ->
                 checkPKWitness tx' pInputs serializedPublicKey signature
@@ -212,9 +215,10 @@ let private checkOutputsNotEmpty tx =
         Ok tx
 
 let private checkOutputsOverflow tx =
-    if tx.outputs
-          |> foldSpends
-          |> checkSpends then Ok tx
+    if tx.outputs 
+        |> List.map (fun o -> o.spend)
+        |> foldSpends
+        |> checkSpends then Ok tx
     else GeneralError "outputs overflow"
 
 let private checkDuplicateInputs tx =
@@ -223,7 +227,7 @@ let private checkDuplicateInputs tx =
     else GeneralError "inputs duplicated"
 
 let private checkInputsStructure tx =
-    if tx.inputs |> List.exists (fun input -> not (Hash.isValid input.txHash)) then
+    if tx.inputs |> List.exists (fun outpoint -> not <| Hash.isValid outpoint.txHash) then
         GeneralError "inputs structurally invalid"
     else
         Ok tx
@@ -240,7 +244,7 @@ let private checkNoCoinbaseLock tx =
     else
         Ok tx
             
-let private tryGetUtxos getUTXO utxoSet (txHash:Hash.Hash) tx =
+let private tryGetUtxos getUTXO utxoSet tx =
     getUtxosResult getUTXO tx.inputs utxoSet
     |> Result.mapError (fun errors ->
         if List.contains Spent errors then DoubleSpend else Orphan
@@ -292,7 +296,7 @@ let validateCoinbase blockNumber =
     >=> checkOutputsOverflow        
 
 let validateInContext getUTXO contractPath blockNumber acs set txHash tx = result {
-    let! outputs = tryGetUtxos getUTXO set txHash tx
+    let! outputs = tryGetUtxos getUTXO set tx
     let! txSkel = checkWitnesses blockNumber acs (txHash, tx, outputs)
     do! checkAmounts txSkel
     let! newAcs = activateContract contractPath acs tx

@@ -82,7 +82,7 @@ let ``Should get expected contract cost``() =
     (compile sampleContractCode
      |> Result.bind (fun contract ->
         Contract.getCost contract "" None List.empty sampleInputTx)
-    , (Ok 216I : Result<bigint, string>))
+    , (Ok 213I : Result<bigint, string>))
     |> shouldEqual
 
 [<Test>]
@@ -98,9 +98,9 @@ let ``Contract should not be able to create tokens other than its own``() =
          module Tx = Zen.TxSkeleton
 
          val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 9
-         let cf _ _ _ #l _ = ret (64 + (64 + 64 + 0) + 24)
+         let cf _ _ _ #l _ = ret (64 + (64 + 64 + 0) + 19)
 
-         val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + 64 + 0) + 24)
+         val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + 64 + 0) + 19)
          let main txSkeleton contractHash command returnAddress #l wallet =
            let! asset = Zen.Asset.getDefault Zen.Asset.zeroHash in
            let lock = ContractLock contractHash in
@@ -108,12 +108,8 @@ let ``Contract should not be able to create tokens other than its own``() =
                asset=asset;
                amount=1000UL
                } in
-           let output = { lock=lock; spend=spend } in
 
-           let pInput = {
-               txHash = Zen.Asset.zeroHash;
-               index = 0ul
-           }, output in
+           let pInput = Mint spend in
 
            let! txSkeleton =
                Tx.addInput pInput txSkeleton
@@ -162,7 +158,7 @@ let ``Contract should be able to destroy its own tokens locked to it``() =
 
     let sampleInputTx =
         {
-            pInputs = [ (sampleInput, sampleOutput) ; (sampleInput2, outputToDestroy) ]
+            pInputs = [ PointedOutput (sampleInput, sampleOutput) ; PointedOutput (sampleInput2, outputToDestroy) ]
             outputs = [ sampleOutput ]
         }
 
@@ -233,7 +229,7 @@ let ``Contract should not be able to destroy tokens other than its own - single 
 
     let sampleInputTx =
         {
-            pInputs = [ (sampleInput, sampleOutput) ; (sampleInput2, outputToDestroy) ]
+            pInputs = [ PointedOutput (sampleInput, sampleOutput) ; PointedOutput (sampleInput2, outputToDestroy) ]
             outputs = [ sampleOutput ]
         }
 
@@ -285,7 +281,7 @@ let ``Contract should not be able to destroy t4okens other than its own - multip
 
     let sampleInputTx =
         {
-            pInputs = [ (sampleInput, sampleOutput) ; (sampleInput2, outputToDestroy) ]
+            pInputs = [ PointedOutput (sampleInput, sampleOutput) ; PointedOutput (sampleInput2, outputToDestroy) ]
             outputs = [ sampleOutput ]
         }
 

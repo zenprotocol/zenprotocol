@@ -9,7 +9,7 @@ module U64 = FStar.UInt64
 
 val getAvailableTokens: asset -> txSkeleton -> U64.t `cost` 64
 
-val addInput: pointedOutput -> txSkeleton -> txSkeleton `cost` 64
+val addInput: input -> txSkeleton -> txSkeleton `cost` 64
 
 val addInput_AvailableTokens:
     pOut:pointedOutput
@@ -17,7 +17,7 @@ val addInput_AvailableTokens:
     -> Lemma ( let open U64 in
                let spend = (snd pOut).spend in
                let asset = spend.asset in
-               let txSkel' = addInput pOut txSkel
+               let txSkel' = addInput (PointedOutput pOut) txSkel
                              |> force in
                let previouslyAvailableTokens = getAvailableTokens asset txSkel
                                                |> force in
@@ -28,15 +28,15 @@ val addInput_AvailableTokens:
 
 
 val addInputs(#n:nat):
-  pointedOutput `V.t` n
+  input `V.t` n
   -> txSkeleton
   -> txSkeleton `cost` (64 * n + 64)
 
 assume AddInputs_is_fold:
-    forall (#n:nat) (pOuts: pointedOutput `V.t` n) (txSkel: txSkeleton).
-        force (addInputs pOuts txSkel)
+    forall (#n:nat) (inputs: input `V.t` n) (txSkel: txSkeleton).
+        force (addInputs inputs txSkel)
         ==
-        force (V.foldl (flip addInput) txSkel pOuts)
+        force (V.foldl (flip addInput) txSkel inputs)
 
 val lockToContract:
   asset

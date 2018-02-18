@@ -172,7 +172,7 @@ let ``Should buy``() =
 
     let inputTx =
         {
-            pInputs = [ input, output ]
+            pInputs = [ PointedOutput (input, output) ]
             outputs = [ ]
         }
 
@@ -229,7 +229,7 @@ let ``Should redeem``() =
 
     let inputTx =
         {
-            pInputs = [ inputContractAsset, outputContractAsset ]
+            pInputs = [ PointedOutput (inputContractAsset, outputContractAsset) ]
             outputs = [ ]
         }
 

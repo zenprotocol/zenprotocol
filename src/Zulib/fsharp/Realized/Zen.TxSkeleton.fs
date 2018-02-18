@@ -29,18 +29,21 @@ let getAvailableTokens (asset : asset) (txSkeleton : txSkeleton) : Cost.t<uint64
           unlockedAmount - lockedAmount)
     |> Cost.C
 
-let insertPointedOutput (pointedOutput : pointedOutput)
+let insertInput (input : input)
     (txSkeleton : txSkeleton) : txSkeleton =
-    let { asset = asset; amount = amount } = (snd pointedOutput).spend
+    let { asset = asset; amount = amount } = 
+        match input with 
+        | PointedOutput (_, output) -> output.spend
+        | Mint spend -> spend
 
     let num_inputs, inputMap = txSkeleton.inputs
     let inputMap =
         if inputMap |> Map.containsKey asset then
-            let oldAmount, pointedOutputs = Map.find asset inputMap
+            let oldAmount, inputs = Map.find asset inputMap
             inputMap |> Map.add asset
                             (amount + oldAmount,
-                            (num_inputs+1UL, pointedOutput)::pointedOutputs)
-        else inputMap |> Map.add asset (amount, [num_inputs+1UL, pointedOutput])
+                            (num_inputs+1UL, input)::inputs)
+        else inputMap |> Map.add asset (amount, [num_inputs+1UL, input])
     { txSkeleton with inputs = num_inputs + 1UL, inputMap }
 
 let insertOutput (output : output) (txSkeleton : txSkeleton) : txSkeleton =
@@ -56,22 +59,32 @@ let insertOutput (output : output) (txSkeleton : txSkeleton) : txSkeleton =
         else outputMap |> Map.add asset (amount, [num_outputs+1UL, output])
     { txSkeleton with outputs = num_outputs+1UL, outputMap }
 
-let addInput (pointedOutput : pointedOutput) (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
-    lazy (insertPointedOutput pointedOutput txSkeleton) |> Cost.C
+let addInput (input : input) (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
+    lazy (insertInput input txSkeleton) |> Cost.C
 
-let rec addInputs (_ : Prims.nat) (pointedOutputs : V.t<pointedOutput, unit>)
+let rec private addPointedOutputs (_ : Prims.nat) (pointedOutputs : V.t<pointedOutput, unit>)
         (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
     lazy (match pointedOutputs with
           | V.VNil -> txSkeleton
           | V.VCons(n, pointedOutput, pointedOutputs) ->
-              insertPointedOutput pointedOutput txSkeleton
-              |> addInputs n pointedOutputs
+              insertInput (PointedOutput pointedOutput) txSkeleton
+              |> addPointedOutputs n pointedOutputs
               |> Cost.__force)
     |> Cost.C
-                                
+
+let rec addInputs (_ : Prims.nat) (inputs : V.t<input, unit>)
+        (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
+    lazy (match inputs with
+          | V.VNil -> txSkeleton
+          | V.VCons(n, input, inputs) ->
+              insertInput input txSkeleton
+              |> addInputs n inputs
+              |> Cost.__force)
+    |> Cost.C
+
 let addOutput (output : output) (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
     lazy (insertOutput output txSkeleton) |> Cost.C
-                             
+
 let lockToContract (asset : asset) (amount:uint64) (contractHash : hash)
     (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
     lazy (let lock = ContractLock contractHash
@@ -92,12 +105,12 @@ let lockToPubKey (asset : asset) (amount:uint64) (pkHash : hash) (txSkeleton : t
     |> Cost.C
 
 let lockToAddress (asset : asset) (amount:uint64) (address : lock) (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
-    lazy (    
+    lazy (
           let output =
               { lock = address;
                 spend = {asset=asset;amount=amount} }
           insertOutput output txSkeleton)
-    |> Cost.C    
+    |> Cost.C
 
 let addChangeOutput (asset : asset) (contractHash : contractHash)
     (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
@@ -113,20 +126,9 @@ let mint (amount : U64.t) ((contractHash, hash) : asset)
               { asset = contractHash, hash;
                 amount = amount }
 
-          let mintLock = ContractLock contractHash
+          let input = Mint mintSpend
 
-          let mintOutput =
-              { lock = mintLock;
-                spend = mintSpend }
-
-          let mintTxHash = Array.create 32 0uy
-
-          let mintOutpoint =
-              { txHash = mintTxHash;
-                index = 0u }
-
-          let pointedOutput = mintOutpoint, mintOutput
-          addInput pointedOutput txSkeleton |> Cost.__force)
+          addInput input txSkeleton |> Cost.__force)
     |> Cost.C
 
 let destroy (amount : U64.t) (asset : asset)
@@ -141,30 +143,30 @@ let destroy (amount : U64.t) (asset : asset)
 
           addOutput destroyOutput txSkeleton |> Cost.__force)
     |> Cost.C
-    
-   
-let fromWallet (_: Prims.nat) (asset:asset) (amount:U64.t) 
+
+
+let fromWallet (_: Prims.nat) (asset:asset) (amount:U64.t)
                 (contractHash:hash) (wallet:wallet<Prims.unit>) (txSkeleton:txSkeleton) =
-                
-    lazy (                
+
+    lazy (
         let n,inputs,collectedAmount = collect asset amount wallet 0I V.VNil 0UL
-        
+
         match inputs with
         | V.VNil -> Native.None
         | _ ->
-            let txSkeleton = addInputs n inputs txSkeleton |> Cost.__force
-            
+            let txSkeleton = addPointedOutputs n inputs txSkeleton |> Cost.__force
+
             // Do we need a change?
-            if collectedAmount > amount then 
+            if collectedAmount > amount then
                 lockToContract asset (collectedAmount - amount) contractHash txSkeleton
                 |> Cost.__force
                 |> Native.Some
             else
                 txSkeleton
-                |> Native.Some   
-                        
+                |> Native.Some
+
     ) |> Cost.C
-             
+
 
 let isValid (txSkeleton : txSkeleton) : Cost.t<bool, unit> =
     let _, inputMap = txSkeleton.inputs
