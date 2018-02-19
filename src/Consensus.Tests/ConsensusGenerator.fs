@@ -110,15 +110,29 @@ type ConsensusGenerator =
         })
 
     static member Transaction() =
-        let inputGenerator =
+        let outpointGenerator =
             gen {
-                let! txHash = Gen.arrayOfLength Hash.Length Arb.generate<byte>
-                let txHash = Hash.Hash txHash
+                let! bytes = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+                let txHash = Hash.Hash bytes
                 let! index = Gen.choose (0,10)
                 let index = uint32 index
 
-                return {txHash = txHash;index=index;}
+                return Outpoint {txHash = txHash;index=index;}
             }
+
+        let mintGenerator =
+            gen {
+                let! bytes1 = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+                let! bytes2 = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+                let asset = (Hash.Hash bytes1, Hash.Hash bytes2) : Asset
+                let! amount = Gen.choose (0,1000)
+                let amount = uint64 amount
+
+                return Mint { asset=asset; amount=amount }
+            }
+
+        let inputGenerator =
+            Gen.oneof [ outpointGenerator; mintGenerator ]
 
         let outputGenerator =
             gen {
@@ -155,4 +169,65 @@ type ConsensusGenerator =
 //                let! contract = contractGenerator
 
                 return {inputs=inputs;outputs=outputs;contract=None;witnesses=[]}
+            })
+
+        static member TxSkeleton() =
+            let pointedOutputGenerator =
+                gen {
+                    let! bytes = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+                    let txHash = Hash.Hash bytes
+                    let! index = Gen.choose (0,10)
+                    let index = uint32 index
+
+                    let outpoint = {txHash = txHash;index=index;}
+
+                    let notCoinbaseLock lock =
+                        match lock with
+                        | Coinbase _ -> false
+                        | _ -> true
+
+                    let! lock = Arb.generate<Lock> |> Gen.filter notCoinbaseLock
+                    let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+                    let asset = Hash.Hash asset, Hash.zero
+                    let! amount = Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
+
+                    let output = {lock=lock;spend={asset=asset;amount=amount}}
+
+                    return TxSkeleton.Input.PointedOutput (outpoint, output)
+                }
+
+            let mintGenerator =
+                gen {
+                    let! bytes1 = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+                    let! bytes2 = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+                    let asset = (Hash.Hash bytes1, Hash.Hash bytes2) : Asset
+                    let! amount = Gen.choose (0,1000)
+                    let amount = uint64 amount
+
+                    return TxSkeleton.Input.Mint { asset=asset; amount=amount }
+                }
+
+            let outputGenerator =
+                gen {
+                    let notCoinbaseLock lock =
+                        match lock with
+                        | Coinbase _ -> false
+                        | _ -> true
+
+                    let! lock = Arb.generate<Lock> |> Gen.filter notCoinbaseLock
+                    let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+                    let asset = Hash.Hash asset, Hash.zero
+                    let! amount = Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
+
+                    return {lock=lock;spend={asset=asset;amount=amount}}
+                }
+
+            let inputGenerator =
+                Gen.oneof [ pointedOutputGenerator; mintGenerator ]
+
+            Arb.fromGen (gen {
+                let! inputs = Gen.nonEmptyListOf inputGenerator
+                let! outputs = Gen.nonEmptyListOf outputGenerator
+
+                return ({pInputs=inputs;outputs=outputs} : TxSkeleton.T)
             })

@@ -179,8 +179,8 @@ let ``Should buy``() =
     TransactionHandler.executeContract session inputTx cHash "buy" Contract.EmptyData (PK samplePKHash) { state.memoryState with utxoSet = utxoSet }
     |> function
     | Ok tx ->
-        tx.inputs |> should haveLength 1
-        tx.inputs |> should contain input
+        tx.inputs |> should haveLength 2
+        tx.inputs |> should contain (Outpoint input)
         tx.outputs |> should haveLength 2
         tx.outputs |> should contain { lock = Contract cHash; spend = spend }
         tx.outputs |> should contain { lock = PK samplePKHash; spend = { spend with asset = cHash, Hash.zero } }
@@ -196,7 +196,7 @@ let ``Should buy``() =
              outputsLength = 2u
         }
         tx.witnesses |> should contain cw
-    | Error error -> failwithf "--> %A" error
+    | Error error -> failwith error
 
 [<Test>]
 let ``Should redeem``() =
@@ -238,8 +238,8 @@ let ``Should redeem``() =
     |> function
     | Ok tx ->
         tx.inputs |> should haveLength 2
-        tx.inputs |> should contain inputContractAsset
-        tx.inputs |> should contain inputZen
+        tx.inputs |> should contain (Outpoint inputContractAsset)
+        tx.inputs |> should contain (Outpoint inputZen)
         tx.outputs |> should haveLength 2
         tx.outputs |> should contain { lock = Destroy; spend = spendContractAsset }
         tx.outputs |> should contain { lock = PK samplePKHash; spend = spendZen }

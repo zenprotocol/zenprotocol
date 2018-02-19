@@ -45,7 +45,7 @@ let ``tokens spent``() =
     let tx = {inputs=[];outputs=[output;output];witnesses=[];contract=None}
     let txHash = (Transaction.hash tx)
 
-    let tx' = {inputs=[{txHash=txHash; index=0ul}];outputs=[];witnesses=[];contract=None}
+    let tx' = {inputs=[ Outpoint {txHash=txHash; index=0ul}];outputs=[];witnesses=[];contract=None}
 
     let account' =
         Account.addTransaction txHash tx account

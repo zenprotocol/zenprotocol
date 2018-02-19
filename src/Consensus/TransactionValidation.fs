@@ -7,6 +7,7 @@ open Consensus.Crypto
 open Consensus
 open Consensus
 open Infrastructure
+open Org.BouncyCastle.Asn1.IsisMtt.Ocsp
 
 
 let private (>=>) f1 f2 x = Result.bind f2 (f1 x)
@@ -94,7 +95,8 @@ let private checkAmounts (txSkeleton:TxSkeleton.T) =
         Ok ()
 
 let getContractWallet tx inputs cHash =
-    List.zip tx.inputs inputs
+    let txInputs = List.choose (function | Outpoint outpoint -> Some outpoint | Mint _ -> None) tx.inputs
+    List.zip txInputs inputs
     |> List.filter (fun (_, output) -> output.lock = Contract cHash)
 
 let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
@@ -261,7 +263,12 @@ let private checkDuplicateInputs tx =
     else GeneralError "inputs duplicated"
 
 let private checkInputsStructure tx =
-    if tx.inputs |> List.exists (fun outpoint -> not <| Hash.isValid outpoint.txHash) then
+    if tx.inputs |> List.exists (function
+        | Types.Input.Outpoint outpoint ->
+            not <| Hash.isValid outpoint.txHash
+        | Types.Input.Mint {asset=cHash,token; amount=_} ->
+            not <| Hash.isValid cHash ||
+            not <| Hash.isValid token) then
         GeneralError "inputs structurally invalid"
     else
         Ok tx
