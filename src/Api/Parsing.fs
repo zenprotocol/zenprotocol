@@ -60,14 +60,14 @@ let getContractExecute chain json =
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
 
-let getContractActivate chain json =
+let getContractActivate json =
     try
         let json = ContractActivateRequestJson.Parse json
 
         if String.length json.Code = 0 then
             Error "Contract code is empty"
         else
-            Ok json.Code
+            Ok (json.Code, uint32 json.NumberOfBlocks)
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
 

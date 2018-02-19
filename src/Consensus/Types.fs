@@ -24,6 +24,7 @@ type Lock =
     | Contract of Hash
     | Coinbase of blockNumber:uint32 * pkHash:Hash
     | Fee
+    | ActivationSacrifice
     | Destroy
 
 type Output = {

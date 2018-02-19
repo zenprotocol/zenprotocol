@@ -4,6 +4,8 @@ open Consensus.Types
 open Consensus.UtxoSet
 open Consensus.Crypto
 
+open Consensus
+open Consensus
 open Infrastructure
 
 
@@ -37,21 +39,46 @@ let private foldSpends =
 let private checkSpends m =
     Map.forall (fun _ v -> Option.isSome v) m
 
-let private activateContract contractPath blockNumber acs (tx : Types.Transaction) = result {
-    match tx.contract with
-    | Some (code,hints) ->
-        let cHash = Contract.computeHash code
+let private activateContract chain contractPath blockNumber acs (tx : Types.Transaction) =
+    let getActivationSacrifice tx = result {
+        let activationSacrifices = List.filter(fun output -> output.lock = ActivationSacrifice) tx.outputs
 
-        match ActiveContractSet.tryFind cHash acs with
-        | Some contract ->
-            let contract = {contract with expiry = contract.expiry + 1000ul}
-            return ActiveContractSet.add cHash contract acs
+        if List.isEmpty activationSacrifices then
+            return! GeneralError "Contract activation must include activation sacrifice"
+
+        let allUsingZen =
+            List.forall (fun output -> output.spend.asset = Constants.Zen) activationSacrifices
+
+        if not allUsingZen then
+            return! GeneralError "Sacrifice must be paid in Zen"
+
+        return List.sumBy (fun output -> output.spend.amount) activationSacrifices
+    }
+
+    result {
+        match tx.contract with
+        | Some (code,hints) ->
+            let cHash = Contract.computeHash code
+
+            let! activationSacrifices = getActivationSacrifice tx
+
+            let codeLengthKB = String.length code |> uint64
+            let activationSacrificePerBlock = ChainParameters.getContractSacrificePerBytePerBlock chain * codeLengthKB
+            let numberOfBlocks = activationSacrifices / activationSacrificePerBlock |> uint32
+
+            if numberOfBlocks = 0ul then
+                return! (GeneralError "Contract must be activate for at least one block")
+
+            match ActiveContractSet.tryFind cHash acs with
+            | Some contract ->
+                let contract = {contract with expiry = contract.expiry + numberOfBlocks}
+                return ActiveContractSet.add cHash contract acs
+            | None ->
+                let! contract = Contract.compile contractPath (code,hints) (blockNumber + numberOfBlocks) |> Result.mapError (fun _ -> BadContract)
+                return ActiveContractSet.add contract.hash contract acs
         | None ->
-            let! contract = Contract.compile contractPath (code,hints) (blockNumber + 1000ul) |> Result.mapError (fun _ -> BadContract)
-            return ActiveContractSet.add contract.hash contract acs
-    | None ->
-        return acs
-}
+            return acs
+    }
 
 let private checkAmounts (txSkeleton:TxSkeleton.T) =
     let inputs = List.map (function | TxSkeleton.Input.PointedOutput (_, output) -> output.spend | TxSkeleton.Input.Mint spend -> spend) txSkeleton.pInputs
@@ -302,10 +329,10 @@ let validateCoinbase blockNumber =
     >=> checkNoContractInCoinbase
     >=> checkOutputsOverflow
 
-let validateInContext getUTXO contractPath blockNumber acs set txHash tx = result {
+let validateInContext chain getUTXO contractPath blockNumber acs set txHash tx = result {
     let! outputs = tryGetUtxos getUTXO set tx
     let! txSkel = checkWitnesses blockNumber acs (txHash, tx, outputs)
     do! checkAmounts txSkel
-    let! newAcs = activateContract contractPath blockNumber acs tx
+    let! newAcs = activateContract chain contractPath blockNumber acs tx
     return tx, newAcs
 }

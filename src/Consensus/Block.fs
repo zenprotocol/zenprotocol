@@ -288,7 +288,7 @@ let connect chain getUTXO contractsPath parent timestamp set acs ema =
                 | Ok (block,set,acs,ema) ->
                     let txHash = (Transaction.hash tx)
 
-                    match TransactionValidation.validateInContext getUTXO contractsPath (block.header.blockNumber) acs set txHash tx with
+                    match TransactionValidation.validateInContext chain getUTXO contractsPath (block.header.blockNumber) acs set txHash tx with
                     | Error err -> Error (sprintf "transactions failed inputs validation due to %A" err)
                     | Ok (_,acs) ->
                         let set = UtxoSet.handleTransaction getUTXO txHash tx set

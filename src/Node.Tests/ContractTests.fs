@@ -64,7 +64,7 @@ let ``Contract should activate and execute - Bus``() =
     let client = ServiceBus.Client.create busName
     let subscriber = EventBus.Subscriber.create<Event> busName
 
-    match Wallet.activateContract client sampleContractCode with
+    match Wallet.activateContract client sampleContractCode 10ul with
     | ActivateContractTransactionResult.Ok (contractActivationTx, cHash) ->
         Blockchain.validateTransaction client contractActivationTx
         waitForTx subscriber contractActivationTx
@@ -77,7 +77,7 @@ let ``Contract should activate and execute - Bus``() =
 
 [<Test>]
 let ``Contract should activate and execute - API``() =
-    let activate = new ContractActivateRequestJson.Root(sampleContractCode)
+    let activate = new ContractActivateRequestJson.Root(sampleContractCode, 10)
     let response = activate.JsonValue.Request ("http://" + apiUri + "/wallet/contract/activate")
     response.StatusCode |> should equal 200
     let responseBody =

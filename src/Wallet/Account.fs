@@ -241,20 +241,35 @@ let createTransaction chain account pkHash spend = result  {
 
     }
 
-let createActivateContractTransaction account code =
-    let unspent = getUnspentOutputs account
+let createActivateContractTransaction chain account code (numberOfBlocks:uint32) =
+    let codeLength = String.length code |> uint64
+
+    let activationSacrifice = ChainParameters.getContractSacrificePerBytePerBlock chain * codeLength * (uint64 numberOfBlocks)
+    let spend = {amount=activationSacrifice;asset=Constants.Zen}
+
     result {
-    let! hints = Contract.recordHints code
-    let input, output = Map.toSeq unspent |> Seq.head
-    let output' = {output with lock=PK account.publicKeyHash}
-    return Transaction.sign
-        [ account.keyPair ]
-        {
-            inputs=[ input ];
-            outputs=[ output' ];
-            witnesses=[];
-            contract = Some (code, hints)
-        }
+        let! (inputs,keys,amount) = getInputs account spend
+        let inputPoints = List.map fst inputs
+
+        let! hints = Contract.recordHints code
+
+        let outputs =
+                {lock=ActivationSacrifice;spend=spend}
+             :: if amount = spend.amount then [] else
+                // Create change if needed
+                [{
+                    spend={spend with amount=(amount-spend.amount)};
+                    lock=PK account.publicKeyHash
+                }]
+
+        return Transaction.sign
+            keys
+            {
+                inputs=inputPoints
+                outputs=outputs
+                witnesses=[];
+                contract = Some (code, hints)
+            }
     }
 
 let rootAccount =

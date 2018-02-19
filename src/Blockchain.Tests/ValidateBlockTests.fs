@@ -596,7 +596,7 @@ let ``block with a contract activation is added to chain``() =
 
     let cHash = Contract.computeHash sampleContractCode
     let tx =
-        Account.createActivateContractTransaction rootAccount sampleContractCode
+        Account.createActivateContractTransaction chain rootAccount sampleContractCode 1000ul
         |>  function
             | Ok tx -> tx
             | Error error -> failwith error
@@ -903,7 +903,7 @@ let ``Template builder uses two transactions in the same block which depend on e
     let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction firstTx) session (timestamp+1UL) genesisState
     let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction secondTx) session (timestamp+1UL) updatedState
     let ema' = EMA.add chain genesisBlock.header.timestamp ema
-    let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList session updatedState
+    let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList chain session updatedState
 
     let twoTxBlock = Block.createTemplate genesisBlock.header (timestamp+1UL) ema' memState.activeContractSet validatedTransactions Hash.zero
     let oldHash = genesisState.tipState.tip.hash
@@ -936,8 +936,8 @@ let ``Out of order dependent transactions are rearranged``() =
     let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction secondTx) session (timestamp+1UL) updatedState
     let blockNumber = updatedState.tipState.tip.header.blockNumber
     let acs = updatedState.tipState.activeContractSet
-    let _, validatedTransactions = BlockTemplateBuilder.selectOrderedTransactions session blockNumber acs [firstTx;secondTx]
-    let _, validatedTransactions_ = BlockTemplateBuilder.selectOrderedTransactions session blockNumber acs [secondTx;firstTx]
+    let _, validatedTransactions = BlockTemplateBuilder.selectOrderedTransactions chain session blockNumber acs [firstTx;secondTx]
+    let _, validatedTransactions_ = BlockTemplateBuilder.selectOrderedTransactions chain session blockNumber acs [secondTx;firstTx]
 
     List.length validatedTransactions |> should equal 2
     validatedTransactions |> should equal validatedTransactions_
