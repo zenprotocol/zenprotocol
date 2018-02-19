@@ -17,7 +17,7 @@ let getUTXO = UtxoSetRepository.get
 let private validateOrphanTransaction session contractPath blockNumber state txHash tx  =
     effectsWriter
         {
-            match TransactionValidation.validateInContext (getUTXO session) contractPath blockNumber
+            match TransactionValidation.validateInContext (getUTXO session) contractPath (blockNumber + 1ul)
                     state.activeContractSet state.utxoSet txHash tx with
             | Ok (tx, acs) ->
                 let utxoSet = UtxoSet.handleTransaction (getUTXO session) txHash tx state.utxoSet
@@ -63,7 +63,7 @@ let rec validateOrphanTransactions session contractPath blockNumber state =
 let validateInputs session contractPath blockNumber txHash tx (state:MemoryState) shouldPublishEvents =
     effectsWriter
         {
-            match TransactionValidation.validateInContext (getUTXO session) contractPath blockNumber
+            match TransactionValidation.validateInContext (getUTXO session) contractPath (blockNumber + 1ul)
                     state.activeContractSet state.utxoSet txHash tx with
             | Error Orphan ->
                 let orphanPool = OrphanPool.add txHash tx state.orphanPool
