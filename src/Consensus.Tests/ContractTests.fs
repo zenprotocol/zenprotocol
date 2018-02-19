@@ -21,7 +21,7 @@ let getUTXO _ = UtxoSet.NoOutput
 
 let compile code = result {
     let! hints = Contract.recordHints code
-    return! Contract.compile contractPath (code, hints)
+    return! Contract.compile contractPath (code, hints) 1000ul
 }
 
 let compileAndCheck code =
@@ -186,7 +186,7 @@ let ``Contract should be able to destroy its own tokens locked to it``() =
         Transaction.fromTxSkeleton sampleOutputTx
         |> Transaction.addWitnesses [ TxSkeleton.getContractWitness sampleContractHash "" (PK Hash.zero) sampleInputTx sampleOutputTx ]
         |> Transaction.sign [ sampleKeyPair ]
-    
+
     (compileRunAndValidate sampleInputTx utxoSet sampleContractCode
     , (Ok sampleExpectedResult : Result<Transaction, string>))
     |> shouldEqual

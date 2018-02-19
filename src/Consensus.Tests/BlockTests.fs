@@ -235,6 +235,8 @@ let ``can connect block with a contract``() =
             hash=Contract.computeHash SampleContract.sampleContractCode
             fn= fun _ _ _ _ tx -> Ok (tx,None)
             costFn = fun _ _ _ _ -> Ok 0I
+            expiry=1001ul
+            size=100ul
         }
 
     let acs = ActiveContractSet.empty |> ActiveContractSet.add contract.hash contract
@@ -244,7 +246,7 @@ let ``can connect block with a contract``() =
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate parent (timestamp+1UL) ema acs [tx] Hash.zero
 
-    Block.connect Chain.Local getUTXO contractsPath parent timestamp utxoSet acs ema block
+    Block.connect Chain.Local getUTXO contractsPath parent timestamp utxoSet ActiveContractSet.empty ema block
     |> should be ok
 
 [<Test>]
@@ -263,6 +265,8 @@ let ``block with invalid contract failed connecting``() =
             hash=Contract.computeHash "ada"
             fn= fun _ _ _ _ tx -> Ok (tx,None)
             costFn = fun _ _ _ _ -> Ok 0I
+            expiry=1000ul
+            size=100ul
         }
 
     let acs = ActiveContractSet.empty |> ActiveContractSet.add contract.hash contract
@@ -274,7 +278,7 @@ let ``block with invalid contract failed connecting``() =
 
     let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "transactions failed inputs validation due to BadContract"
 
-    Block.connect Chain.Local getUTXO contractsPath parent timestamp utxoSet acs ema block
+    Block.connect Chain.Local getUTXO contractsPath parent timestamp utxoSet (ActiveContractSet.empty) ema block
     |> should equal expected
 
 [<Test>]
@@ -537,40 +541,7 @@ let ``coinbase reward split over multiple outputs``() =
 [<Test>]
 let ``block spending mature transaction is valid``() =
     let rootAccount =
-        {Account.rootAccount with blockNumber=101ul}
-    let account1 = Account.create ()
-
-    let origin =
-        {
-            inputs=[]
-            outputs=[{lock =  Coinbase (1ul, rootAccount.publicKeyHash); spend= {asset = Constants.Zen;amount=100000000UL}}]
-            witnesses=[]
-            contract=None
-        }
-    let originHash = Transaction.hash origin
-
-    let rootAccount = Account.addTransaction originHash origin rootAccount
-
-    let tx =
-        Account.createTransaction Chain.Local rootAccount account1.publicKeyHash { asset = Constants.Zen; amount = 1UL }
-        |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
-
-
-    let acs = ActiveContractSet.empty
-    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO originHash origin
-    let ema = EMA.create Chain.Local
-
-    let parent = {version=0ul; parent=Hash.zero; blockNumber=101ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
-    let block = Block.createTemplate parent (timestamp+1UL) ema acs [tx] Hash.zero
-
-    Block.connect Chain.Local getUTXO contractsPath parent timestamp utxoSet acs ema block
-    |> should be ok
-
-
-[<Test>]
-let ``block spending unmature transaction is invalid``() =
-    let rootAccount =
-        {Account.rootAccount with blockNumber=101ul}
+        {Account.rootAccount with blockNumber=100ul}
     let account1 = Account.create ()
 
     let origin =
@@ -596,8 +567,62 @@ let ``block spending unmature transaction is invalid``() =
     let parent = {version=0ul; parent=Hash.zero; blockNumber=100ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate parent (timestamp+1UL) ema acs [tx] Hash.zero
 
+    Block.connect Chain.Local getUTXO contractsPath parent timestamp utxoSet acs ema block
+    |> should be ok
+
+
+[<Test>]
+let ``block spending unmature transaction is invalid``() =
+    let rootAccount =
+        {Account.rootAccount with blockNumber=100ul}
+    let account1 = Account.create ()
+
+    let origin =
+        {
+            inputs=[]
+            outputs=[{lock =  Coinbase (1ul, rootAccount.publicKeyHash); spend= {asset = Constants.Zen;amount=100000000UL}}]
+            witnesses=[]
+            contract=None
+        }
+    let originHash = Transaction.hash origin
+
+    let rootAccount = Account.addTransaction originHash origin rootAccount
+
+    let tx =
+        Account.createTransaction Chain.Local rootAccount account1.publicKeyHash { asset = Constants.Zen; amount = 1UL }
+        |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
+
+
+    let acs = ActiveContractSet.empty
+    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO originHash origin
+    let ema = EMA.create Chain.Local
+
+    let parent = {version=0ul; parent=Hash.zero; blockNumber=99ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
+    let block = Block.createTemplate parent (timestamp+1UL) ema acs [tx] Hash.zero
+
     let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> =
         Error "transactions failed inputs validation due to General \"Coinbase not mature enough\""
 
     Block.connect Chain.Local getUTXO contractsPath parent timestamp utxoSet acs ema block
     |> should equal expected
+
+[<Test>]
+let ``contract get removed when expiring arrive``() =
+    let contract : Contract.T =
+        {
+            hash=Contract.computeHash SampleContract.sampleContractCode
+            fn= fun _ _ _ _ tx -> Ok (tx,None)
+            costFn = fun _ _ _ _ -> Ok 0I
+            expiry=1ul
+            size=100ul
+        }
+
+    let acs = ActiveContractSet.empty |> ActiveContractSet.add contract.hash contract
+    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO Transaction.rootTxHash Transaction.rootTx
+    let ema = EMA.create Chain.Local
+
+    let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
+    let block = Block.createTemplate parent (timestamp+1UL) ema acs [] Hash.zero
+
+    Block.connect Chain.Local getUTXO contractsPath parent timestamp utxoSet acs ema block
+    |> should be ok

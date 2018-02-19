@@ -24,6 +24,8 @@ type T = {
     hash: Hash
     fn:   ContractFn
     costFn: ContractCostFn
+    expiry: uint32
+    size: uint32
 }
 
 let private findMethods assembly =
@@ -96,7 +98,7 @@ let computeHash code =
     |> Encoding.UTF8.GetBytes
     |> Hash.compute
 
-let load contractsPath hash =
+let load contractsPath expiry size hash =
     getModuleName hash
     |> ZFStar.load contractsPath
     |> Result.bind findMethods
@@ -106,16 +108,20 @@ let load contractsPath hash =
             hash = hash
             fn = mainFn
             costFn = costFn
+            expiry = expiry
+            size = size
         })
 
-let compile contractsPath (code, hints) =
+let compile contractsPath (code, hints) expiry =
     let hash = computeHash code
+
+    let size = String.length code |> uint32
 
     hash
     |> getModuleName
     |> ZFStar.compile contractsPath (code, hints)
     |> Result.map (fun _ -> hash)
-    |> Result.bind (load contractsPath)
+    |> Result.bind (load contractsPath expiry size)
 
 let recordHints code =
     code
