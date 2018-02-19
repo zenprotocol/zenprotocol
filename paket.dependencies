@@ -1,6 +1,6 @@
 source https://nuget.org/api/v2
 
-framework: 462
+framework: 47
 
 nuget FSharp.Core
 nuget NUnit
