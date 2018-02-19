@@ -21,35 +21,35 @@ type PkTransaction = {
     keys: KeyPair list
 }
 
-type ArbitraryGenerators = 
-    static member PublicKeyUtxoSetGenerator() = 
-        let utxoSetGenerator = 
+type ArbitraryGenerators =
+    static member PublicKeyUtxoSetGenerator() =
+        let utxoSetGenerator =
             gen {
                 let! size = Gen.choose (1,4)
                 let! pkKeyOutputs = Gen.listOfLength size pkKeyOutputGenerator
                 let pkOutputs = pkKeyOutputs |> List.map fst
                 let unspentPkOutputs = pkOutputs |> List.map Unspent
-                let outpoint i = 
+                let outpoint i =
                     {
                         txHash = Array.create 32 i |> Hash
-                        index = uint32 i 
+                        index = uint32 i
                     }
                 let outpoints = [ 1uy..List.length pkOutputs |> byte ] |> List.map outpoint
                 return List.zip outpoints unspentPkOutputs |> Map.ofList, Map.ofList pkKeyOutputs
             }
         let txGenerator (utxos, (keyMap: Map<Output, KeyPair>)) =
             let getUTXO _ = UtxoSet.NoOutput
-         
-            gen { 
+
+            gen {
                 let outpoints = utxos |> Map.toList |> List.map fst
-                let! txInputs = Gen.shuffle outpoints 
+                let! txInputs = Gen.shuffle outpoints
                 let! size = Gen.choose (0, Array.length txInputs - 1)
                 let txInputs = List.ofArray txInputs.[0..size]
                 let txOutputs = UtxoSet.getUtxos getUTXO txInputs utxos |> Option.get //expecting Some
                 let keys = List.map (fun output -> Map.find output keyMap) txOutputs
                 let tx =
                     {
-                        inputs = txInputs
+                        inputs = List.map Outpoint txInputs
                         outputs = txOutputs
                         witnesses = []
                         contract = None
@@ -58,7 +58,7 @@ type ArbitraryGenerators =
                 return {
                     tx = tx
                     utxos = utxos
-                    keys = keys 
+                    keys = keys
                 }
             }
         Arb.fromGen (utxoSetGenerator >>= txGenerator)

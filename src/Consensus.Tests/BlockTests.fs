@@ -120,8 +120,9 @@ let ``connecting block should fail when transaction inputs are invalid``(parent:
 
     let block = Block.createTemplate parent timestamp ema acs transactions Hash.zero
 
-    Block.connect Chain.Local getUTXO contractsPath parent (timestamp + 1UL) utxoSet acs ema block =
-        Error "transactions failed inputs validation due to Orphan"
+    match Block.connect Chain.Local getUTXO contractsPath parent (timestamp + 1UL) utxoSet acs ema block with
+    | Error error when error.StartsWith "transactions failed inputs validation due to" -> true
+    | _ -> false
 
 [<Test>]
 let ``block timestamp too early``() =
@@ -262,7 +263,7 @@ let ``block with invalid contract failed connecting``() =
         {output with lock=ActivationSacrifice}
 
     let tx =
-        {contract = Some ("ada","dasdas"); inputs=[outpoint]; outputs=[output];witnesses=[]}
+        {contract = Some ("ada","dasdas"); inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
         |> Transaction.sign [rootAccount.keyPair]
 
     let contract : Contract.T =
@@ -290,7 +291,7 @@ let ``block with invalid contract failed connecting``() =
 let ``block with coinbase lock within a regular transaction should fail``() =
     let tx =
         {
-            inputs = [{txHash=Hash.zero;index=1ul}];
+            inputs = [Outpoint {txHash=Hash.zero;index=1ul}];
             outputs=[{lock= Coinbase (15ul,Hash.zero);spend={amount=1UL;asset=Constants.Zen}}]
             witnesses=[]
             contract=None

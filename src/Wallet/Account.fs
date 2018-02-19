@@ -59,7 +59,10 @@ let private handleTransaction txHash (tx:Transaction) account outputs =
             Map.add outpoint (Spent output) outputs
         | _ -> outputs
 
-    let outputs = List.fold handleInput outputs tx.inputs
+    let outputs =
+        tx.inputs
+        |> List.choose (function | Outpoint outpoint -> Some outpoint | Mint _ -> None)
+        |> List.fold handleInput outputs
 
     let outputsWithIndex = List.mapi (fun i output -> (uint32 i,output)) tx.outputs
     List.fold handleOutput outputs outputsWithIndex
@@ -97,7 +100,10 @@ let undoBlock block account =
             | Some (Spent output) -> Map.add input (Unspent output) outputs
             | _ -> outputs
 
-        let outputs' = List.fold handleInput outputs tx.inputs
+        let outputs' =
+            tx.inputs
+            |> List.choose (function | Outpoint outpoint -> Some outpoint | Mint _ -> None)
+            |> List.fold handleInput outputs
 
         let outputsWithIndex = List.mapi (fun i output -> (uint32 i,output)) tx.outputs
         let outputs' = List.fold handleOutput outputs' outputsWithIndex
@@ -181,7 +187,11 @@ let addTransaction txHash (tx:Transaction) account =
         | _ -> false) tx.outputs
 
     let unspentOutputs = getUnspentOutputs account
-    let anyInputs = List.exists (fun input -> Map.containsKey input unspentOutputs) tx.inputs
+
+    let anyInputs =
+        tx.inputs
+        |> List.choose (function | Outpoint outpoint -> Some outpoint | Mint _ -> None)
+        |> List.exists (fun input -> Map.containsKey input unspentOutputs)
 
     if anyInputs || anyOutput then
         let mempool = List.add (txHash,tx) account.mempool
@@ -224,7 +234,7 @@ let private getInputs account spend =
 
 let createTransaction chain account pkHash spend = result  {
     let! (inputs, keys, amount) = getInputs account spend
-    let inputPoints = List.map fst inputs
+    let inputPoints = List.map (fst >> Outpoint) inputs
     let outputs =
         {spend=spend;lock=PK pkHash}
      :: if amount = spend.amount then [] else
@@ -249,7 +259,7 @@ let createActivateContractTransaction chain account code (numberOfBlocks:uint32)
 
     result {
         let! (inputs,keys,amount) = getInputs account spend
-        let inputPoints = List.map fst inputs
+        let inputPoints = List.map (fst >> Outpoint) inputs
 
         let! hints = Contract.recordHints code
 

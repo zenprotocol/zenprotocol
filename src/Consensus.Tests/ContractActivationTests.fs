@@ -27,7 +27,7 @@ let ``Contract activation without contract sacrifice should fail``() =
     let output = Account.getUnspentOutputs rootAccount |> Map.toSeq |> Seq.head |> snd
 
     let tx =
-        {contract = Some (code,""); inputs=[outpoint]; outputs=[output];witnesses=[]}
+        {contract = Some (code,""); inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
         |> Transaction.sign [rootAccount.keyPair]
     let txHash = Transaction.hash tx
 
@@ -52,7 +52,7 @@ let ``Contract activation with too low contract sacrifice``() =
         ]
 
     let tx =
-        {contract = Some (code,""); inputs=[outpoint]; outputs=outputs;witnesses=[]}
+        {contract = Some (code,""); inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
         |> Transaction.sign [rootAccount.keyPair]
     let txHash = Transaction.hash tx
 
@@ -81,7 +81,7 @@ let ``Contract activation with asset other than zen should fail``() =
     let output = {lock=ActivationSacrifice;spend={amount=1UL;asset=asset}}
 
     let tx =
-        {contract = Some (code,""); inputs=[outpoint]; outputs=[output];witnesses=[]}
+        {contract = Some (code,""); inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
         |> Transaction.sign [Account.rootAccount.keyPair]
     let txHash = Transaction.hash tx
 

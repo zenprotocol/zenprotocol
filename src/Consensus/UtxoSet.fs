@@ -12,8 +12,8 @@ type OutputStatus =
     | Unspent of Output
 
 type T = Map<Outpoint, OutputStatus>
-    
-/// Means that the utxoset is equal to the persisted utxoset    
+
+/// Means that the utxoset is equal to the persisted utxoset
 let asDatabase = Map.empty
 
 let get getUTXO outpoint set =
@@ -27,33 +27,35 @@ let handleTransaction getUTXO txHash tx set =
         | Unspent _ -> Map.add input Spent state
         | NoOutput
         | Spent -> failwith "Expected output to be unspent"
-                
+
     let outputsWithIndex = List.mapi (fun i output -> (uint32 i,output)) tx.outputs
 
-    let set = 
-        let set = 
+    let set =
+        let set =
             tx.inputs
-            |> List.choose (function | outpoint -> Some outpoint | _ -> None)
-            |> List.fold folder set 
-            
+            |> List.choose (function | Outpoint outpoint -> Some outpoint | _ -> None)
+            |> List.fold folder set
+
         List.fold (fun state (index,output) ->
             let outpoint = {txHash=txHash;index=index;}
             Map.add outpoint (Unspent output) state) set outputsWithIndex
-        
+
     set
 
 // Use an applicative traversable to collate the errors
-let getUtxosResult getUTXO outpoints utxoSet =
-    Result.traverseResultA
+let getUtxosResult getUTXO inputs utxoSet =
+    inputs
+    |> List.choose (function | Outpoint outpoint -> Some outpoint | Mint _ -> None)
+    |> Result.traverseResultA
         (fun outpoint ->
             match get getUTXO outpoint utxoSet with
             | Unspent output -> Ok output
             | Spent -> Error [Spent]
             | NoOutput -> Error [NoOutput])
-        outpoints
 
 // Currently only used for tests
-let getUtxos getUTXO inputs utxoSet =
+let getUtxos getUTXO outpoints utxoSet =
+    let inputs = List.map Outpoint outpoints
     getUtxosResult getUTXO inputs utxoSet |> Option.ofResult
 
 let undoBlock getOutput getUTXO block utxoSet =
@@ -62,19 +64,19 @@ let undoBlock getOutput getUTXO block utxoSet =
     List.foldBack (fun tx utxoSet ->
         let txHash = Transaction.hash tx
 
-        let utxoSet = 
+        let utxoSet =
             tx.inputs
+            |> List.choose (function | Outpoint outpoint -> Some outpoint | Mint _ -> None)
             |> List.fold (fun utxoSet input ->
                 match get getUTXO input utxoSet with
-                | Spent -> 
+                | Spent ->
                     let output = getOutput input
                     Map.add input (Unspent output) utxoSet
                 | NoOutput
                 | Unspent _ -> failwith "Expected output to be spent") utxoSet
-        
+
         [0 .. List.length tx.outputs - 1]
         |> List.map (fun i -> {txHash=txHash; index=uint32 i})
         |> List.fold (fun utxoSet outpoint ->
             Map.add outpoint NoOutput utxoSet
             ) utxoSet) block.transactions utxoSet
-        

@@ -26,7 +26,7 @@ let ``Transaction should be orphan``() =
     }
     let output = { lock = PK testHash; spend = { asset = Constants.Zen; amount = 1UL } }
     let tx = {
-        inputs = [ testInput1; orphanInput ]
+        inputs = [ Outpoint testInput1; Outpoint orphanInput ]
         witnesses = []
         outputs = [ output ]
         contract = None
@@ -38,8 +38,8 @@ let ``Transaction should be orphan``() =
 [<Test>]
 let ``Transaction basic validation should be Ok``() =
     let output = { lock = PK testHash; spend = { asset = Constants.Zen; amount = 1UL } }
-    let tx = {  
-        inputs = [ testInput1 ]
+    let tx = {
+        inputs = [ Outpoint testInput1 ]
         witnesses = []
         outputs = [ output ]
         contract = None
@@ -50,7 +50,7 @@ let ``Transaction basic validation should be Ok``() =
 [<Test>]
 let ``Transaction validation should fail with outputs invalid error``() =
     let tx = {
-        inputs = [ testInput1 ];
+        inputs = [ Outpoint testInput1 ];
         witnesses = []
         outputs = [ { lock = PK testHash; spend = { asset = Constants.Zen; amount = 0UL } } ]
         contract = None
@@ -61,7 +61,7 @@ let ``Transaction validation should fail with outputs invalid error``() =
 [<Test>]
 let ``Transaction validation should fail with duplicate inputs error``() =
     let tx = {
-        inputs = [ testInput1; testInput1 ]
+        inputs = [ Outpoint testInput1; Outpoint testInput1 ]
         witnesses = []
         outputs = [ { lock = PK testHash; spend = { asset = Constants.Zen; amount = 1UL } } ]
         contract = None
@@ -73,7 +73,7 @@ let ``Transaction validation should fail with duplicate inputs error``() =
 let ``Transaction validation should fail with inputs structurally invalid error``() =
     let invalidHash = Hash (Array.create 31 1uy) // an invalid hash with length 31
     let tx = {
-        inputs = [ { txHash = invalidHash; index = 0ul } ]
+        inputs = [ Outpoint { txHash = invalidHash; index = 0ul } ]
         witnesses = []
         outputs = [ { lock = PK testHash; spend = { asset = Constants.Zen; amount = 1UL } } ]
         contract = None
@@ -87,7 +87,7 @@ let ``Signed transaction should be valid``() =
     let outputLock = PK (PublicKey.hash publicKey)
     let output = { lock = outputLock; spend = { asset = Constants.Zen; amount = 1UL } }
     let tx = {
-        inputs = [ testInput1 ]
+        inputs = [ Outpoint testInput1 ]
         witnesses = []
         outputs = [ output ]
         contract = None
@@ -101,11 +101,11 @@ let ``Signed transaction validation result should be invalid witness``() =
     let outputLock = PK testHash // testHash will not match keypair
     let output = { lock = outputLock; spend = { asset = Constants.Zen; amount = 1UL } }
     let tx = {
-        inputs = [ testInput1 ]
+        inputs = [ Outpoint testInput1 ]
         witnesses = []
         outputs = [ output ]
         contract = None
     }
     let utxos = Map.ofSeq [ testInput1, Unspent output ]
     inputsValidationMsg "PK witness mismatch" 1ul acs utxos tx keys
-    |> shouldEqual 
+    |> shouldEqual

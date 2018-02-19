@@ -49,7 +49,9 @@ let sign keyPairs tx =
 
 let fromTxSkeleton tx =
     {
-        inputs = List.choose (function | PointedOutput (outpoint, _) -> Some outpoint | _ -> None) tx.pInputs
+        inputs = List.map (function
+            | TxSkeleton.Input.PointedOutput (outpoint, _) -> Outpoint outpoint
+            | TxSkeleton.Input.Mint spend -> Mint spend) tx.pInputs
         outputs = tx.outputs
         witnesses = []
         contract = None

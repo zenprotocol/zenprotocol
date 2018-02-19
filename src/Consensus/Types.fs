@@ -19,6 +19,10 @@ type Spend = {
     amount: uint64
 }
 
+type Input =
+    | Outpoint of Outpoint
+    | Mint of Spend
+
 type Lock =
     | PK of Hash
     | Contract of Hash
@@ -62,7 +66,7 @@ type Witness =
     | ContractWitness of ContractWitness
 
 type Transaction = {
-    inputs: Outpoint list
+    inputs: Input list
     outputs: Output list
     witnesses: Witness list
     contract: (string * string) Option
