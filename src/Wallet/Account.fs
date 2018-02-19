@@ -272,7 +272,7 @@ let createTestAccount () =
     |> addTransaction Transaction.rootTxHash Transaction.rootTx
 
 
-let createExecuteContractTransaction account executeContract cHash command spends = result {
+let createExecuteContractTransaction account executeContract cHash command data spends = result {
     let mutable txSkeleton = TxSkeleton.empty
     let mutable keys = List.empty
     for (asset, amount) in Map.toSeq spends do
@@ -283,6 +283,6 @@ let createExecuteContractTransaction account executeContract cHash command spend
             TxSkeleton.addInputs inputs txSkeleton
             |> TxSkeleton.addChange asset collectedAmount amount account.publicKeyHash
         keys <- List.append keys keys'
-    let! unsignedTx = executeContract cHash command (PK account.publicKeyHash) txSkeleton
+    let! unsignedTx = executeContract cHash command data (PK account.publicKeyHash) txSkeleton
     return Transaction.sign keys unsignedTx
     }

@@ -2,6 +2,7 @@
 
 open Operators.Checked
 
+open Consensus
 open Consensus.Types
 open Consensus.Hash
 open Consensus.SparseMerkleTree
@@ -13,10 +14,14 @@ open Zen.TxSkeleton
 open Zen.Types.Main
 open FStar.Pervasives
 open Zen.Vector
+open Newtonsoft.Json
+open MBrace.FsPickler.Combinators
 
 module Cost = Zen.Cost.Realized
 
 let unCost (Cost.C inj:Zen.Cost.Realized.cost<'Aa, 'An>) : 'Aa = inj.Force()
+
+let pickler = Pickler.auto<Zen.Types.Data.data>
 
 let toResult = function
     | ERR err -> Error err
@@ -100,7 +105,7 @@ let private fstToFsInput (input: input) : Input =
         let outpoint = { Outpoint.txHash = Hash.Hash outpoint.txHash; index = outpoint.index }
         let output = fstToFsOutput output
         Input.PointedOutput <| (outpoint, output)
-    | Mint spend -> 
+    | Mint spend ->
         Input.Mint <| fstToFsSpend spend
 
 let private fsToFstInput (input: Input) : input =
@@ -109,7 +114,7 @@ let private fsToFstInput (input: Input) : input =
         let outpoint = { txHash = Hash.bytes outpoint.txHash; index = outpoint.index }
         let output = fsToFstOutput output
         PointedOutput <| (outpoint, output)
-    | Input.Mint spend -> 
+    | Input.Mint spend ->
         Mint <| fsToFstSpend spend
 
 let private fsToFstPointedOutput ((outpoint, output):PointedOutput) : pointedOutput =
@@ -144,9 +149,26 @@ let private fstToFsTx : txSkeleton -> _ = function
     | _ ->
         Error "malformed txSkeleton"
 
+let fstToFsData =
+//    Binary.pickle pickler
+    JsonConvert.SerializeObject
+    >> System.Text.Encoding.ASCII.GetBytes
+    >> Types.Data
+
+let fsToFstData (Data data) =
+//    Binary.unpickle pickler
+    System.Text.Encoding.ASCII.GetString data
+    |> JsonConvert.DeserializeObject<Zen.Types.Data.data>
+
 let fstTofsMessage = function
-    | Native.option.Some { Zen.Types.Main.message.cHash = cHash; command = command } ->
-        Ok <| Some { Consensus.Types.Message.cHash = Hash.Hash cHash; command = command }
+    | Native.option.Some ({ cHash = cHash; command = command; data = data } : Zen.Types.Main.message) ->
+        ({
+            cHash = Hash.Hash cHash
+            command = command
+            data = fstToFsData data
+        } : Consensus.Types.Message)
+        |> Some
+        |> Ok
     | Native.option.None ->
         Ok None
     | _ ->
@@ -168,7 +190,7 @@ let fsToFstTxSkeleton (txSkeleton:TxSkeleton.T) : txSkeleton =
         insertInput pointedOutput txSkeleton
     let insertOutput txSkeleton output =
         insertOutput output txSkeleton
-        
+
     let inputs = txSkeleton.pInputs |> List.map fsToFstInput
     let outputs = txSkeleton.outputs |> List.map fsToFstOutput
 

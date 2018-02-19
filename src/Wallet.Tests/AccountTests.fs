@@ -176,7 +176,7 @@ let ``picking from multiple inputs``() =
 let ``create execute contract transaction``() =
     let account = Account.createTestAccount ()
 
-    let executeContract _ _ _ txSkeleton =
+    let executeContract _ _ _ _ txSkeleton =
         let tx =
             txSkeleton
             |> TxSkeleton.addOutput {lock=Contract Hash.zero;spend={asset=Constants.Zen;amount=1UL}}
@@ -186,7 +186,7 @@ let ``create execute contract transaction``() =
 
     let spends = Map.add Constants.Zen 1UL Map.empty
 
-    let result = Account.createExecuteContractTransaction account executeContract Hash.zero "" spends
+    let result = Account.createExecuteContractTransaction account executeContract Hash.zero "" Contract.EmptyData spends
 
     result |> should be ok
 

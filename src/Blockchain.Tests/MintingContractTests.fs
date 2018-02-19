@@ -80,8 +80,8 @@ let setUp = fun () ->
     module ET = Zen.ErrorT
     module Tx = Zen.TxSkeleton
 
-    val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 19
-    let cf _ _ _ #l _ = ret (64 + (64 + (64 + 64 + (l * 128 + 192) + 0)) + 28 + 22)
+    val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 19
+    let cf _ _ _ _ #l _ = ret (64 + (64 + (64 + 64 + (l * 128 + 192) + 0)) + 28 + 22)
 
     let buy txSkeleton contractHash returnAddress =
       let! contractToken = Zen.Asset.getDefault contractHash in
@@ -109,8 +109,8 @@ let setUp = fun () ->
 
       ET.of_option "contract doesn't have enough zens to pay you" result
 
-    val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + (64 + 64 + (l * 128 + 192) + 0)) + 28 + 22)
-    let main txSkeleton contractHash command returnAddress #l wallet =
+    val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + (64 + 64 + (l * 128 + 192) + 0)) + 28 + 22)
+    let main txSkeleton contractHash command data returnAddress #l wallet =
       match returnAddress with
       | Some returnAddress ->
         if command = "redeem" then
@@ -150,7 +150,7 @@ let ``Contract should detect unsupported command``() =
             pInputs = [ ]
             outputs = [ ]
         }
-    TransactionHandler.executeContract session inputTx cHash "x" (PK samplePKHash) state.memoryState
+    TransactionHandler.executeContract session inputTx cHash "x" Contract.EmptyData (PK samplePKHash) state.memoryState
     |> shouldBeErrorMessage "unsupported command"
 
 [<Test>]
@@ -176,7 +176,7 @@ let ``Should buy``() =
             outputs = [ ]
         }
 
-    TransactionHandler.executeContract session inputTx cHash "buy" (PK samplePKHash) { state.memoryState with utxoSet = utxoSet }
+    TransactionHandler.executeContract session inputTx cHash "buy" Contract.EmptyData (PK samplePKHash) { state.memoryState with utxoSet = utxoSet }
     |> function
     | Ok tx ->
         tx.inputs |> should haveLength 1
@@ -188,6 +188,7 @@ let ``Should buy``() =
         let cw = ContractWitness {
              cHash = cHash
              command = "buy"
+             data = Contract.EmptyData
              returnAddressIndex = Some 1ul
              beginInputs = 1u
              beginOutputs = 0u
@@ -233,7 +234,7 @@ let ``Should redeem``() =
             outputs = [ ]
         }
 
-    TransactionHandler.executeContract session inputTx cHash "redeem" (PK samplePKHash) { state.memoryState with utxoSet = utxoSet }
+    TransactionHandler.executeContract session inputTx cHash "redeem" Contract.EmptyData (PK samplePKHash) { state.memoryState with utxoSet = utxoSet }
     |> function
     | Ok tx ->
         tx.inputs |> should haveLength 2
@@ -246,6 +247,7 @@ let ``Should redeem``() =
         let cw = ContractWitness {
              cHash = cHash
              command = "redeem"
+             data = Contract.EmptyData
              returnAddressIndex = Some 1ul
              beginInputs = 1u
              beginOutputs = 0u

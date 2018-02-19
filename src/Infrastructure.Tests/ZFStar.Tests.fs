@@ -98,11 +98,11 @@ let fstCode = """
     open Zen.Cost
     open Zen.ErrorT
 
-    val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 1
-    let cf _ _ _ #l _ = ~!4
+    val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 1
+    let cf _ _ _ _ #l _ = ~!4
 
-    val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) 4
-    let main tx chash command returnAddress #l _ =
+    val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) 4
+    let main tx chash command data returnAddress #l _ =
         ret @ (tx, None)
     """
 
@@ -114,7 +114,7 @@ let ``Should record hints``() =
 
 [<Test>]
 let ``Should invoke compiled``() =
-    compileAndInvoke fstCode [| input; null; null; null; 0I; null |]
+    compileAndInvoke fstCode [| input; null; null; null; null; 0I; null |]
     |> shouldBeOk (input, Native.option<message>.None)
 
 [<Test>]
@@ -125,13 +125,13 @@ let ``Should throw with command's value``() =
         open Zen.Cost
         open Zen.ErrorT
 
-        val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 1
-        let cf _ _ _ #l _ = ~!1
+        val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 1
+        let cf _ _ _ _ #l _ = ~!1
 
-        val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) 1
-        let main tx chash command returnAddress #l _ =
+        val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) 1
+        let main tx chash command data returnAddress #l _ =
             failw command
-        """ [| null; null; "test command";null;0I;null |]
+        """ [| null; null; "test command";null;null;0I;null |]
     |> shouldBeError "test command"
 
 [<Test>]

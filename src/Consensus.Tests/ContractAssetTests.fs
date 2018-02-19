@@ -29,7 +29,7 @@ let tearDown = fun () ->
 let compileAndRun code =
     compile code
     |> Result.bind (fun contract ->
-        Contract.run contract "" None List.empty TxSkeleton.empty
+        Contract.run contract "" Contract.EmptyData None List.empty TxSkeleton.empty
         |> Result.map (fun (tx, _) -> tx)
     )
 
@@ -51,11 +51,11 @@ let ``Should generate assets from a string and from an int``() =
         module Tx = Zen.TxSkeleton
         module S = Zen.String
 
-        val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 11
-        let cf _ _ _ #l _ = ret (64 + (64 + (64 + 64 + 0)) + 23)
+        val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 11
+        let cf _ _ _ _ #l _ = ret (64 + (64 + (64 + 64 + 0)) + 23)
 
-        val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + (64 + 64 + 0)) + 23)
-        let main txSkeleton contractHash command returnAddress #l wallet =
+        val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + (64 + 64 + 0)) + 23)
+        let main txSkeleton contractHash command data returnAddress #l wallet =
             let str = "Test" in
 
             if S.byteCount str < 29 then

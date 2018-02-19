@@ -1,5 +1,6 @@
 module Consensus.Types
 
+open System
 open Consensus.Hash
 open Consensus.Crypto
 
@@ -32,16 +33,19 @@ type Output = {
 
 type PointedOutput = Outpoint * Output
 
+type Data = Data of Byte[]
+
 type Message = {
     cHash: Hash
     command: string
-    //TODO: data
+    data: Data
 }
 
 type ContractWitness =
     {
         cHash: Hash
         command: string
+        data: Data
         returnAddressIndex : uint32 option
         beginInputs: uint32
         beginOutputs: uint32

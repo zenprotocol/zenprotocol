@@ -365,61 +365,61 @@ let ``Invalid contract should not be added to ActiveContractSet or mempool``() =
 
     // Checking that the transaction was not added to orphans
     OrphanPool.containsTransaction txHash state'.memoryState.orphanPool |> should equal false
-    
+
 [<Test>]
 let ``contract activation arrived, running orphan transaction``() =
     let getResult = function
         | Ok r -> r
         | Error error -> failwithf "%A" error
-    
+
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
     let account = Account.createTestAccount ()
-    
-    let activationTransaction = 
+
+    let activationTransaction =
         Account.createActivateContractTransaction account sampleContractCode
         |> getResult
-    let activationTxHash = Transaction.hash activationTransaction  
-    
-    let state = { state with memoryState = { state.memoryState with utxoSet = getSampleUtxoset utxoSet } }      
-           
-    let _, stateWithContract = 
+    let activationTxHash = Transaction.hash activationTransaction
+
+    let state = { state with memoryState = { state.memoryState with utxoSet = getSampleUtxoset utxoSet } }
+
+    let _, stateWithContract =
         Handler.handleCommand chain (ValidateTransaction activationTransaction) session 1UL state
-        |> Writer.unwrap  
-        
-    let tx = 
-        TransactionHandler.executeContract session sampleInputTx sampleContractHash "" (PK Hash.zero) stateWithContract.memoryState
+        |> Writer.unwrap
+
+    let tx =
+        TransactionHandler.executeContract session sampleInputTx sampleContractHash "" Contract.EmptyData (PK Hash.zero) stateWithContract.memoryState
         |> getResult
-    let txHash = Transaction.hash tx        
-    
-    let events, state = 
+    let txHash = Transaction.hash tx
+
+    let events, state =
         Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
-        |> Writer.unwrap      
-                
+        |> Writer.unwrap
+
     // Checking that both transaction added to mempool and published
     events |> should haveLength 0
     OrphanPool.containsTransaction txHash state.memoryState.orphanPool |> should equal true
-    
-    // This will actually fail and the transaction will not pass, however it is enough for our test 
+
+    // This will actually fail and the transaction will not pass, however it is enough for our test
     // to see that the transaction was run and removed from orphan pool as it is not valid
-    let events, state = 
+    let events, state =
         Handler.handleCommand chain (ValidateTransaction activationTransaction) session 1UL state
-        |> Writer.unwrap                    
-        
+        |> Writer.unwrap
+
     events |> should haveLength 1
     OrphanPool.containsTransaction txHash state.memoryState.orphanPool |> should equal false
     MemPool.containsTransaction activationTxHash state.memoryState.mempool |> should equal true
-    MemPool.containsTransaction txHash state.memoryState.mempool |> should equal false    
+    MemPool.containsTransaction txHash state.memoryState.mempool |> should equal false
     events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (activationTxHash,activationTransaction)))
-    
-[<Test>]    
-let ``Transaction already in db but not part of the main chain``() = 
+
+[<Test>]
+let ``Transaction already in db but not part of the main chain``() =
     use databaseContext = DatabaseContext.createEmpty "test"
     use session = DatabaseContext.createSession databaseContext
-    
+
     // we need to fake some information
-    let header = 
+    let header =
         {
             version = 0ul
             parent = Hash.zero
@@ -429,7 +429,7 @@ let ``Transaction already in db but not part of the main chain``() =
             difficulty = 0ul
             nonce = 0UL,0UL
         }
-    let extendedHeader : ExtendedBlockHeader.T =        
+    let extendedHeader : ExtendedBlockHeader.T =
         {
             hash = BlockHeader.hash header
             header = header
@@ -439,11 +439,11 @@ let ``Transaction already in db but not part of the main chain``() =
             activeContractSetMerkleRoot = Hash.zero
             witnessMerkleRoot = Hash.zero
             commitments = []
-        }    
-    
+        }
+
     Collection.put session.context.blocks session.session extendedHeader.hash extendedHeader
-    MultiCollection.put session.context.transactionBlocks session.session txHash extendedHeader.hash 
-                
+    MultiCollection.put session.context.transactionBlocks session.session txHash extendedHeader.hash
+
     let result = Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
 
     let events, state' = Writer.unwrap result
@@ -460,14 +460,14 @@ let ``Transaction already in db but not part of the main chain``() =
     // Checking the tx is in the utxoset
     UtxoSet.getUtxos (UtxoSetRepository.get session) txOutpoints state'.memoryState.utxoSet
     |> should equal (Some tx.outputs)
-    
-[<Test>]    
-let ``Transaction already in db and part of the main chain is ignored``() = 
+
+[<Test>]
+let ``Transaction already in db and part of the main chain is ignored``() =
     use databaseContext = DatabaseContext.createEmpty "test"
     use session = DatabaseContext.createSession databaseContext
-    
+
     // we need to fake some information
-    let header = 
+    let header =
         {
             version = 0ul
             parent = Hash.zero
@@ -477,7 +477,7 @@ let ``Transaction already in db and part of the main chain is ignored``() =
             difficulty = 0ul
             nonce = 0UL,0UL
         }
-    let extendedHeader : ExtendedBlockHeader.T =        
+    let extendedHeader : ExtendedBlockHeader.T =
         {
             hash = BlockHeader.hash header
             header = header
@@ -487,11 +487,11 @@ let ``Transaction already in db and part of the main chain is ignored``() =
             activeContractSetMerkleRoot = Hash.zero
             witnessMerkleRoot = Hash.zero
             commitments = []
-        }    
-    
+        }
+
     Collection.put session.context.blocks session.session extendedHeader.hash extendedHeader
-    MultiCollection.put session.context.transactionBlocks session.session txHash extendedHeader.hash 
-                
+    MultiCollection.put session.context.transactionBlocks session.session txHash extendedHeader.hash
+
     let result = Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
 
     let events, state' = Writer.unwrap result

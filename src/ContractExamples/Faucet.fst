@@ -8,8 +8,8 @@ open FStar.Mul
 module ET = Zen.ErrorT
 module Tx = Zen.TxSkeleton
 
-val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 11
-let cf _ _ _ #l _ = 
+val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 11
+let cf _ _ _ _ #l _ = 
     ret (64 + l * 128 + 192 + 15 + 9)
           
 let get #l txSkeleton contractHash returnAddress (wallet:wallet l) =  
@@ -29,8 +29,8 @@ let init txSkeleton contractHash  =
   let txSkeleton = Tx.lockToContract zenAsset tokens contractHash txSkeleton in
   ET.retT txSkeleton  
   
-val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result txSkeleton) (64 + l * 128 + 192 + 15 + 9)
-let main txSkeleton contractHash command returnAddress #l wallet =  
+val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result txSkeleton) (64 + l * 128 + 192 + 15 + 9)
+let main txSkeleton contractHash command data returnAddress #l wallet =  
   if command <> "init" then
     get txSkeleton contractHash returnAddress wallet
   else

@@ -8,8 +8,8 @@ open FStar.Mul
 module ET = Zen.ErrorT
 module Tx = Zen.TxSkeleton
         
-val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 15
-let cf _ _ _ #l _ = ret (64 + (64 + 64 + (l * 128 + 192)) + 19 + 22)
+val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 15
+let cf _ _ _ _ #l _ = ret (64 + (64 + 64 + (l * 128 + 192)) + 19 + 22)
 
 let buy txSkeleton contractHash returnAddress = 
   let! tokens = Tx.getAvailableTokens zenAsset txSkeleton in
@@ -31,8 +31,8 @@ let redeem #l txSkeleton contractHash returnAddress (wallet:wallet l) =
 
   ET.of_optionT "contract doesn't have enough zens to pay you" txSkeleton
 
-val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result txSkeleton) (64 + (64 + 64 + (l * 128 + 192)) + 19 + 22)
-let main txSkeleton contractHash command returnAddress #l wallet =
+val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result txSkeleton) (64 + (64 + 64 + (l * 128 + 192)) + 19 + 22)
+let main txSkeleton contractHash command data returnAddress #l wallet =
   match returnAddress with
   | Some returnAddress -> 
       if command = "redeem" then

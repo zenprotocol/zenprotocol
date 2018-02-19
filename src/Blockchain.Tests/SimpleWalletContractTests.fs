@@ -87,13 +87,13 @@ let setUp = fun () ->
     module ET = Zen.ErrorT
     module Tx = Zen.TxSkeleton
 
-    val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 11
-    let cf _ _ _ #l _ =
+    val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 11
+    let cf _ _ _ _ #l _ =
         let res : nat = (64 + (l * 128 + 192) + 0 + 20) in
         ret res
 
-    val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) ((64 + (l * 128 + 192) + 0 + 20) <: nat)
-    let main txSkeleton contractHash command returnAddress #l wallet =
+    val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) ((64 + (l * 128 + 192) + 0 + 20) <: nat)
+    let main txSkeleton contractHash command data returnAddress #l wallet =
     let! result =
         Tx.lockToPubKey zenAsset 10UL (hashFromBase64 "DYggLLPq6eXj1YxjiPQ5dSvb/YVqAVNf8Mjnpc9P9BI=") txSkeleton
         >>= Tx.fromWallet zenAsset 10UL contractHash wallet in
@@ -121,7 +121,7 @@ let ``Wallet using contract should execute``() =
     let output = {lock=Contract cHash;spend={asset=Constants.Zen;amount=10UL}}
     let utxoSet = Map.add {txHash=Hash.zero;index=10ul} (UtxoSet.Unspent output) utxoSet
 
-    TransactionHandler.executeContract session sampleInputTx cHash "" (PK Hash.zero) { state.memoryState with utxoSet = utxoSet }
+    TransactionHandler.executeContract session sampleInputTx cHash "" Contract.EmptyData (PK Hash.zero) { state.memoryState with utxoSet = utxoSet }
     |> shouldBeOk
 
 [<Test>]
@@ -129,13 +129,13 @@ let ``Contract should not be able to lock more token than available``() =
     let output = {lock=Contract cHash;spend={asset=Constants.Zen;amount=9UL}}
     let utxoSet = Map.add {txHash=Hash.zero;index=1ul} (UtxoSet.Unspent output) utxoSet
 
-    TransactionHandler.executeContract session sampleInputTx cHash "" (PK Hash.zero) { state.memoryState with utxoSet = utxoSet }
+    TransactionHandler.executeContract session sampleInputTx cHash "" Contract.EmptyData (PK Hash.zero) { state.memoryState with utxoSet = utxoSet }
     |> shouldBeErrorMessage "not enough Zens"
 
 [<Test>]
 let ``Contract should not have enough tokens when output is missing``() =
 
-    TransactionHandler.executeContract session sampleInputTx cHash "" (PK Hash.zero) state.memoryState
+    TransactionHandler.executeContract session sampleInputTx cHash "" Contract.EmptyData (PK Hash.zero) state.memoryState
     |> shouldBeErrorMessage "not enough Zens"
 
 [<Test>]
@@ -143,7 +143,7 @@ let ``Contract should not have enough tokens when output locked to PK address``(
     let output = {lock=PK cHash;spend={asset=Constants.Zen;amount=10UL}}
     let utxoSet = Map.add {txHash=Hash.zero;index=10ul} (UtxoSet.Unspent output) utxoSet
 
-    TransactionHandler.executeContract session sampleInputTx cHash "" (PK Hash.zero) { state.memoryState with utxoSet = utxoSet }
+    TransactionHandler.executeContract session sampleInputTx cHash "" Contract.EmptyData (PK Hash.zero) { state.memoryState with utxoSet = utxoSet }
     |> shouldBeErrorMessage "not enough Zens"
 
 [<Test>]
@@ -151,5 +151,5 @@ let ``Contract should not have enough tokens when output is spent``() =
     let output = {lock=PK cHash;spend={asset=Constants.Zen;amount=10UL}}
     let utxoSet = Map.add {txHash=Hash.zero;index=10ul} UtxoSet.Spent utxoSet
 
-    TransactionHandler.executeContract session sampleInputTx cHash "" (PK Hash.zero) { state.memoryState with utxoSet = utxoSet }
+    TransactionHandler.executeContract session sampleInputTx cHash "" Contract.EmptyData (PK Hash.zero) { state.memoryState with utxoSet = utxoSet }
     |> shouldBeErrorMessage "not enough Zens"

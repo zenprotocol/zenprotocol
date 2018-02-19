@@ -46,11 +46,11 @@ let setup = fun () ->
     module ET = Zen.ErrorT
     module Tx = Zen.TxSkeleton
 
-    val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 9
-    let cf _ _ _ #l _ = ret (64 + (64 + 64 + 0) + 19)
+    val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 9
+    let cf _ _ _ _ #l _ = ret (64 + (64 + 64 + 0) + 19)
 
-    val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + 64 + 0) + 19)
-    let main txSkeleton contractHash command returnAddress #l wallet =
+    val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + 64 + 0) + 19)
+    let main txSkeleton contractHash command data returnAddress #l wallet =
         if command = "contract2_test" then
         begin
             let! contractToken = Zen.Asset.getDefault contractHash in
@@ -78,11 +78,11 @@ let setup = fun () ->
             module ET = Zen.ErrorT
             module Tx = Zen.TxSkeleton
 
-            val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 9
-            let cf _ _ _ #l _ = ret (64 + (64 + 64 + 0) + 23)
+            val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 9
+            let cf _ _ _ _ #l _ = ret (64 + (64 + 64 + 0) + 24)
 
-            val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + 64 + 0) + 23)
-            let main txSkeleton contractHash command returnAddress #l wallet =
+            val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + 64 + 0) + 24)
+            let main txSkeleton contractHash command data returnAddress #l wallet =
                 if command = "contract1_test" then
                 begin
                     let! asset = Zen.Asset.getDefault contractHash in
@@ -91,7 +91,8 @@ let setup = fun () ->
                         >>= Tx.lockToContract asset 25UL contractHash in
                     let message = {
                         cHash = hashFromBase64 "%s";
-                        command = "contract2_test"
+                        command = "contract2_test";
+                        data = data
                     } in
                     ET.ret (txSkeleton, Some message)
                 end
@@ -132,16 +133,24 @@ let ``Should produce execute contracts with message passed between them``() =
                     ]
             }
 
-        let! (tx, message) = Contract.run contract1 "contract1_test" None List.empty TxSkeleton.empty
+        let stringData = Zen.Types.Data.data.String "Some string data"
+
+        let data = ZFStar.fstToFsData stringData
+
+        let! (tx, message) = Contract.run contract1 "contract1_test" data None List.empty TxSkeleton.empty
 
         let command =
             match message with
-            | Some {cHash=cHash;command=command} when cHash =
-                contract2.hash -> command
+            | Some {cHash=cHash;command=command;data=data} when cHash = contract2.hash ->
+                data
+                |> ZFStar.fsToFstData
+                |> should equal stringData
+
+                command
             | _ ->
                 failwithf "should be some message"
 
-        let! (tx, message) = Contract.run contract2 command None List.empty tx
+        let! (tx, message) = Contract.run contract2 command Contract.EmptyData None List.empty tx
 
         match message with
         | Some _ ->

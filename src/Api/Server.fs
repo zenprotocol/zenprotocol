@@ -88,8 +88,8 @@ let handleRequest chain client (request,reply) =
     | Post ("/wallet/contract/execute", Some body) ->
         match getContractExecute chain body with
         | Result.Error error -> replyError error
-        | Result.Ok (cHash, command, spends) ->
-            Wallet.executeContract client cHash command spends
+        | Result.Ok (cHash, command, data, spends) ->
+            Wallet.executeContract client cHash command data spends
             |> validateTx
     | Post ("/block/publish", Some body) ->
             match getPublishBlock body with
