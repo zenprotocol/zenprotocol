@@ -77,7 +77,7 @@ let isSkeletonOf txSkeleton tx inputs =
     && inputs = (outpoints |> List.map snd) // Check that the contract didn't change the inputs
     && tx.outputs = txSkeleton.outputs
 
-let getContractWitness cHash command returnAddress initialTxSkelton finalTxSkeleton =
+let getContractWitness cHash command data returnAddress initialTxSkelton finalTxSkeleton =
     let length list = List.length list |> uint32
     
     let returnAddressIndex = 
@@ -87,6 +87,7 @@ let getContractWitness cHash command returnAddress initialTxSkelton finalTxSkele
     ContractWitness {
         cHash = cHash
         command = command
+        data = data
         returnAddressIndex = returnAddressIndex
         beginInputs = length initialTxSkelton.pInputs
         beginOutputs = length initialTxSkelton.outputs

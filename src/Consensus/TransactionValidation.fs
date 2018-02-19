@@ -148,7 +148,7 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
                     else
                         None) cw.returnAddressIndex
 
-            Contract.run contract cw.command returnAddress contractWallet inputTx
+            Contract.run contract cw.command cw.data returnAddress contractWallet inputTx
             |> Result.mapError General
             |> Result.bind checkMessage
             |> Result.bind checkIssuedAndDestroyed
@@ -195,7 +195,7 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
                         else
                             match tx.witnesses.[i+1] with
                             | ContractWitness cw ->
-                                Some { cHash = cw.cHash; command = cw.command }
+                                Some { cHash = cw.cHash; command = cw.command; data = cw.data }
                             | _ ->
                                 None
                     | _ -> None)

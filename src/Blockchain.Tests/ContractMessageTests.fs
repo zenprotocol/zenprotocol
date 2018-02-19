@@ -87,11 +87,11 @@ open Zen.Asset
 module ET = Zen.ErrorT
 module Tx = Zen.TxSkeleton
 
-val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 7
-let cf _ _ _ #l _ = ret (64 + 64 + 0 + 16)
+val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 7
+let cf _ _ _ _ #l _ = ret (64 + 64 + 0 + 16)
 
-val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + 64 + 0 + 16)
-let main txSkeleton contractHash command returnAddress #l wallet =
+val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + 64 + 0 + 16)
+let main txSkeleton contractHash command data returnAddress #l wallet =
     if command = "contract2_test" then
     begin
         let! tokens = Tx.getAvailableTokens zenAsset txSkeleton in
@@ -122,11 +122,11 @@ open Zen.Asset
 module ET = Zen.ErrorT
 module Tx = Zen.TxSkeleton
 
-val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 11
-let cf _ _ _ #l _ = ret (64 + (64 + (64 + 64 + 0)) + 24)
+val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 11
+let cf _ _ _ _ #l _ = ret (64 + (64 + (64 + 64 + 0)) + 25)
 
-val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + (64 + 64 + 0)) + 24)
-let main txSkeleton contractHash command returnAddress #l wallet =
+val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + (64 + 64 + 0)) + 25)
+let main txSkeleton contractHash command data returnAddress #l wallet =
     match returnAddress with
     | Some returnAddress ->
         let! tokens = Tx.getAvailableTokens zenAsset txSkeleton in
@@ -137,7 +137,8 @@ let main txSkeleton contractHash command returnAddress #l wallet =
 
         let message = {
             cHash = hashFromBase64 "%s";
-            command = "contract2_test"
+            command = "contract2_test";
+            data
         } in
 
         ET.ret (txSkeleton, Some message)
@@ -180,7 +181,7 @@ let ``Should execute contract chain and get a valid transaction``() =
     result {
         let! (state, cHash1) = activateContract contract1Code account session state
         let! (state, _) = activateContract contract2Code account session state
-        let! tx = TransactionHandler.executeContract session inputTx cHash1 "" (PK samplePKHash) state.memoryState
+        let! tx = TransactionHandler.executeContract session inputTx cHash1 "" Contract.EmptyData (PK samplePKHash) state.memoryState
 
         let tx = Transaction.sign [ sampleKeyPair ] tx
         let txHash = Transaction.hash tx
@@ -189,7 +190,7 @@ let ``Should execute contract chain and get a valid transaction``() =
             TransactionHandler.validateTransaction session dataPath 1ul tx state.memoryState
             |> Writer.unwrap
 
-        //exptect the transaction to be valid
+        //expect the transaction to be valid
         events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (txHash,tx)))
         MemPool.containsTransaction txHash memoryState.mempool |> should equal true
 

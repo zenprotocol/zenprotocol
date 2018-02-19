@@ -66,9 +66,9 @@ let requestHandler chain client (requestId:RequestId) request session wallet =
         | Result.Error err -> 
             ActivateContractTransactionResult.Error err
         |> reply
-    | ExecuteContract (cHash,command, spends) ->   
+    | ExecuteContract (cHash,command,data,spends) ->   
         let executeContract = Blockchain.executeContract client 
-        Account.createExecuteContractTransaction wallet executeContract cHash command spends
+        Account.createExecuteContractTransaction wallet executeContract cHash command data spends
         |> getTransactionResult
         |> reply
 
