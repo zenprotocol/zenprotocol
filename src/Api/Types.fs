@@ -15,15 +15,15 @@ type AddressJson = JsonProvider<"""
 {
     "address" : "address"
 }
-""">   
+""">
 
 type ContractActivateResponseJson = JsonProvider<"""
 {
     "address" : "address",
     "hash" : "hash"
 }
-""">   
- 
+""">
+
 type SpendRequestJson = JsonProvider<"""
 {
     "address": "address",
@@ -36,7 +36,8 @@ type SpendRequestJson = JsonProvider<"""
 
 type ContractActivateRequestJson = JsonProvider<"""
 {
-    "code": "string"
+    "code": "string",
+    "numberOfBlocks": 1
 }
 """>
 

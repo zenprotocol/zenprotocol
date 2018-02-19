@@ -307,7 +307,7 @@ let ``Valid contract should be added to ActiveContractSet``() =
     let cHash = getStringHash sampleContractCode
 
     let tx =
-        match Account.createActivateContractTransaction rootAccount sampleContractCode with
+        match Account.createActivateContractTransaction chain rootAccount sampleContractCode 1ul with
             | Result.Ok tx ->
                 tx
             | _ ->
@@ -378,7 +378,7 @@ let ``contract activation arrived, running orphan transaction``() =
     let account = Account.createTestAccount ()
 
     let activationTransaction =
-        Account.createActivateContractTransaction account sampleContractCode
+        Account.createActivateContractTransaction chain account sampleContractCode 1ul
         |> getResult
     let activationTxHash = Transaction.hash activationTransaction
 

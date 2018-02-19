@@ -1,6 +1,7 @@
 module Consensus.Tests.ContractTests
 
 open Consensus
+open Consensus.ChainParameters
 open Types
 open NUnit.Framework
 open Hash
@@ -48,7 +49,7 @@ let ``Should get 'elaborate' error for invalid code``() =
 
 let validateInputs (contract:Contract.T) utxos tx  =
     let acs = ActiveContractSet.add contract.hash contract ActiveContractSet.empty
-    TransactionValidation.validateInContext getUTXO contractPath 1ul acs utxos (Transaction.hash tx) tx
+    TransactionValidation.validateInContext Chain.Local getUTXO contractPath 1ul acs utxos (Transaction.hash tx) tx
     |> Result.mapError (function
         | TransactionValidation.ValidationError.General error -> error
         | other -> other.ToString())

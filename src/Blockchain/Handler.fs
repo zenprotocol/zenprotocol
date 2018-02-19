@@ -18,7 +18,7 @@ let handleCommand chain command session timestamp (state:State) =
     | ValidateTransaction tx ->
         effectsWriter {
             let! memoryState =
-                TransactionHandler.validateTransaction session contractPath state.tipState.tip.header.blockNumber
+                TransactionHandler.validateTransaction chain session contractPath state.tipState.tip.header.blockNumber
                     tx state.memoryState
             return {state with memoryState = memoryState}
         }
@@ -86,7 +86,7 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
         TransactionHandler.executeContract session txSkeleton cHash command data returnAddress state.memoryState
         |> requestId.reply
     | GetBlockTemplate pkHash ->
-        let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList session state
+        let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList chain session state
         let block = Block.createTemplate state.tipState.tip.header (Timestamp.now ()) state.tipState.ema memState.activeContractSet validatedTransactions pkHash
 
         requestId.reply block

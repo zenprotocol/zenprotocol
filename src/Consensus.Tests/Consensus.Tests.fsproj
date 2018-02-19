@@ -66,6 +66,7 @@
     </ProjectReference>
     <Compile Include="SampleContract.fs" />
     <Compile Include="ContractTests.fs" />
+    <Compile Include="ContractActivationTests.fs" />
     <Compile Include="BlockTests.fs" />
     <Compile Include="ContractMessageTests.fs" />
     <ProjectReference Include="..\Infrastructure\Infrastructure.fsproj">

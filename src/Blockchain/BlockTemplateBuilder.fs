@@ -7,11 +7,11 @@ open Consensus
 
 let getUTXO = UtxoSetRepository.get
 
-let selectOrderedTransactions (session:DatabaseContext.Session) blockNumber acs transactions =
+let selectOrderedTransactions chain (session:DatabaseContext.Session) blockNumber acs transactions =
     let contractPath = session.context.contractPath
 
     let tryAddTransaction (state, added, notAdded, altered) (txHash,tx) =
-        validateInContext (getUTXO session) contractPath (blockNumber + 1ul)
+        validateInContext chain (getUTXO session) contractPath (blockNumber + 1ul)
             state.activeContractSet state.utxoSet txHash tx
         |> function
         | Error (Orphan | ContractNotActive) ->
@@ -44,6 +44,6 @@ let selectOrderedTransactions (session:DatabaseContext.Session) blockNumber acs 
     foldUntilUnchanged initialState <| List.map (fun tx -> (Transaction.hash tx, tx)) transactions
 
 
-let makeTransactionList (session:DatabaseContext.Session) (state:State) =
+let makeTransactionList chain (session:DatabaseContext.Session) (state:State) =
     let txs = MemPool.getTransactions state.memoryState.mempool
-    selectOrderedTransactions session state.tipState.tip.header.blockNumber state.tipState.activeContractSet txs
+    selectOrderedTransactions chain session state.tipState.tip.header.blockNumber state.tipState.activeContractSet txs
