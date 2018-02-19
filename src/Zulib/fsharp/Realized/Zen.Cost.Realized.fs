@@ -48,7 +48,7 @@ let assoc ( _: Prims.nat)
           : Prims.unit = ()
 
 let force ( _: Prims.nat)
-          ( _: cost<'Aa, Prims.unit> ) =
+          ( _: cost<'Aa, Prims.unit> ) : 'Aa =
           failwith "force is not allowed in executed code."
 
 type forceT<'DummyA,'DummyB> = Prims.unit

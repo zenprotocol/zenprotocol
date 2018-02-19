@@ -241,7 +241,6 @@ type list (a:Type) =
   | Nil  : list a
   | Cons : hd:a -> tl:list a -> list a
 
-
 abstract type pattern = unit
 // SMTPat and SMTPatOr desugar to these two
 irreducible let smt_pat (#a:Type) (x:a) : pattern = ()
@@ -333,6 +332,13 @@ let abs (x:int) : Tot int = if x >= 0 then x else -x
 
 assume val string_of_bool: bool -> Tot string
 assume val string_of_int: int -> Tot string
+
+(* We use a custom list representation with constant-time length lookup.
+   The length function is realized because of this. *)
+val length(#a:Type): list a -> nat
+let rec length #_ = function
+  | [] -> 0
+  | _::tl -> length tl + 1
 
 
 

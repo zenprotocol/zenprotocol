@@ -28,7 +28,11 @@ type bool      = Microsoft.FSharp.Core.bool
 type string    = Microsoft.FSharp.Core.string
 type 'a array  = 'a Microsoft.FSharp.Core.array
 type exn       = Microsoft.FSharp.Core.exn
+
 type 'a list   = 'a Microsoft.FSharp.Collections.list
+let length (ls:'a list) : int =
+    Microsoft.FSharp.Collections.List.length ls
+    |> bigint
 type 'a option = 'a Microsoft.FSharp.Core.option
 
 type range     = unit

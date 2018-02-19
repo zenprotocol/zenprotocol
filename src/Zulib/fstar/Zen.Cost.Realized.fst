@@ -48,10 +48,9 @@ let assoc #_ #_ #_ #_ #_ #_ _ _ _ = ()
 
 // These functions are intentionally not implemented. They cannot be used in actual code.
 // Nevertheless, they are very useful for theorem proving.
-val force(#a:Type)(#n:nat): cost a n -> a
+val force(#a:Type)(#n:nat): cost a n -> GTot a
 let force #_ #_ mx = C?.inj mx
-val forceT(#n:nat): cost bool n -> GTot Type0
-let forceT #_ mx = force mx == true
+
 val force_ret(#a:Type): x:a -> Lemma (force (ret x) == x)
                                [SMTPat (ret x)]
 let force_ret #_ x = ()
