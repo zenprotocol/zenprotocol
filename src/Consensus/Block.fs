@@ -140,6 +140,7 @@ let createTemplate (parent:BlockHeader) timestamp (ema:EMA.T) acs transactions c
         |> List.map Transaction.witnessHash
         |> MerkleTree.computeRoot
 
+    let acs = ActiveContractSet.expireContracts blockNumber acs
     let acsMerkleRoot = SparseMerkleTree.root acs
 
     let parentHash = BlockHeader.hash parent
@@ -287,7 +288,7 @@ let connect chain getUTXO contractsPath parent timestamp set acs ema =
                 | Ok (block,set,acs,ema) ->
                     let txHash = (Transaction.hash tx)
 
-                    match TransactionValidation.validateInContext getUTXO contractsPath (block.header.blockNumber - 1ul) acs set txHash tx with
+                    match TransactionValidation.validateInContext getUTXO contractsPath (block.header.blockNumber) acs set txHash tx with
                     | Error err -> Error (sprintf "transactions failed inputs validation due to %A" err)
                     | Ok (_,acs) ->
                         let set = UtxoSet.handleTransaction getUTXO txHash tx set
@@ -296,6 +297,7 @@ let connect chain getUTXO contractsPath parent timestamp set acs ema =
                     ) (Ok (block,set,acs,ema)) withoutCoinbase
 
     let checkCommitments (block,set,acs,ema) =
+        let acs = ActiveContractSet.expireContracts block.header.blockNumber acs
         let acsMerkleRoot = SparseMerkleTree.root acs
 
         // we already validated txMerkleRoot and witness merkle root at the basic validation, re-calculate with acsMerkleRoot

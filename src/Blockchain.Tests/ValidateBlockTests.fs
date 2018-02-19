@@ -603,8 +603,10 @@ let ``block with a contract activation is added to chain``() =
 
     let contract = {
         hash = cHash
-        fn = fun _ _ _ _ tx -> Ok (tx,None)
-        costFn = fun _ _ _ tx -> Ok 1I
+        fn = fun _ _ _ _ _ tx -> Ok (tx,None)
+        costFn = fun _ _ _ _ _ -> Ok 1I
+        expiry=1002ul
+        size=100ul
     }
 
     let acs = ActiveContractSet.add cHash contract state.tipState.activeContractSet
@@ -774,7 +776,7 @@ let ``Valid template for two transactions which don't depend on each other``() =
     let _, genesisState =
         BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state
         |> Writer.unwrap
-    
+
     let balances = Account.getBalance rootAccount
     let asset, amount = balances |> Map.toList |> List.head
     let firstAmount = amount / 4UL
@@ -788,7 +790,7 @@ let ``Valid template for two transactions which don't depend on each other``() =
     let account = Account.addTransaction (Transaction.hash splitTx) splitTx rootAccount
     let ema'' = EMA.add chain timestamp ema'
     ema''.delayed.Length |> should equal 2
-  
+
     let _, splitState =
         BlockHandler.validateBlock chain session.context.contractPath session timestamp splitBlock false genesisState
         |> Writer.unwrap
@@ -829,7 +831,7 @@ let ``Two transactions in the same block which depend on each other are valid``(
     let _, genesisState =
         BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state
         |> Writer.unwrap
-    
+
     let balances = Account.getBalance rootAccount
     let asset, amount = balances |> Map.toList |> List.head
     let firstAmount = amount
@@ -858,7 +860,7 @@ let ``Two transactions in the same block which depend on each other are invalid 
     let _, genesisState =
         BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state
         |> Writer.unwrap
-    
+
     let balances = Account.getBalance rootAccount
     let asset, amount = balances |> Map.toList |> List.head
     let firstAmount = amount
@@ -887,7 +889,7 @@ let ``Template builder uses two transactions in the same block which depend on e
     let _, genesisState =
         BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state
         |> Writer.unwrap
-    
+
     let balances = Account.getBalance rootAccount
     let asset, amount = balances |> Map.toList |> List.head
     let firstAmount = amount
@@ -920,7 +922,7 @@ let ``Out of order dependent transactions are rearranged``() =
     let _, genesisState =
         BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state
         |> Writer.unwrap
-    
+
     let balances = Account.getBalance rootAccount
     let asset, amount = balances |> Map.toList |> List.head
     let firstTx =

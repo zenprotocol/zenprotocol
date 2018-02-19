@@ -26,7 +26,7 @@ let clean() =
 
 let compile code = result {
     let! hints = Contract.recordHints code
-    return! Contract.compile contractPath (code, hints)
+    return! Contract.compile contractPath (code, hints) 1000ul
 }
 
 // Message passing 'artificial' test:
@@ -42,15 +42,15 @@ let setup = fun () ->
     open Zen.Vector
     open Zen.Base
     open Zen.Cost
-    
+
     module ET = Zen.ErrorT
     module Tx = Zen.TxSkeleton
-    
-    val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 9
-    let cf _ _ _ #l _ = ret (64 + (64 + 64 + 0) + 19)
-    
-    val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + 64 + 0) + 19)
-    let main txSkeleton contractHash command returnAddress #l wallet =
+
+    val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 9
+    let cf _ _ _ _ #l _ = ret (64 + (64 + 64 + 0) + 19)
+
+    val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + 64 + 0) + 19)
+    let main txSkeleton contractHash command data returnAddress #l wallet =
         if command = "contract2_test" then
         begin
             let! contractToken = Zen.Asset.getDefault contractHash in
@@ -59,12 +59,12 @@ let setup = fun () ->
                 >>= Tx.lockToContract contractToken 50UL contractHash in
             ET.ret (txSkeleton, None)
         end
-        else 
+        else
             ET.autoFailw "unsupported command"
     """
     let contract2Hash = Contract.computeHash contract2Code
-        
-    let contract1Code = 
+
+    let contract1Code =
         contract2Hash
         |> Hash.bytes
         |> System.Convert.ToBase64String
@@ -74,38 +74,39 @@ let setup = fun () ->
             open Zen.Util
             open Zen.Base
             open Zen.Cost
-            
+
             module ET = Zen.ErrorT
             module Tx = Zen.TxSkeleton
-            
-            val cf: txSkeleton -> string -> option lock -> #l:nat -> wallet l -> cost nat 9
-            let cf _ _ _ #l _ = ret (64 + (64 + 64 + 0) + 23)
-            
-            val main: txSkeleton -> hash -> string -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + 64 + 0) + 23)
-            let main txSkeleton contractHash command returnAddress #l wallet =
+
+            val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 9
+            let cf _ _ _ _ #l _ = ret (64 + (64 + 64 + 0) + 24)
+
+            val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + 64 + 0) + 24)
+            let main txSkeleton contractHash command data returnAddress #l wallet =
                 if command = "contract1_test" then
                 begin
                     let! asset = Zen.Asset.getDefault contractHash in
                     let! txSkeleton =
                         Tx.mint 25UL asset txSkeleton
                         >>= Tx.lockToContract asset 25UL contractHash in
-                    let message = { 
+                    let message = {
                         cHash = hashFromBase64 "%s";
-                        command = "contract2_test"
+                        command = "contract2_test";
+                        data = data
                     } in
                     ET.ret (txSkeleton, Some message)
                 end
-                else 
+                else
                     ET.autoFailw "unsupported command"
         """
 
     contracts <- result {
         let! contract1 = compile contract1Code
         let! contract2 = compile contract2Code
-        
+
         return (contract1, contract2)
     }
-    
+
 [<OneTimeSetUp>]
 let tearDown = fun () ->
     clean ()
@@ -118,38 +119,46 @@ let ``Should produce execute contracts with message passed between them``() =
         let spend1 = {asset = contract1.hash, Hash.zero; amount = 25UL}
         let spend2 = {asset = contract2.hash, Hash.zero; amount = 50UL}
 
-        let expectedTx = 
+        let expectedTx =
             {
-                pInputs = 
+                pInputs =
                     [
                         Mint spend1
                         Mint spend2
                     ]
-                outputs = 
+                outputs =
                     [
                         {lock = Contract contract1.hash; spend = {asset = contract1.hash, Hash.zero; amount = 25UL}}
                         {lock = Contract contract2.hash; spend = {asset = contract2.hash, Hash.zero; amount = 50UL}}
                     ]
             }
-        
-        let! (tx, message) = Contract.run contract1 "contract1_test" None List.empty TxSkeleton.empty
 
-        let command = 
-            match message with 
-            | Some {cHash=cHash;command=command} when cHash = 
-                contract2.hash -> command
-            | _ -> 
+        let stringData = Zen.Types.Data.data.String "Some string data"
+
+        let data = ZFStar.fstToFsData stringData
+
+        let! (tx, message) = Contract.run contract1 "contract1_test" data None List.empty TxSkeleton.empty
+
+        let command =
+            match message with
+            | Some {cHash=cHash;command=command;data=data} when cHash = contract2.hash ->
+                data
+                |> ZFStar.fsToFstData
+                |> should equal stringData
+
+                command
+            | _ ->
                 failwithf "should be some message"
-            
-        let! (tx, message) = Contract.run contract2 command None List.empty tx
 
-        match message with 
+        let! (tx, message) = Contract.run contract2 command Contract.EmptyData None List.empty tx
+
+        match message with
         | Some _ ->
             failwithf "should be no message"
-        | _ -> 
+        | _ ->
             ()
 
         should equal tx expectedTx
-    }    
+    }
     |> Result.mapError failwith
     |> ignore

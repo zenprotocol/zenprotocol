@@ -17,14 +17,18 @@ open Consensus.Types
 open Zen.Types.Main
 
 type ContractWallet = PointedOutput list
-type ContractFn = Hash -> string -> Lock option -> ContractWallet -> TxSkeleton.T -> Result<(TxSkeleton.T * Message Option),string>
-type ContractCostFn = string -> Lock option -> ContractWallet -> TxSkeleton.T -> Result<bigint,string>
+type ContractFn = Hash -> string -> Data -> Lock option -> ContractWallet -> TxSkeleton.T -> Result<(TxSkeleton.T * Message Option),string>
+type ContractCostFn = string -> Data -> Lock option -> ContractWallet -> TxSkeleton.T -> Result<bigint,string>
 
 type T = {
     hash: Hash
     fn:   ContractFn
     costFn: ContractCostFn
+    expiry: uint32
+    size: uint32
 }
+
+let EmptyData = Data [||]
 
 let private findMethods assembly =
     try
@@ -37,15 +41,15 @@ let private findMethods assembly =
         Exception.toError "get contract methods" ex
 
 
-let private invokeMainFn methodInfo cHash command returnAddress contractWallet input =
+let private invokeMainFn methodInfo cHash command data returnAddress contractWallet input =
     try
-        (methodInfo:MethodInfo).Invoke (null, [| input; cHash; command ; returnAddress; ZFStar.vectorLength contractWallet; contractWallet |]) |> Ok
+        (methodInfo:MethodInfo).Invoke (null, [| input; cHash; command; data; returnAddress; ZFStar.vectorLength contractWallet; contractWallet |]) |> Ok
     with _ as ex ->
         Exception.toError "invoke contract main fn" ex
 
-let private invokeCostFn methodInfo command returnAddress contractWallet input =
+let private invokeCostFn methodInfo command data returnAddress contractWallet input =
     try
-        (methodInfo:MethodInfo).Invoke (null, [| input; command; returnAddress; ZFStar.vectorLength contractWallet;  contractWallet |]) |> Ok
+        (methodInfo:MethodInfo).Invoke (null, [| input; command; data; returnAddress; ZFStar.vectorLength contractWallet;  contractWallet |]) |> Ok
     with _ as ex ->
         Exception.toError "invoke contract cost fn" ex
 
@@ -63,23 +67,25 @@ let private castCostFnOutput output =
 
 let private wrap (mainMethodInfo, costMethodInfo) =
     (
-    fun (Hash.Hash cHash) command returnAddress contractWallet txSkeleton ->
+    fun (Hash.Hash cHash) command data returnAddress contractWallet txSkeleton ->
         let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
         let contractWallet' = ZFStar.convertWallet contractWallet
         let returnAddress' = ZFStar.fsToFstOption ZFStar.fsToFstLock returnAddress
+        let data' = ZFStar.fsToFstData data
 
-        invokeMainFn mainMethodInfo cHash command returnAddress' contractWallet' txSkeleton'
+        invokeMainFn mainMethodInfo cHash command data' returnAddress' contractWallet' txSkeleton'
         |> Result.bind castMainFnOutput
         |> Result.map ZFStar.unCost
         |> Result.bind ZFStar.toResult
         |> Result.bind ZFStar.convertResult
     ,
-    fun command returnAddress contractWallet txSkeleton ->
+    fun command data returnAddress contractWallet txSkeleton ->
         let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
         let contractWallet' = ZFStar.convertWallet contractWallet
         let returnAddress' = ZFStar.fsToFstOption ZFStar.fsToFstLock returnAddress
+        let data' = ZFStar.fsToFstData data
 
-        invokeCostFn costMethodInfo command returnAddress' contractWallet' txSkeleton'
+        invokeCostFn costMethodInfo command data' returnAddress' contractWallet' txSkeleton'
         |> Result.bind castCostFnOutput
         |> Result.map ZFStar.unCost
     )
@@ -96,7 +102,7 @@ let computeHash code =
     |> Encoding.UTF8.GetBytes
     |> Hash.compute
 
-let load contractsPath hash =
+let load contractsPath expiry size hash =
     getModuleName hash
     |> ZFStar.load contractsPath
     |> Result.bind findMethods
@@ -106,16 +112,20 @@ let load contractsPath hash =
             hash = hash
             fn = mainFn
             costFn = costFn
+            expiry = expiry
+            size = size
         })
 
-let compile contractsPath (code, hints) =
+let compile contractsPath (code, hints) expiry =
     let hash = computeHash code
+
+    let size = String.length code |> uint32
 
     hash
     |> getModuleName
     |> ZFStar.compile contractsPath (code, hints)
     |> Result.map (fun _ -> hash)
-    |> Result.bind (load contractsPath)
+    |> Result.bind (load contractsPath expiry size)
 
 let recordHints code =
     code
@@ -126,5 +136,5 @@ let recordHints code =
 let getCost contract command =
     contract.costFn command
 
-let run contract command returnAddress wallet inputTx =
-    contract.fn contract.hash command returnAddress wallet inputTx
+let run contract command data returnAddress wallet inputTx =
+    contract.fn contract.hash command data returnAddress wallet inputTx

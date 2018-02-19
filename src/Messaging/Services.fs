@@ -11,10 +11,10 @@ type TransactionResult = Result<Transaction,string>
 
 type ActivateContractTransactionResult = Result<Transaction * Hash, string>
 
-module Blockchain = 
+module Blockchain =
     let serviceName = "blockchain"
 
-    type Command = 
+    type Command =
         | ValidateTransaction of Types.Transaction
         | RequestMemPool of peerId:byte[]
         | RequestTransaction of peerId:byte[] * txHash:Hash.Hash
@@ -26,113 +26,113 @@ module Blockchain =
         | ValidateBlock of Types.Block
         | ValidateMinedBlock of Types.Block
 
-    type Request = 
-        | ExecuteContract of Hash.Hash * string * Lock * TxSkeleton.T 
+    type Request =
+        | ExecuteContract of Hash.Hash * string * Data * Lock * TxSkeleton.T
         | GetBlockTemplate of pkHash:Hash.Hash
         | GetTip
         | GetBlock of Hash.Hash
         | GetBlockHeader of Hash.Hash
 
     type Response = unit
-        
-    let validateTransaction client tx = 
-        Command.send client serviceName (ValidateTransaction tx)
-    
-    let requestMemPool client peerId = 
-        Command.send client serviceName (RequestMemPool peerId)
-        
-    let requestTransaction client peerId txHash = 
-        Command.send client serviceName (RequestTransaction (peerId,txHash))
-    
-    let handleMemPool client peerId txHashes =
-        Command.send client serviceName (HandleMemPool (peerId,txHashes))                                                
 
-    let executeContract client cHash command returnAddress txSkeleton = 
-        ExecuteContract (cHash,command, returnAddress,txSkeleton)
+    let validateTransaction client tx =
+        Command.send client serviceName (ValidateTransaction tx)
+
+    let requestMemPool client peerId =
+        Command.send client serviceName (RequestMemPool peerId)
+
+    let requestTransaction client peerId txHash =
+        Command.send client serviceName (RequestTransaction (peerId,txHash))
+
+    let handleMemPool client peerId txHashes =
+        Command.send client serviceName (HandleMemPool (peerId,txHashes))
+
+    let executeContract client cHash command data returnAddress txSkeleton =
+        ExecuteContract (cHash,command, data, returnAddress,txSkeleton)
         |> Request.send<Request, TransactionResult> client serviceName
-        
-    let validateBlock client block = 
-        ValidateBlock block 
+
+    let validateBlock client block =
+        ValidateBlock block
         |> Command.send client serviceName
-    
-    let validateMinedBlock client block = 
-        ValidateMinedBlock block 
+
+    let validateMinedBlock client block =
+        ValidateMinedBlock block
         |> Command.send client serviceName
-    
-    let handleTip client header = 
-        HandleTip header 
+
+    let handleTip client header =
+        HandleTip header
         |> Command.send client serviceName
-        
-    let validateNewBlockHeader client peerId header = 
+
+    let validateNewBlockHeader client peerId header =
         ValidateNewBlockHeader (peerId,header)
-        |> Command.send client serviceName 
-                
-    let requestBlock client peerId blockHash = 
+        |> Command.send client serviceName
+
+    let requestBlock client peerId blockHash =
         RequestBlock (peerId,blockHash)
         |> Command.send client serviceName
-        
+
     let requestTip client peerId =
-        RequestTip peerId         
+        RequestTip peerId
         |> Command.send client serviceName
-        
-    let getBlockTemplate client pkHash = 
+
+    let getBlockTemplate client pkHash =
         GetBlockTemplate pkHash
-        |> Request.send<Request,Block> client serviceName        
-        
-    let getBlockHeader client blockHash = 
+        |> Request.send<Request,Block> client serviceName
+
+    let getBlockHeader client blockHash =
         Request.send<Request,BlockHeader option> client serviceName (GetBlockHeader blockHash)
-        
-    let getBlock client blockHash = 
+
+    let getBlock client blockHash =
         Request.send<Request,Block option> client serviceName (GetBlock blockHash)
-        
-    let getTip client =                         
+
+    let getTip client =
         Request.send<Request,(Hash.Hash*BlockHeader) option> client serviceName GetTip
-        
+
 module Network =
-    type Command = 
+    type Command =
         | SendMemPool of peerId:byte[] * Hash.Hash list
-        | SendTransaction of peerId:byte[] * Transaction 
+        | SendTransaction of peerId:byte[] * Transaction
         | SendTip of peerId:byte[] * BlockHeader
         | SendBlock of peerId:byte[] * Block
         | GetTransaction of peerId:byte[] * Hash.Hash
-        | GetBlock of Hash.Hash 
+        | GetBlock of Hash.Hash
         | GetNewBlock of peerId:byte[] * Hash.Hash
         | PublishBlock of BlockHeader
-                   
-    type Request = unit
-                
-    type Response = unit        
 
-    let serviceName = "network"       
-    
-module Wallet = 
+    type Request = unit
+
+    type Response = unit
+
+    let serviceName = "network"
+
+module Wallet =
     type Command = unit
-    
-    type Request = 
-        | GetAddressPKHash 
+
+    type Request =
+        | GetAddressPKHash
         | GetAddress
         | GetBalance
         | Spend of Hash * Spend
         | ActivateContract of string
-        | ExecuteContract of Hash * string * Map<Asset, uint64>
+        | ExecuteContract of Hash * string * Data * Map<Asset, uint64>
 
     let serviceName = "wallet"
-    
+
     let getBalance client =
         Request.send<Request, Map<Asset,uint64>> client serviceName GetBalance
 
     let getAddressPKHash client =
         Request.send<Request, Hash.Hash> client serviceName GetAddressPKHash
-        
+
     let getAddress client =
         Request.send<Request, string> client serviceName GetAddress
-        
-        
+
+
     let createTransaction client address spend =
         Request.send<Request, TransactionResult> client serviceName (Spend (address, spend))
 
     let activateContract client code =
         Request.send<Request, ActivateContractTransactionResult> client serviceName (ActivateContract (code))
 
-    let executeContract client address command spends =
-        Request.send<Request, TransactionResult> client serviceName (ExecuteContract (address,command, spends))
+    let executeContract client address command data spends =
+        Request.send<Request, TransactionResult> client serviceName (ExecuteContract (address,command,data,spends))

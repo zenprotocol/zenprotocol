@@ -37,11 +37,18 @@ let private foldSpends =
 let private checkSpends m =
     Map.forall (fun _ v -> Option.isSome v) m
 
-let private activateContract contractPath acs (tx : Types.Transaction) = result {
+let private activateContract contractPath blockNumber acs (tx : Types.Transaction) = result {
     match tx.contract with
-    | Some code ->
-        let! contract = Contract.compile contractPath code |> Result.mapError (fun _ -> BadContract)
-        return ActiveContractSet.add contract.hash contract acs
+    | Some (code,hints) ->
+        let cHash = Contract.computeHash code
+
+        match ActiveContractSet.tryFind cHash acs with
+        | Some contract ->
+            let contract = {contract with expiry = contract.expiry + 1000ul}
+            return ActiveContractSet.add cHash contract acs
+        | None ->
+            let! contract = Contract.compile contractPath (code,hints) (blockNumber + 1000ul) |> Result.mapError (fun _ -> BadContract)
+            return ActiveContractSet.add contract.hash contract acs
     | None ->
         return acs
 }
@@ -63,9 +70,9 @@ let getContractWallet tx inputs cHash =
     List.zip tx.inputs inputs
     |> List.filter (fun (_, output) -> output.lock = Contract cHash)
 
-let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =            
+let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
     let checkPKWitness inputTx pInputs serializedPublicKey signature =
-        let verifyPkHash pkHash tail = 
+        let verifyPkHash pkHash tail =
             match PublicKey.deserialize serializedPublicKey with
             | Some publicKey ->
                 if PublicKey.hashSerialized serializedPublicKey = pkHash then
@@ -74,15 +81,15 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
                     | _ -> GeneralError "invalid PK witness signature"
                 else GeneralError "PK witness mismatch"
             | _ -> GeneralError "invalid PK witness"
-    
+
         match pInputs with
         | [] -> GeneralError "missing PK witness input"
         | TxSkeleton.Input.PointedOutput (_, {lock=Coinbase (coinbaseBlockNumber,pkHash)}) :: tail ->
             if blockNumber - coinbaseBlockNumber < CoinbaseMaturity then
                 GeneralError "Coinbase not mature enough"
             else
-                verifyPkHash pkHash tail                        
-        | TxSkeleton.Input.PointedOutput (_, {lock=PK pkHash}) :: tail -> verifyPkHash pkHash tail           
+                verifyPkHash pkHash tail
+        | TxSkeleton.Input.PointedOutput (_, {lock=PK pkHash}) :: tail -> verifyPkHash pkHash tail
         | _ -> GeneralError "unexpected PK witness lock type"
 
     let checkContractWitness inputTx acs cw message pInputs =
@@ -141,7 +148,7 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
                     else
                         None) cw.returnAddressIndex
 
-            Contract.run contract cw.command returnAddress contractWallet inputTx
+            Contract.run contract cw.command cw.data returnAddress contractWallet inputTx
             |> Result.mapError General
             |> Result.bind checkMessage
             |> Result.bind checkIssuedAndDestroyed
@@ -188,7 +195,7 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
                         else
                             match tx.witnesses.[i+1] with
                             | ContractWitness cw ->
-                                Some { cHash = cw.cHash; command = cw.command }
+                                Some { cHash = cw.cHash; command = cw.command; data = cw.data }
                             | _ ->
                                 None
                     | _ -> None)
@@ -215,7 +222,7 @@ let private checkOutputsNotEmpty tx =
         Ok tx
 
 let private checkOutputsOverflow tx =
-    if tx.outputs 
+    if tx.outputs
         |> List.map (fun o -> o.spend)
         |> foldSpends
         |> checkSpends then Ok tx
@@ -231,74 +238,74 @@ let private checkInputsStructure tx =
         GeneralError "inputs structurally invalid"
     else
         Ok tx
-        
+
 let private checkNoCoinbaseLock tx =
-    let anyCoinbase = 
-        List.exists (fun output -> 
+    let anyCoinbase =
+        List.exists (fun output ->
             match output.lock with
             | Coinbase _ -> true
-            | _ -> false) tx.outputs        
-    
-    if anyCoinbase then 
+            | _ -> false) tx.outputs
+
+    if anyCoinbase then
         GeneralError "coinbase lock is not allow within regular transaction"
     else
         Ok tx
-            
+
 let private tryGetUtxos getUTXO utxoSet tx =
     getUtxosResult getUTXO tx.inputs utxoSet
     |> Result.mapError (fun errors ->
         if List.contains Spent errors then DoubleSpend else Orphan
     )
 
-let validateBasic = 
-    checkInputsNotEmpty     
+let validateBasic =
+    checkInputsNotEmpty
     >=> checkOutputsNotEmpty
     >=> checkNoCoinbaseLock
     >=> checkOutputsOverflow
     >=> checkDuplicateInputs
     >=> checkInputsStructure
-    
-let validateCoinbase blockNumber =     
+
+let validateCoinbase blockNumber =
     let checkOnlyCoinbaseLocks blockNumber tx =
-        let allCoinbase = 
-            List.forall (fun output -> 
+        let allCoinbase =
+            List.forall (fun output ->
                 match output.lock with
                 | Coinbase (blockNumber',_) when blockNumber' = blockNumber -> true
-                | _ -> false) tx.outputs        
-        
-        if allCoinbase then 
+                | _ -> false) tx.outputs
+
+        if allCoinbase then
             Ok tx
         else
-            GeneralError "within coinbase transaction all outputs must use coinbase lock"                     
-           
-    let checkNoInputWithinCoinbaseTx tx = 
+            GeneralError "within coinbase transaction all outputs must use coinbase lock"
+
+    let checkNoInputWithinCoinbaseTx tx =
         match tx.inputs with
         | [] -> Ok tx
         | _ -> GeneralError "coinbase transaction must not have any inputs"
-        
-    let checkNoContractInCoinbase tx = 
+
+    let checkNoContractInCoinbase tx =
         if Option.isSome tx.contract then
             GeneralError "coinbase transaction cannot activate a contract"
         else
-            Ok tx     
-       
+            Ok tx
+
     let checkNoWitnesses tx =
         match tx.witnesses with
         | [] -> Ok tx
         | _ -> GeneralError "coinbase transaction must not have any witnesses"
-                   
-       
+
+
     checkOutputsNotEmpty
     >=> checkNoInputWithinCoinbaseTx
-    >=> checkNoWitnesses    
+    >=> checkNoWitnesses
     >=> checkOnlyCoinbaseLocks blockNumber
     >=> checkNoContractInCoinbase
-    >=> checkOutputsOverflow        
+    >=> checkOutputsOverflow
 
 let validateInContext getUTXO contractPath blockNumber acs set txHash tx = result {
     let! outputs = tryGetUtxos getUTXO set tx
     let! txSkel = checkWitnesses blockNumber acs (txHash, tx, outputs)
     do! checkAmounts txSkel
-    let! newAcs = activateContract contractPath acs tx
+    let! newAcs = activateContract contractPath blockNumber acs tx
     return tx, newAcs
 }
