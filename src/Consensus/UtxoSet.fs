@@ -37,8 +37,12 @@ let handleTransaction getUTXO txHash tx set =
             |> List.fold folder set
 
         List.fold (fun state (index,output) ->
-            let outpoint = {txHash=txHash;index=index;}
-            Map.add outpoint (Unspent output) state) set outputsWithIndex
+            if Transaction.isOutputSpendable output then
+                let outpoint = {txHash=txHash;index=index;}
+                Map.add outpoint (Unspent output) state
+            else
+                state
+            ) set outputsWithIndex
 
     set
 
@@ -75,8 +79,11 @@ let undoBlock getOutput getUTXO block utxoSet =
                 | NoOutput
                 | Unspent _ -> failwith "Expected output to be spent") utxoSet
 
-        [0 .. List.length tx.outputs - 1]
-        |> List.map (fun i -> {txHash=txHash; index=uint32 i})
-        |> List.fold (fun utxoSet outpoint ->
-            Map.add outpoint NoOutput utxoSet
-            ) utxoSet) block.transactions utxoSet
+        tx.outputs
+        |> List.mapi (fun i output -> i,output )
+        |> List.fold (fun utxoSet (i,output) ->
+            if Transaction.isOutputSpendable output then
+                let outpoint = {txHash=txHash; index=uint32 i}
+                Map.add outpoint NoOutput utxoSet
+            else
+                utxoSet) utxoSet) block.transactions utxoSet
