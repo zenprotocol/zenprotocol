@@ -42,27 +42,24 @@ let checkPrefix txSub txSuper =
     else
         Error "invalid prefix"
 
-let fromTransaction tx (outputs : Output List)=
-    match List.fold (fun state input ->
-        state
-        |> Option.bind (
-            fun (inputs, outputs) ->
-                match input with
-                | Types.Input.Outpoint outpoint ->
-                    List.tryHead outputs
-                    |> Option.bind (fun output ->
-                        Some (PointedOutput (outpoint, output) :: inputs, List.tail outputs)
-                    )
-                | Types.Input.Mint spend ->
-                    Some (Mint spend :: inputs, outputs)
-        )) (Some ([], outputs)) tx.inputs with
-    | Some (inputs, _) ->
-        Ok {
-            pInputs = List.rev inputs
-            outputs = tx.outputs
-        }
-    | None ->
-        Error "could not construct txSkeleton"
+let fromTransaction tx (outputs : Output List) =
+    let pInputs,_ =
+        List.fold (fun (inputs, outputs) input ->
+
+            match input with
+            | Types.Input.Outpoint outpoint ->
+                let output = List.head outputs
+                PointedOutput (outpoint, output) :: inputs, List.tail outputs
+
+            | Types.Input.Mint spend ->
+                Mint spend :: inputs, outputs
+
+            ) ([], outputs) tx.inputs
+
+    {
+        pInputs = List.rev pInputs
+        outputs = tx.outputs
+    }
 
 let applyMask tx cw =
     let (=>) list length =

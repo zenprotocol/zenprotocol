@@ -81,7 +81,7 @@ let ``Contract generated transaction should be valid``() =
 [<Test>]
 let ``Should get expected contract cost``() =
     (compile sampleContractCode
-     |> Result.bind (fun contract ->
+     |> Result.map (fun contract ->
         Contract.getCost contract "" Contract.EmptyData None List.empty sampleInputTx)
     , (Ok 213I : Result<bigint, string>))
     |> shouldEqual
@@ -148,24 +148,24 @@ let ``Contract should be able to destroy its own tokens locked to it``() =
         |> Hash.compute
 
     let outputToDestroy = {
-        lock = Contract sampleContractHash
+        lock = PK (PublicKey.hash samplePublicKey)
         spend = { asset = sampleContractHash, Hash.zero; amount = 1000UL }
     }
 
-    let sampleInput2 = {
+    let sampleInput = {
         txHash = Hash.zero
         index = 2u
     }
 
     let sampleInputTx =
         {
-            pInputs = [ PointedOutput (sampleInput, sampleOutput) ; PointedOutput (sampleInput2, outputToDestroy) ]
-            outputs = [ sampleOutput ]
+            pInputs = [ PointedOutput (sampleInput, outputToDestroy) ]
+            outputs = [ ]
         }
 
     let utxoSet =
         getSampleUtxoset (UtxoSet.asDatabase)
-        |> Map.add sampleInput2 (OutputStatus.Unspent outputToDestroy)
+        |> Map.add sampleInput (OutputStatus.Unspent outputToDestroy)
 
     let sampleContractTester txSkeleton cHash =
         let output = {

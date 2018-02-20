@@ -65,9 +65,6 @@ let ``Should create transaction from txSkeleton``(tx:TxSkeleton.T) =
         tx.pInputs
         |> List.choose (function | PointedOutput (_, output) -> Some output | _ -> None)
 
-    let txSkeleton' =
-        match TxSkeleton.fromTransaction tx' outputs with
-        | Error error -> failwith error
-        | Ok tx -> tx
+    let txSkeleton' = TxSkeleton.fromTransaction tx' outputs
 
     txSkeleton' = tx

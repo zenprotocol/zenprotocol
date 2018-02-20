@@ -29,6 +29,8 @@ type lock =
     | ContractLock of contractHash
     | FeeLock
     | DestroyLock
+    | ActivationSacrificeLock
+    | CoinbaseLock of U32.t ** hash
 
 type output =
     { lock: lock;

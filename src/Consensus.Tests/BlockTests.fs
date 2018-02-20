@@ -231,13 +231,11 @@ let ``can connect block with a contract``() =
         Account.createActivateContractTransaction Chain.Local rootAccount SampleContract.sampleContractCode 1000ul
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
 
-    printfn "%A" tx
-
     let contract : Contract.T =
         {
             hash=Contract.computeHash SampleContract.sampleContractCode
             fn= fun _ _ _ _ _ tx -> Ok (tx,None)
-            costFn = fun _ _ _ _ _ -> Ok 0I
+            costFn = fun _ _ _ _ _ -> 0I
             expiry=1001ul
             size=100ul
         }
@@ -250,8 +248,7 @@ let ``can connect block with a contract``() =
     let block = Block.createTemplate parent (timestamp+1UL) ema acs [tx] Hash.zero
 
     Block.connect Chain.Local getUTXO contractsPath parent timestamp utxoSet ActiveContractSet.empty ema block
-    //|> should be ok
-    |> printfn "%A"
+    |> should be ok
 
 [<Test>]
 let ``block with invalid contract failed connecting``() =
@@ -270,7 +267,7 @@ let ``block with invalid contract failed connecting``() =
         {
             hash=Contract.computeHash "ada"
             fn= fun _ _ _ _ _ tx -> Ok (tx,None)
-            costFn = fun _ _ _ _ _ -> Ok 0I
+            costFn = fun _ _ _ _ _ -> 0I
             expiry=1000ul
             size=100ul
         }
@@ -618,7 +615,7 @@ let ``contract get removed when expiring arrive``() =
         {
             hash=Contract.computeHash SampleContract.sampleContractCode
             fn= fun _ _ _ _ _ tx -> Ok (tx,None)
-            costFn = fun _ _ _ _ _ -> Ok 0I
+            costFn = fun _ _ _ _ _ -> 0I
             expiry=1ul
             size=100ul
         }
