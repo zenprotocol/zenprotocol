@@ -94,12 +94,18 @@ let private checkAmounts (txSkeleton:TxSkeleton.T) =
     else
         Ok ()
 
-let getContractWallet tx inputs cHash =
-    let txInputs = List.choose (function | Outpoint outpoint -> Some outpoint | Mint _ -> None) tx.inputs
-    List.zip txInputs inputs
-    |> List.filter (fun (_, output) -> output.lock = Contract cHash)
+let getContractWallet (txSkeleton:TxSkeleton.T) cw =
+    txSkeleton.pInputs.[int cw.beginInputs .. int cw.endInputs]
+    |> List.choose (fun input ->
+        match input with
+        | TxSkeleton.PointedOutput (outpoint,output) when output.lock = Contract cw.cHash ->
+            Some (outpoint,output)
+        | _ -> None
+    )
 
 let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
+    let fulltxSkeleton = TxSkeleton.fromTransaction tx inputs
+
     let checkPKWitness inputTx pInputs serializedPublicKey signature =
         let verifyPkHash pkHash tail =
             match PublicKey.deserialize serializedPublicKey with
@@ -123,6 +129,8 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
 
     let checkContractWitness inputTx acs cw message pInputs =
         let checkMessage (txSkeleton, resultMessage) =
+            printfn "%A %A" message resultMessage
+
             if message = resultMessage then
                 Ok txSkeleton
             else
@@ -155,18 +163,24 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
             else
                 Ok txSkeleton
 
-        let rec popContractsLocksOf cHash pInputs =
-            match pInputs with
-            | [] -> []
-            | TxSkeleton.Input.PointedOutput (input, output) :: tail ->
-                match output.lock with
-                | Contract cHash' when cHash' = cHash ->
-                    popContractsLocksOf cHash' tail
-                | _ -> TxSkeleton.Input.PointedOutput (input, output) :: tail
+        let rec popContractsLocksOf cHash pInputs left =
+            if left = 0ul then
+                pInputs
+            else
+                match pInputs with
+                | [] -> []
+                | TxSkeleton.Input.PointedOutput (_, output) :: tail ->
+                    match output.lock with
+                    | Contract cHash' when cHash' = cHash ->
+                        popContractsLocksOf cHash' tail (left - 1ul)
+                    | _ -> pInputs
+                | TxSkeleton.Input.Mint mint :: tail when fst mint.asset = cHash ->
+                    popContractsLocksOf cHash tail (left - 1ul)
+                | _ -> pInputs
 
         match ActiveContractSet.tryFind cw.cHash acs with
         | Some contract ->
-            let contractWallet = getContractWallet tx inputs cw.cHash
+            let contractWallet = getContractWallet fulltxSkeleton cw
 
             let returnAddress =
                 Option.bind (fun (index:uint32) ->
@@ -185,7 +199,7 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
                 if List.length outputTx.pInputs - List.length inputTx.pInputs = int cw.inputsLength &&
                    List.length outputTx.outputs - List.length inputTx.outputs = int cw.outputsLength then
 
-                    Ok (outputTx, popContractsLocksOf cw.cHash pInputs)
+                    Ok (outputTx, popContractsLocksOf cw.cHash pInputs cw.inputsLength)
                 else GeneralError "input/output length mismatch")
         | None -> Error ContractNotActive
 
@@ -210,8 +224,7 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
             Ok pTx
 
     result {
-        let! txSkel = TxSkeleton.fromTransaction tx inputs |> Result.mapError General
-        let! masked = applyMaskIfContract txSkel |> Result.mapError General
+        let! masked = applyMaskIfContract fulltxSkeleton |> Result.mapError General
 
         let! (witnessedSkel, pInputs) =
             List.mapi (fun i witness -> (i, witness)) tx.witnesses
@@ -228,7 +241,7 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
                             | _ ->
                                 None
                     | _ -> None)
-            |> List.fold witnessesFolder (Ok (masked, masked.pInputs))
+            |> List.fold witnessesFolder (Ok (masked, fulltxSkeleton.pInputs))
 
         if not <| List.isEmpty pInputs then
             return! GeneralError "missing witness(es)"

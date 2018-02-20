@@ -123,21 +123,23 @@ let validateTransaction chain session contractPath blockNumber tx (state:MemoryS
     }
 
 let executeContract session txSkeleton cHash command data returnAddress state =
-    let checkACS cHash =
+    let isInTxSkeleton (txSkeleton:TxSkeleton.T) (outpoint,_)  =
+        List.exists (fun input ->
+            match input with
+            | TxSkeleton.Mint _ -> false
+            | TxSkeleton.PointedOutput (outpoint',_) -> outpoint' = outpoint) txSkeleton.pInputs
+
+    let rec run cHash command data (txSkeleton:TxSkeleton.T) witnesses totalCost =
         match ActiveContractSet.tryFind cHash state.activeContractSet with
-        | Some contract -> Ok contract
         | None -> Error "Contract not active"
+        | Some contract ->
+            let contractWallet =
+                ContractUtxoRepository.getContractUtxo session cHash state.utxoSet
+                |> List.reject (isInTxSkeleton txSkeleton)
 
-    let contractWallet = ContractUtxoRepository.getContractUtxo session cHash state.utxoSet
+            let cost = Contract.getCost contract command data (Some returnAddress) contractWallet txSkeleton
+            let totalCost = cost + totalCost
 
-    checkACS cHash
-    |> Result.bind (fun contract ->
-        Contract.getCost contract command data (Some returnAddress) contractWallet txSkeleton
-        |> Result.map (Log.info "Running contract with cost: %A")
-        |> Result.mapError (Log.info "Error getting contract with cost: %A")
-        |> ignore
-
-        let rec run contract command data returnAddress contractWallet txSkeleton witnesses =
             Contract.run contract command data (Some returnAddress) contractWallet txSkeleton
             |> Result.bind (fun (tx, message) ->
                 TxSkeleton.checkPrefix txSkeleton tx
@@ -146,18 +148,20 @@ let executeContract session txSkeleton cHash command data returnAddress state =
 
                     match message with
                     | Some {cHash=cHash; command=command; data=data} ->
-                        checkACS cHash
-                        |> Result.bind (fun contract ->
-                            run contract command data returnAddress contractWallet finalTxSkeleton witnesses
-                        )
+                        run cHash command data finalTxSkeleton witnesses totalCost
                     | None ->
-                        Ok (finalTxSkeleton, witnesses)
+                        Ok (finalTxSkeleton, witnesses, totalCost)
                 )
             )
 
-        run contract command data returnAddress contractWallet txSkeleton []
-        |> Result.map (fun (finalTxSkeleton, witnesses) ->
+    run cHash command data txSkeleton [] 0I
+    |> Result.map (fun (finalTxSkeleton, witnesses, totalCost) ->
+        Log.info "Running contract chain with cost: %A" totalCost
+
+        let tx =
             Transaction.fromTxSkeleton finalTxSkeleton
             |> Transaction.addWitnesses witnesses
-        )
+
+        tx
     )
+

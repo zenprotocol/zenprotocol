@@ -55,11 +55,11 @@
     <Compile Include="ChainParameters.fs" />
     <Compile Include="EMA.fs" />
     <Compile Include="TxSkeleton.fs" />
-    <Compile Include="Transaction.fs" />
-    <Compile Include="UtxoSet.fs" />
     <Compile Include="ZFStar.fs" />
     <Compile Include="Contract.fs" />
     <Compile Include="ActiveContractSet.fs" />
+    <Compile Include="Transaction.fs" />
+    <Compile Include="UtxoSet.fs" />
     <Compile Include="TransactionValidation.fs" />
     <Compile Include="BlockHeader.fs" />
     <Compile Include="Block.fs" />
