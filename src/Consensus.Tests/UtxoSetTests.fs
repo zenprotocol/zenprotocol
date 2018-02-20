@@ -94,3 +94,19 @@ let ``Should be some utxos``(utxos:Map<Outpoint, Output>) =
 let ``Should be none utxos``(utxos:Map<Outpoint, Output>) (outpoints:List<Outpoint>) =
     let utxos  = Map.map (fun _ value -> Unspent value) utxos
     (outpoints |> List.distinct |> List.length > Map.count utxos) ==> (Option.isNone <| UtxoSet.getUtxos getUTXO outpoints utxos)
+
+[<Test>]
+let ``Unspendable outputs should not be added to utxoset``() =
+    let tx =
+        {
+            inputs=[]
+            outputs=[{lock=Destroy;spend={amount=1UL;asset=Constants.Zen}}]
+            witnesses = []
+            contract = None
+        }
+    let txHash = Transaction.hash tx
+    let outpoint = {txHash=txHash;index = 0ul}
+
+    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO txHash tx
+
+    UtxoSet.get getUTXO outpoint utxoSet |> should equal NoOutput
