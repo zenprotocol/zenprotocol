@@ -5,10 +5,7 @@ open Consensus.UtxoSet
 open Consensus.Crypto
 
 open Consensus
-open Consensus
 open Infrastructure
-open Org.BouncyCastle.Asn1.IsisMtt.Ocsp
-
 
 let private (>=>) f1 f2 x = Result.bind f2 (f1 x)
 
@@ -68,7 +65,7 @@ let private activateContract chain contractPath blockNumber acs (tx : Types.Tran
             let numberOfBlocks = activationSacrifices / activationSacrificePerBlock |> uint32
 
             if numberOfBlocks = 0ul then
-                return! (GeneralError "Contract must be activate for at least one block")
+                return! (GeneralError "Contract must be activated for at least one block")
 
             match ActiveContractSet.tryFind cHash acs with
             | Some contract ->
@@ -190,17 +187,22 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
                         Some tx.outputs.[index].lock
                     else
                         None) cw.returnAddressIndex
+            // Validate true cost (not weight!) of running contract against
+            // the witness commitment
+            let cost = Contract.getCost contract cw.command cw.data returnAddress contractWallet inputTx
+            if uint32 cost <> cw.cost then
+                GeneralError <| sprintf "Contract witness committed to cost %d, but cost of execution is %d" (uint32 cost) cw.cost
+            else
+                Contract.run contract cw.command cw.data returnAddress contractWallet inputTx
+                |> Result.mapError General
+                |> Result.bind checkMessage
+                |> Result.bind checkIssuedAndDestroyed
+                |> Result.bind (fun outputTx ->
+                    if List.length outputTx.pInputs - List.length inputTx.pInputs = int cw.inputsLength &&
+                       List.length outputTx.outputs - List.length inputTx.outputs = int cw.outputsLength then
 
-            Contract.run contract cw.command cw.data returnAddress contractWallet inputTx
-            |> Result.mapError General
-            |> Result.bind checkMessage
-            |> Result.bind checkIssuedAndDestroyed
-            |> Result.bind (fun outputTx ->
-                if List.length outputTx.pInputs - List.length inputTx.pInputs = int cw.inputsLength &&
-                   List.length outputTx.outputs - List.length inputTx.outputs = int cw.outputsLength then
-
-                    Ok (outputTx, popContractsLocksOf cw.cHash pInputs cw.inputsLength)
-                else GeneralError "input/output length mismatch")
+                        Ok (outputTx, popContractsLocksOf cw.cHash pInputs cw.inputsLength)
+                    else GeneralError "input/output length mismatch")
         | None -> Error ContractNotActive
 
     let witnessesFolder state (witness, message) =
@@ -294,11 +296,11 @@ let private checkNoCoinbaseLock tx =
             | _ -> false) tx.outputs
 
     if anyCoinbase then
-        GeneralError "coinbase lock is not allow within regular transaction"
+        GeneralError "coinbase lock is not allowed within an ordinary transaction"
     else
         Ok tx
 
-let private tryGetUtxos getUTXO utxoSet tx =
+let internal tryGetUtxos getUTXO utxoSet tx =
     getUtxosResult getUTXO tx.inputs utxoSet
     |> Result.mapError (fun errors ->
         if List.contains Spent errors then DoubleSpend else Orphan

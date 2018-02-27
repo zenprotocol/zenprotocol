@@ -46,9 +46,7 @@ let isAccountInSet session (account:Account.T) =
 let rootAccount = Account.createTestAccount ()
 
 let createTransaction account =
-    match Account.createTransaction chain account account.publicKeyHash {asset=Constants.Zen;amount=1UL} with
-    | Ok tx -> tx
-    | Error error -> failwith error
+    Result.get <| Account.createTransaction chain account account.publicKeyHash {asset=Constants.Zen;amount=1UL}
 
 
 // Default initial state of mempool and utxoset
@@ -802,7 +800,7 @@ let ``Valid template for two transactions which don't depend on each other``() =
         Transaction.sign
             [ rootAccount.keyPair ]
             {
-                inputs = [ Outpoint outpoint];
+                inputs = [Outpoint outpoint];
                 outputs = outputs;
                 witnesses=[];
                 contract=None

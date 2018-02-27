@@ -1,4 +1,5 @@
 ﻿module Consensus.ZFStar
+#nowarn "664"   // Ignore type erasure warnings.
 
 open Operators.Checked
 

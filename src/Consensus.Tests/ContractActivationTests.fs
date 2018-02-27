@@ -56,7 +56,7 @@ let ``Contract activation with too low contract sacrifice``() =
         |> Transaction.sign [rootAccount.keyPair]
     let txHash = Transaction.hash tx
 
-    let expected:TxResult = General "Contract must be activate for at least one block" |> Error
+    let expected:TxResult = General "Contract must be activated for at least one block" |> Error
 
     validateInContext 1ul ActiveContractSet.empty utxoSet txHash tx
     |> should equal expected

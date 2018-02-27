@@ -1,8 +1,6 @@
 module Blockchain.TransactionHandler
 
 open Blockchain
-open Blockchain
-open Blockchain
 open Blockchain.EffectsWriter
 open Messaging.Events
 open Infrastructure
@@ -10,7 +8,6 @@ open Consensus
 open Consensus.Transaction
 open Consensus.TransactionValidation
 open State
-open Infrastructure.ServiceBus.Agent
 
 let getUTXO = UtxoSetRepository.get
 
@@ -144,7 +141,7 @@ let executeContract session txSkeleton cHash command data returnAddress state =
             |> Result.bind (fun (tx, message) ->
                 TxSkeleton.checkPrefix txSkeleton tx
                 |> Result.bind (fun finalTxSkeleton ->
-                    let witnesses = List.add (TxSkeleton.getContractWitness contract.hash command data returnAddress txSkeleton finalTxSkeleton) witnesses
+                    let witnesses = List.add (TxSkeleton.getContractWitness contract.hash command data returnAddress txSkeleton finalTxSkeleton cost) witnesses
 
                     match message with
                     | Some {cHash=cHash; command=command; data=data} ->

@@ -321,7 +321,7 @@ let ``block with coinbase lock within a regular transaction should fail``() =
 
     let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot; witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=Hash.zero;}
 
-    let expected : Result<Block,string> = Error (sprintf "transaction %A failed validation due to General \"coinbase lock is not allow within regular transaction\"" <| Transaction.hash tx)
+    let expected : Result<Block,string> = Error (sprintf "transaction %A failed validation due to General \"coinbase lock is not allowed within an ordinary transaction\"" <| Transaction.hash tx)
 
     Block.validate Chain.Local block |> should equal expected
 
