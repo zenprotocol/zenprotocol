@@ -19,6 +19,12 @@ type ResultBuilder<'err>() =
                 (fun () -> it.MoveNext()),
                 (fun () -> f it.Current) )
         )
+    member this.TryWith<'res>(m:Result<'res,'err>, h) =
+        try this.ReturnFrom(m)
+        with e -> h e
+    member this.TryFinally<'res>(m:Result<'res,'err>, recover) =
+        try this.ReturnFrom(m)
+        finally recover()
 
 let isOk<'res,'err> : Result<'res,'err> -> bool = function | Ok _ -> true | Error _ -> false
 let isError<'res,'err> : Result<'res,'err> -> bool = isOk >> not
@@ -46,3 +52,5 @@ let traverseResultA f xs : Result<'res list, 'err list> =
     let folder head tail =
         retn cons <*> (f head) <*> tail
     List.foldBack folder xs initState
+
+let (|ResultOf|) err = function | Some x -> Ok x | None -> Error err

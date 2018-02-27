@@ -185,6 +185,12 @@ let ``Should buy``() =
         tx.outputs |> should contain { lock = Contract cHash; spend = spend }
         tx.outputs |> should contain { lock = PK samplePKHash; spend = { spend with asset = cHash, Hash.zero } }
         tx.witnesses |> should haveLength 1
+        let wit, cost = 
+            match tx.witnesses.[0] with
+            | ContractWitness {cost=cost} as wit ->
+                wit, cost
+            | _ as wit -> wit, 0u
+        
         let cw = ContractWitness {
              cHash = cHash
              command = "buy"
@@ -194,8 +200,9 @@ let ``Should buy``() =
              beginOutputs = 0u
              inputsLength = 1u
              outputsLength = 2u
+             cost = cost
         }
-        tx.witnesses |> should contain cw
+        wit |> should equal cw
     | Error error -> failwith error
 
 [<Test>]
@@ -244,6 +251,12 @@ let ``Should redeem``() =
         tx.outputs |> should contain { lock = Destroy; spend = spendContractAsset }
         tx.outputs |> should contain { lock = PK samplePKHash; spend = spendZen }
         tx.witnesses |> should haveLength 1
+        let wit, cost = 
+            match tx.witnesses.[0] with
+            | ContractWitness {cost=cost} as wit ->
+                wit, cost
+            | _ as wit -> wit, 0u
+        
         let cw = ContractWitness {
              cHash = cHash
              command = "redeem"
@@ -253,6 +266,7 @@ let ``Should redeem``() =
              beginOutputs = 0u
              inputsLength = 1u
              outputsLength = 2u
+             cost = cost
         }
-        tx.witnesses |> should contain cw
+        wit |> should equal cw
     | Error error -> failwith error

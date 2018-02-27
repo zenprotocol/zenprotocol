@@ -85,10 +85,7 @@ let private getModuleName =
     >> Base16.encode
     >> (+) "Z"
 
-let computeHash code =
-    (code : string)
-    |> Encoding.UTF8.GetBytes
-    |> Hash.compute
+let computeHash : string -> Hash = Hash.compute << Encoding.UTF8.GetBytes
 
 let load contractsPath expiry size hash =
     getModuleName hash

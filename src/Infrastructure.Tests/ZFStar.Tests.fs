@@ -26,12 +26,12 @@ let clean() =
     Platform.cleanDirectory assemblyDirectory
 
 [<SetUp>]
-    let setup = fun () ->
-        clean()
+let setup = fun () ->
+    clean()
 
 [<TearDown>]
-    let teadDown = fun () ->
-        clean()
+let tearDown = fun () ->
+    clean()
 
 let shouldBeOk value = function
     | Ok value' -> should equal value value'

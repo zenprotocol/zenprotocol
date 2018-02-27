@@ -1,7 +1,6 @@
 ﻿module Consensus.TxSkeleton
 
 open Consensus
-open Consensus
 open Consensus.Types
 
 type Input =
@@ -18,6 +17,11 @@ let empty =
         pInputs = []
         outputs = []
     }
+
+let (|Lock|) input =
+    match input with
+    | PointedOutput (_, {lock=lock}) -> lock
+    | Mint {asset=(cHash,_)} -> Contract cHash
 
 let addInputs inputs (txSkeleton:T) =
     {txSkeleton with pInputs=List.append txSkeleton.pInputs inputs}
@@ -42,6 +46,7 @@ let checkPrefix txSub txSuper =
     else
         Error "invalid prefix"
 
+//UNDONE: Disappearing check on lengths of pInputs and outputs? make sure.
 let fromTransaction tx (outputs : Output List) =
     let pInputs,_ =
         List.fold (fun (inputs, outputs) input ->
@@ -96,7 +101,7 @@ let isSkeletonOf txSkeleton tx outputs =
     && outputs = outputsFromSkeleton
     && tx.outputs = txSkeleton.outputs
 
-let getContractWitness cHash command data returnAddress initialTxSkelton finalTxSkeleton =
+let getContractWitness cHash command data returnAddress initialTxSkelton finalTxSkeleton (cost:bigint) =
     let length list = List.length list |> uint32
 
     let returnAddressIndex =
@@ -112,4 +117,5 @@ let getContractWitness cHash command data returnAddress initialTxSkelton finalTx
         beginOutputs = length initialTxSkelton.outputs
         inputsLength = length finalTxSkeleton.pInputs - length initialTxSkelton.pInputs
         outputsLength = length finalTxSkeleton.outputs - length initialTxSkelton.outputs
+        cost = uint32 cost
     }

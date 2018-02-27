@@ -13,14 +13,18 @@ type ChainParameters =
     {
         proofOfWorkLimit:Hash.Hash;
         blockInterval:uint64;
-        smoothingFactor:float
+        smoothingFactor:float;
+        txWeight:Transaction->int64;
+        maxBlockWeight:int64
     }
 
-let getChainParameters = function
-    | Main -> {proofOfWorkLimit=Difficulty.uncompress 0x1d00fffful;blockInterval=240UL*1000UL;smoothingFactor=0.0055}
-    | Test
-    | Local -> {proofOfWorkLimit=Difficulty.uncompress 0x20fffffful;blockInterval=60UL*1000UL;smoothingFactor=0.05}
+let zeroWeight = fun _ -> 0L
 
+let getChainParameters = function
+    | Main -> {proofOfWorkLimit=Difficulty.uncompress 0x1d00fffful;blockInterval=240UL*1000UL;smoothingFactor=0.0055;txWeight=zeroWeight;maxBlockWeight=1000_000_000L}
+    | Test
+    | Local -> {proofOfWorkLimit=Difficulty.uncompress 0x20fffffful;blockInterval=60UL*1000UL;smoothingFactor=0.05;txWeight=zeroWeight;maxBlockWeight=1000_000_000L}
+    
 let proofOfWorkLimit chain =
     let p = getChainParameters chain
     p.proofOfWorkLimit

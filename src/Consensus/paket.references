@@ -7,3 +7,4 @@ FSharp.Compiler.Tools
 FSharp.Compatibility.OCaml
 FsNetMQ
 Newtonsoft.Json
+FSharpx.Extras

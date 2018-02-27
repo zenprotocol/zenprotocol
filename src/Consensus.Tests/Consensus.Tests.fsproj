@@ -1,5 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\..\packages\FSharp.Compiler.Tools\build\FSharp.Compiler.Tools.props" Condition="Exists('..\..\packages\FSharp.Compiler.Tools\build\FSharp.Compiler.Tools.props')" Label="Paket" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -59,16 +58,22 @@
     <Compile Include="CoinbaseTests.fs" />
     <Compile Include="TransactionPropertyTests.fs" />
     <Compile Include="UtxoSetTests.fs" />
-    <Content Include="paket.references" />
-    <ProjectReference Include="..\Consensus\Consensus.fsproj">
-      <Project>{5ec4457b-615a-4bbd-b3d5-d0e311b9d5e9}</Project>
-      <Name>Consensus</Name>
-    </ProjectReference>
     <Compile Include="SampleContract.fs" />
     <Compile Include="ContractTests.fs" />
     <Compile Include="ContractActivationTests.fs" />
     <Compile Include="BlockTests.fs" />
     <Compile Include="ContractMessageTests.fs" />
+    <Compile Include="TransactionSerializationTests.fs" />
+    <Compile Include="TxSkeletonTests.fs" />
+    <Compile Include="TransactionOverflowTests.fs" />
+    <Compile Include="WitnessValidationTests.fs" />
+    <Compile Include="EMATests.fs" />
+    <Content Include="paket.references" />
+    <Compile Include="WeightTests.fs" />
+    <ProjectReference Include="..\Consensus\Consensus.fsproj">
+      <Project>{5ec4457b-615a-4bbd-b3d5-d0e311b9d5e9}</Project>
+      <Name>Consensus</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Infrastructure\Infrastructure.fsproj">
       <Project>{81161f64-d019-422c-a3cf-321cde6ca209}</Project>
       <Name>Infrastructure</Name>
@@ -77,15 +82,10 @@
       <Project>{289a59eb-d1d4-499f-87b9-f75b799829c0}</Project>
       <Name>Wallet</Name>
     </ProjectReference>
-    <Compile Include="TransactionSerializationTests.fs" />
-    <Compile Include="TxSkeletonTests.fs" />
-    <Compile Include="TransactionOverflowTests.fs" />
     <ProjectReference Include="..\TestsInfrastructure\TestsInfrastructure.fsproj">
       <Project>{9DF227BB-E98D-49D7-A33B-C0D5B170F430}</Project>
       <Name>TestsInfrastructure</Name>
     </ProjectReference>
-    <Compile Include="WitnessValidationTests.fs" />
-    <Compile Include="EMATests.fs" />
   </ItemGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>

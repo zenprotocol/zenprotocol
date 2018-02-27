@@ -56,6 +56,7 @@ type ContractWitness =
         beginOutputs: uint32
         inputsLength: uint32
         outputsLength: uint32
+        cost: uint32
     }
     with
         member x.endOutputs = x.beginOutputs + x.outputsLength - 1ul

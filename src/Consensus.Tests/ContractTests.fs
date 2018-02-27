@@ -59,10 +59,11 @@ let compileRunAndValidate inputTx utxoSet code =
     |> Result.bind (fun contract ->
         Contract.run contract "" Contract.EmptyData None List.empty inputTx
         |> Result.bind (fun (tx, _) ->
+            let cost = Contract.getCost contract "" Contract.EmptyData None List.empty inputTx
             tx
             |> TxSkeleton.checkPrefix inputTx
             |> Result.map (fun finalTxSkeleton ->
-                let cw = TxSkeleton.getContractWitness contract.hash "" Contract.EmptyData (PK Hash.zero) inputTx finalTxSkeleton
+                let cw = TxSkeleton.getContractWitness contract.hash "" Contract.EmptyData (PK Hash.zero) inputTx finalTxSkeleton cost
                 Transaction.fromTxSkeleton finalTxSkeleton
                 |> Transaction.addWitnesses [ cw ])
             |> Result.map (Transaction.sign [ sampleKeyPair ])
@@ -185,7 +186,7 @@ let ``Contract should be able to destroy its own tokens locked to it``() =
 
     let sampleExpectedResult =
         Transaction.fromTxSkeleton sampleOutputTx
-        |> Transaction.addWitnesses [ TxSkeleton.getContractWitness sampleContractHash "" Contract.EmptyData (PK Hash.zero) sampleInputTx sampleOutputTx ]
+        |> Transaction.addWitnesses [ TxSkeleton.getContractWitness sampleContractHash "" Contract.EmptyData (PK Hash.zero) sampleInputTx sampleOutputTx 137I]
         |> Transaction.sign [ sampleKeyPair ]
 
     (compileRunAndValidate sampleInputTx utxoSet sampleContractCode
