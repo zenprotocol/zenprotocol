@@ -7,8 +7,6 @@ open FSharpx.Option
 open Infrastructure.Result
 open Infrastructure.ZFStar
 
-type ValidationError = TransactionValidation.ValidationError
-
 let result = new ResultBuilder<string>()
 
 //UNDONE: Alter this active pattern when Coinbase locks are generalised.
@@ -34,7 +32,7 @@ type Weights = {
 }
 
 // Returns outputs without mints. But they get added back from the inputs.
-let getOutputs = TransactionValidation.tryGetUtxos
+let getOutputs = UtxoSet.tryGetOutputs
 
 
 // HACK: Copied from TransactionValidation.fs
@@ -96,8 +94,8 @@ let accumulateWeights weights fixedSkeleton =
 
 let txWeight weights
         getUTXO memUTXOs tx = result {
-    let! outputs =  getOutputs getUTXO memUTXOs tx
-                        |> Result.mapError (sprintf "%A")
+    let! outputs =  getOutputs getUTXO memUTXOs tx.inputs
+                        |> (|ResultOf|) "Output lookup error"
     let! skeleton =
         try
             Ok <| TxSkeleton.fromTransaction tx outputs
@@ -120,5 +118,23 @@ let txWeight weights
 let transactionWeight =
     txWeight realWeights
 
-//let bkWeight weights
-        //getUTXO acs memUTXOs tx = ()
+
+// HACK: Something is wrong with using utxoSet here. Need to work out what.
+let bkWeight weights getUTXO utxoSet txs =
+    let inner (weight, memUTXOs) (txHash, tx) = result {
+        let! txWeight = txWeight weights getUTXO memUTXOs tx
+        let newMemUTXOs = UtxoSet.handleTransaction getUTXO txHash tx memUTXOs
+        return (weight+txWeight, newMemUTXOs)
+    }
+    let folder accResult next = result {
+        let! acc = accResult
+        return! inner acc next
+        } 
+    List.fold
+        folder
+        (Ok (0I, utxoSet))
+        [ for tx in txs do yield Transaction.hash tx, tx ]
+    |> Result.map fst
+
+let blockWeight getUTXO utxoSet (block : Block) =
+    bkWeight realWeights getUTXO utxoSet (block.transactions)

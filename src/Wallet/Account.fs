@@ -232,11 +232,11 @@ let private getInputs account spend =
     else
         Error "Not enough tokens"
 
-let createTransaction chain account pkHash spend = result  {
+let createTransactionFromLock account lk spend = result {
     let! (inputs, keys, amount) = getInputs account spend
     let inputPoints = List.map (fst >> Outpoint) inputs
     let outputs =
-        {spend=spend;lock=PK pkHash}
+        {spend=spend;lock=lk}
      :: if amount = spend.amount then [] else
         // Create change if needed
         [{
@@ -250,6 +250,9 @@ let createTransaction chain account pkHash spend = result  {
                                 contract=None }
 
     }
+
+let createTransaction account pkHash spend =
+    createTransactionFromLock account (PK pkHash) spend
 
 let createActivateContractTransaction chain account code (numberOfBlocks:uint32) =
     let codeLength = String.length code |> uint64

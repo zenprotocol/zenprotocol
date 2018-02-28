@@ -303,7 +303,10 @@ let private checkNoCoinbaseLock tx =
 let internal tryGetUtxos getUTXO utxoSet tx =
     getUtxosResult getUTXO tx.inputs utxoSet
     |> Result.mapError (fun errors ->
-        if List.contains Spent errors then DoubleSpend else Orphan
+        if List.exists
+            (fun err -> match err with | Spent _ -> true | _ -> false)
+            errors
+        then DoubleSpend else Orphan
     )
 
 let validateBasic =

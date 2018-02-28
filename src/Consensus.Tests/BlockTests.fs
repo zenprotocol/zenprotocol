@@ -1,4 +1,4 @@
-module Consensus.Tests.BlockTests
+﻿module Consensus.Tests.BlockTests
 
 open Consensus
 open Consensus.ChainParameters
@@ -11,11 +11,16 @@ open FsCheck
 open FsCheck.NUnit
 open FsUnit
 open TestsInfrastructure.Constraints
+open Consensus.Tests.SampleContract
 
 let timestamp = 1515594186383UL + 1UL
 let difficulty = 0x20fffffful
 
 let contractsPath = "./test"
+
+let goodHints = match Contract.recordHints sampleContractCode with
+                | Ok hints -> hints
+                | _ -> failwith "Couldn't make hints"
 
 let getUTXO _ = UtxoSet.NoOutput
 let getWallet _ = Map.empty
@@ -121,7 +126,13 @@ let ``connecting block should fail when transaction inputs are invalid``(parent:
     let block = Block.createTemplate parent timestamp ema acs transactions Hash.zero
 
     match Block.connect Chain.Local getUTXO contractsPath parent (timestamp + 1UL) utxoSet acs ema block with
-    | Error error when error.StartsWith "transactions failed inputs validation due to" -> true
+    | Error error
+                when error.StartsWith "transactions failed inputs validation due to"
+                  || error.Contains "Orphan"
+                  || error.Contains "witnesses" -> true     //too many/few wts
+    | Error _ as res ->
+        System.Console.WriteLine (sprintf "Got unexpected result %A" res)
+        true
     | _ -> false
 
 [<Test>]
@@ -133,7 +144,7 @@ let ``block timestamp too early``() =
     let rootAccount = Account.createTestAccount ()
     let account1 = Account.create ()
     let tx =
-        Account.createTransaction Chain.Local rootAccount account1.publicKeyHash {asset=Constants.Zen;amount=1UL}
+        Account.createTransaction rootAccount account1.publicKeyHash {asset=Constants.Zen;amount=1UL}
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
 
     let acs = ActiveContractSet.empty
@@ -156,7 +167,7 @@ let ``block timestamp in the future``() =
     let rootAccount = Account.createTestAccount ()
     let account1 = Account.create ()
     let tx =
-        Account.createTransaction Chain.Local rootAccount account1.publicKeyHash {asset=Constants.Zen;amount=1UL}
+        Account.createTransaction rootAccount account1.publicKeyHash {asset=Constants.Zen;amount=1UL}
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
 
     let acs = ActiveContractSet.empty
@@ -175,7 +186,7 @@ let ``block with mismatch commitments fail connecting``() =
     let rootAccount = Account.createTestAccount ()
     let account1 = Account.create ()
     let tx =
-        Account.createTransaction Chain.Local rootAccount account1.publicKeyHash { asset = Constants.Zen; amount = 1UL }
+        Account.createTransaction rootAccount account1.publicKeyHash { asset = Constants.Zen; amount = 1UL }
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
 
     let acs = ActiveContractSet.empty
@@ -196,7 +207,7 @@ let ``can connect valid block``() =
     let rootAccount = Account.createTestAccount ()
     let account1 = Account.create ()
     let tx =
-        Account.createTransaction Chain.Local rootAccount account1.publicKeyHash { asset = Constants.Zen; amount = 1UL }
+        Account.createTransaction rootAccount account1.publicKeyHash { asset = Constants.Zen; amount = 1UL }
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
 
     let acs = ActiveContractSet.empty
@@ -260,7 +271,7 @@ let ``block with invalid contract failed connecting``() =
         {output with lock=ActivationSacrifice}
 
     let tx =
-        {contract = Some ("ada","dasdas"); inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
+        {contract = Some ("ada",goodHints); inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
         |> Transaction.sign [rootAccount.keyPair]
 
     let contract : Contract.T =
@@ -559,7 +570,7 @@ let ``block spending mature transaction is valid``() =
     let rootAccount = Account.addTransaction originHash origin rootAccount
 
     let tx =
-        Account.createTransaction Chain.Local rootAccount account1.publicKeyHash { asset = Constants.Zen; amount = 1UL }
+        Account.createTransaction rootAccount account1.publicKeyHash { asset = Constants.Zen; amount = 1UL }
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
 
 
@@ -571,7 +582,7 @@ let ``block spending mature transaction is valid``() =
     let block = Block.createTemplate parent (timestamp+1UL) ema acs [tx] Hash.zero
 
     Block.connect Chain.Local getUTXO contractsPath parent timestamp utxoSet acs ema block
-    |> should be ok
+    |>  should be ok
 
 
 [<Test>]
@@ -592,7 +603,7 @@ let ``block spending unmature transaction is invalid``() =
     let rootAccount = Account.addTransaction originHash origin rootAccount
 
     let tx =
-        Account.createTransaction Chain.Local rootAccount account1.publicKeyHash { asset = Constants.Zen; amount = 1UL }
+        Account.createTransaction rootAccount account1.publicKeyHash { asset = Constants.Zen; amount = 1UL }
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
 
 
@@ -629,3 +640,43 @@ let ``contract get removed when expiring arrive``() =
 
     Block.connect Chain.Local getUTXO contractsPath parent timestamp utxoSet acs ema block
     |> should be ok
+
+[<Test>]
+let ``Overweight block should be rejected``() =
+    let rootAccount = Account.createTestAccount ()
+    let account1 = Account.create ()
+    let cLock = Lock.Contract Hash.zero
+    let cWitness = {
+        cHash = Hash.zero;
+        command = "nothing";
+        data = Data [||];
+        returnAddressIndex = None;
+        beginInputs = 0u;
+        beginOutputs = 0u;
+        inputsLength = 1u;
+        outputsLength = 0u;
+        cost = System.UInt32.MaxValue       // Weight >>> max block weight
+        }
+    let tx1 =
+        Account.createTransactionFromLock rootAccount cLock { asset = Constants.Zen; amount = 1UL }
+        |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
+    let tx1Hash = Transaction.hash tx1
+    let tx2 = {
+        inputs = [Outpoint {txHash=tx1Hash;index=0u}];
+        outputs = [];
+        witnesses = [ContractWitness cWitness];
+        contract = None;
+    }
+
+    let acs = ActiveContractSet.empty
+    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO Transaction.rootTxHash Transaction.rootTx
+    let ema = EMA.create Chain.Local
+
+    let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
+    let block = Block.createTemplate parent (timestamp+1UL) ema acs [tx1;tx2] Hash.zero
+
+    let res = Block.connect Chain.Local getUTXO contractsPath parent timestamp utxoSet acs ema block
+    res |> should not' (be ok)
+    let errStr =
+        match res with | Error err -> err | _ -> assert false; ""
+    errStr |> should contain "greater than maximum block weight"

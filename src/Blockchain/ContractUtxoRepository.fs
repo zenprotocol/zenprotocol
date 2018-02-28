@@ -19,7 +19,7 @@ let getContractUtxo (session:Session) cHash (utxoSet:UtxoSet.T) =
             if Map.containsKey outpoint block then
                 match outputStatus with
                 | NoOutput
-                | Spent -> memory,Map.remove outpoint block
+                | Spent _ -> memory,Map.remove outpoint block
                 | _ -> failwith "output cannot be both in memory and disk"
             else
                 match outputStatus with

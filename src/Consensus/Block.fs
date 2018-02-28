@@ -163,6 +163,7 @@ let createTemplate (parent:BlockHeader) timestamp (ema:EMA.T) acs transactions c
 
     {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot;witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot}
 
+// TODO: Refactor to avoid chained state-passing style
 let validate chain =
     let checkTxNotEmpty (block:Block) =
         if List.isEmpty block.transactions then Error "transactions is empty" else Ok block
@@ -251,7 +252,7 @@ let validate chain =
     >=> checkCommitments
 
 /// Apply block to UTXO and ACS, operation can fail
-let connect chain getUTXO contractsPath parent timestamp set acs ema =
+let connect chain getUTXO contractsPath parent timestamp utxoSet acs ema =
     let checkBlockNumber (block:Block) =
         if parent.blockNumber + 1ul <> block.header.blockNumber then
             Error "blockNumber mismatch"
@@ -274,13 +275,13 @@ let connect chain getUTXO contractsPath parent timestamp set acs ema =
         if isGenesis chain block then
             let set = List.fold (fun set tx ->
                 let txHash = (Transaction.hash tx)
-                UtxoSet.handleTransaction getUTXO txHash tx set) set block.transactions
+                UtxoSet.handleTransaction getUTXO txHash tx set) utxoSet block.transactions
             Ok (block,set,acs,ema)
         else
             let coinbase = List.head block.transactions
             let withoutCoinbase = List.tail block.transactions
 
-            let set = UtxoSet.handleTransaction getUTXO (Transaction.hash coinbase) coinbase set
+            let set = UtxoSet.handleTransaction getUTXO (Transaction.hash coinbase) coinbase utxoSet
 
             List.fold (fun state tx->
                 match state with
@@ -312,8 +313,22 @@ let connect chain getUTXO contractsPath parent timestamp set acs ema =
         else
             Error "commitments mismatch"
 
+    let checkWeight (block,ema) = result {
+        let! weight = Weight.blockWeight getUTXO utxoSet block
+        let maxWeight = ChainParameters.getMaximumBlockWeight chain
+        if weight <= maxWeight
+        then
+            return block,ema
+        else
+            let err = sprintf
+                        "Block weight of %A is greater than maximum block weight %A" weight maxWeight
+            return! Error err
+    }
+
+
     checkBlockNumber
     >=> checkDifficulty
+    >=> checkWeight
     >=> checkTxInputs
     >=> checkCommitments
 

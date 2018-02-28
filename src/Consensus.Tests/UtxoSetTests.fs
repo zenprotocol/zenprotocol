@@ -60,7 +60,9 @@ let ``handling transaction mark inputs as spent``() =
 
     (match UtxoSet.getUtxosResult getUTXO tx2.inputs set with
     | Error errors ->
-        List.contains Spent errors
+        List.exists
+            (fun err -> match err with | Spent _ -> true | _ -> false)
+            errors
     | Ok _ -> false) |> should equal true
 
 [<Test>]

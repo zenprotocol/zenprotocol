@@ -1,7 +1,5 @@
 module Consensus.ChainParameters
 
-open Consensus.Types
-
 let ContractSacrificePerBytePerBlock = 1UL
 
 type Chain =
@@ -14,16 +12,13 @@ type ChainParameters =
         proofOfWorkLimit:Hash.Hash;
         blockInterval:uint64;
         smoothingFactor:float;
-        txWeight:Transaction->int64;
-        maxBlockWeight:int64
+        maxBlockWeight:bigint
     }
 
-let zeroWeight = fun _ -> 0L
-
 let getChainParameters = function
-    | Main -> {proofOfWorkLimit=Difficulty.uncompress 0x1d00fffful;blockInterval=240UL*1000UL;smoothingFactor=0.0055;txWeight=zeroWeight;maxBlockWeight=1000_000_000L}
+    | Main -> {proofOfWorkLimit=Difficulty.uncompress 0x1d00fffful;blockInterval=240UL*1000UL;smoothingFactor=0.0055;maxBlockWeight=1000_000_000I}
     | Test
-    | Local -> {proofOfWorkLimit=Difficulty.uncompress 0x20fffffful;blockInterval=60UL*1000UL;smoothingFactor=0.05;txWeight=zeroWeight;maxBlockWeight=1000_000_000L}
+    | Local -> {proofOfWorkLimit=Difficulty.uncompress 0x20fffffful;blockInterval=60UL*1000UL;smoothingFactor=0.05;maxBlockWeight=1000_000_000I}
     
 let proofOfWorkLimit chain =
     let p = getChainParameters chain
@@ -54,3 +49,7 @@ let getGenesisTime =
     | Local -> 1515594186383UL
 
 let getContractSacrificePerBytePerBlock (_:Chain) = ContractSacrificePerBytePerBlock
+
+let getMaximumBlockWeight chain =
+    let p = getChainParameters chain
+    p.maxBlockWeight

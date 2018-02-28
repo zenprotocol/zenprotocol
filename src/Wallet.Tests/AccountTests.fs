@@ -66,7 +66,7 @@ let ``creating, not enough tokens``() =
 
     let account' = Account.addTransaction (Transaction.hash tx) tx account
 
-    let result = Account.createTransaction chain account account.publicKeyHash { asset = Constants.Zen; amount = 11UL }
+    let result = Account.createTransaction account account.publicKeyHash { asset = Constants.Zen; amount = 11UL }
 
     let expected:Result<Transaction,string> = Error "Not enough tokens"
 
@@ -83,7 +83,7 @@ let ``creating, no change``() =
     let bob' = Account.addTransaction (Transaction.hash tx) tx bob
 
     // sending money to alice
-    let result = Account.createTransaction chain bob' alice.publicKeyHash { asset = Constants.Zen; amount = 10UL }
+    let result = Account.createTransaction bob' alice.publicKeyHash { asset = Constants.Zen; amount = 10UL }
 
     match result with
     | Error x -> failwithf "expected transaction %s" x
@@ -105,7 +105,7 @@ let ``creating, with change``() =
     let bob' = Account.addTransaction (Transaction.hash tx) tx bob
 
     // sending money to alice
-    let result = Account.createTransaction chain bob' alice.publicKeyHash { asset = Constants.Zen; amount = 7UL }
+    let result = Account.createTransaction bob' alice.publicKeyHash { asset = Constants.Zen; amount = 7UL }
 
     match result with
     | Error x -> failwithf "expected transaction %s" x
@@ -132,7 +132,7 @@ let ``picking the correct asset``() =
     bob' |> balanceShouldBe anotherAsset 10UL
 
     // sending money to alice
-    let result = Account.createTransaction chain bob' alice.publicKeyHash { asset = Constants.Zen; amount = 7UL }
+    let result = Account.createTransaction bob' alice.publicKeyHash { asset = Constants.Zen; amount = 7UL }
 
     match result with
     | Error x -> failwithf "expected transaction %s" x
@@ -161,7 +161,7 @@ let ``picking from multiple inputs``() =
     let bob' = Account.addTransaction (Transaction.hash tx) tx bob
 
     // sending money to alice
-    let result = Account.createTransaction chain bob' alice.publicKeyHash { asset = Constants.Zen; amount = 10UL }
+    let result = Account.createTransaction bob' alice.publicKeyHash { asset = Constants.Zen; amount = 10UL }
 
     match result with
     | Error x -> failwithf "expected transaction %s" x
@@ -381,7 +381,7 @@ let ``wallet won't spend coinbase if not mature enough``() =
 
     let expected: Result<Transaction,string>= Error "Not enough tokens"
 
-    Account.createTransaction Chain.Local rootAccount rootAccount.publicKeyHash { asset = Constants.Zen; amount = 1UL }
+    Account.createTransaction rootAccount rootAccount.publicKeyHash { asset = Constants.Zen; amount = 1UL }
     |> should equal expected
 
 [<Test>]
@@ -398,7 +398,7 @@ let ``wallet spend coinbase with coinbase mature enough``() =
 
     let rootAccount = Account.addTransaction originHash origin rootAccount
 
-    Account.createTransaction Chain.Local rootAccount rootAccount.publicKeyHash { asset = Constants.Zen; amount = 1UL }
+    Account.createTransaction rootAccount rootAccount.publicKeyHash { asset = Constants.Zen; amount = 1UL }
     |> should be ok
 
 [<Test>]
@@ -427,5 +427,5 @@ let ``wallet spend coinbase when come from block``() =
 
     let rootAccount = Account.handleBlock (Block.hash block) block rootAccount
 
-    Account.createTransaction Chain.Local rootAccount rootAccount.publicKeyHash { asset = Constants.Zen; amount = 1UL }
+    Account.createTransaction rootAccount rootAccount.publicKeyHash { asset = Constants.Zen; amount = 1UL }
     |> should be ok
