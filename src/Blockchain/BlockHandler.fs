@@ -1,13 +1,6 @@
 module Blockchain.BlockHandler
 
 open Blockchain
-open Blockchain
-open Blockchain
-open Blockchain
-open Blockchain
-open Blockchain
-open Blockchain
-open Blockchain
 open Consensus
 open Infrastructure
 open Blockchain.EffectsWriter

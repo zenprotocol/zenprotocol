@@ -1,4 +1,4 @@
-module Blockchain.Tests.ValidateBlockTests
+﻿module Blockchain.Tests.ValidateBlockTests
 
 open NUnit.Framework
 open FsUnit
@@ -46,7 +46,7 @@ let isAccountInSet session (account:Account.T) =
 let rootAccount = Account.createTestAccount ()
 
 let createTransaction account =
-    Result.get <| Account.createTransaction chain account account.publicKeyHash {asset=Constants.Zen;amount=1UL}
+    Result.get <| Account.createTransaction account account.publicKeyHash {asset=Constants.Zen;amount=1UL}
 
 
 // Default initial state of mempool and utxoset
@@ -780,7 +780,7 @@ let ``Valid template for two transactions which don't depend on each other``() =
     let firstAmount = amount / 4UL
     let secondAmount = amount - firstAmount
     let splitTx =
-        Account.createTransaction chain rootAccount rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        Account.createTransaction rootAccount rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
         |>  Result.get
     let ema' = EMA.add chain genesisBlock.header.timestamp ema
     let splitBlock = Block.createTemplate genesisBlock.header timestamp ema' acs [splitTx] Hash.zero
@@ -834,11 +834,11 @@ let ``Two transactions in the same block which depend on each other are valid``(
     let asset, amount = balances |> Map.toList |> List.head
     let firstAmount = amount
     let firstTx =
-        Account.createTransaction chain rootAccount rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        Account.createTransaction rootAccount rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
         |>  Result.get
     let account = Account.addTransaction (Transaction.hash firstTx) firstTx rootAccount
     let secondTx =
-        Account.createTransaction chain account rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        Account.createTransaction account rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
         |>  Result.get
     let ema' = EMA.add chain genesisBlock.header.timestamp ema
     let twoTxBlock = Block.createTemplate genesisBlock.header timestamp ema' acs [firstTx;secondTx] Hash.zero
@@ -863,11 +863,11 @@ let ``Two transactions in the same block which depend on each other are invalid 
     let asset, amount = balances |> Map.toList |> List.head
     let firstAmount = amount
     let firstTx =
-        Account.createTransaction chain rootAccount rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        Account.createTransaction rootAccount rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
         |>  Result.get
     let account = Account.addTransaction (Transaction.hash firstTx) firstTx rootAccount
     let secondTx =
-        Account.createTransaction chain account rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        Account.createTransaction account rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
         |>  Result.get
     let ema' = EMA.add chain genesisBlock.header.timestamp ema
     let twoTxBlock = Block.createTemplate genesisBlock.header timestamp ema' acs [secondTx;firstTx] Hash.zero
@@ -892,11 +892,11 @@ let ``Template builder uses two transactions in the same block which depend on e
     let asset, amount = balances |> Map.toList |> List.head
     let firstAmount = amount
     let firstTx =
-        Account.createTransaction chain rootAccount rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        Account.createTransaction rootAccount rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
         |>  Result.get
     let account = Account.addTransaction (Transaction.hash firstTx) firstTx rootAccount
     let secondTx =
-        Account.createTransaction chain account rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        Account.createTransaction account rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
         |>  Result.get
     let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction firstTx) session (timestamp+1UL) genesisState
     let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction secondTx) session (timestamp+1UL) updatedState
@@ -924,18 +924,19 @@ let ``Out of order dependent transactions are rearranged``() =
     let balances = Account.getBalance rootAccount
     let asset, amount = balances |> Map.toList |> List.head
     let firstTx =
-        Account.createTransaction chain rootAccount rootAccount.publicKeyHash {asset=asset;amount=amount}
+        Account.createTransaction rootAccount rootAccount.publicKeyHash {asset=asset;amount=amount}
         |>  Result.get
     let account = Account.addTransaction (Transaction.hash firstTx) firstTx rootAccount
     let secondTx =
-        Account.createTransaction chain account rootAccount.publicKeyHash {asset=asset;amount=amount}
+        Account.createTransaction account rootAccount.publicKeyHash {asset=asset;amount=amount}
         |>  Result.get
     let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction firstTx) session (timestamp+1UL) genesisState
     let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction secondTx) session (timestamp+1UL) updatedState
     let blockNumber = updatedState.tipState.tip.header.blockNumber
     let acs = updatedState.tipState.activeContractSet
-    let _, validatedTransactions = BlockTemplateBuilder.selectOrderedTransactions chain session blockNumber acs [firstTx;secondTx]
-    let _, validatedTransactions_ = BlockTemplateBuilder.selectOrderedTransactions chain session blockNumber acs [secondTx;firstTx]
+    let txList = List.map (fun tx -> (Transaction.hash tx, tx, 0I)) [firstTx;secondTx]
+    let _, validatedTransactions = BlockTemplateBuilder.selectOrderedTransactions chain session blockNumber acs txList
+    let _, validatedTransactions_ = BlockTemplateBuilder.selectOrderedTransactions chain session blockNumber acs <| List.rev txList
 
     List.length validatedTransactions |> should equal 2
     validatedTransactions |> should equal validatedTransactions_

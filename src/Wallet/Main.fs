@@ -55,7 +55,7 @@ let requestHandler chain client (requestId:RequestId) request session wallet =
         Account.getAddress chain wallet
         |> reply
     | Spend (address, spend) ->
-        Account.createTransaction chain wallet address spend
+        Account.createTransaction wallet address spend
         |> getTransactionResult
         |> reply
     | ActivateContract (code,numberOfBlocks) ->

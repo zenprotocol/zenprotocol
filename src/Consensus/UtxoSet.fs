@@ -8,7 +8,7 @@ open Infrastructure
 
 type OutputStatus =
     | NoOutput
-    | Spent
+    | Spent of Output       // Used for weight lookups
     | Unspent of Output
 
 type T = Map<Outpoint, OutputStatus>
@@ -24,9 +24,9 @@ let get getUTXO outpoint set =
 let handleTransaction getUTXO txHash tx set =
     let folder state input =
         match get getUTXO input state with
-        | Unspent _ -> Map.add input Spent state
+        | Unspent output -> Map.add input (Spent output) state
         | NoOutput
-        | Spent -> failwith "Expected output to be unspent"
+        | Spent _ -> failwith "Expected output to be unspent"
 
     let outputsWithIndex = List.mapi (fun i output -> (uint32 i,output)) tx.outputs
 
@@ -46,6 +46,21 @@ let handleTransaction getUTXO txHash tx set =
 
     set
 
+let private fromOutputStatus status =
+    match status with
+    | Spent output
+    | Unspent output -> Some output
+    | NoOutput -> None
+
+let tryGetOutput getUTXO utxoSet outpoint =
+    let status = get getUTXO outpoint utxoSet
+    fromOutputStatus status
+
+let tryGetOutputs getUTXO utxoSet inputs =
+    inputs
+    |> List.choose (function | Outpoint outpoint -> Some outpoint | Mint _ -> None)
+    |> Option.traverseM (tryGetOutput getUTXO utxoSet)
+
 // Use an applicative traversable to collate the errors
 let getUtxosResult getUTXO inputs utxoSet =
     inputs
@@ -54,8 +69,7 @@ let getUtxosResult getUTXO inputs utxoSet =
         (fun outpoint ->
             match get getUTXO outpoint utxoSet with
             | Unspent output -> Ok output
-            | Spent -> Error [Spent]
-            | NoOutput -> Error [NoOutput])
+            | err -> Error [err])
 
 // Currently only used for tests
 let getUtxos getUTXO outpoints utxoSet =
@@ -73,8 +87,7 @@ let undoBlock getOutput getUTXO block utxoSet =
             |> List.choose (function | Outpoint outpoint -> Some outpoint | Mint _ -> None)
             |> List.fold (fun utxoSet input ->
                 match get getUTXO input utxoSet with
-                | Spent ->
-                    let output = getOutput input
+                | Spent output ->
                     Map.add input (Unspent output) utxoSet
                 | NoOutput
                 | Unspent _ -> failwith "Expected output to be spent") utxoSet
