@@ -2,7 +2,7 @@ module Consensus.Tests.TransactionHelpers
 
 open Consensus
 open Consensus.Types
-open Consensus.ChainParameters
+open Consensus.Chain
 open TransactionValidation
 
 

@@ -61,7 +61,7 @@ let private activateContract chain contractPath blockNumber acs (tx : Types.Tran
             let! activationSacrifices = getActivationSacrifice tx
 
             let codeLengthKB = String.length code |> uint64
-            let activationSacrificePerBlock = ChainParameters.getContractSacrificePerBytePerBlock chain * codeLengthKB
+            let activationSacrificePerBlock = Chain.getContractSacrificePerBytePerBlock chain * codeLengthKB
             let numberOfBlocks = activationSacrifices / activationSacrificePerBlock |> uint32
 
             if numberOfBlocks = 0ul then

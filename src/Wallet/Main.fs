@@ -60,7 +60,7 @@ let requestHandler chain client (requestId:RequestId) request session wallet =
         |> reply
     | ActivateContract (code,numberOfBlocks) ->
         Account.createActivateContractTransaction chain wallet code numberOfBlocks
-        |> function
+        |> function     // TODO: cleanup
         | Result.Ok tx ->
             ActivateContractTransactionResult.Ok (tx, Consensus.Contract.computeHash code)
         | Result.Error err ->

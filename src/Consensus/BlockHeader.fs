@@ -1,8 +1,8 @@
-module Consensus.BlockHeader
+﻿module Consensus.BlockHeader
 
 open Consensus.Types
 open Consensus.Crypto
-open Consensus.ChainParameters
+open Consensus.Chain
 open FsNetMQ.Stream
 open FsNetMQ.Stream.Reader
 
@@ -77,6 +77,6 @@ let validate chain header  =
     let h = hash header
     
     let difficulty = Difficulty.uncompress header.difficulty
-    let proofOfWorkLimit = ChainParameters.proofOfWorkLimit chain
+    let proofOfWorkLimit = Chain.proofOfWorkLimit chain
     
     if difficulty <= proofOfWorkLimit && h <= difficulty then Ok header else Error "proof of work failed"        

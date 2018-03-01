@@ -2,7 +2,7 @@
 open FSharp.Configuration
 open Argu
 open Infrastructure
-open Consensus.ChainParameters
+open Consensus.Chain
 open Consensus
 open System
 

@@ -1,9 +1,9 @@
-module Consensus.Tests.BlockHeaderTests
+﻿module Consensus.Tests.BlockHeaderTests
 
 open Consensus
 open Consensus
 open Consensus.Types
-open Consensus.ChainParameters
+open Consensus.Chain
 open NUnit.Framework
 open FsUnit
 open FsCheck

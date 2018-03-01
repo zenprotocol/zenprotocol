@@ -1,7 +1,7 @@
-module Consensus.Tests.ContractTests
+﻿module Consensus.Tests.ContractTests
 
 open Consensus
-open Consensus.ChainParameters
+open Consensus.Chain
 open Types
 open NUnit.Framework
 open Hash

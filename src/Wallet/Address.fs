@@ -1,7 +1,7 @@
-module Address 
+﻿module Address 
 
 open Consensus.Hash
-open Consensus.ChainParameters
+open Consensus.Chain
 open FsBech32
 
 [<Literal>]

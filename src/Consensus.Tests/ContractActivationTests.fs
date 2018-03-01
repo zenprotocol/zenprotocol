@@ -8,7 +8,7 @@ open NUnit.Framework
 open FsUnit
 open TestsInfrastructure.Constraints
 
-let chain = ChainParameters.Local
+let chain = Chain.Local
 let getUTXO _ = UtxoSet.NoOutput
 let contractPath = "./test"
 let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO Transaction.rootTxHash Transaction.rootTx

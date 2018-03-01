@@ -4,7 +4,7 @@ open NUnit.Framework
 open FsUnit
 open Consensus
 open Consensus.Types
-open Consensus.ChainParameters
+open Consensus.Chain
 open Infrastructure
 open Blockchain
 open Blockchain.State

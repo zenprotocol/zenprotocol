@@ -1,4 +1,4 @@
-module Consensus.ChainParameters
+module Consensus.Chain
 
 let ContractSacrificePerBytePerBlock = 1UL
 
@@ -16,7 +16,7 @@ type ChainParameters =
     }
 
 let getChainParameters = function
-    | Main -> {proofOfWorkLimit=Difficulty.uncompress 0x1d00fffful;blockInterval=240UL*1000UL;smoothingFactor=0.0055;maxBlockWeight=1000_000_000I}
+    | Main -> {proofOfWorkLimit=Difficulty.uncompress 0x1d00fffful;blockInterval=236682UL;smoothingFactor=0.0055;maxBlockWeight=1000_000_000I}
     | Test
     | Local -> {proofOfWorkLimit=Difficulty.uncompress 0x20fffffful;blockInterval=60UL*1000UL;smoothingFactor=0.05;maxBlockWeight=1000_000_000I}
     

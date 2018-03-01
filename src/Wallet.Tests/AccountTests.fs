@@ -3,12 +3,12 @@
 open NUnit.Framework
 open FsUnit
 open Consensus
-open Consensus.ChainParameters
+open Consensus.Chain
 open Consensus.Types
 open Wallet
 open TestsInfrastructure.Constraints
 
-let chain = ChainParameters.Local
+let chain = Chain.Local
 
 let balanceShouldBe asset expected account =
     let balance = Account.getBalance account
@@ -202,7 +202,7 @@ let ``create execute contract transaction``() =
 let ``account sync up``() =
     let startBlockHeader = {
         version = 0ul
-        parent = ChainParameters.getGenesisHash Chain.Local
+        parent = Chain.getGenesisHash Chain.Local
         blockNumber = 2ul
         commitments = Hash.zero
         timestamp = 0UL
@@ -256,7 +256,7 @@ let ``sync up from empty wallet``() =
 
     let header = {
         version = 0ul
-        parent = ChainParameters.getGenesisHash Chain.Local
+        parent = Chain.getGenesisHash Chain.Local
         blockNumber = 2ul
         commitments = Hash.zero
         timestamp = 0UL
@@ -277,7 +277,7 @@ let ``sync up from empty wallet``() =
 
     let account = Account.sync Chain.Local blockHash (fun _ -> failwith "unexpected")
                     (fun blockHash ->
-                        if blockHash = ChainParameters.getGenesisHash Chain.Local then
+                        if blockHash = Chain.getGenesisHash Chain.Local then
                             Block.createGenesis chain [Transaction.rootTx] (0UL,0UL)
                         else
                             block) account
@@ -290,7 +290,7 @@ let ``sync up from empty wallet``() =
 let ``account reorg``() =
     let startBlockHeader = {
         version = 0ul
-        parent = ChainParameters.getGenesisHash Chain.Local
+        parent = Chain.getGenesisHash Chain.Local
         blockNumber = 2ul
         commitments = Hash.zero
         timestamp = 0UL

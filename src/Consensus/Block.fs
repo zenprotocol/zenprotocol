@@ -48,7 +48,7 @@ let fromHex hex =
 let isGenesis chain block =
     let blockHash = hash block
 
-    ChainParameters.getGenesisHash chain = blockHash
+    Chain.getGenesisHash chain = blockHash
 
 let getChainWork (prevWork:bigint) header =
     let target =
@@ -86,7 +86,7 @@ let createGenesis chain transactions nonce =
             parent=Hash.zero;
             blockNumber=1ul;
             commitments=commitments;
-            timestamp=ChainParameters.getGenesisTime chain;
+            timestamp=Chain.getGenesisTime chain;
             difficulty=(EMA.create chain).difficulty;
             nonce=nonce;
         }
@@ -315,7 +315,7 @@ let connect chain getUTXO contractsPath parent timestamp utxoSet acs ema =
 
     let checkWeight (block,ema) = result {
         let! weight = Weight.blockWeight getUTXO utxoSet block
-        let maxWeight = ChainParameters.getMaximumBlockWeight chain
+        let maxWeight = Chain.getMaximumBlockWeight chain
         if weight <= maxWeight
         then
             return block,ema

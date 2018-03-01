@@ -1,7 +1,7 @@
 ﻿module Consensus.Tests.BlockTests
 
 open Consensus
-open Consensus.ChainParameters
+open Consensus.Chain
 open Consensus.Types
 open Consensus.Tests
 open Wallet

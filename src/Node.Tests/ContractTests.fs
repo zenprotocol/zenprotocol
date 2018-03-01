@@ -7,7 +7,7 @@ open FsNetMQ
 open Consensus
 open Consensus.Types
 open Infrastructure
-open Consensus.ChainParameters
+open Consensus.Chain
 open Consensus
 open Consensus.Tests.SampleContract
 open Messaging.Services

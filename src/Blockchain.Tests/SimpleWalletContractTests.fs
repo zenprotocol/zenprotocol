@@ -14,7 +14,7 @@ open Blockchain.State
 open TestsInfrastructure.Constraints
 open Consensus.Tests.SampleContract
 
-let chain = ChainParameters.Local
+let chain = Chain.Local
 
 let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction (fun _ -> UtxoSet.NoOutput) Transaction.rootTxHash Transaction.rootTx
 let mempool = MemPool.empty |> MemPool.add Transaction.rootTxHash Transaction.rootTx
