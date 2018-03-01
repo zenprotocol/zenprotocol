@@ -3,35 +3,16 @@ module Consensus.Transaction
 open Consensus.TxSkeleton
 open Consensus.Types
 open Consensus.Crypto
-open MBrace.FsPickler.Combinators
-open Newtonsoft.Json
 
-type SerializationMode =
-    | Full
-    | WithoutWitness
-
-let serialize mode tx =
-    match mode with
-    | Full -> tx
-    | WithoutWitness -> {tx with witnesses=[]}
-    |> JsonConvert.SerializeObject
-    |> System.Text.Encoding.ASCII.GetBytes
-
-let deserialize bytes =
-    try
-        bytes
-        |> System.Text.Encoding.ASCII.GetString
-        |> JsonConvert.DeserializeObject<Transaction>
-        |> Some
-    with | _ ->
-        None
+let serialize = TransactionSerialization.serialize
+let deserialize = TransactionSerialization.deserialize
 
 let hash =
-    serialize WithoutWitness >> Hash.compute
+    serialize TransactionSerialization.WithoutWitness >> Hash.compute
 
 let witnessHash =
     //TODO: only serialize witness
-    serialize Full >> Hash.compute
+    serialize TransactionSerialization.Full >> Hash.compute
 
 let addWitnesses witnesses tx =
     { tx with witnesses = witnesses @ tx.witnesses }
