@@ -18,6 +18,7 @@ module Actor = FsNetMQ.Actor
 
 let busName = "test"
 let chain = Chain.Local
+let chainParams = Chain.getChainParameters chain
 let dataPath = ".data"
 let apiUri = "127.0.0.1:29555"
 
@@ -41,12 +42,12 @@ let setUp = fun () ->
     clean ()
 
     createBroker () |> ignore
-    Blockchain.Main.main dataPath chain busName |> ignore
+    Blockchain.Main.main dataPath chainParams busName |> ignore
     Wallet.Main.main dataPath busName chain true |> ignore
     Api.Main.main chain busName apiUri |> ignore
 
     // initialize genesis block
-    let block = Block.createGenesis chain [Transaction.rootTx] (0UL,0UL)
+    let block = Block.createGenesis chainParams [Transaction.rootTx] (0UL,0UL)
     let client = ServiceBus.Client.create busName
     Blockchain.validateBlock client block
 

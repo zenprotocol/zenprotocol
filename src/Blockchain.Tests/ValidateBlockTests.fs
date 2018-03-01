@@ -19,7 +19,7 @@ open TestsInfrastructure.Constraints
 open Messaging.Services
 
 let (>>=) = Writer.bind
-let chain = Chain.Local
+let chain = Chain.getChainParameters Chain.Local
 let timestamp = 1515594186383UL + 1UL
 
 module Result =
@@ -159,7 +159,7 @@ let ``wrong genesis block should be rejected``() =
     areOutpointsInSet session rootTxOutpoints UtxoSet.asDatabase |> should equal false
 
 [<Test>]
-let ``validate new valid block which extended main chain``() =
+let ``validate new valid block which extended main localParams``() =
     use databaseContext = DatabaseContext.createEmpty "test"
     use session = DatabaseContext.createSession databaseContext
 
@@ -198,7 +198,7 @@ let ``validate new valid block which extended main chain``() =
     areOutpointsInSet session (getTxOutpoints tx) UtxoSet.asDatabase |> should equal true
 
 [<Test>]
-let ``validate new invalid block which try to extended main chain``() =
+let ``validate new invalid block which try to extended main localParams``() =
     use databaseContext = DatabaseContext.createEmpty "test"
     use session = DatabaseContext.createSession databaseContext
 
@@ -250,7 +250,7 @@ let ``validating orphan block yield a request for block from network``() =
     areOutpointsInSet session (getTxOutpoints tx) UtxoSet.asDatabase |> should equal false
 
 [<Test>]
-let ``validate new block which connect orphan chain which extend main chain``() =
+let ``validate new block which connect orphan localParams which extend main localParams``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
@@ -266,7 +266,7 @@ let ``validate new block which connect orphan chain which extend main chain``() 
         BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state
         |> Writer.unwrap
 
-    // Now sending the genesis, which should roll forward the chain
+    // Now sending the genesis, which should roll forward the localParams
     let events, state' =
         BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state
         |> Writer.unwrap
@@ -288,7 +288,7 @@ let ``validate new block which connect orphan chain which extend main chain``() 
     areOutpointsInSet session (getTxOutpoints tx) UtxoSet.asDatabase |> should equal true
 
 [<Test>]
-let ``validate new block which connect orphan chain which is not long enough to become main chain``() =
+let ``validate new block which connect orphan localParams which is not long enough to become main localParams``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
@@ -297,10 +297,10 @@ let ``validate new block which connect orphan chain which is not long enough to 
     let mainChain,account = createChainFromGenesis 3 0
     let alternativeChain, sideChainAccount = createChainFromGenesis 2 1
 
-    // validate main chain first
+    // validate main localParams first
     let _,state = validateChain session mainChain state
 
-    // now validating orphan chain which is not long enough
+    // now validating orphan localParams which is not long enough
     // we reverse the order of block in order to make it orphan first
     let events ,state = validateChain session (List.rev alternativeChain) state
 
@@ -314,7 +314,7 @@ let ``validate new block which connect orphan chain which is not long enough to 
     isAccountInSet session sideChainAccount UtxoSet.asDatabase |> should equal false
 
 [<Test>]
-let ``orphan chain become longer than main chain``() =
+let ``orphan localParams become longer than main localParams``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
@@ -323,28 +323,28 @@ let ``orphan chain become longer than main chain``() =
     let mainChain, account = createChainFromGenesis 3 0
     let alternativeChain, sideChainAccount = createChainFromGenesis 2 1
 
-    // validate main chain first
+    // validate main localParams first
     let _,state = validateChain session alternativeChain state
 
-    // Check that the alternative chain, which is now main, is marked as main
+    // Check that the alternative localParams, which is now main, is marked as main
     List.iter (fun block ->
         let blockHash = Block.hash block
         let extendedHeader = BlockRepository.getHeader session blockHash
         extendedHeader.status |> should equal ExtendedBlockHeader.MainChain) alternativeChain
 
-    // now validating orphan chain which is longer
+    // now validating orphan localParams which is longer
     // we reverse the order of block in order to make it orphan first
     let events,state = validateChain session (List.rev mainChain) state
 
     let tip = List.last mainChain
 
-    // Making sure all the alternative chain status changed to Connected
+    // Making sure all the alternative localParams status changed to Connected
     List.iter (fun block ->
         let blockHash = Block.hash block
         let extendedHeader = BlockRepository.getHeader session blockHash
         extendedHeader.status |> should equal ExtendedBlockHeader.Connected) alternativeChain
 
-    // Making sure all the new main chain status changed to Main
+    // Making sure all the new main localParams status changed to Main
     List.iter (fun block ->
         let blockHash = Block.hash block
         let extendedHeader = BlockRepository.getHeader session blockHash
@@ -370,7 +370,7 @@ let ``orphan chain become longer than main chain``() =
     isAccountInSet session sideChainAccount UtxoSet.asDatabase |> should equal false
 
 [<Test>]
-let ``new block extend fork chain which become longest``() =
+let ``new block extend fork localParams which become longest``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
@@ -379,10 +379,10 @@ let ``new block extend fork chain which become longest``() =
     let mainChain, account = createChainFromGenesis 2 0
     let alternativeChain, sideChainAccount = createChainFromGenesis 1 1
 
-    // validate main chain first
+    // validate main localParams first
     let _,state = validateChain session alternativeChain state
 
-    // now validating orphan chain which is longer
+    // now validating orphan localParams which is longer
     // we reverse the order of block in order to make it orphan first
     let events,state = validateChain session mainChain state
 
@@ -402,7 +402,7 @@ let ``new block extend fork chain which become longest``() =
     isAccountInSet session sideChainAccount UtxoSet.asDatabase |> should equal false
 
 [<Test>]
-let ``2 orphan chains, one become longer than main chain``() =
+let ``2 orphan localParamss, one become longer than main localParams``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
@@ -417,7 +417,7 @@ let ``2 orphan chains, one become longer than main chain``() =
     let sideChain1, _ = createChain 1 2 orphanBlock orphanEMA orphanAccount
     let sideChain2, sideChainAccount = createChain 2 3 orphanBlock orphanEMA orphanAccount
 
-    // validate all chains
+    // validate all localParamss
     let _,state = validateChain session mainChain state
     let _,state = validateChain session sideChain1 state
     let _,state = validateChain session sideChain2 state
@@ -440,7 +440,7 @@ let ``2 orphan chains, one become longer than main chain``() =
     isAccountInSet session sideChainAccount UtxoSet.asDatabase |> should equal true
 
 [<Test>]
-let ``2 orphan chains, two longer than main, one is longer``() =
+let ``2 orphan localParamss, two longer than main, one is longer``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
@@ -455,7 +455,7 @@ let ``2 orphan chains, two longer than main, one is longer``() =
     let sideChain1, _ = createChain 2 2 orphanBlock orphanEMA orphanAccount
     let sideChain2, sideChainAccount = createChain 3 3 orphanBlock orphanEMA orphanAccount
 
-    // validate all chains
+    // validate all localParamss
     let _,state = validateChain session mainChain state
     let _,state = validateChain session sideChain1 state
     let _,state = validateChain session sideChain2 state
@@ -479,7 +479,7 @@ let ``2 orphan chains, two longer than main, one is longer``() =
     isAccountInSet session sideChainAccount UtxoSet.asDatabase |> should equal true
 
 [<Test>]
-let ``2 orphan chains, two longer than main, longest is invalid, shuld pick second long``() =
+let ``2 orphan localParamss, two longer than main, longest is invalid, shuld pick second long``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
@@ -492,11 +492,11 @@ let ``2 orphan chains, two longer than main, longest is invalid, shuld pick seco
 
     let mainChain, account = createChainFromGenesis 2 0
 
-    // we are creatig invalid sidchain by giving sideChain1 the wrong account which will create invalid chain
+    // we are creatig invalid sidchain by giving sideChain1 the wrong account which will create invalid localParams
     let sideChain1, _ = createChain 3 2 orphanBlock orphanEMA account
     let sideChain2, sideChainAccount = createChain 2 3 orphanBlock orphanEMA orphanAccount
 
-    // validate all chains
+    // validate all localParamss
     let _,state = validateChain session mainChain state
     let _,state = validateChain session sideChain1 state
     let _,state = validateChain session sideChain2 state
@@ -524,7 +524,7 @@ let ``transaction in mempool and not in next block stays in mempool``() =
 
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session
-    let chain,account = createChainFromGenesis 1 0
+    let localParams,account = createChainFromGenesis 1 0
     let tx1 = createTransaction rootAccount
     let tx2 = createTransaction account
     let txHash1 = Transaction.hash tx1
@@ -544,7 +544,7 @@ let ``transaction in mempool and not in next block stays in mempool``() =
         state with memoryState = {state.memoryState with utxoSet=utxoSet;mempool=mempool}
     }
 
-    let _, state = validateChain session chain state
+    let _, state = validateChain session localParams state
 
     Map.containsKey txHash2 state.memoryState.mempool  |> should equal true
     Map.containsKey txHash1 state.memoryState.mempool  |> should equal false
@@ -559,7 +559,7 @@ let ``orphan transactions added to mempool after origin tx found in block``() =
 
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session
-    let chain,account = createChainFromGenesis 1 0
+    let localParams,account = createChainFromGenesis 1 0
     let tx1 = createTransaction account
     let txHash1 = Transaction.hash tx1
     let tx2 =
@@ -576,7 +576,7 @@ let ``orphan transactions added to mempool after origin tx found in block``() =
         state with memoryState = {state.memoryState with orphanPool=orphanPool}
     }
 
-    let _, state = validateChain session chain state
+    let _, state = validateChain session localParams state
 
     Map.containsKey txHash1 state.memoryState.mempool |> should equal true
     Map.containsKey txHash2 state.memoryState.mempool |> should equal true
@@ -587,7 +587,7 @@ let ``orphan transactions added to mempool after origin tx found in block``() =
     areOutpointsInSet session (getTxOutpoints tx2) UtxoSet.asDatabase |> should equal false
 
 [<Test>]
-let ``block with a contract activation is added to chain``() =
+let ``block with a contract activation is added to localParams``() =
     use databaseContext = DatabaseContext.createEmpty "test"
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session

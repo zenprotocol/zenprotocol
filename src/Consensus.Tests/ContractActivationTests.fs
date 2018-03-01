@@ -9,11 +9,12 @@ open FsUnit
 open TestsInfrastructure.Constraints
 
 let chain = Chain.Local
+let localParams = Chain.getChainParameters chain
 let getUTXO _ = UtxoSet.NoOutput
 let contractPath = "./test"
 let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO Transaction.rootTxHash Transaction.rootTx
 
-let validateInContext = validateInContext chain getUTXO contractPath
+let validateInContext = validateInContext localParams getUTXO contractPath
 
 type TxResult = Result<Transaction*ActiveContractSet.T,ValidationError>
 
@@ -98,7 +99,7 @@ let ``Contract activation with exact amount``() =
     let rootAccount = Account.createTestAccount ()
 
     let tx =
-        Account.createActivateContractTransaction chain rootAccount code 1ul
+        Account.createActivateContractTransaction localParams rootAccount code 1ul
         |> function | Ok tx -> tx | _ -> failwith "unexpected"
     let txHash = Transaction.hash tx
 

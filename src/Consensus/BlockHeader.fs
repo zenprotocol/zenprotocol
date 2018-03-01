@@ -1,4 +1,4 @@
-﻿module Consensus.BlockHeader
+module Consensus.BlockHeader
 
 open Consensus.Types
 open Consensus.Crypto
@@ -77,6 +77,6 @@ let validate chain header  =
     let h = hash header
     
     let difficulty = Difficulty.uncompress header.difficulty
-    let proofOfWorkLimit = Chain.proofOfWorkLimit chain
+    let proofOfWorkLimit = chain.proofOfWorkLimit
     
     if difficulty <= proofOfWorkLimit && h <= difficulty then Ok header else Error "proof of work failed"        

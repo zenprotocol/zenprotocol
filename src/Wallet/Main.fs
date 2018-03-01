@@ -36,6 +36,7 @@ let eventHandler collection event session account =
 let commandHandler command session wallet = wallet
 
 let requestHandler chain client (requestId:RequestId) request session wallet =
+    let chainParams = Consensus.Chain.getChainParameters chain
     let reply =
         requestId.reply
     let getTransactionResult =
@@ -59,7 +60,7 @@ let requestHandler chain client (requestId:RequestId) request session wallet =
         |> getTransactionResult
         |> reply
     | ActivateContract (code,numberOfBlocks) ->
-        Account.createActivateContractTransaction chain wallet code numberOfBlocks
+        Account.createActivateContractTransaction chainParams wallet code numberOfBlocks
         |> function     // TODO: cleanup
         | Result.Ok tx ->
             ActivateContractTransactionResult.Ok (tx, Consensus.Contract.computeHash code)
@@ -75,6 +76,7 @@ let requestHandler chain client (requestId:RequestId) request session wallet =
     wallet
 
 let main dataPath busName chain root =
+    let chainParams = Consensus.Chain.getChainParameters chain
     Actor.create<Command,Request,Event, Account.T> busName serviceName (fun poller sbObservable ebObservable ->
         let databaseContext = DatabaseContext.create (Platform.combine dataPath "wallet")
 
@@ -107,7 +109,7 @@ let main dataPath busName chain root =
 
                 if blockHash <> account.tip then
                     let account =
-                        Account.sync chain blockHash
+                        Account.sync chainParams blockHash
                             (Blockchain.getBlockHeader client >> Option.get)
                             (Blockchain.getBlock client >> Option.get)
                             account

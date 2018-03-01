@@ -129,8 +129,6 @@ let private fstToFsTx : txSkeleton -> _ = function
             |> List.sortBy fst
             |> List.map (snd >> fstToFsOutput)
         Ok {pInputs=inputs; outputs=outputs}
-    | _ ->
-        Error "malformed txSkeleton"
 
 let fstToFsData =
 //    Binary.pickle pickler
@@ -154,8 +152,6 @@ let fstTofsMessage = function
         |> Ok
     | Native.option.None ->
         Ok None
-    | _ ->
-        Error "malformed message"
 
 let convertResult (tx, message : message Native.option) =
     fstTofsMessage message

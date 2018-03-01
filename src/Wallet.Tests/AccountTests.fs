@@ -9,6 +9,7 @@ open Wallet
 open TestsInfrastructure.Constraints
 
 let chain = Chain.Local
+let chainParams = Chain.localParameters
 
 let balanceShouldBe asset expected account =
     let balance = Account.getBalance account
@@ -202,7 +203,7 @@ let ``create execute contract transaction``() =
 let ``account sync up``() =
     let startBlockHeader = {
         version = 0ul
-        parent = Chain.getGenesisHash Chain.Local
+        parent = chainParams.genesisHash
         blockNumber = 2ul
         commitments = Hash.zero
         timestamp = 0UL
@@ -242,7 +243,7 @@ let ``account sync up``() =
 
     let blockHash = Block.hash block
 
-    let account' = Account.sync Chain.Local blockHash (fun _ -> startBlockHeader) (fun _ -> block) account
+    let account' = Account.sync chainParams blockHash (fun _ -> startBlockHeader) (fun _ -> block) account
 
     account'.tip |> should equal blockHash
     account'.mempool |> should haveLength 0
@@ -256,7 +257,7 @@ let ``sync up from empty wallet``() =
 
     let header = {
         version = 0ul
-        parent = Chain.getGenesisHash Chain.Local
+        parent = chainParams.genesisHash
         blockNumber = 2ul
         commitments = Hash.zero
         timestamp = 0UL
@@ -275,10 +276,10 @@ let ``sync up from empty wallet``() =
 
     let blockHash = Block.hash block
 
-    let account = Account.sync Chain.Local blockHash (fun _ -> failwith "unexpected")
+    let account = Account.sync chainParams blockHash (fun _ -> failwith "unexpected")
                     (fun blockHash ->
-                        if blockHash = Chain.getGenesisHash Chain.Local then
-                            Block.createGenesis chain [Transaction.rootTx] (0UL,0UL)
+                        if blockHash = chainParams.genesisHash then
+                            Block.createGenesis chainParams [Transaction.rootTx] (0UL,0UL)
                         else
                             block) account
 
@@ -290,7 +291,7 @@ let ``sync up from empty wallet``() =
 let ``account reorg``() =
     let startBlockHeader = {
         version = 0ul
-        parent = Chain.getGenesisHash Chain.Local
+        parent = Chain.getGenesisHash chain
         blockNumber = 2ul
         commitments = Hash.zero
         timestamp = 0UL
@@ -328,7 +329,7 @@ let ``account reorg``() =
 
     let blockHash = Block.hash block
 
-    let account = Account.sync Chain.Local blockHash (fun _ -> startBlockHeader) (fun _ -> block) account
+    let account = Account.sync chainParams blockHash (fun _ -> startBlockHeader) (fun _ -> block) account
     account.tip |> should equal blockHash
 
     let header2 = {
@@ -352,7 +353,7 @@ let ``account reorg``() =
 
     let blockHash2 = Block.hash block2
 
-    let account = Account.sync Chain.Local blockHash2 (fun _ -> block.header)
+    let account = Account.sync chainParams blockHash2 (fun _ -> block.header)
                         (fun bh ->
                             if bh = blockHash then
                                 block

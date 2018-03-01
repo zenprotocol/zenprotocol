@@ -146,7 +146,7 @@ let sync chain tipBlockHash (getHeader:Hash.Hash -> BlockHeader) (getBlock:Hash.
 
     let rec sync' currentBlockHash =
         // If new account and genesis block handle genesis block
-        if account.tip = Hash.zero && currentBlockHash = Chain.getGenesisHash chain then
+        if account.tip = Hash.zero && currentBlockHash = chain.genesisHash then
             let block = getBlock currentBlockHash
             handleBlock currentBlockHash block account
         // If we found the account tip we stop the recursion and start syncing up
@@ -257,7 +257,7 @@ let createTransaction account pkHash spend =
 let createActivateContractTransaction chain account code (numberOfBlocks:uint32) =
     let codeLength = String.length code |> uint64
 
-    let activationSacrifice = Chain.getContractSacrificePerBytePerBlock chain * codeLength * (uint64 numberOfBlocks)
+    let activationSacrifice = chain.sacrificePerByteBlock * codeLength * (uint64 numberOfBlocks)
     let spend = {amount=activationSacrifice;asset=Constants.Zen}
 
     result {

@@ -45,10 +45,10 @@ let fromHex hex =
     FsBech32.Base16.decode hex
     |> Option.bind deserialize
 
-let isGenesis chain block =
+let isGenesis (chain:Chain.ChainParameters) block =
     let blockHash = hash block
 
-    Chain.getGenesisHash chain = blockHash
+    chain.genesisHash = blockHash
 
 let getChainWork (prevWork:bigint) header =
     let target =
@@ -63,7 +63,7 @@ let getBlockReward blockNumber =
     //TODO: implement this method
     50UL * 100000000UL
 
-let createGenesis chain transactions nonce =
+let createGenesis (chain:Chain.ChainParameters) transactions nonce =
     let txMerkleRoot =
         transactions
         |> List.map Transaction.hash
@@ -86,7 +86,7 @@ let createGenesis chain transactions nonce =
             parent=Hash.zero;
             blockNumber=1ul;
             commitments=commitments;
-            timestamp=Chain.getGenesisTime chain;
+            timestamp=chain.genesisTime;
             difficulty=(EMA.create chain).difficulty;
             nonce=nonce;
         }
@@ -315,7 +315,7 @@ let connect chain getUTXO contractsPath parent timestamp utxoSet acs ema =
 
     let checkWeight (block,ema) = result {
         let! weight = Weight.blockWeight getUTXO utxoSet block
-        let maxWeight = Chain.getMaximumBlockWeight chain
+        let maxWeight = chain.maxBlockWeight
         if weight <= maxWeight
         then
             return block,ema
