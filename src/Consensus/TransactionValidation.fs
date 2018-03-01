@@ -37,7 +37,7 @@ let private foldSpends =
 let private checkSpends m =
     Map.forall (fun _ v -> Option.isSome v) m
 
-let private activateContract chain contractPath blockNumber acs (tx : Types.Transaction) =
+let private activateContract (chainParams : Chain.ChainParameters) contractPath blockNumber acs (tx : Types.Transaction) =
     let getActivationSacrifice tx = result {
         let activationSacrifices = List.filter(fun output -> output.lock = ActivationSacrifice) tx.outputs
 
@@ -61,7 +61,7 @@ let private activateContract chain contractPath blockNumber acs (tx : Types.Tran
             let! activationSacrifices = getActivationSacrifice tx
 
             let codeLengthKB = String.length code |> uint64
-            let activationSacrificePerBlock = ChainParameters.getContractSacrificePerBytePerBlock chain * codeLengthKB
+            let activationSacrificePerBlock = chainParams.sacrificePerByteBlock * codeLengthKB
             let numberOfBlocks = activationSacrifices / activationSacrificePerBlock |> uint32
 
             if numberOfBlocks = 0ul then
@@ -354,10 +354,10 @@ let validateCoinbase blockNumber =
     >=> checkNoContractInCoinbase
     >=> checkOutputsOverflow
 
-let validateInContext chain getUTXO contractPath blockNumber acs set txHash tx = result {
+let validateInContext chainParams getUTXO contractPath blockNumber acs set txHash tx = result {
     let! outputs = tryGetUtxos getUTXO set tx
     let! txSkel = checkWitnesses blockNumber acs (txHash, tx, outputs)
     do! checkAmounts txSkel
-    let! newAcs = activateContract chain contractPath blockNumber acs tx
+    let! newAcs = activateContract chainParams contractPath blockNumber acs tx
     return tx, newAcs
 }

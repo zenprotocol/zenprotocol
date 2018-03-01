@@ -54,3 +54,5 @@ let traverseResultA f xs : Result<'res list, 'err list> =
     List.foldBack folder xs initState
 
 let (|ResultOf|) err = function | Some x -> Ok x | None -> Error err
+
+let get = function | Ok x -> x | Error err -> failwithf "%A" err

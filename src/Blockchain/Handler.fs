@@ -11,14 +11,14 @@ open Blockchain.EffectsWriter
 open State
 open DatabaseContext
 
-let handleCommand chain command session timestamp (state:State) =
+let handleCommand chainParams command session timestamp (state:State) =
     let contractPath = session.context.contractPath
 
     match command with
     | ValidateTransaction tx ->
         effectsWriter {
             let! memoryState =
-                TransactionHandler.validateTransaction chain session contractPath state.tipState.tip.header.blockNumber
+                TransactionHandler.validateTransaction chainParams session contractPath state.tipState.tip.header.blockNumber
                     tx state.memoryState
             return {state with memoryState = memoryState}
         }
@@ -54,13 +54,13 @@ let handleCommand chain command session timestamp (state:State) =
 
         Writer.bind writer (fun () -> Writer.ret state)
     | ValidateBlock block ->
-        BlockHandler.validateBlock chain contractPath session timestamp block false state
+        BlockHandler.validateBlock chainParams contractPath session timestamp block false state
     | ValidateMinedBlock block ->
-        BlockHandler.validateBlock chain contractPath session timestamp block true state
+        BlockHandler.validateBlock chainParams contractPath session timestamp block true state
     | HandleTip header ->
-        BlockHandler.handleTip chain session header state
+        BlockHandler.handleTip chainParams session header state
     | ValidateNewBlockHeader (peerId, header) ->
-        BlockHandler.handleNewBlockHeader chain session peerId header state
+        BlockHandler.handleNewBlockHeader chainParams session peerId header state
     | RequestTip peerId ->
         effectsWriter {
             if state.tipState.tip <> ExtendedBlockHeader.empty then

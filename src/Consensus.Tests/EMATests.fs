@@ -44,8 +44,8 @@ let ``Clamp returns a value between lower and upper``() =
 
 [<Property(Arbitrary = [|typeof<NormalIntervalTimestamps>|], StartSize=50)>]
 let ``Default difficulty for first 11 blocks``(tstamps:uint64 list) =
-    let ema = create ChainParameters.Main
-    let emas = List.scan (fun e ts -> add ChainParameters.Main ts e) ema (List.take 11 tstamps)
+    let ema = create Chain.mainParameters
+    let emas = List.scan (fun e ts -> add Chain.mainParameters ts e) ema (List.take 11 tstamps)
     List.forall (fun e -> e.difficulty = ema.difficulty) emas
 
 type FastIntervalTimestamps =
@@ -53,9 +53,9 @@ type FastIntervalTimestamps =
 
 [<Property(Arbitrary = [|typeof<FastIntervalTimestamps>|], StartSize=1000)>]
 let ``Difficulty increases when blocks are generated quickly``(tstamps:uint64 list) =
-    let ema = create ChainParameters.Main
-    let emas = List.scan (fun e ts -> add ChainParameters.Main ts e) ema tstamps
-    let initTarget = Hash.toBigInt (ChainParameters.proofOfWorkLimit ChainParameters.Main)
+    let ema = create Chain.mainParameters
+    let emas = List.scan (fun e ts -> add Chain.mainParameters ts e) ema tstamps
+    let initTarget = Hash.toBigInt (Chain.proofOfWorkLimit Chain.Main)
     let finalTarget =
         List.last emas
         |> fun e -> e.difficulty
@@ -68,9 +68,9 @@ type SlowIntervalTimestamps =
 
 [<Property(Arbitrary = [|typeof<SlowIntervalTimestamps>|], StartSize=1000)>]
 let ``Difficulty is always more than the chain minimum``(tstamps:uint64 list) =
-    let ema = create ChainParameters.Main
-    let emas = List.scan (fun e ts -> add ChainParameters.Main ts e) ema tstamps
-    let targetLimit = Hash.toBigInt (ChainParameters.proofOfWorkLimit ChainParameters.Main)
+    let ema = create Chain.mainParameters
+    let emas = List.scan (fun e ts -> add Chain.mainParameters ts e) ema tstamps
+    let targetLimit = Hash.toBigInt (Chain.proofOfWorkLimit Chain.Main)
     List.forall
         (fun e -> 
             e.difficulty

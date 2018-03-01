@@ -8,7 +8,7 @@ open Messaging.Events
 open Consensus
 open State
 
-let main dataPath chain busName =
+let main dataPath chainParams busName =
     Actor.create<Command,Request,Event,State> busName serviceName (fun poller sbObservable ebObservable  ->  
         let publisher = EventBus.Publisher.create<Event> busName
         let client = ServiceBus.Client.create busName        
@@ -16,10 +16,10 @@ let main dataPath chain busName =
         let sbObservable = 
             sbObservable
             |> Observable.map (fun message ->                
-                match message with 
-                | ServiceBus.Agent.Command c -> Handler.handleCommand chain c 
+                match message with
+                | ServiceBus.Agent.Command c -> Handler.handleCommand chainParams c 
                 | ServiceBus.Agent.Request (requestId, request) -> 
-                    Handler.handleRequest chain requestId request)
+                    Handler.handleRequest chainParams requestId request)
         
         let ebObservable = 
             ebObservable
@@ -36,7 +36,7 @@ let main dataPath chain busName =
                 tip,acs,ema
             | None -> 
                 Log.info "No tip in db"
-                ExtendedBlockHeader.empty,ActiveContractSet.empty,EMA.create chain
+                ExtendedBlockHeader.empty,ActiveContractSet.empty,EMA.create chainParams
                          
         let tipState = 
             {

@@ -55,7 +55,7 @@
     <Compile Include="Transaction.fs" />
     <Compile Include="UtxoSet.fs" />
     <Compile Include="Weight.fs" />
-    <Compile Include="ChainParameters.fs" />
+    <Compile Include="Chain.fs" />
     <Compile Include="EMA.fs" />
     <Compile Include="ZFStar.fs" />
     <Compile Include="Contract.fs" />

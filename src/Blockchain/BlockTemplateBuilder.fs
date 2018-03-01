@@ -28,9 +28,9 @@ let weights session state =
                 | _ -> ()
             ]
 
-let selectOrderedTransactions chain (session:DatabaseContext.Session) blockNumber acs transactions =
+let selectOrderedTransactions (chain:Chain.ChainParameters) (session:DatabaseContext.Session) blockNumber acs transactions =
     let contractPath = session.context.contractPath
-    let maxWeight = ChainParameters.getMaximumBlockWeight chain
+    let maxWeight = chain.maxBlockWeight
 
     let tryAddTransaction (state, added, notAdded, altered, weight) (txHash,tx,wt) =
         let newWeight = weight+wt

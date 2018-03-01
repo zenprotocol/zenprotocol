@@ -4,7 +4,7 @@ open NUnit.Framework
 open FsUnit
 open Consensus
 open Consensus.Types
-open Consensus.ChainParameters
+open Consensus.Chain
 open Infrastructure
 open Blockchain
 open Blockchain.State
@@ -19,7 +19,7 @@ open TestsInfrastructure.Constraints
 open Messaging.Services
 
 let (>>=) = Writer.bind
-let chain = Chain.Local
+let chain = Chain.getChainParameters Chain.Local
 let timestamp = 1515594186383UL + 1UL
 
 module Result =

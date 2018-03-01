@@ -13,7 +13,7 @@ open Consensus.Tests.ContractTests
 open Blockchain.State
 open TestsInfrastructure.Constraints
 
-let chain = ChainParameters.Local
+let chain = Chain.getChainParameters Chain.Local
 
 let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction (fun _ -> UtxoSet.NoOutput) Transaction.rootTxHash Transaction.rootTx
 let mempool = MemPool.empty |> MemPool.add Transaction.rootTxHash Transaction.rootTx

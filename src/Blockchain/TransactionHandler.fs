@@ -11,10 +11,10 @@ open State
 
 let getUTXO = UtxoSetRepository.get
 
-let private validateOrphanTransaction chain session contractPath blockNumber state txHash tx  =
+let private validateOrphanTransaction chainParams session contractPath blockNumber state txHash tx  =
     effectsWriter
         {
-            match TransactionValidation.validateInContext chain (getUTXO session) contractPath (blockNumber + 1ul)
+            match TransactionValidation.validateInContext chainParams (getUTXO session) contractPath (blockNumber + 1ul)
                     state.activeContractSet state.utxoSet txHash tx with
             | Ok (tx, acs) ->
                 let utxoSet = UtxoSet.handleTransaction (getUTXO session) txHash tx state.utxoSet
@@ -46,21 +46,21 @@ let private validateOrphanTransaction chain session contractPath blockNumber sta
                 return {state with orphanPool = orphanPool}
         }
 
-let rec validateOrphanTransactions chain session contractPath blockNumber state =
+let rec validateOrphanTransactions chainParams session contractPath blockNumber state =
     effectsWriter {
-        let! state' = OrphanPool.foldWriter (validateOrphanTransaction chain session contractPath blockNumber) state state.orphanPool
+        let! state' = OrphanPool.foldWriter (validateOrphanTransaction chainParams session contractPath blockNumber) state state.orphanPool
 
         // if orphan pool changed we run again until there is no change
         if state'.orphanPool <> state.orphanPool then
-            return! validateOrphanTransactions chain session contractPath blockNumber state'
+            return! validateOrphanTransactions chainParams session contractPath blockNumber state'
         else
             return state'
     }
 
-let validateInputs chain session contractPath blockNumber txHash tx (state:MemoryState) shouldPublishEvents =
+let validateInputs chainParams session contractPath blockNumber txHash tx (state:MemoryState) shouldPublishEvents =
     effectsWriter
         {
-            match TransactionValidation.validateInContext chain (getUTXO session) contractPath (blockNumber + 1ul)
+            match TransactionValidation.validateInContext chainParams (getUTXO session) contractPath (blockNumber + 1ul)
                     state.activeContractSet state.utxoSet txHash tx with
             | Error Orphan ->
                 let orphanPool = OrphanPool.add txHash tx state.orphanPool
@@ -97,11 +97,11 @@ let validateInputs chain session contractPath blockNumber txHash tx (state:Memor
                                 utxoSet=utxoSet;
                              }
 
-                return! validateOrphanTransactions chain session contractPath blockNumber state
+                return! validateOrphanTransactions chainParams session contractPath blockNumber state
         }
 
 
-let validateTransaction chain session contractPath blockNumber tx (state:MemoryState) =
+let validateTransaction chainParams session contractPath blockNumber tx (state:MemoryState) =
     effectsWriter {
         let txHash = Transaction.hash tx
 
@@ -116,7 +116,7 @@ let validateTransaction chain session contractPath blockNumber tx (state:MemoryS
 
                 return state
             | Ok tx ->
-                return! validateInputs chain session contractPath blockNumber txHash tx state true
+                return! validateInputs chainParams session contractPath blockNumber txHash tx state true
     }
 
 let executeContract session txSkeleton cHash command data returnAddress state =
