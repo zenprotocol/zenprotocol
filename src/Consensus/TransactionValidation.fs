@@ -126,8 +126,6 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
 
     let checkContractWitness inputTx acs cw message pInputs =
         let checkMessage (txSkeleton, resultMessage) =
-            printfn "%A %A" message resultMessage
-
             if message = resultMessage then
                 Ok txSkeleton
             else
@@ -277,16 +275,53 @@ let private checkDuplicateInputs tx =
     if List.distinct tx.inputs == tx.inputs then Ok tx
     else GeneralError "inputs duplicated"
 
-let private checkInputsStructure tx =
-    if tx.inputs |> List.exists (function
-        | Types.Input.Outpoint outpoint ->
-            not <| Hash.isValid outpoint.txHash
-        | Types.Input.Mint {asset=cHash,token; amount=_} ->
-            not <| Hash.isValid cHash ||
-            not <| Hash.isValid token) then
-        GeneralError "inputs structurally invalid"
-    else
-        Ok tx
+let private checkStructure =
+    let isInvalidHash = fun hash ->
+        hash 
+        |> Hash.isValid 
+        |> not
+
+    let isInvalidAsset = fun asset ->
+        asset |> fst |> isInvalidHash ||
+        asset |> snd |> isInvalidHash
+    
+    (fun tx -> 
+        match tx.contract with
+        | Some (code, hints) when not <| (String.length code > 0 && String.length hints > 0) ->
+            GeneralError "structurally invalid contract data"
+        | _ -> 
+            Ok tx)
+    >=> (fun tx ->
+        if List.exists (function
+            | Outpoint outpoint -> isInvalidHash outpoint.txHash
+            | Mint spend -> isInvalidAsset spend.asset
+        ) tx.inputs then
+            GeneralError "structurally invalid input data"
+        else
+            Ok tx)
+    >=> (fun tx ->
+        if List.exists (fun { lock = lock; spend = spend } ->
+           match lock with
+           | PK hash -> isInvalidHash hash
+           | Contract hash -> isInvalidHash hash
+           | Coinbase (_, pkHash) -> isInvalidHash pkHash
+           | _ -> false
+           || isInvalidAsset spend.asset
+        ) tx.outputs then
+            GeneralError "structurally invalid output data"
+        else
+            Ok tx)
+    >=> (fun tx ->
+        if List.exists (function
+            | PKWitness (serializedPublicKey, Crypto.Signature signature) ->
+                Array.length serializedPublicKey <> Crypto.SerializedPublicKeyLength ||
+                Array.length signature <> Crypto.SerializedSignatureLength
+            | ContractWitness cw -> 
+                isInvalidHash cw.cHash
+        ) tx.witnesses then
+            GeneralError "structurally invalid witness data"
+        else
+            Ok tx)
 
 let private checkNoCoinbaseLock tx =
     let anyCoinbase =
@@ -310,12 +345,12 @@ let internal tryGetUtxos getUTXO utxoSet tx =
     )
 
 let validateBasic =
-    checkInputsNotEmpty
+    checkStructure
+    >=> checkInputsNotEmpty
     >=> checkOutputsNotEmpty
     >=> checkNoCoinbaseLock
     >=> checkOutputsOverflow
     >=> checkDuplicateInputs
-    >=> checkInputsStructure
 
 let validateCoinbase blockNumber =
     let checkOnlyCoinbaseLocks blockNumber tx =
