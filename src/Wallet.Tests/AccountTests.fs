@@ -21,7 +21,7 @@ let balanceShouldBe asset expected account =
 
     actual |> should equal expected
 
-let anotherAsset = Hash.zero, Hash.compute "anotherasset"B
+let anotherAsset = Hash.compute "anotherasset"B, Hash.compute "anotherasset"B
 
 [<Test>]
 let ``received tokens``() =
