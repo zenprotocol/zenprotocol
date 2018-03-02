@@ -42,7 +42,7 @@ let testParameters =
 let localParameters = {
     testParameters with
         genesisHash =
-            get <| Hash.fromString "13319403fd078d87a2f91543a4d1ed2c0d8fe64b0657b123e709a362d59a3fb6";
+            get <| Hash.fromString "8fdcf358819dd89b6beb8a0e611f21031deb4fc36b42c4d2c3cb2bc0ce0d7446";
         genesisTime=1515594186383UL
 }
 
@@ -70,7 +70,7 @@ let getGenesisHash =
         Hash.fromString "9c38be3ee5e1a3d6e3c4f7184ff1b1cc99b44dfa12ce2cfc8ba437eeaa33627a" |>
         function | Ok value -> value | Error error -> failwith error
     | Local ->
-        Hash.fromString "13319403fd078d87a2f91543a4d1ed2c0d8fe64b0657b123e709a362d59a3fb6" |>
+        Hash.fromString "8fdcf358819dd89b6beb8a0e611f21031deb4fc36b42c4d2c3cb2bc0ce0d7446" |>
         function | Ok value -> value | Error error -> failwith error
 
 let getGenesisTime =
