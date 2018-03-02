@@ -479,7 +479,7 @@ let ``2 orphan chains, two longer than main, one is longer``() =
     isAccountInSet session sideChainAccount UtxoSet.asDatabase |> should equal true
 
 [<Test>]
-let ``2 orphan chains, two longer than main, longest is invalid, shuld pick second long``() =
+let ``2 orphan chains, two longer than main, longest is invalid, should pick second long``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
