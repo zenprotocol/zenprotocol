@@ -358,9 +358,9 @@ let deserialize bytes =
     // main deserialization function
     let readTx = reader {
         let! inputs = readList readInput
-        let! witnesses = readList readWitness
         let! outputs = readList readOutput
         let! contract = readContract
+        let! witnesses = readList readWitness
         return { inputs = inputs; witnesses = witnesses; outputs = outputs; contract = contract }
     }
 

@@ -21,7 +21,7 @@ let maxConnections = 3
 let eventHandler transport event (connector,addressBook, ownAddress) = 
     match event with 
     | Event.TransactionAddedToMemPool (txHash, tx) ->
-        let bytes = Transaction.serialize Transaction.Full tx        
+        let bytes = TransactionSerialization.serialize TransactionSerialization.Full tx        
             
         Transport.publishTransaction transport bytes
         connector,addressBook,ownAddress
@@ -37,7 +37,7 @@ let transportHandler transport seeds client msg (connector,addressBook,ownAddres
  
     match msg with 
     | InProcMessage.Transaction msg ->
-        match Transaction.deserialize msg with
+        match TransactionSerialization.deserialize msg with
         | Some tx ->
             Services.Blockchain.validateTransaction client tx
             connector,addressBook,ownAddress
@@ -189,7 +189,7 @@ let commandHandler transport command (state:State) =
         Transport.getTransaction transport peerId (Hash.bytes txHash)
         state          
     | Command.SendTransaction (peerId, tx) ->
-        let bytes = Transaction.serialize Transaction.Full tx
+        let bytes = TransactionSerialization.serialize TransactionSerialization.Full tx
         Transport.sendTransaction transport peerId bytes         
         state
     | Command.SendBlock (peerId, block) ->

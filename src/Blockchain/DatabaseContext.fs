@@ -90,7 +90,7 @@ let create dataPath =
     let blockTransactions = Collection.create session "blockTransactions" Hash.bytes serializeHashes deserializeHashes
 
     let transactions = Collection.create session "transactions" Hash.bytes
-                        (Transaction.serialize Transaction.Full) (Transaction.deserialize >> Option.get)
+                        (TransactionSerialization.serialize TransactionSerialization.Full) (TransactionSerialization.deserialize >> Option.get)
 
     let transactionBlocks = MultiCollection.create session "transactionBlocks"
                                 Hash.bytes Hash.bytes Hash.Hash

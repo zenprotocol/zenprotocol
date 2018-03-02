@@ -4,15 +4,12 @@ open Consensus.TxSkeleton
 open Consensus.Types
 open Consensus.Crypto
 
-let serialize = TransactionSerialization.serialize
-let deserialize = TransactionSerialization.deserialize
-
 let hash =
-    serialize TransactionSerialization.WithoutWitness >> Hash.compute
+    TransactionSerialization.serialize TransactionSerialization.WithoutWitness >> Hash.compute
 
 let witnessHash =
     //TODO: only serialize witness
-    serialize TransactionSerialization.Full >> Hash.compute
+    TransactionSerialization.serialize TransactionSerialization.Full >> Hash.compute
 
 let addWitnesses witnesses tx =
     { tx with witnesses = witnesses @ tx.witnesses }
