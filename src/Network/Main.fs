@@ -38,7 +38,7 @@ let transportHandler transport seeds client msg (connector,addressBook,ownAddres
  
     match msg with 
     | InProcMessage.Transaction msg ->
-        match deserializeTransaction msg with
+        match deserializeTransaction Full msg with
         | Some tx ->
             Services.Blockchain.validateTransaction client tx
             connector,addressBook,ownAddress
@@ -151,7 +151,7 @@ let transportHandler transport seeds client msg (connector,addressBook,ownAddres
         Blockchain.requestTip client peerId
         connector, addressBook,ownAddress
     | InProcMessage.Block block ->
-        match Block.deserialize block with
+        match deserializeBlock block with
         | Some block ->
             Blockchain.validateBlock client block
             connector,addressBook,ownAddress
@@ -194,7 +194,7 @@ let commandHandler transport command (state:State) =
         Transport.sendTransaction transport peerId bytes         
         state
     | Command.SendBlock (peerId, block) ->
-        let bytes = Block.serialize block
+        let bytes = serializeBlock block
         Transport.sendBlock transport peerId bytes         
         state
     | Command.SendTip (peerId,blockHeader) ->

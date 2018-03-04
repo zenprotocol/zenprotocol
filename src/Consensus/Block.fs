@@ -1,14 +1,9 @@
 module Consensus.Block
 
 open Consensus
-open Consensus.Types
-
-open MBrace.FsPickler.Combinators
-
-open Consensus
-open Consensus
+open Types
 open Infrastructure
-
+open Serialization
 [<Literal>]
 let Version = 0ul
 
@@ -17,8 +12,6 @@ let TwoPow256 = bigint.Pow (2I, 256)
 let MaxTimeInFuture = 2UL * 60UL * 60UL * 1000UL // 2 hours in milliseconds
 
 let genesisParent = {version=Version;parent=Hash.zero;blockNumber=0ul;commitments=Hash.zero;timestamp=0UL;difficulty=0ul;nonce=0UL,0UL}
-
-let pickler = Pickler.auto<Block>
 
 let private (>=>) f1 f2 x = Result.bind f2 (f1 x)
 
@@ -31,20 +24,11 @@ let private computeCommitmentsRoot = MerkleTree.computeRoot
 
 let hash (block:Block) = BlockHeader.hash block.header
 
-let serialize block =
-
-    Binary.pickle pickler block
-
-let deserialize block =
-    try
-        Some (Binary.unpickle pickler block) with
-    | _ -> None
-
-let toHex = serialize >> FsBech32.Base16.encode
+let toHex = serializeBlock >> FsBech32.Base16.encode
 
 let fromHex hex =
     FsBech32.Base16.decode hex
-    |> Option.bind deserialize
+    |> Option.bind deserializeBlock
 
 let isGenesis (chain:Chain.ChainParameters) block =
     let blockHash = hash block
