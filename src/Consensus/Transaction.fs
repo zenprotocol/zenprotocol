@@ -1,15 +1,16 @@
 module Consensus.Transaction
 
-open Consensus.TxSkeleton
-open Consensus.Types
-open Consensus.Crypto
+open TxSkeleton
+open Types
+open Crypto
+open Serialization
 
 let hash =
-    TransactionSerialization.serialize TransactionSerialization.WithoutWitness >> Hash.compute
+    serializeTransaction WithoutWitness >> Hash.compute
 
 let witnessHash =
     //TODO: only serialize witness
-    TransactionSerialization.serialize TransactionSerialization.Full >> Hash.compute
+    serializeTransaction Full >> Hash.compute
 
 let addWitnesses witnesses tx =
     { tx with witnesses = witnesses @ tx.witnesses }

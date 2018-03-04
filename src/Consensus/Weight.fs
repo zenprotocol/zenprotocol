@@ -6,6 +6,7 @@ open Infrastructure
 open FSharpx.Option
 open Infrastructure.Result
 open Infrastructure.ZFStar
+open Serialization
 
 let result = new ResultBuilder<string>()
 
@@ -110,7 +111,7 @@ let txWeight weights
         if weights.dataSize = 0I then 0I
         else
             weights.dataSize *
-            (TransactionSerialization.serialize TransactionSerialization.Full tx
+            (serializeTransaction Full tx
                 |> Array.length |> bigint)
     return inputWeights + contractActivationWeight + txSizeWeight
 }

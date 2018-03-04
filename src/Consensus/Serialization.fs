@@ -1,4 +1,4 @@
-module Consensus.TransactionSerialization
+module Consensus.Serialization
 open Consensus
 
 open Consensus
@@ -10,7 +10,7 @@ open FsNetMQ
 open FsNetMQ.Stream
 open FsNetMQ.Stream.Reader
 
-type SerializationMode =
+type TransactionSerializationMode =
     | Full
     | WithoutWitness
 
@@ -51,7 +51,7 @@ let private None = 0uy
 [<Literal>]
 let private Some = 1uy
 
-type private fns<'a> = {
+type private Operations<'a> = {
     writeHash: Hash.Hash -> 'a -> 'a
     writeByte: Byte -> 'a -> 'a
     writeBytes: Byte[] -> int -> 'a -> 'a
@@ -65,14 +65,14 @@ let private writeByte byte =
     writeNumber1 byte
 let private writeHash hash =
     writeBytes (Hash.bytes hash) Hash.Length
-let private writeOption fns writerFn = function
+let private writeOption ops writerFn = function
     | Option.Some value ->
-        fns.writeByte Some
+        ops.writeByte Some
         >> writerFn value
     | Option.None ->
-        fns.writeByte None
+        ops.writeByte None
 
-let private serializers: fns<Stream.T> = {
+let private serializers: Operations<Stream.T> = {
     writeHash = writeHash
     writeByte = writeByte
     writeBytes = writeBytes
@@ -82,7 +82,7 @@ let private serializers: fns<Stream.T> = {
     writeNumber8 = writeNumber8
 }
 
-let private counters: fns<int32> = {
+let private counters: Operations<int32> = {
     writeHash = fun _ l -> l + Hash.Length
     writeByte = fun _ l -> l + 1
     writeBytes = fun _ len l -> l + len
@@ -92,105 +92,105 @@ let private counters: fns<int32> = {
     writeNumber8 = fun _ l -> l + 8
 }
 
-let serialize mode tx =
-    let writeSpend fns = function
+let serializeTransaction mode tx =
+    let writeSpend ops = function
         | { asset = cHash, token; amount = amount } when cHash = Hash.zero && token = Hash.zero ->
-            fns.writeByte SpendZen
-            >> fns.writeNumber8 amount
+            ops.writeByte SpendZen
+            >> ops.writeNumber8 amount
         | { asset = cHash, token; amount = amount } when cHash <> Hash.zero && token = Hash.zero ->
-            fns.writeByte SpendDefault
-            >> fns.writeHash cHash
-            >> fns.writeNumber8 amount
+            ops.writeByte SpendDefault
+            >> ops.writeHash cHash
+            >> ops.writeNumber8 amount
         | { asset = cHash, token; amount = amount } when cHash <> Hash.zero && token <> Hash.zero ->
-            fns.writeByte Spend
-            >> fns.writeHash cHash
-            >> fns.writeHash token
-            >> fns.writeNumber8 amount
+            ops.writeByte Spend
+            >> ops.writeHash cHash
+            >> ops.writeHash token
+            >> ops.writeNumber8 amount
         | { asset = cHash, token; amount = _ } when cHash = Hash.zero && token <> Hash.zero ->
             failwithf "Not supported"
         | _ ->
             failwithf "Not expected"
 
-    let writeInput fns = function
+    let writeInput ops = function
         | Types.Outpoint { txHash = txHash; index = index } ->
-            fns.writeByte Outpoint
-            >> fns.writeHash txHash
-            >> fns.writeNumber4 index
+            ops.writeByte Outpoint
+            >> ops.writeHash txHash
+            >> ops.writeNumber4 index
         | Types.Mint spend ->
-            writeSpend fns spend
+            writeSpend ops spend
 
-    let writeWitness fns = function
+    let writeWitness ops = function
         | Types.PKWitness (bytes, Signature signature) ->
-            fns.writeByte PKWitness
-            >> fns.writeBytes bytes Crypto.SerializedPublicKeyLength
-            >> fns.writeBytes signature Crypto.SerializedSignatureLength
+            ops.writeByte PKWitness
+            >> ops.writeBytes bytes Crypto.SerializedPublicKeyLength
+            >> ops.writeBytes signature Crypto.SerializedSignatureLength
         | Types.ContractWitness cw ->
             let (Data data) = cw.data
             let dataLength = Array.length data
-            fns.writeByte ContractWitness
-            >> fns.writeHash cw.cHash
-            >> fns.writeString cw.command
-            >> fns.writeNumber4 (uint32 dataLength)
-            >> fns.writeBytes data dataLength
-            >> writeOption fns fns.writeNumber4 cw.returnAddressIndex
-            >> fns.writeNumber4 cw.beginInputs
-            >> fns.writeNumber4 cw.beginOutputs
-            >> fns.writeNumber4 cw.inputsLength
-            >> fns.writeNumber4 cw.outputsLength
-            >> fns.writeNumber4 cw.cost
+            ops.writeByte ContractWitness
+            >> ops.writeHash cw.cHash
+            >> ops.writeString cw.command
+            >> ops.writeNumber4 (uint32 dataLength)
+            >> ops.writeBytes data dataLength
+            >> writeOption ops ops.writeNumber4 cw.returnAddressIndex
+            >> ops.writeNumber4 cw.beginInputs
+            >> ops.writeNumber4 cw.beginOutputs
+            >> ops.writeNumber4 cw.inputsLength
+            >> ops.writeNumber4 cw.outputsLength
+            >> ops.writeNumber4 cw.cost
         | _ ->
             failwithf "Not expected"
 
-    let writeLock fns = function
+    let writeLock ops = function
         | Types.PK hash ->
-            fns.writeByte PK
-            >> fns.writeHash hash
+            ops.writeByte PK
+            >> ops.writeHash hash
         | Types.Contract hash ->
-            fns.writeByte Contract
-            >> fns.writeHash hash
+            ops.writeByte Contract
+            >> ops.writeHash hash
         | Types.Coinbase (blockNumber, pkHash) ->
-            fns.writeByte Coinbase
-            >> fns.writeNumber4 blockNumber
-            >> fns.writeHash pkHash
+            ops.writeByte Coinbase
+            >> ops.writeNumber4 blockNumber
+            >> ops.writeHash pkHash
         | Types.Fee ->
-            fns.writeByte Fee
+            ops.writeByte Fee
         | Types.ActivationSacrifice ->
-            fns.writeByte ActivationSacrifice
+            ops.writeByte ActivationSacrifice
         | Types.Destroy ->
-            fns.writeByte Destroy
+            ops.writeByte Destroy
 
-    let writeOutput fns = fun { lock = lock; spend = spend } ->
-        writeLock fns lock
-        >> writeSpend fns spend
+    let writeOutput ops = fun { lock = lock; spend = spend } ->
+        writeLock ops lock
+        >> writeSpend ops spend
 
-    let writeContract fns =
-        writeOption fns (fun (code, hints) ->
-            fns.writeLongString code
-            >> fns.writeLongString hints)
+    let writeContract ops =
+        writeOption ops (fun (code, hints) ->
+            ops.writeLongString code
+            >> ops.writeLongString hints)
 
-    let writeItem fns item =
+    let writeItem ops item =
         match box item with
-        | (:? Input as input) -> writeInput fns input
-        | (:? Witness as witness) -> writeWitness fns witness
-        | (:? Output as output) -> writeOutput fns output
+        | (:? Input as input) -> writeInput ops input
+        | (:? Witness as witness) -> writeWitness ops witness
+        | (:? Output as output) -> writeOutput ops output
         | _ -> failwithf "Not expected"
 
-    let writeList fns list =
+    let writeList ops list =
         let writeList list writerFn stream = //TODO: use fold?
             let mutable stream = stream
             for item in list do
-                stream <- writerFn fns item stream
+                stream <- writerFn ops item stream
             stream
-        fns.writeNumber4 (List.length list |> uint32)
+        ops.writeNumber4 (List.length list |> uint32)
         >> writeList list writeItem
 
     // main serialization function
-    let writeTx fns tx =
-        writeList fns tx.inputs
-        >> writeList fns tx.outputs
-        >> writeContract fns tx.contract
+    let writeTx ops tx =
+        writeList ops tx.inputs
+        >> writeList ops tx.outputs
+        >> writeContract ops tx.contract
         >> match mode with
-        | Full -> writeList fns tx.witnesses
+        | Full -> writeList ops tx.witnesses
         | WithoutWitness -> id
 
     writeTx counters tx 0 // get the byte count
@@ -198,7 +198,7 @@ let serialize mode tx =
     |> writeTx serializers tx
     |> getBuffer
 
-let deserialize bytes =
+let deserializeTransaction bytes =
     let stream = Stream (bytes, 0)
 
     let readByte =
