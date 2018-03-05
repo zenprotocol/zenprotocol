@@ -28,7 +28,7 @@ let getUTXO _ = UtxoSet.NoOutput
 let getWallet _ = Map.empty
 
 let coinbase blockNumber transactions =
-    Block.getBlockCoinbase blockNumber transactions Hash.zero
+    Block.getBlockCoinbase chain ActiveContractSet.empty blockNumber transactions Hash.zero
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``block with empty transactions failed validation``(header) =
@@ -125,7 +125,7 @@ let ``connecting block should fail when transaction inputs are invalid``(parent:
     let utxoSet = UtxoSet.asDatabase
     let ema = EMA.create chain
 
-    let block = Block.createTemplate parent timestamp ema acs transactions Hash.zero
+    let block = Block.createTemplate chain parent timestamp ema acs transactions Hash.zero
 
     match Block.connect chain getUTXO contractsPath parent (timestamp + 1UL) utxoSet acs ema block with
     | Error error
@@ -153,7 +153,7 @@ let ``block timestamp too early``() =
     let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO Transaction.rootTxHash Transaction.rootTx
 
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
-    let block = Block.createTemplate parent timestamp ema acs [tx] Hash.zero
+    let block = Block.createTemplate chain parent timestamp ema acs [tx] Hash.zero
 
     let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "block's timestamp is too early"
 
@@ -176,7 +176,7 @@ let ``block timestamp in the future``() =
     let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO Transaction.rootTxHash Transaction.rootTx
 
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
-    let block = Block.createTemplate parent (timestamp + Block.MaxTimeInFuture + 1UL) ema acs [tx] Hash.zero
+    let block = Block.createTemplate chain parent (timestamp + Block.MaxTimeInFuture + 1UL) ema acs [tx] Hash.zero
 
     let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "block timestamp too far in the future"
 
@@ -196,7 +196,7 @@ let ``block with mismatch commitments fail connecting``() =
     let ema = EMA.create chain
 
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0x20fffffful;nonce=0UL,0UL}
-    let block = Block.createTemplate parent (timestamp + 1UL) ema acs [tx] Hash.zero
+    let block = Block.createTemplate chain parent (timestamp + 1UL) ema acs [tx] Hash.zero
     let block = {block with commitments=[Hash.zero]}
 
     let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "commitments mismatch"
@@ -217,7 +217,7 @@ let ``can connect valid block``() =
     let ema = EMA.create chain
 
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
-    let block = Block.createTemplate parent (timestamp+1UL) ema acs [tx] Hash.zero
+    let block = Block.createTemplate chain parent (timestamp+1UL) ema acs [tx] Hash.zero
 
     Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ema block
     |> should be ok
@@ -232,7 +232,7 @@ let ``can connect block with coinbase only``() =
     let ema = EMA.create chain
 
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
-    let block = Block.createTemplate parent (timestamp+1UL) ema acs [] Hash.zero
+    let block = Block.createTemplate chain parent (timestamp+1UL) ema acs [] Hash.zero
 
     Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ema block
     |> should be ok
@@ -250,7 +250,7 @@ let ``can connect block with a contract``() =
             fn= fun _ _ _ _ _ tx -> Ok (tx,None)
             costFn = fun _ _ _ _ _ -> 0I
             expiry=1001ul
-            size=100ul
+            size=String.length SampleContract.sampleContractCode |> uint32
         }
 
     let acs = ActiveContractSet.empty |> ActiveContractSet.add contract.hash contract
@@ -258,7 +258,7 @@ let ``can connect block with a contract``() =
     let ema = EMA.create chain
 
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
-    let block = Block.createTemplate parent (timestamp+1UL) ema acs [tx] Hash.zero
+    let block = Block.createTemplate chain  parent (timestamp+1UL) ema acs [tx] Hash.zero
 
     Block.connect chain getUTXO contractsPath parent timestamp utxoSet ActiveContractSet.empty ema block
     |> should be ok
@@ -290,7 +290,7 @@ let ``block with invalid contract failed connecting``() =
     let ema = EMA.create chain
 
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
-    let block = Block.createTemplate parent (timestamp+1UL) ema acs [tx] Hash.zero
+    let block = Block.createTemplate chain parent (timestamp+1UL) ema acs [tx] Hash.zero
 
     let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "transactions failed inputs validation due to BadContract"
 
@@ -340,6 +340,9 @@ let ``block with coinbase lock within a regular transaction should fail``() =
 
 [<Test>]
 let ``block with wrong coinbase reward``() =
+    let ema = EMA.create chain
+    let parent = {version=0ul; parent=Hash.zero; blockNumber=14ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
+
     let tx =
         {
             inputs = [];
@@ -360,24 +363,27 @@ let ``block with wrong coinbase reward``() =
         |> List.map Transaction.witnessHash
         |> MerkleTree.computeRoot
 
-    let commitments = MerkleTree.computeRoot [txMerkleRoot;witnessMerkleRoot;Hash.zero;]
+    let acsMerkleRoot = SparseMerkleTree.root ActiveContractSet.empty
+
+    let commitments = MerkleTree.computeRoot [txMerkleRoot;witnessMerkleRoot;acsMerkleRoot]
 
     let header =
         {
             version = Block.Version
             parent = Hash.zero
             blockNumber = 15ul
-            difficulty = 0x20fffffful;
+            difficulty = ema.difficulty;
             commitments=commitments;
             timestamp = timestamp
             nonce = 0UL,0UL
         }
 
-    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot; witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=Hash.zero;}
+    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot; witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot;}
 
-    let expected : Result<Block,string> = Error "block reward is incorrect"
+    let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "block reward is incorrect"
 
-    Block.validate chain block |> should equal expected
+    Block.connect chain getUTXO contractsPath parent timestamp (UtxoSet.asDatabase) (ActiveContractSet.empty) ema block
+    |> should equal expected
 
 [<Test>]
 let ``coinbase lock have wrong blockNumber``() =
@@ -465,6 +471,9 @@ let ``block without coinbase``() =
 
 [<Test>]
 let ``block with coinbase with multiple asset as reward should fail``() =
+    let ema = EMA.create chain
+    let parent = {version=0ul; parent=Hash.zero; blockNumber=14ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
+
     let tx =
         {
             inputs = [];
@@ -489,28 +498,34 @@ let ``block with coinbase with multiple asset as reward should fail``() =
         |> List.map Transaction.witnessHash
         |> MerkleTree.computeRoot
 
-    let commitments = MerkleTree.computeRoot [txMerkleRoot;witnessMerkleRoot;Hash.zero;]
+    let acsMerkleRoot = SparseMerkleTree.root ActiveContractSet.empty
+
+    let commitments = MerkleTree.computeRoot [txMerkleRoot;witnessMerkleRoot;acsMerkleRoot;]
 
     let header =
         {
             version = Block.Version
             parent = Hash.zero
             blockNumber = 15ul
-            difficulty = 0x20fffffful;
+            difficulty = ema.difficulty;
             commitments=commitments;
             timestamp = timestamp
             nonce = 0UL,0UL
         }
 
-    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot; witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=Hash.zero;}
+    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot; witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot;}
 
-    let expected : Result<Block,string> =
+    let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> =
         Error "block reward is incorrect"
 
-    Block.validate chain block |> should equal expected
+    Block.connect chain getUTXO contractsPath parent timestamp (UtxoSet.asDatabase) (ActiveContractSet.empty) ema block
+    |> should equal expected
 
 [<Test>]
 let ``coinbase reward split over multiple outputs``() =
+    let ema = EMA.create chain
+    let parent = {version=0ul; parent=Hash.zero; blockNumber=14ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
+
     let tx =
         {
             inputs = [];
@@ -535,7 +550,9 @@ let ``coinbase reward split over multiple outputs``() =
         |> List.map Transaction.witnessHash
         |> MerkleTree.computeRoot
 
-    let commitments = MerkleTree.computeRoot [txMerkleRoot;witnessMerkleRoot;Hash.zero;]
+    let acsMerkleRoot = SparseMerkleTree.root ActiveContractSet.empty
+
+    let commitments = MerkleTree.computeRoot [txMerkleRoot;witnessMerkleRoot;acsMerkleRoot;]
 
     let header =
         {
@@ -548,11 +565,10 @@ let ``coinbase reward split over multiple outputs``() =
             nonce = 0UL,0UL
         }
 
-    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot; witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=Hash.zero;}
+    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot; witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot;}
 
-    let expected : Result<Block,string> = Ok block
-
-    Block.validate chain block |> should equal expected
+    Block.connect chain getUTXO contractsPath parent timestamp (UtxoSet.asDatabase) (ActiveContractSet.empty) ema block
+    |> should be ok
 
 [<Test>]
 let ``block spending mature transaction is valid``() =
@@ -581,7 +597,7 @@ let ``block spending mature transaction is valid``() =
     let ema = EMA.create chain
 
     let parent = {version=0ul; parent=Hash.zero; blockNumber=100ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
-    let block = Block.createTemplate parent (timestamp+1UL) ema acs [tx] Hash.zero
+    let block = Block.createTemplate chain parent (timestamp+1UL) ema acs [tx] Hash.zero
 
     Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ema block
     |>  should be ok
@@ -614,7 +630,7 @@ let ``block spending unmature transaction is invalid``() =
     let ema = EMA.create chain
 
     let parent = {version=0ul; parent=Hash.zero; blockNumber=99ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
-    let block = Block.createTemplate parent (timestamp+1UL) ema acs [tx] Hash.zero
+    let block = Block.createTemplate chain parent (timestamp+1UL) ema acs [tx] Hash.zero
 
     let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> =
         Error "transactions failed inputs validation due to General \"Coinbase not mature enough\""
@@ -638,7 +654,7 @@ let ``contract get removed when expiring arrive``() =
     let ema = EMA.create chain
 
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
-    let block = Block.createTemplate parent (timestamp+1UL) ema acs [] Hash.zero
+    let block = Block.createTemplate chain parent (timestamp+1UL) ema acs [] Hash.zero
 
     Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ema block
     |> should be ok
@@ -675,7 +691,7 @@ let ``Overweight block should be rejected``() =
     let ema = EMA.create chain
 
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
-    let block = Block.createTemplate parent (timestamp+1UL) ema acs [tx1;tx2] Hash.zero
+    let block = Block.createTemplate chain parent (timestamp+1UL) ema acs [tx1;tx2] Hash.zero
 
     let res = Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ema block
     res |> should not' (be ok)
