@@ -122,11 +122,13 @@ val sumZ(#l:nat):
 let sumZ #_ =
     sumBy ret
 
+(*
 val sumN(#l:nat):
     vector nat l
     -> nat `cost` (2*l+2)
 let sumN #_ =
     sumBy ret
+*)
 
 val zip(#a #b:Type)(#l:nat):
   vector a l -> vector b l -> cost (vector (a**b) l) (3*l+3)
