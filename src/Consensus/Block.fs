@@ -6,6 +6,7 @@ open Consensus.Types
 open MBrace.FsPickler.Combinators
 
 open Consensus
+open Consensus
 open Infrastructure
 
 [<Literal>]
@@ -93,7 +94,14 @@ let createGenesis (chain:Chain.ChainParameters) transactions nonce =
 
     {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot;witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot}
 
-let getBlockCoinbase blockNumber transactions coinbasePkHash =
+let getBlockSacrificeAmount chain acs =
+    let computeContractSacrifice (contract:Contract.T) =
+        (contract.size |> uint64) * (Chain.getContractSacrificePerBytePerBlock chain)
+
+    Seq.sumBy computeContractSacrifice (ActiveContractSet.getContracts acs)
+
+
+let getBlockCoinbase chain acs blockNumber transactions coinbasePkHash =
     // Get the coinbase outputs by summing the fees per asset and adding the block reward
     let coinbaseOutputs =
         let blockRewardAndFees =
@@ -105,7 +113,10 @@ let getBlockCoinbase blockNumber transactions coinbasePkHash =
                       let amount = defaultArg (Map.tryFind output.spend.asset totals) 0UL
                       Map.add output.spend.asset (output.spend.amount + amount) totals) Map.empty
             let totalZen = defaultArg (Map.tryFind Constants.Zen blockFees) 0UL
-            Map.add Constants.Zen (totalZen + getBlockReward blockNumber) blockFees
+            let blockSacrifice = getBlockSacrificeAmount chain acs
+            let blockReward = getBlockReward blockNumber
+
+            Map.add Constants.Zen (totalZen + blockReward + blockSacrifice) blockFees
 
         let lock = Coinbase (blockNumber, coinbasePkHash)
 
@@ -124,9 +135,9 @@ let getBlockCoinbase blockNumber transactions coinbasePkHash =
         witnesses=[]
     }
 
-let createTemplate (parent:BlockHeader) timestamp (ema:EMA.T) acs transactions coinbasePkHash =
+let createTemplate chain (parent:BlockHeader) timestamp (ema:EMA.T) acs transactions coinbasePkHash =
     let blockNumber = (parent.blockNumber + 1ul)
-    let coinbase = getBlockCoinbase blockNumber transactions coinbasePkHash
+    let coinbase = getBlockCoinbase chain acs blockNumber transactions coinbasePkHash
 
     let transactions = coinbase :: transactions
 
@@ -177,34 +188,10 @@ let validate chain =
             Ok block
         else
             let coinbase = List.head block.transactions
-            let transactions = List.tail block.transactions
 
             match TransactionValidation.validateCoinbase block.header.blockNumber coinbase with
             | Error error -> Error <| sprintf "Block failed coinbase validation due to %A" error
-            | Ok _ ->
-                let folder totals output =
-                    let amount = defaultArg (Map.tryFind output.spend.asset totals) 0UL
-                    Map.add output.spend.asset (output.spend.amount + amount) totals
-
-                // Compute the amount of reward per asset
-                let coinbaseTotals = List.fold folder Map.empty coinbase.outputs
-
-                // Compute the block reward and fees together
-                let blockRewardAndFees =
-                    // Compute entire fees paid transactions in the block
-                    let blockFees =
-                        transactions
-                        |> List.collect (fun tx -> tx.outputs)
-                        |> List.filter (fun output -> output.lock = Fee)
-                        |> List.fold folder Map.empty
-
-                    let totalZen = defaultArg (Map.tryFind Constants.Zen blockFees) 0UL
-                    Map.add Constants.Zen (totalZen + getBlockReward block.header.blockNumber) blockFees
-
-                if coinbaseTotals <> blockRewardAndFees then
-                    Error "block reward is incorrect"
-                else
-                    Ok block
+            | Ok _ -> Ok block
 
     let checkTxBasic (block:Block) = result {
         // skip if genesis block
@@ -297,6 +284,41 @@ let connect chain getUTXO contractsPath parent timestamp utxoSet acs ema =
                         Ok (block,set,acs,ema)
                     ) (Ok (block,set,acs,ema)) withoutCoinbase
 
+    let checkCoinbase (block,set,acs,ema) =
+        if isGenesis chain block then
+            Ok (block,set,acs,ema)
+        else
+            let coinbase = List.head block.transactions
+            let transactions = List.tail block.transactions
+
+            let folder totals output =
+                let amount = defaultArg (Map.tryFind output.spend.asset totals) 0UL
+                Map.add output.spend.asset (output.spend.amount + amount) totals
+
+            // Compute the amount of reward per asset
+            let coinbaseTotals = List.fold folder Map.empty coinbase.outputs
+
+            // Compute the block reward and fees together
+            let blockRewardAndFees =
+                // Compute entire fees paid transactions in the block
+                let blockFees =
+                    transactions
+                    |> List.collect (fun tx -> tx.outputs)
+                    |> List.filter (fun output -> output.lock = Fee)
+                    |> List.fold folder Map.empty
+
+                let totalZen = defaultArg (Map.tryFind Constants.Zen blockFees) 0UL
+
+                let blockSacrifice = getBlockSacrificeAmount chain acs
+                let blockReward = getBlockReward block.header.blockNumber
+
+                Map.add Constants.Zen (totalZen + blockSacrifice + blockReward) blockFees
+
+            if coinbaseTotals <> blockRewardAndFees then
+                Error "block reward is incorrect"
+            else
+                Ok (block,set,acs,ema)
+
     let checkCommitments (block,set,acs,ema) =
         let acs = ActiveContractSet.expireContracts block.header.blockNumber acs
         let acsMerkleRoot = SparseMerkleTree.root acs
@@ -330,6 +352,7 @@ let connect chain getUTXO contractsPath parent timestamp utxoSet acs ema =
     >=> checkDifficulty
     >=> checkWeight
     >=> checkTxInputs
+    >=> checkCoinbase
     >=> checkCommitments
 
 

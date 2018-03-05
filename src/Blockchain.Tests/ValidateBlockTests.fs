@@ -85,7 +85,7 @@ let createChain (length:int) nonce start ema account =
             let parent = List.head blocks
             let timestamp = timestamp + ((uint64 i) * 1000UL * 60UL * 10UL)
             let tx = createTransaction account
-            let block = Block.createTemplate parent.header timestamp ema acs [tx] Hash.zero
+            let block = Block.createTemplate chain parent.header timestamp ema acs [tx] Hash.zero
             let block = {block with header ={ block.header with nonce = uint64 nonce,0UL}}
 
             let account = Account.addTransaction (Transaction.hash tx) tx account
@@ -168,7 +168,7 @@ let ``validate new valid block which extended main chain``() =
         |> Writer.unwrap
 
     let tx = createTransaction rootAccount
-    let block = Block.createTemplate genesisBlock.header timestamp state.tipState.ema acs [tx] Hash.zero
+    let block = Block.createTemplate chain genesisBlock.header timestamp state.tipState.ema acs [tx] Hash.zero
     let blockHash = Block.hash block
 
 
@@ -207,7 +207,7 @@ let ``validate new invalid block which try to extended main chain``() =
         |> Writer.unwrap
 
     let tx = createTransaction rootAccount
-    let block = Block.createTemplate genesisBlock.header timestamp state.tipState.ema acs [tx] Hash.zero
+    let block = Block.createTemplate chain genesisBlock.header timestamp state.tipState.ema acs [tx] Hash.zero
     let block = {block with txMerkleRoot = Hash.zero}
 
     // Mark the block as new so we will also have network command
@@ -234,7 +234,7 @@ let ``validating orphan block yield a request for block from network``() =
     use session = DatabaseContext.createSession databaseContext
 
     let tx = createTransaction rootAccount
-    let block = Block.createTemplate genesisBlock.header timestamp state.tipState.ema acs [tx] Hash.zero
+    let block = Block.createTemplate chain genesisBlock.header timestamp state.tipState.ema acs [tx] Hash.zero
 
     let events, state' =
         BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state
@@ -258,7 +258,7 @@ let ``validate new block which connect orphan chain which extend main chain``() 
     let tx = createTransaction rootAccount
 
     let ema = EMA.add chain genesisBlock.header.timestamp ema
-    let block = Block.createTemplate genesisBlock.header timestamp ema acs [tx] Hash.zero
+    let block = Block.createTemplate chain genesisBlock.header timestamp ema acs [tx] Hash.zero
     let blockHash = Block.hash block
 
     // Sending orphan block first
@@ -604,12 +604,12 @@ let ``block with a contract activation is added to chain``() =
         fn = fun _ _ _ _ _ tx -> Ok (tx,None)
         costFn = fun _ _ _ _ _ -> 1I
         expiry=1002ul
-        size=100ul
+        size=String.length sampleContractCode |> uint32
     }
 
     let acs = ActiveContractSet.add cHash contract state.tipState.activeContractSet
 
-    let block = Block.createTemplate genesisBlock.header timestamp state.tipState.ema acs [tx] Hash.zero
+    let block = Block.createTemplate chain genesisBlock.header timestamp state.tipState.ema acs [tx] Hash.zero
 
     let events, state' =
             BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state
@@ -783,7 +783,7 @@ let ``Valid template for two transactions which don't depend on each other``() =
         Account.createTransaction rootAccount rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
         |>  Result.get
     let ema' = EMA.add chain genesisBlock.header.timestamp ema
-    let splitBlock = Block.createTemplate genesisBlock.header timestamp ema' acs [splitTx] Hash.zero
+    let splitBlock = Block.createTemplate chain genesisBlock.header timestamp ema' acs [splitTx] Hash.zero
 
     let account = Account.addTransaction (Transaction.hash splitTx) splitTx rootAccount
     let ema'' = EMA.add chain timestamp ema'
@@ -813,7 +813,7 @@ let ``Valid template for two transactions which don't depend on each other``() =
         | [t1;t2] -> (t1,t2)
         | _ -> failwith "Wrong number of outputs"
 
-    let twoTxBlock = Block.createTemplate splitBlock.header (timestamp+100UL) splitState.tipState.ema acs [tx1;tx2] Hash.zero
+    let twoTxBlock = Block.createTemplate chain splitBlock.header (timestamp+100UL) splitState.tipState.ema acs [tx1;tx2] Hash.zero
     let oldHash = splitState.tipState.tip.hash
     let _, withTxsState =
         BlockHandler.validateBlock chain session.context.contractPath session (timestamp+100UL) twoTxBlock false splitState
@@ -841,7 +841,7 @@ let ``Two transactions in the same block which depend on each other are valid``(
         Account.createTransaction account rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
         |>  Result.get
     let ema' = EMA.add chain genesisBlock.header.timestamp ema
-    let twoTxBlock = Block.createTemplate genesisBlock.header timestamp ema' acs [firstTx;secondTx] Hash.zero
+    let twoTxBlock = Block.createTemplate chain genesisBlock.header timestamp ema' acs [firstTx;secondTx] Hash.zero
     let oldHash = genesisState.tipState.tip.hash
 
     let _, twoTxState =
@@ -870,7 +870,7 @@ let ``Two transactions in the same block which depend on each other are invalid 
         Account.createTransaction account rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
         |>  Result.get
     let ema' = EMA.add chain genesisBlock.header.timestamp ema
-    let twoTxBlock = Block.createTemplate genesisBlock.header timestamp ema' acs [secondTx;firstTx] Hash.zero
+    let twoTxBlock = Block.createTemplate chain genesisBlock.header timestamp ema' acs [secondTx;firstTx] Hash.zero
     let oldHash = genesisState.tipState.tip.hash
 
     let _, twoTxState =
@@ -903,7 +903,7 @@ let ``Template builder uses two transactions in the same block which depend on e
     let ema' = EMA.add chain genesisBlock.header.timestamp ema
     let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList chain session updatedState
 
-    let twoTxBlock = Block.createTemplate genesisBlock.header (timestamp+1UL) ema' memState.activeContractSet validatedTransactions Hash.zero
+    let twoTxBlock = Block.createTemplate chain genesisBlock.header (timestamp+1UL) ema' memState.activeContractSet validatedTransactions Hash.zero
     let oldHash = genesisState.tipState.tip.hash
     let _, twoTxState =
         BlockHandler.validateBlock chain session.context.contractPath session (timestamp+1UL) twoTxBlock false genesisState

@@ -50,7 +50,7 @@ let getChainParameters = function
     | Main -> mainParameters
     | Test -> testParameters
     | Local -> localParameters
-    
+
 let proofOfWorkLimit chain =
     let p = getChainParameters chain
     p.proofOfWorkLimit
@@ -79,7 +79,7 @@ let getGenesisTime =
     | Test -> 1517828985040UL
     | Local -> 1515594186383UL
 
-let getContractSacrificePerBytePerBlock (_:Chain) = ContractSacrificePerBytePerBlock
+let getContractSacrificePerBytePerBlock (_:ChainParameters) = ContractSacrificePerBytePerBlock
 
 let getMaximumBlockWeight chain =
     let p = getChainParameters chain
