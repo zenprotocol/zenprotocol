@@ -13,7 +13,7 @@ let init ( _: Prims.nat)
          ( f: Prims.nat -> Cost.t<'Aa, Prims.unit>)
          : Cost.t< array<'Aa, Prims.unit>, Prims.unit> =
     let init_index : int -> 'Aa =
-      bigint >> f >> Cost.__force in
+      int64 >> f >> Cost.__force in
     lazy (Arr.init (int l) init_index)
     |> Cost.C
 

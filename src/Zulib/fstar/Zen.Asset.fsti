@@ -1,7 +1,7 @@
 module Zen.Asset
 
 module U32 = FStar.UInt32
-module S = Zen.String
+module S = FStar.String
 
 open Zen.Cost
 open Zen.Types
@@ -13,10 +13,10 @@ val zenAsset:asset
 val getDefault:
     contractHash
     -> asset `cost` 64
-    
+
 val fromString:
    contractHash
-   -> s:string { S.byteCount s <= 29 }
+   -> s:string { S.length s <= 29 }
    -> asset `cost` 64
 
 val fromInt:

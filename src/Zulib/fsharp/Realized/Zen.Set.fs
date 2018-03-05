@@ -8,7 +8,6 @@ type set<'a when 'a : comparison> =
 
 type t<'a when 'a : comparison> = set<'a>
 
-let nullSet : set<'a> = Set.empty, 0u
 
 let contains (x:'a) (s:set<'a>) : Cost.t<bool, unit> =
     lazy ( Set.contains x (fst s) )
@@ -28,3 +27,15 @@ let remove (x:'a) ((s, n):set<'a>) : Cost.t<set<'a>, unit> =
         else Set.remove x s, n-1u
     )
     |> Cost.C
+
+let empty : set<'a> = Set.empty, 0u
+
+let add_contains (_:'a) (_:set<'a>) : unit = ()
+let add_contains_invariant (_:'a) (_:'a) (_:set<'a>) : unit = ()
+let add_count (_:'a) (_:set<'a>) : unit = ()
+let remove_contains (_:'a) (_:set<'a>) : unit = ()
+let remove_contains_invariant (_:'a) (_:'a) (_:set<'a>) : unit = ()
+let remove_count (_:'a) (_:set<'a>) : unit = ()
+let empty_contains (_:'a) : unit = ()
+let empty_count (_:'a) : unit = ()
+let empty_unique (_:set<'a>) : unit = ()

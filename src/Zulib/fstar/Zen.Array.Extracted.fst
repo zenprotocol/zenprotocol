@@ -10,13 +10,10 @@ module V = Zen.Vector
 type t (a:Type) (n:nat) = array a n // For qualified access
 
 unfold val at(#a:Type)(#l:nat): array a l -> i:nat{i<l} -> cost a 1
-unfold let at #_ #_ arr i = elem i arr
-
-unfold val get(#a:Type)(#l:nat): array a l -> i:nat{i<l} -> cost a 1
-unfold let get = at
+unfold let at #_ #_ arr i = get i arr
 
 unfold val op_Array_Access (#a:Type)(#l:nat): array a l -> i:nat{i<l} -> cost a 1
-unfold let op_Array_Access #_ #_ arr i = arr `at` i
+unfold let op_Array_Access #_ #_ arr i = arr `get` i
 
 (** create returns an array of length l in which each element is x. *)
 val create(#a:Type): l:nat -> x:a -> cost (array a l) (l+1)
