@@ -7,7 +7,7 @@ open FsNetMQ
 open Consensus
 open Consensus.Types
 open Infrastructure
-open Consensus.ChainParameters
+open Consensus.Chain
 open Consensus
 open Consensus.Tests.SampleContract
 open Messaging.Services
@@ -18,6 +18,7 @@ module Actor = FsNetMQ.Actor
 
 let busName = "test"
 let chain = Chain.Local
+let chainParams = Chain.getChainParameters chain
 let dataPath = ".data"
 let apiUri = "127.0.0.1:29555"
 
@@ -41,12 +42,12 @@ let setUp = fun () ->
     clean ()
 
     createBroker () |> ignore
-    Blockchain.Main.main dataPath chain busName |> ignore
+    Blockchain.Main.main dataPath chainParams busName |> ignore
     Wallet.Main.main dataPath busName chain true |> ignore
     Api.Main.main chain busName apiUri |> ignore
 
     // initialize genesis block
-    let block = Block.createGenesis chain [Transaction.rootTx] (0UL,0UL)
+    let block = Block.createGenesis chainParams [Transaction.rootTx] (0UL,0UL)
     let client = ServiceBus.Client.create busName
     Blockchain.validateBlock client block
 
@@ -64,7 +65,7 @@ let ``Contract should activate and execute - Bus``() =
     let client = ServiceBus.Client.create busName
     let subscriber = EventBus.Subscriber.create<Event> busName
 
-    match Wallet.activateContract client sampleContractCode with
+    match Wallet.activateContract client sampleContractCode 10ul with
     | ActivateContractTransactionResult.Ok (contractActivationTx, cHash) ->
         Blockchain.validateTransaction client contractActivationTx
         waitForTx subscriber contractActivationTx
@@ -77,7 +78,7 @@ let ``Contract should activate and execute - Bus``() =
 
 [<Test>]
 let ``Contract should activate and execute - API``() =
-    let activate = new ContractActivateRequestJson.Root(sampleContractCode)
+    let activate = new ContractActivateRequestJson.Root(sampleContractCode, 10)
     let response = activate.JsonValue.Request ("http://" + apiUri + "/wallet/contract/activate")
     response.StatusCode |> should equal 200
     let responseBody =

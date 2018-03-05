@@ -2,7 +2,7 @@
 open FSharp.Configuration
 open Argu
 open Infrastructure
-open Consensus.ChainParameters
+open Consensus.Chain
 open Consensus
 open System
 
@@ -119,10 +119,10 @@ let main argv =
             config.miner <- true  
         | Data_Path dataPath ->
             config.dataPath <- dataPath
-                                                                                                   
     ) (results.GetAllResults())                 
             
     let chain = getChain config
+    let chainParams = getChainParameters chain
     let dataPath = Platform.combine config.dataPath config.chain
         
     if wipe then 
@@ -130,8 +130,8 @@ let main argv =
         if System.IO.Directory.Exists dataPath then 
                 System.IO.Directory.Delete (dataPath,true)
     
-    use brokerActor = createBroker ()    
-    use blockchainActor = Blockchain.Main.main dataPath chain busName
+    use brokerActor = createBroker ()
+    use blockchainActor = Blockchain.Main.main dataPath chainParams busName
         
     use networkActor = 
         Network.Main.main busName config.externalIp config.listen config.bind config.seeds
@@ -140,7 +140,7 @@ let main argv =
     
     use minerActor =
         if config.miner then        
-            Miner.Main.main busName chain
+            Miner.Main.main busName chainParams
             |> Disposables.toDisposable
         else
             Disposables.empty 
@@ -155,7 +155,7 @@ let main argv =
     printfn "running..."
        
     if root && chain = Chain.Local then    
-        let block = Block.createGenesis chain [Transaction.rootTx] (0UL,0UL)
+        let block = Block.createGenesis chainParams [Transaction.rootTx] (0UL,0UL)
         
         use client = ServiceBus.Client.create busName  
         

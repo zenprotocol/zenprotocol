@@ -15,7 +15,7 @@ open TestsInfrastructure.Constraints
 open Crypto
 open TxSkeleton
 
-let chain = ChainParameters.Local
+let chain = Chain.getChainParameters Chain.Local
 
 let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction (fun _ -> UtxoSet.NoOutput) Transaction.rootTxHash Transaction.rootTx
 let mempool = MemPool.empty |> MemPool.add Transaction.rootTxHash Transaction.rootTx
@@ -47,7 +47,7 @@ let shouldBeErrorMessage message =
     | Error err -> err |> should equal message
 
 let activateContract code account session state =
-    Account.createActivateContractTransaction { account with mempool = Map.toList state.memoryState.mempool } code
+    Account.createActivateContractTransaction chain { account with mempool = Map.toList state.memoryState.mempool } code 1ul
     |> Result.map (fun tx ->
         let events, state =
             Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
@@ -187,7 +187,7 @@ let ``Should execute contract chain and get a valid transaction``() =
         let txHash = Transaction.hash tx
 
         let events, memoryState =
-            TransactionHandler.validateTransaction session dataPath 1ul tx state.memoryState
+            TransactionHandler.validateTransaction chain session dataPath 1ul tx state.memoryState
             |> Writer.unwrap
 
         //expect the transaction to be valid
@@ -205,7 +205,7 @@ let ``Should execute contract chain and get a valid transaction``() =
         let txHash = Transaction.hash tx
 
         let events, memoryState =
-            TransactionHandler.validateTransaction session dataPath  1ul tx state.memoryState
+            TransactionHandler.validateTransaction chain session dataPath  1ul tx state.memoryState
             |> Writer.unwrap
 
         //exptect the transaction to be invalid

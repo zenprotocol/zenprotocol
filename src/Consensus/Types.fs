@@ -19,11 +19,16 @@ type Spend = {
     amount: uint64
 }
 
+type Input =
+    | Outpoint of Outpoint
+    | Mint of Spend
+
 type Lock =
     | PK of Hash
     | Contract of Hash
     | Coinbase of blockNumber:uint32 * pkHash:Hash
     | Fee
+    | ActivationSacrifice
     | Destroy
 
 type Output = {
@@ -51,6 +56,7 @@ type ContractWitness =
         beginOutputs: uint32
         inputsLength: uint32
         outputsLength: uint32
+        cost: uint32
     }
     with
         member x.endOutputs = x.beginOutputs + x.outputsLength - 1ul
@@ -61,7 +67,7 @@ type Witness =
     | ContractWitness of ContractWitness
 
 type Transaction = {
-    inputs: Outpoint list
+    inputs: Input list
     outputs: Output list
     witnesses: Witness list
     contract: (string * string) Option

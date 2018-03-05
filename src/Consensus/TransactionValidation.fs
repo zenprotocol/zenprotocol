@@ -4,8 +4,8 @@ open Consensus.Types
 open Consensus.UtxoSet
 open Consensus.Crypto
 
+open Consensus
 open Infrastructure
-
 
 let private (>=>) f1 f2 x = Result.bind f2 (f1 x)
 
@@ -37,21 +37,46 @@ let private foldSpends =
 let private checkSpends m =
     Map.forall (fun _ v -> Option.isSome v) m
 
-let private activateContract contractPath blockNumber acs (tx : Types.Transaction) = result {
-    match tx.contract with
-    | Some (code,hints) ->
-        let cHash = Contract.computeHash code
+let private activateContract (chainParams : Chain.ChainParameters) contractPath blockNumber acs (tx : Types.Transaction) =
+    let getActivationSacrifice tx = result {
+        let activationSacrifices = List.filter(fun output -> output.lock = ActivationSacrifice) tx.outputs
 
-        match ActiveContractSet.tryFind cHash acs with
-        | Some contract ->
-            let contract = {contract with expiry = contract.expiry + 1000ul}
-            return ActiveContractSet.add cHash contract acs
+        if List.isEmpty activationSacrifices then
+            return! GeneralError "Contract activation must include activation sacrifice"
+
+        let allUsingZen =
+            List.forall (fun output -> output.spend.asset = Constants.Zen) activationSacrifices
+
+        if not allUsingZen then
+            return! GeneralError "Sacrifice must be paid in Zen"
+
+        return List.sumBy (fun output -> output.spend.amount) activationSacrifices
+    }
+
+    result {
+        match tx.contract with
+        | Some (code,hints) ->
+            let cHash = Contract.computeHash code
+
+            let! activationSacrifices = getActivationSacrifice tx
+
+            let codeLengthKB = String.length code |> uint64
+            let activationSacrificePerBlock = chainParams.sacrificePerByteBlock * codeLengthKB
+            let numberOfBlocks = activationSacrifices / activationSacrificePerBlock |> uint32
+
+            if numberOfBlocks = 0ul then
+                return! (GeneralError "Contract must be activated for at least one block")
+
+            match ActiveContractSet.tryFind cHash acs with
+            | Some contract ->
+                let contract = {contract with expiry = contract.expiry + numberOfBlocks}
+                return ActiveContractSet.add cHash contract acs
+            | None ->
+                let! contract = Contract.compile contractPath (code,hints) (blockNumber + numberOfBlocks) |> Result.mapError (fun _ -> BadContract)
+                return ActiveContractSet.add contract.hash contract acs
         | None ->
-            let! contract = Contract.compile contractPath (code,hints) (blockNumber + 1000ul) |> Result.mapError (fun _ -> BadContract)
-            return ActiveContractSet.add contract.hash contract acs
-    | None ->
-        return acs
-}
+            return acs
+    }
 
 let private checkAmounts (txSkeleton:TxSkeleton.T) =
     let inputs = List.map (function | TxSkeleton.Input.PointedOutput (_, output) -> output.spend | TxSkeleton.Input.Mint spend -> spend) txSkeleton.pInputs
@@ -66,11 +91,18 @@ let private checkAmounts (txSkeleton:TxSkeleton.T) =
     else
         Ok ()
 
-let getContractWallet tx inputs cHash =
-    List.zip tx.inputs inputs
-    |> List.filter (fun (_, output) -> output.lock = Contract cHash)
+let getContractWallet (txSkeleton:TxSkeleton.T) cw =
+    txSkeleton.pInputs.[int cw.beginInputs .. int cw.endInputs]
+    |> List.choose (fun input ->
+        match input with
+        | TxSkeleton.PointedOutput (outpoint,output) when output.lock = Contract cw.cHash ->
+            Some (outpoint,output)
+        | _ -> None
+    )
 
 let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
+    let fulltxSkeleton = TxSkeleton.fromTransaction tx inputs
+
     let checkPKWitness inputTx pInputs serializedPublicKey signature =
         let verifyPkHash pkHash tail =
             match PublicKey.deserialize serializedPublicKey with
@@ -94,6 +126,8 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
 
     let checkContractWitness inputTx acs cw message pInputs =
         let checkMessage (txSkeleton, resultMessage) =
+            printfn "%A %A" message resultMessage
+
             if message = resultMessage then
                 Ok txSkeleton
             else
@@ -126,18 +160,24 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
             else
                 Ok txSkeleton
 
-        let rec popContractsLocksOf cHash pInputs =
-            match pInputs with
-            | [] -> []
-            | TxSkeleton.Input.PointedOutput (input, output) :: tail ->
-                match output.lock with
-                | Contract cHash' when cHash' = cHash ->
-                    popContractsLocksOf cHash' tail
-                | _ -> TxSkeleton.Input.PointedOutput (input, output) :: tail
+        let rec popContractsLocksOf cHash pInputs left =
+            if left = 0ul then
+                pInputs
+            else
+                match pInputs with
+                | [] -> []
+                | TxSkeleton.Input.PointedOutput (_, output) :: tail ->
+                    match output.lock with
+                    | Contract cHash' when cHash' = cHash ->
+                        popContractsLocksOf cHash' tail (left - 1ul)
+                    | _ -> pInputs
+                | TxSkeleton.Input.Mint mint :: tail when fst mint.asset = cHash ->
+                    popContractsLocksOf cHash tail (left - 1ul)
+                | _ -> pInputs
 
         match ActiveContractSet.tryFind cw.cHash acs with
         | Some contract ->
-            let contractWallet = getContractWallet tx inputs cw.cHash
+            let contractWallet = getContractWallet fulltxSkeleton cw
 
             let returnAddress =
                 Option.bind (fun (index:uint32) ->
@@ -147,17 +187,22 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
                         Some tx.outputs.[index].lock
                     else
                         None) cw.returnAddressIndex
+            // Validate true cost (not weight!) of running contract against
+            // the witness commitment
+            let cost = Contract.getCost contract cw.command cw.data returnAddress contractWallet inputTx
+            if uint32 cost <> cw.cost then
+                GeneralError <| sprintf "Contract witness committed to cost %d, but cost of execution is %d" (uint32 cost) cw.cost
+            else
+                Contract.run contract cw.command cw.data returnAddress contractWallet inputTx
+                |> Result.mapError General
+                |> Result.bind checkMessage
+                |> Result.bind checkIssuedAndDestroyed
+                |> Result.bind (fun outputTx ->
+                    if List.length outputTx.pInputs - List.length inputTx.pInputs = int cw.inputsLength &&
+                       List.length outputTx.outputs - List.length inputTx.outputs = int cw.outputsLength then
 
-            Contract.run contract cw.command cw.data returnAddress contractWallet inputTx
-            |> Result.mapError General
-            |> Result.bind checkMessage
-            |> Result.bind checkIssuedAndDestroyed
-            |> Result.bind (fun outputTx ->
-                if List.length outputTx.pInputs - List.length inputTx.pInputs = int cw.inputsLength &&
-                   List.length outputTx.outputs - List.length inputTx.outputs = int cw.outputsLength then
-
-                    Ok (outputTx, popContractsLocksOf cw.cHash pInputs)
-                else GeneralError "input/output length mismatch")
+                        Ok (outputTx, popContractsLocksOf cw.cHash pInputs cw.inputsLength)
+                    else GeneralError "input/output length mismatch")
         | None -> Error ContractNotActive
 
     let witnessesFolder state (witness, message) =
@@ -181,8 +226,7 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
             Ok pTx
 
     result {
-        let! txSkel = TxSkeleton.fromTransaction tx inputs |> Result.mapError General
-        let! masked = applyMaskIfContract txSkel |> Result.mapError General
+        let! masked = applyMaskIfContract fulltxSkeleton |> Result.mapError General
 
         let! (witnessedSkel, pInputs) =
             List.mapi (fun i witness -> (i, witness)) tx.witnesses
@@ -199,7 +243,7 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
                             | _ ->
                                 None
                     | _ -> None)
-            |> List.fold witnessesFolder (Ok (masked, masked.pInputs))
+            |> List.fold witnessesFolder (Ok (masked, fulltxSkeleton.pInputs))
 
         if not <| List.isEmpty pInputs then
             return! GeneralError "missing witness(es)"
@@ -234,7 +278,12 @@ let private checkDuplicateInputs tx =
     else GeneralError "inputs duplicated"
 
 let private checkInputsStructure tx =
-    if tx.inputs |> List.exists (fun outpoint -> not <| Hash.isValid outpoint.txHash) then
+    if tx.inputs |> List.exists (function
+        | Types.Input.Outpoint outpoint ->
+            not <| Hash.isValid outpoint.txHash
+        | Types.Input.Mint {asset=cHash,token; amount=_} ->
+            not <| Hash.isValid cHash ||
+            not <| Hash.isValid token) then
         GeneralError "inputs structurally invalid"
     else
         Ok tx
@@ -247,14 +296,17 @@ let private checkNoCoinbaseLock tx =
             | _ -> false) tx.outputs
 
     if anyCoinbase then
-        GeneralError "coinbase lock is not allow within regular transaction"
+        GeneralError "coinbase lock is not allowed within an ordinary transaction"
     else
         Ok tx
 
-let private tryGetUtxos getUTXO utxoSet tx =
+let internal tryGetUtxos getUTXO utxoSet tx =
     getUtxosResult getUTXO tx.inputs utxoSet
     |> Result.mapError (fun errors ->
-        if List.contains Spent errors then DoubleSpend else Orphan
+        if List.exists
+            (fun err -> match err with | Spent _ -> true | _ -> false)
+            errors
+        then DoubleSpend else Orphan
     )
 
 let validateBasic =
@@ -302,10 +354,10 @@ let validateCoinbase blockNumber =
     >=> checkNoContractInCoinbase
     >=> checkOutputsOverflow
 
-let validateInContext getUTXO contractPath blockNumber acs set txHash tx = result {
+let validateInContext chainParams getUTXO contractPath blockNumber acs set txHash tx = result {
     let! outputs = tryGetUtxos getUTXO set tx
     let! txSkel = checkWitnesses blockNumber acs (txHash, tx, outputs)
     do! checkAmounts txSkel
-    let! newAcs = activateContract contractPath blockNumber acs tx
+    let! newAcs = activateContract chainParams contractPath blockNumber acs tx
     return tx, newAcs
 }

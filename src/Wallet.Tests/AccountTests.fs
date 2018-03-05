@@ -3,12 +3,13 @@
 open NUnit.Framework
 open FsUnit
 open Consensus
-open Consensus.ChainParameters
+open Consensus.Chain
 open Consensus.Types
 open Wallet
 open TestsInfrastructure.Constraints
 
-let chain = ChainParameters.Local
+let chain = Chain.Local
+let chainParams = Chain.localParameters
 
 let balanceShouldBe asset expected account =
     let balance = Account.getBalance account
@@ -45,7 +46,7 @@ let ``tokens spent``() =
     let tx = {inputs=[];outputs=[output;output];witnesses=[];contract=None}
     let txHash = (Transaction.hash tx)
 
-    let tx' = {inputs=[{txHash=txHash; index=0ul}];outputs=[];witnesses=[];contract=None}
+    let tx' = {inputs=[ Outpoint {txHash=txHash; index=0ul}];outputs=[];witnesses=[];contract=None}
 
     let account' =
         Account.addTransaction txHash tx account
@@ -66,7 +67,7 @@ let ``creating, not enough tokens``() =
 
     let account' = Account.addTransaction (Transaction.hash tx) tx account
 
-    let result = Account.createTransaction chain account account.publicKeyHash { asset = Constants.Zen; amount = 11UL }
+    let result = Account.createTransaction account account.publicKeyHash { asset = Constants.Zen; amount = 11UL }
 
     let expected:Result<Transaction,string> = Error "Not enough tokens"
 
@@ -83,7 +84,7 @@ let ``creating, no change``() =
     let bob' = Account.addTransaction (Transaction.hash tx) tx bob
 
     // sending money to alice
-    let result = Account.createTransaction chain bob' alice.publicKeyHash { asset = Constants.Zen; amount = 10UL }
+    let result = Account.createTransaction bob' alice.publicKeyHash { asset = Constants.Zen; amount = 10UL }
 
     match result with
     | Error x -> failwithf "expected transaction %s" x
@@ -105,7 +106,7 @@ let ``creating, with change``() =
     let bob' = Account.addTransaction (Transaction.hash tx) tx bob
 
     // sending money to alice
-    let result = Account.createTransaction chain bob' alice.publicKeyHash { asset = Constants.Zen; amount = 7UL }
+    let result = Account.createTransaction bob' alice.publicKeyHash { asset = Constants.Zen; amount = 7UL }
 
     match result with
     | Error x -> failwithf "expected transaction %s" x
@@ -132,7 +133,7 @@ let ``picking the correct asset``() =
     bob' |> balanceShouldBe anotherAsset 10UL
 
     // sending money to alice
-    let result = Account.createTransaction chain bob' alice.publicKeyHash { asset = Constants.Zen; amount = 7UL }
+    let result = Account.createTransaction bob' alice.publicKeyHash { asset = Constants.Zen; amount = 7UL }
 
     match result with
     | Error x -> failwithf "expected transaction %s" x
@@ -161,7 +162,7 @@ let ``picking from multiple inputs``() =
     let bob' = Account.addTransaction (Transaction.hash tx) tx bob
 
     // sending money to alice
-    let result = Account.createTransaction chain bob' alice.publicKeyHash { asset = Constants.Zen; amount = 10UL }
+    let result = Account.createTransaction bob' alice.publicKeyHash { asset = Constants.Zen; amount = 10UL }
 
     match result with
     | Error x -> failwithf "expected transaction %s" x
@@ -202,7 +203,7 @@ let ``create execute contract transaction``() =
 let ``account sync up``() =
     let startBlockHeader = {
         version = 0ul
-        parent = ChainParameters.getGenesisHash Chain.Local
+        parent = chainParams.genesisHash
         blockNumber = 2ul
         commitments = Hash.zero
         timestamp = 0UL
@@ -242,7 +243,7 @@ let ``account sync up``() =
 
     let blockHash = Block.hash block
 
-    let account' = Account.sync Chain.Local blockHash (fun _ -> startBlockHeader) (fun _ -> block) account
+    let account' = Account.sync chainParams blockHash (fun _ -> startBlockHeader) (fun _ -> block) account
 
     account'.tip |> should equal blockHash
     account'.mempool |> should haveLength 0
@@ -256,7 +257,7 @@ let ``sync up from empty wallet``() =
 
     let header = {
         version = 0ul
-        parent = ChainParameters.getGenesisHash Chain.Local
+        parent = chainParams.genesisHash
         blockNumber = 2ul
         commitments = Hash.zero
         timestamp = 0UL
@@ -275,10 +276,10 @@ let ``sync up from empty wallet``() =
 
     let blockHash = Block.hash block
 
-    let account = Account.sync Chain.Local blockHash (fun _ -> failwith "unexpected")
+    let account = Account.sync chainParams blockHash (fun _ -> failwith "unexpected")
                     (fun blockHash ->
-                        if blockHash = ChainParameters.getGenesisHash Chain.Local then
-                            Block.createGenesis chain [Transaction.rootTx] (0UL,0UL)
+                        if blockHash = chainParams.genesisHash then
+                            Block.createGenesis chainParams [Transaction.rootTx] (0UL,0UL)
                         else
                             block) account
 
@@ -290,7 +291,7 @@ let ``sync up from empty wallet``() =
 let ``account reorg``() =
     let startBlockHeader = {
         version = 0ul
-        parent = ChainParameters.getGenesisHash Chain.Local
+        parent = Chain.getGenesisHash chain
         blockNumber = 2ul
         commitments = Hash.zero
         timestamp = 0UL
@@ -328,7 +329,7 @@ let ``account reorg``() =
 
     let blockHash = Block.hash block
 
-    let account = Account.sync Chain.Local blockHash (fun _ -> startBlockHeader) (fun _ -> block) account
+    let account = Account.sync chainParams blockHash (fun _ -> startBlockHeader) (fun _ -> block) account
     account.tip |> should equal blockHash
 
     let header2 = {
@@ -352,7 +353,7 @@ let ``account reorg``() =
 
     let blockHash2 = Block.hash block2
 
-    let account = Account.sync Chain.Local blockHash2 (fun _ -> block.header)
+    let account = Account.sync chainParams blockHash2 (fun _ -> block.header)
                         (fun bh ->
                             if bh = blockHash then
                                 block
@@ -381,7 +382,7 @@ let ``wallet won't spend coinbase if not mature enough``() =
 
     let expected: Result<Transaction,string>= Error "Not enough tokens"
 
-    Account.createTransaction Chain.Local rootAccount rootAccount.publicKeyHash { asset = Constants.Zen; amount = 1UL }
+    Account.createTransaction rootAccount rootAccount.publicKeyHash { asset = Constants.Zen; amount = 1UL }
     |> should equal expected
 
 [<Test>]
@@ -398,7 +399,7 @@ let ``wallet spend coinbase with coinbase mature enough``() =
 
     let rootAccount = Account.addTransaction originHash origin rootAccount
 
-    Account.createTransaction Chain.Local rootAccount rootAccount.publicKeyHash { asset = Constants.Zen; amount = 1UL }
+    Account.createTransaction rootAccount rootAccount.publicKeyHash { asset = Constants.Zen; amount = 1UL }
     |> should be ok
 
 [<Test>]
@@ -427,5 +428,5 @@ let ``wallet spend coinbase when come from block``() =
 
     let rootAccount = Account.handleBlock (Block.hash block) block rootAccount
 
-    Account.createTransaction Chain.Local rootAccount rootAccount.publicKeyHash { asset = Constants.Zen; amount = 1UL }
+    Account.createTransaction rootAccount rootAccount.publicKeyHash { asset = Constants.Zen; amount = 1UL }
     |> should be ok

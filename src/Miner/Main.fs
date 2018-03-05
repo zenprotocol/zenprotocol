@@ -65,7 +65,7 @@ let minerTask chain busName (collection:Queue) =
             | Exit -> shouldStop <- true
     }
                                                    
-let handleEvent chain pkHash client (collection:Queue) event =    
+let handleEvent pkHash client (collection:Queue) event =    
     match event with    
     | TransactionAddedToMemPool _
     | TipChanged _ ->                
@@ -88,7 +88,7 @@ let main busName chain =
         
         let observable = 
             ebObservable
-            |> Observable.map (handleEvent chain pkHash client collection)               
+            |> Observable.map (handleEvent pkHash client collection)               
                                                                                       
         Disposables.empty, observable
     )

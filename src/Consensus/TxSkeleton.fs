@@ -1,5 +1,6 @@
 ﻿module Consensus.TxSkeleton
 
+open Consensus
 open Consensus.Types
 
 type Input =
@@ -16,6 +17,11 @@ let empty =
         pInputs = []
         outputs = []
     }
+
+let (|Lock|) input =
+    match input with
+    | PointedOutput (_, {lock=lock}) -> lock
+    | Mint {asset=(cHash,_)} -> Contract cHash
 
 let addInputs inputs (txSkeleton:T) =
     {txSkeleton with pInputs=List.append txSkeleton.pInputs inputs}
@@ -40,17 +46,25 @@ let checkPrefix txSub txSuper =
     else
         Error "invalid prefix"
 
-let fromTransaction tx outputs =
-    let (==) a b =
-        List.length a = List.length b
+//UNDONE: Disappearing check on lengths of pInputs and outputs? make sure.
+let fromTransaction tx (outputs : Output List) =
+    let pInputs,_ =
+        List.fold (fun (inputs, outputs) input ->
 
-    if tx.inputs == outputs then
-        Ok {
-            pInputs = List.zip tx.inputs outputs |> List.map PointedOutput
-            outputs = tx.outputs
-        }
-    else
-        Error "could not construct txSkeleton"
+            match input with
+            | Types.Input.Outpoint outpoint ->
+                let output = List.head outputs
+                PointedOutput (outpoint, output) :: inputs, List.tail outputs
+
+            | Types.Input.Mint spend ->
+                Mint spend :: inputs, outputs
+
+            ) ([], outputs) tx.inputs
+
+    {
+        pInputs = List.rev pInputs
+        outputs = tx.outputs
+    }
 
 let applyMask tx cw =
     let (=>) list length =
@@ -66,21 +80,31 @@ let applyMask tx cw =
     else
         Error "could not apply mask"
 
-let isSkeletonOf txSkeleton tx inputs =
-    let outpoints =
-        txSkeleton.pInputs 
-        |> List.choose (function 
-            | Mint _ -> None
-            | PointedOutput pointedOutput -> Some pointedOutput)
+let isSkeletonOf txSkeleton tx outputs =
+    let inputsOfSkeleton =
+        txSkeleton.pInputs
+        |> List.map (function
+            | Mint spend ->
+                Types.Input.Mint spend
+            | PointedOutput (outpoint, _) ->
+                Types.Input.Outpoint outpoint)
 
-    tx.inputs = (outpoints |> List.map fst)
-    && inputs = (outpoints |> List.map snd) // Check that the contract didn't change the inputs
+    let outputsFromSkeleton =
+        txSkeleton.pInputs
+        |> List.choose (function
+            | Mint _ ->
+                None
+            | PointedOutput (_, output) ->
+                Some output)
+
+    tx.inputs = inputsOfSkeleton // Check that the contract didn't change the inputs
+    && outputs = outputsFromSkeleton
     && tx.outputs = txSkeleton.outputs
 
-let getContractWitness cHash command data returnAddress initialTxSkelton finalTxSkeleton =
+let getContractWitness cHash command data returnAddress initialTxSkelton finalTxSkeleton (cost:bigint) =
     let length list = List.length list |> uint32
-    
-    let returnAddressIndex = 
+
+    let returnAddressIndex =
         List.tryFindIndex (fun output -> output.lock = returnAddress) finalTxSkeleton.outputs
         |> Option.map uint32
 
@@ -93,4 +117,5 @@ let getContractWitness cHash command data returnAddress initialTxSkelton finalTx
         beginOutputs = length initialTxSkelton.outputs
         inputsLength = length finalTxSkeleton.pInputs - length initialTxSkelton.pInputs
         outputsLength = length finalTxSkeleton.outputs - length initialTxSkelton.outputs
+        cost = uint32 cost
     }

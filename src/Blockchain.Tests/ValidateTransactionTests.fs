@@ -1,4 +1,4 @@
-module Blockchain.Tests.ValidateTransactionTests
+﻿module Blockchain.Tests.ValidateTransactionTests
 
 // This tests only for ValidateTransaction command
 // We don't need to cover the entire outcome of transaction validation
@@ -22,12 +22,12 @@ open TestsInfrastructure.Constraints
 
 type TransactionResult = Messaging.Services.TransactionResult
 
-let chain = ChainParameters.Local
+let chain = Chain.getChainParameters Chain.Local
 // Helper functions for the tests
 let getStringBytes (str : string) = System.Text.Encoding.UTF8.GetBytes str
 let getStringHash = getStringBytes >> Hash.compute
 let createTransaction address amount account =
-    match Account.createTransaction chain account address { asset = Constants.Zen; amount = amount } with
+    match Account.createTransaction account address { asset = Constants.Zen; amount = amount } with
     | Result.Ok tx -> tx
     | Result.Error error -> failwith error
 let getTxOutpoints txHash tx = [ for i in 0 .. List.length tx.outputs - 1 -> {txHash=txHash;index= uint32 i} ]
@@ -307,7 +307,7 @@ let ``Valid contract should be added to ActiveContractSet``() =
     let cHash = getStringHash sampleContractCode
 
     let tx =
-        match Account.createActivateContractTransaction rootAccount sampleContractCode with
+        match Account.createActivateContractTransaction chain rootAccount sampleContractCode 1ul with
             | Result.Ok tx ->
                 tx
             | _ ->
@@ -345,7 +345,7 @@ let ``Invalid contract should not be added to ActiveContractSet or mempool``() =
     let tx =
         let input, output = Account.getUnspentOutputs rootAccount |> Map.toSeq |> Seq.head
         let output' = {output with lock=PK rootAccount.publicKeyHash}
-        { inputs=[ input ]; outputs=[ output' ]; witnesses=[]; contract = Some (contractCode, "") }
+        { inputs=[ Outpoint input ]; outputs=[ output' ]; witnesses=[]; contract = Some (contractCode, "") }
         |> (Transaction.sign [ rootAccount.keyPair ])
 
     let txHash = Transaction.hash tx
@@ -378,7 +378,7 @@ let ``contract activation arrived, running orphan transaction``() =
     let account = Account.createTestAccount ()
 
     let activationTransaction =
-        Account.createActivateContractTransaction account sampleContractCode
+        Account.createActivateContractTransaction chain account sampleContractCode 1ul
         |> getResult
     let activationTxHash = Transaction.hash activationTransaction
 

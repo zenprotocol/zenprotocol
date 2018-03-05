@@ -1,6 +1,7 @@
-module Consensus.Tests.ContractTests
+﻿module Consensus.Tests.ContractTests
 
 open Consensus
+open Consensus.Chain
 open Types
 open NUnit.Framework
 open Hash
@@ -48,7 +49,7 @@ let ``Should get 'elaborate' error for invalid code``() =
 
 let validateInputs (contract:Contract.T) utxos tx  =
     let acs = ActiveContractSet.add contract.hash contract ActiveContractSet.empty
-    TransactionValidation.validateInContext getUTXO contractPath 1ul acs utxos (Transaction.hash tx) tx
+    TransactionValidation.validateInContext Chain.localParameters getUTXO contractPath 1ul acs utxos (Transaction.hash tx) tx
     |> Result.mapError (function
         | TransactionValidation.ValidationError.General error -> error
         | other -> other.ToString())
@@ -58,10 +59,11 @@ let compileRunAndValidate inputTx utxoSet code =
     |> Result.bind (fun contract ->
         Contract.run contract "" Contract.EmptyData None List.empty inputTx
         |> Result.bind (fun (tx, _) ->
+            let cost = Contract.getCost contract "" Contract.EmptyData None List.empty inputTx
             tx
             |> TxSkeleton.checkPrefix inputTx
             |> Result.map (fun finalTxSkeleton ->
-                let cw = TxSkeleton.getContractWitness contract.hash "" Contract.EmptyData (PK Hash.zero) inputTx finalTxSkeleton
+                let cw = TxSkeleton.getContractWitness contract.hash "" Contract.EmptyData (PK Hash.zero) inputTx finalTxSkeleton cost
                 Transaction.fromTxSkeleton finalTxSkeleton
                 |> Transaction.addWitnesses [ cw ])
             |> Result.map (Transaction.sign [ sampleKeyPair ])
@@ -80,7 +82,7 @@ let ``Contract generated transaction should be valid``() =
 [<Test>]
 let ``Should get expected contract cost``() =
     (compile sampleContractCode
-     |> Result.bind (fun contract ->
+     |> Result.map (fun contract ->
         Contract.getCost contract "" Contract.EmptyData None List.empty sampleInputTx)
     , (Ok 213I : Result<bigint, string>))
     |> shouldEqual
@@ -147,24 +149,24 @@ let ``Contract should be able to destroy its own tokens locked to it``() =
         |> Hash.compute
 
     let outputToDestroy = {
-        lock = Contract sampleContractHash
+        lock = PK (PublicKey.hash samplePublicKey)
         spend = { asset = sampleContractHash, Hash.zero; amount = 1000UL }
     }
 
-    let sampleInput2 = {
+    let sampleInput = {
         txHash = Hash.zero
         index = 2u
     }
 
     let sampleInputTx =
         {
-            pInputs = [ PointedOutput (sampleInput, sampleOutput) ; PointedOutput (sampleInput2, outputToDestroy) ]
-            outputs = [ sampleOutput ]
+            pInputs = [ PointedOutput (sampleInput, outputToDestroy) ]
+            outputs = [ ]
         }
 
     let utxoSet =
         getSampleUtxoset (UtxoSet.asDatabase)
-        |> Map.add sampleInput2 (OutputStatus.Unspent outputToDestroy)
+        |> Map.add sampleInput (OutputStatus.Unspent outputToDestroy)
 
     let sampleContractTester txSkeleton cHash =
         let output = {
@@ -184,7 +186,7 @@ let ``Contract should be able to destroy its own tokens locked to it``() =
 
     let sampleExpectedResult =
         Transaction.fromTxSkeleton sampleOutputTx
-        |> Transaction.addWitnesses [ TxSkeleton.getContractWitness sampleContractHash "" Contract.EmptyData (PK Hash.zero) sampleInputTx sampleOutputTx ]
+        |> Transaction.addWitnesses [ TxSkeleton.getContractWitness sampleContractHash "" Contract.EmptyData (PK Hash.zero) sampleInputTx sampleOutputTx 137I]
         |> Transaction.sign [ sampleKeyPair ]
 
     (compileRunAndValidate sampleInputTx utxoSet sampleContractCode

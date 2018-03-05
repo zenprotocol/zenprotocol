@@ -113,7 +113,7 @@ module Wallet =
         | GetAddress
         | GetBalance
         | Spend of Hash * Spend
-        | ActivateContract of string
+        | ActivateContract of string*uint32
         | ExecuteContract of Hash * string * Data * Map<Asset, uint64>
 
     let serviceName = "wallet"
@@ -131,8 +131,8 @@ module Wallet =
     let createTransaction client address spend =
         Request.send<Request, TransactionResult> client serviceName (Spend (address, spend))
 
-    let activateContract client code =
-        Request.send<Request, ActivateContractTransactionResult> client serviceName (ActivateContract (code))
+    let activateContract client code numberOfBlocks =
+        Request.send<Request, ActivateContractTransactionResult> client serviceName (ActivateContract (code,numberOfBlocks))
 
     let executeContract client address command data spends =
         Request.send<Request, TransactionResult> client serviceName (ExecuteContract (address,command,data,spends))

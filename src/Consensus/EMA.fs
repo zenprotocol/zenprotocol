@@ -1,5 +1,5 @@
-module Consensus.EMA
-open Consensus.ChainParameters
+﻿module Consensus.EMA
+open Consensus.Chain
 open Consensus.Types
 
 type T  = {
@@ -10,9 +10,9 @@ type T  = {
 
 let clamp lower upper x = min upper (max lower x)
 
-let create chain =
-    let difficulty = Difficulty.compress (ChainParameters.proofOfWorkLimit chain)
-    {difficulty = difficulty; interval=ChainParameters.blockInterval chain; delayed=[]}
+let create (chain:ChainParameters) =
+    let difficulty = Difficulty.compress chain.proofOfWorkLimit
+    {difficulty = difficulty; interval=chain.blockInterval; delayed=[]}
 
 let push newTimestamp (timestamps:uint64 list) =
     if List.length timestamps < 11 then
@@ -29,14 +29,14 @@ let private median timestamps =
 let add chain header ema =
     let newDelayed = push header ema.delayed
     if List.length ema.delayed < 11 then {ema with delayed = newDelayed} else // First 11 blocks don't alter difficulty
-    let alpha = ChainParameters.smoothingFactor chain
+    let alpha = chain.smoothingFactor
     let oldDelayed = ema.delayed
     let currentInterval = median newDelayed - median oldDelayed
     let nextEstimatedInterval = float ema.interval * (1.0 - alpha) + float currentInterval * alpha |> uint64
     let currentTarget = Hash.toBigInt <| Difficulty.uncompress ema.difficulty
     let nextTarget = clamp  (Hash.toBigInt <| Difficulty.maximum)   // maximum difficulty => low target
-                            (Hash.toBigInt <| ChainParameters.proofOfWorkLimit chain)   // high target
-                            (currentTarget * bigint nextEstimatedInterval / bigint (ChainParameters.blockInterval chain))
+                            (Hash.toBigInt <| chain.proofOfWorkLimit)   // high target
+                            (currentTarget * bigint nextEstimatedInterval / bigint (chain.blockInterval))
     let nextDifficulty = Difficulty.compress <| Hash.fromBigInt nextTarget
     {ema with delayed = newDelayed; interval = nextEstimatedInterval; difficulty = nextDifficulty}
 

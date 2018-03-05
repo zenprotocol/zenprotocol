@@ -1,10 +1,10 @@
-module Blockchain.Tests.ValidateBlockTests
+﻿module Blockchain.Tests.ValidateBlockTests
 
 open NUnit.Framework
 open FsUnit
 open Consensus
 open Consensus.Types
-open Consensus.ChainParameters
+open Consensus.Chain
 open Infrastructure
 open Blockchain
 open Blockchain.State
@@ -19,7 +19,7 @@ open TestsInfrastructure.Constraints
 open Messaging.Services
 
 let (>>=) = Writer.bind
-let chain = Chain.Local
+let chain = Chain.getChainParameters Chain.Local
 let timestamp = 1515594186383UL + 1UL
 
 module Result =
@@ -46,9 +46,7 @@ let isAccountInSet session (account:Account.T) =
 let rootAccount = Account.createTestAccount ()
 
 let createTransaction account =
-    match Account.createTransaction chain account account.publicKeyHash {asset=Constants.Zen;amount=1UL} with
-    | Ok tx -> tx
-    | Error error -> failwith error
+    Result.get <| Account.createTransaction account account.publicKeyHash {asset=Constants.Zen;amount=1UL}
 
 
 // Default initial state of mempool and utxoset
@@ -596,7 +594,7 @@ let ``block with a contract activation is added to chain``() =
 
     let cHash = Contract.computeHash sampleContractCode
     let tx =
-        Account.createActivateContractTransaction rootAccount sampleContractCode
+        Account.createActivateContractTransaction chain rootAccount sampleContractCode 1000ul
         |>  function
             | Ok tx -> tx
             | Error error -> failwith error
@@ -604,7 +602,7 @@ let ``block with a contract activation is added to chain``() =
     let contract = {
         hash = cHash
         fn = fun _ _ _ _ _ tx -> Ok (tx,None)
-        costFn = fun _ _ _ _ _ -> Ok 1I
+        costFn = fun _ _ _ _ _ -> 1I
         expiry=1002ul
         size=100ul
     }
@@ -782,7 +780,7 @@ let ``Valid template for two transactions which don't depend on each other``() =
     let firstAmount = amount / 4UL
     let secondAmount = amount - firstAmount
     let splitTx =
-        Account.createTransaction chain rootAccount rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        Account.createTransaction rootAccount rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
         |>  Result.get
     let ema' = EMA.add chain genesisBlock.header.timestamp ema
     let splitBlock = Block.createTemplate genesisBlock.header timestamp ema' acs [splitTx] Hash.zero
@@ -802,7 +800,7 @@ let ``Valid template for two transactions which don't depend on each other``() =
         Transaction.sign
             [ rootAccount.keyPair ]
             {
-                inputs = [ outpoint];
+                inputs = [Outpoint outpoint];
                 outputs = outputs;
                 witnesses=[];
                 contract=None
@@ -836,11 +834,11 @@ let ``Two transactions in the same block which depend on each other are valid``(
     let asset, amount = balances |> Map.toList |> List.head
     let firstAmount = amount
     let firstTx =
-        Account.createTransaction chain rootAccount rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        Account.createTransaction rootAccount rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
         |>  Result.get
     let account = Account.addTransaction (Transaction.hash firstTx) firstTx rootAccount
     let secondTx =
-        Account.createTransaction chain account rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        Account.createTransaction account rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
         |>  Result.get
     let ema' = EMA.add chain genesisBlock.header.timestamp ema
     let twoTxBlock = Block.createTemplate genesisBlock.header timestamp ema' acs [firstTx;secondTx] Hash.zero
@@ -865,11 +863,11 @@ let ``Two transactions in the same block which depend on each other are invalid 
     let asset, amount = balances |> Map.toList |> List.head
     let firstAmount = amount
     let firstTx =
-        Account.createTransaction chain rootAccount rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        Account.createTransaction rootAccount rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
         |>  Result.get
     let account = Account.addTransaction (Transaction.hash firstTx) firstTx rootAccount
     let secondTx =
-        Account.createTransaction chain account rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        Account.createTransaction account rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
         |>  Result.get
     let ema' = EMA.add chain genesisBlock.header.timestamp ema
     let twoTxBlock = Block.createTemplate genesisBlock.header timestamp ema' acs [secondTx;firstTx] Hash.zero
@@ -894,16 +892,16 @@ let ``Template builder uses two transactions in the same block which depend on e
     let asset, amount = balances |> Map.toList |> List.head
     let firstAmount = amount
     let firstTx =
-        Account.createTransaction chain rootAccount rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        Account.createTransaction rootAccount rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
         |>  Result.get
     let account = Account.addTransaction (Transaction.hash firstTx) firstTx rootAccount
     let secondTx =
-        Account.createTransaction chain account rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        Account.createTransaction account rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
         |>  Result.get
     let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction firstTx) session (timestamp+1UL) genesisState
     let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction secondTx) session (timestamp+1UL) updatedState
     let ema' = EMA.add chain genesisBlock.header.timestamp ema
-    let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList session updatedState
+    let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList chain session updatedState
 
     let twoTxBlock = Block.createTemplate genesisBlock.header (timestamp+1UL) ema' memState.activeContractSet validatedTransactions Hash.zero
     let oldHash = genesisState.tipState.tip.hash
@@ -926,18 +924,19 @@ let ``Out of order dependent transactions are rearranged``() =
     let balances = Account.getBalance rootAccount
     let asset, amount = balances |> Map.toList |> List.head
     let firstTx =
-        Account.createTransaction chain rootAccount rootAccount.publicKeyHash {asset=asset;amount=amount}
+        Account.createTransaction rootAccount rootAccount.publicKeyHash {asset=asset;amount=amount}
         |>  Result.get
     let account = Account.addTransaction (Transaction.hash firstTx) firstTx rootAccount
     let secondTx =
-        Account.createTransaction chain account rootAccount.publicKeyHash {asset=asset;amount=amount}
+        Account.createTransaction account rootAccount.publicKeyHash {asset=asset;amount=amount}
         |>  Result.get
     let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction firstTx) session (timestamp+1UL) genesisState
     let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction secondTx) session (timestamp+1UL) updatedState
     let blockNumber = updatedState.tipState.tip.header.blockNumber
     let acs = updatedState.tipState.activeContractSet
-    let _, validatedTransactions = BlockTemplateBuilder.selectOrderedTransactions session blockNumber acs [firstTx;secondTx]
-    let _, validatedTransactions_ = BlockTemplateBuilder.selectOrderedTransactions session blockNumber acs [secondTx;firstTx]
+    let txList = List.map (fun tx -> (Transaction.hash tx, tx, 0I)) [firstTx;secondTx]
+    let _, validatedTransactions = BlockTemplateBuilder.selectOrderedTransactions chain session blockNumber acs txList
+    let _, validatedTransactions_ = BlockTemplateBuilder.selectOrderedTransactions chain session blockNumber acs <| List.rev txList
 
     List.length validatedTransactions |> should equal 2
     validatedTransactions |> should equal validatedTransactions_

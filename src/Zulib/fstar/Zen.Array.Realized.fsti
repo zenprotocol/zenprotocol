@@ -13,7 +13,7 @@ val init(#a:Type)(#n:nat): l:nat
   -> array a l `cost` ((l+1)*(n+1))
 
 val empty: array 'a 0
-val init_unique(#a:Type): arr:a `array` 0 -> Lemma (arr == empty)
+val init_unique(#a:Type): arr:(a `array` 0) -> Lemma (arr == empty)
 
 
 val item(#a:Type)(#l:nat): i:nat{i<l} -> array a l -> cost a 1
@@ -23,7 +23,8 @@ val init_item(#a:Type)(#n:nat): l:nat
   -> i:nat{i < l}
   -> Lemma (force (init l f >>= item i) == force (f i))
 
+(*)
 val ofVec(#a:Type)(#l:nat): V.t a l -> cost (array a l) (2*(l+1))
-val ofVec_item(#a:Type)(#l:nat): v: a `V.t` l
+val ofVec_item(#a:Type)(#l:nat): v:(a `V.t` l)
   -> i:nat{i<l}
   -> Lemma (force (ofVec v >>= item i) == force (V.nth v i))

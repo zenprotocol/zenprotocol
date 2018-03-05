@@ -40,9 +40,9 @@ let save (session:Session) set =
         | NoOutput -> 
             deleteContractUtxo outpoint                   
             Collection.delete collection session outpoint
-        | Spent ->
+        | Spent output ->
             deleteContractUtxo outpoint
-            Collection.put collection session outpoint Spent        
+            Collection.put collection session outpoint (Spent output)
         | Unspent output -> 
             addContractUtxo outpoint output
             Collection.put collection session outpoint (Unspent output)) set        

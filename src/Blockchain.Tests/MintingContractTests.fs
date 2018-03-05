@@ -13,7 +13,7 @@ open Consensus.Tests.ContractTests
 open Blockchain.State
 open TestsInfrastructure.Constraints
 
-let chain = ChainParameters.Local
+let chain = Chain.getChainParameters Chain.Local
 
 let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction (fun _ -> UtxoSet.NoOutput) Transaction.rootTxHash Transaction.rootTx
 let mempool = MemPool.empty |> MemPool.add Transaction.rootTxHash Transaction.rootTx
@@ -45,7 +45,7 @@ let shouldBeErrorMessage message =
     | Error err -> err |> should equal message
 
 let activateContract code account session state =
-    Account.createActivateContractTransaction account code
+    Account.createActivateContractTransaction chain account code 1ul
     |> Result.map (fun tx ->
         let events, state =
             Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
@@ -179,12 +179,18 @@ let ``Should buy``() =
     TransactionHandler.executeContract session inputTx cHash "buy" Contract.EmptyData (PK samplePKHash) { state.memoryState with utxoSet = utxoSet }
     |> function
     | Ok tx ->
-        tx.inputs |> should haveLength 1
-        tx.inputs |> should contain input
+        tx.inputs |> should haveLength 2
+        tx.inputs |> should contain (Outpoint input)
         tx.outputs |> should haveLength 2
         tx.outputs |> should contain { lock = Contract cHash; spend = spend }
         tx.outputs |> should contain { lock = PK samplePKHash; spend = { spend with asset = cHash, Hash.zero } }
         tx.witnesses |> should haveLength 1
+        let wit, cost = 
+            match tx.witnesses.[0] with
+            | ContractWitness {cost=cost} as wit ->
+                wit, cost
+            | _ as wit -> wit, 0u
+        
         let cw = ContractWitness {
              cHash = cHash
              command = "buy"
@@ -194,9 +200,10 @@ let ``Should buy``() =
              beginOutputs = 0u
              inputsLength = 1u
              outputsLength = 2u
+             cost = cost
         }
-        tx.witnesses |> should contain cw
-    | Error error -> failwithf "--> %A" error
+        wit |> should equal cw
+    | Error error -> failwith error
 
 [<Test>]
 let ``Should redeem``() =
@@ -238,12 +245,18 @@ let ``Should redeem``() =
     |> function
     | Ok tx ->
         tx.inputs |> should haveLength 2
-        tx.inputs |> should contain inputContractAsset
-        tx.inputs |> should contain inputZen
+        tx.inputs |> should contain (Outpoint inputContractAsset)
+        tx.inputs |> should contain (Outpoint inputZen)
         tx.outputs |> should haveLength 2
         tx.outputs |> should contain { lock = Destroy; spend = spendContractAsset }
         tx.outputs |> should contain { lock = PK samplePKHash; spend = spendZen }
         tx.witnesses |> should haveLength 1
+        let wit, cost = 
+            match tx.witnesses.[0] with
+            | ContractWitness {cost=cost} as wit ->
+                wit, cost
+            | _ as wit -> wit, 0u
+        
         let cw = ContractWitness {
              cHash = cHash
              command = "redeem"
@@ -253,6 +266,7 @@ let ``Should redeem``() =
              beginOutputs = 0u
              inputsLength = 1u
              outputsLength = 2u
+             cost = cost
         }
-        tx.witnesses |> should contain cw
+        wit |> should equal cw
     | Error error -> failwith error

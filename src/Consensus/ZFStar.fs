@@ -1,4 +1,5 @@
 ﻿module Consensus.ZFStar
+#nowarn "664"   // Ignore type erasure warnings.
 
 open Operators.Checked
 
@@ -42,47 +43,29 @@ let fsToFstLock (outputLock:Types.Lock) : lock =
     match outputLock with
     | PK (Hash.Hash pkHash) ->
         PKLock pkHash
-    //| Types.Lock.Contract (Hash.Hash pkHash, null) ->
-    //    ContractLock (pkHash, 0I, Empty)
-    //| Types.Lock.Contract (Hash.Hash pkHash, [||]) ->
-        //ContractLock (pkHash, 0I, Empty)
     | Contract (Hash.Hash pkHash) ->
         ContractLock pkHash
     | Destroy ->
         DestroyLock
+    | Fee ->
+        FeeLock
+    | ActivationSacrifice ->
+        ActivationSacrificeLock
+    | Coinbase (blockNumber, (Hash.Hash pkHash)) ->
+        CoinbaseLock (blockNumber,pkHash)
 
-
-    //TODO:
-    //| Types.Lock.Contract (Hash.Hash pkHash, bytes) ->
-        //let serializer = context.GetSerializer<data<unit>>()
-        //let data = serializer.UnpackSingleObject bytes
-        //ContractLock (pkHash, getDataPoints data, data)
-
-
-    | _ ->
-        //TODO
-        throwNotImplemented "fsToFstLock" (outputLock.ToString())
 
 let private fstToFsLock (outputLock:lock) : Types.Lock =
     match outputLock with
     | PKLock pkHash ->
         PK (Hash.Hash pkHash)
-
-
-    //TODO:
     | ContractLock pkHash ->
         Contract (Hash.Hash pkHash)
     | DestroyLock -> Destroy
-    //| ContractLock (pkHash, _, _) ->
-        //Types.Lock.Contract (Hash.Hash pkHash, [||])
-    //| ContractLock (pkHash, _, data) ->
-        //let serializer = context.GetSerializer<data<unit>>()
-        //Types.Lock.Contract (Hash.Hash pkHash, serializer.PackSingleObject data)
-
-
-    | _ ->
-        //TODO
-        throwNotImplemented "fstToFsLock" (outputLock.ToString())
+    | FeeLock -> Fee
+    | ActivationSacrificeLock -> ActivationSacrifice
+    | CoinbaseLock (blockNumber,pkHash) ->
+            Coinbase (blockNumber, Hash.Hash pkHash)
 
 let private fsToFstSpend (spend:Types.Spend) : spend =
     let tokenContract, tokenHash = spend.asset
@@ -146,8 +129,6 @@ let private fstToFsTx : txSkeleton -> _ = function
             |> List.sortBy fst
             |> List.map (snd >> fstToFsOutput)
         Ok {pInputs=inputs; outputs=outputs}
-    | _ ->
-        Error "malformed txSkeleton"
 
 let fstToFsData =
 //    Binary.pickle pickler
@@ -171,8 +152,6 @@ let fstTofsMessage = function
         |> Ok
     | Native.option.None ->
         Ok None
-    | _ ->
-        Error "malformed message"
 
 let convertResult (tx, message : message Native.option) =
     fstTofsMessage message

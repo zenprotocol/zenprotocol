@@ -49,11 +49,22 @@ let sign keyPairs tx =
 
 let fromTxSkeleton tx =
     {
-        inputs = List.choose (function | PointedOutput (outpoint, _) -> Some outpoint | _ -> None) tx.pInputs
+        inputs = List.map (function
+            | TxSkeleton.Input.PointedOutput (outpoint, _) -> Outpoint outpoint
+            | TxSkeleton.Input.Mint spend -> Mint spend) tx.pInputs
         outputs = tx.outputs
         witnesses = []
         contract = None
     }
+
+let isOutputSpendable output =
+    match output.lock with
+    | PK _
+    | Coinbase _
+    | Contract _ -> true
+    | Fee
+    | Destroy
+    | ActivationSacrifice -> false
 
 // Temporary stuff until we will have blocks
 let rootPKHash = Hash.compute [| 3uy; 235uy; 227uy; 69uy; 160uy; 193uy; 130uy; 94uy; 110uy; 75uy; 201uy;

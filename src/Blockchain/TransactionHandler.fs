@@ -1,8 +1,6 @@
 module Blockchain.TransactionHandler
 
 open Blockchain
-open Blockchain
-open Blockchain
 open Blockchain.EffectsWriter
 open Messaging.Events
 open Infrastructure
@@ -10,14 +8,13 @@ open Consensus
 open Consensus.Transaction
 open Consensus.TransactionValidation
 open State
-open Infrastructure.ServiceBus.Agent
 
 let getUTXO = UtxoSetRepository.get
 
-let private validateOrphanTransaction session contractPath blockNumber state txHash tx  =
+let private validateOrphanTransaction chainParams session contractPath blockNumber state txHash tx  =
     effectsWriter
         {
-            match TransactionValidation.validateInContext (getUTXO session) contractPath (blockNumber + 1ul)
+            match TransactionValidation.validateInContext chainParams (getUTXO session) contractPath (blockNumber + 1ul)
                     state.activeContractSet state.utxoSet txHash tx with
             | Ok (tx, acs) ->
                 let utxoSet = UtxoSet.handleTransaction (getUTXO session) txHash tx state.utxoSet
@@ -49,21 +46,21 @@ let private validateOrphanTransaction session contractPath blockNumber state txH
                 return {state with orphanPool = orphanPool}
         }
 
-let rec validateOrphanTransactions session contractPath blockNumber state =
+let rec validateOrphanTransactions chainParams session contractPath blockNumber state =
     effectsWriter {
-        let! state' = OrphanPool.foldWriter (validateOrphanTransaction session contractPath blockNumber) state state.orphanPool
+        let! state' = OrphanPool.foldWriter (validateOrphanTransaction chainParams session contractPath blockNumber) state state.orphanPool
 
         // if orphan pool changed we run again until there is no change
         if state'.orphanPool <> state.orphanPool then
-            return! validateOrphanTransactions session contractPath blockNumber state'
+            return! validateOrphanTransactions chainParams session contractPath blockNumber state'
         else
             return state'
     }
 
-let validateInputs session contractPath blockNumber txHash tx (state:MemoryState) shouldPublishEvents =
+let validateInputs chainParams session contractPath blockNumber txHash tx (state:MemoryState) shouldPublishEvents =
     effectsWriter
         {
-            match TransactionValidation.validateInContext (getUTXO session) contractPath (blockNumber + 1ul)
+            match TransactionValidation.validateInContext chainParams (getUTXO session) contractPath (blockNumber + 1ul)
                     state.activeContractSet state.utxoSet txHash tx with
             | Error Orphan ->
                 let orphanPool = OrphanPool.add txHash tx state.orphanPool
@@ -100,11 +97,11 @@ let validateInputs session contractPath blockNumber txHash tx (state:MemoryState
                                 utxoSet=utxoSet;
                              }
 
-                return! validateOrphanTransactions session contractPath blockNumber state
+                return! validateOrphanTransactions chainParams session contractPath blockNumber state
         }
 
 
-let validateTransaction session contractPath blockNumber tx (state:MemoryState) =
+let validateTransaction chainParams session contractPath blockNumber tx (state:MemoryState) =
     effectsWriter {
         let txHash = Transaction.hash tx
 
@@ -119,45 +116,49 @@ let validateTransaction session contractPath blockNumber tx (state:MemoryState) 
 
                 return state
             | Ok tx ->
-                return! validateInputs session contractPath blockNumber txHash tx state true
+                return! validateInputs chainParams session contractPath blockNumber txHash tx state true
     }
 
 let executeContract session txSkeleton cHash command data returnAddress state =
-    let checkACS cHash =
+    let isInTxSkeleton (txSkeleton:TxSkeleton.T) (outpoint,_)  =
+        List.exists (fun input ->
+            match input with
+            | TxSkeleton.Mint _ -> false
+            | TxSkeleton.PointedOutput (outpoint',_) -> outpoint' = outpoint) txSkeleton.pInputs
+
+    let rec run cHash command data (txSkeleton:TxSkeleton.T) witnesses totalCost =
         match ActiveContractSet.tryFind cHash state.activeContractSet with
-        | Some contract -> Ok contract
         | None -> Error "Contract not active"
+        | Some contract ->
+            let contractWallet =
+                ContractUtxoRepository.getContractUtxo session cHash state.utxoSet
+                |> List.reject (isInTxSkeleton txSkeleton)
 
-    let contractWallet = ContractUtxoRepository.getContractUtxo session cHash state.utxoSet
+            let cost = Contract.getCost contract command data (Some returnAddress) contractWallet txSkeleton
+            let totalCost = cost + totalCost
 
-    checkACS cHash
-    |> Result.bind (fun contract ->
-        Contract.getCost contract command data (Some returnAddress) contractWallet txSkeleton
-        |> Result.map (Log.info "Running contract with cost: %A")
-        |> Result.mapError (Log.info "Error getting contract with cost: %A")
-        |> ignore
-
-        let rec run contract command data returnAddress contractWallet txSkeleton witnesses =
             Contract.run contract command data (Some returnAddress) contractWallet txSkeleton
             |> Result.bind (fun (tx, message) ->
                 TxSkeleton.checkPrefix txSkeleton tx
                 |> Result.bind (fun finalTxSkeleton ->
-                    let witnesses = List.add (TxSkeleton.getContractWitness contract.hash command data returnAddress txSkeleton finalTxSkeleton) witnesses
+                    let witnesses = List.add (TxSkeleton.getContractWitness contract.hash command data returnAddress txSkeleton finalTxSkeleton cost) witnesses
 
                     match message with
                     | Some {cHash=cHash; command=command; data=data} ->
-                        checkACS cHash
-                        |> Result.bind (fun contract ->
-                            run contract command data returnAddress contractWallet finalTxSkeleton witnesses
-                        )
+                        run cHash command data finalTxSkeleton witnesses totalCost
                     | None ->
-                        Ok (finalTxSkeleton, witnesses)
+                        Ok (finalTxSkeleton, witnesses, totalCost)
                 )
             )
 
-        run contract command data returnAddress contractWallet txSkeleton []
-        |> Result.map (fun (finalTxSkeleton, witnesses) ->
+    run cHash command data txSkeleton [] 0I
+    |> Result.map (fun (finalTxSkeleton, witnesses, totalCost) ->
+        Log.info "Running contract chain with cost: %A" totalCost
+
+        let tx =
             Transaction.fromTxSkeleton finalTxSkeleton
             |> Transaction.addWitnesses witnesses
-        )
+
+        tx
     )
+

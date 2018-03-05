@@ -14,7 +14,7 @@ open Blockchain.State
 open TestsInfrastructure.Constraints
 open Consensus.Tests.SampleContract
 
-let chain = ChainParameters.Local
+let chain = Chain.getChainParameters Chain.Local
 
 let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction (fun _ -> UtxoSet.NoOutput) Transaction.rootTxHash Transaction.rootTx
 let mempool = MemPool.empty |> MemPool.add Transaction.rootTxHash Transaction.rootTx
@@ -51,7 +51,7 @@ let shouldBeErrorMessage message =
     | Error err -> err |> should equal message
 
 let activateContract code account session state =
-    Account.createActivateContractTransaction account code
+    Account.createActivateContractTransaction chain account code 1ul
     |> Result.map (fun tx ->
         let events, state =
             Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
@@ -149,7 +149,7 @@ let ``Contract should not have enough tokens when output locked to PK address``(
 [<Test>]
 let ``Contract should not have enough tokens when output is spent``() =
     let output = {lock=PK cHash;spend={asset=Constants.Zen;amount=10UL}}
-    let utxoSet = Map.add {txHash=Hash.zero;index=10ul} UtxoSet.Spent utxoSet
+    let utxoSet = Map.add {txHash=Hash.zero;index=10ul} (UtxoSet.Spent output) utxoSet
 
     TransactionHandler.executeContract session sampleInputTx cHash "" Contract.EmptyData (PK Hash.zero) { state.memoryState with utxoSet = utxoSet }
     |> shouldBeErrorMessage "not enough Zens"

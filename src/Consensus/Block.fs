@@ -45,10 +45,10 @@ let fromHex hex =
     FsBech32.Base16.decode hex
     |> Option.bind deserialize
 
-let isGenesis chain block =
+let isGenesis (chain:Chain.ChainParameters) block =
     let blockHash = hash block
 
-    ChainParameters.getGenesisHash chain = blockHash
+    chain.genesisHash = blockHash
 
 let getChainWork (prevWork:bigint) header =
     let target =
@@ -63,7 +63,7 @@ let getBlockReward blockNumber =
     //TODO: implement this method
     50UL * 100000000UL
 
-let createGenesis chain transactions nonce =
+let createGenesis (chain:Chain.ChainParameters) transactions nonce =
     let txMerkleRoot =
         transactions
         |> List.map Transaction.hash
@@ -86,7 +86,7 @@ let createGenesis chain transactions nonce =
             parent=Hash.zero;
             blockNumber=1ul;
             commitments=commitments;
-            timestamp=ChainParameters.getGenesisTime chain;
+            timestamp=chain.genesisTime;
             difficulty=(EMA.create chain).difficulty;
             nonce=nonce;
         }
@@ -163,6 +163,7 @@ let createTemplate (parent:BlockHeader) timestamp (ema:EMA.T) acs transactions c
 
     {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot;witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot}
 
+// TODO: Refactor to avoid chained state-passing style
 let validate chain =
     let checkTxNotEmpty (block:Block) =
         if List.isEmpty block.transactions then Error "transactions is empty" else Ok block
@@ -251,7 +252,7 @@ let validate chain =
     >=> checkCommitments
 
 /// Apply block to UTXO and ACS, operation can fail
-let connect chain getUTXO contractsPath parent timestamp set acs ema =
+let connect chain getUTXO contractsPath parent timestamp utxoSet acs ema =
     let checkBlockNumber (block:Block) =
         if parent.blockNumber + 1ul <> block.header.blockNumber then
             Error "blockNumber mismatch"
@@ -274,13 +275,13 @@ let connect chain getUTXO contractsPath parent timestamp set acs ema =
         if isGenesis chain block then
             let set = List.fold (fun set tx ->
                 let txHash = (Transaction.hash tx)
-                UtxoSet.handleTransaction getUTXO txHash tx set) set block.transactions
+                UtxoSet.handleTransaction getUTXO txHash tx set) utxoSet block.transactions
             Ok (block,set,acs,ema)
         else
             let coinbase = List.head block.transactions
             let withoutCoinbase = List.tail block.transactions
 
-            let set = UtxoSet.handleTransaction getUTXO (Transaction.hash coinbase) coinbase set
+            let set = UtxoSet.handleTransaction getUTXO (Transaction.hash coinbase) coinbase utxoSet
 
             List.fold (fun state tx->
                 match state with
@@ -288,7 +289,7 @@ let connect chain getUTXO contractsPath parent timestamp set acs ema =
                 | Ok (block,set,acs,ema) ->
                     let txHash = (Transaction.hash tx)
 
-                    match TransactionValidation.validateInContext getUTXO contractsPath (block.header.blockNumber) acs set txHash tx with
+                    match TransactionValidation.validateInContext chain getUTXO contractsPath (block.header.blockNumber) acs set txHash tx with
                     | Error err -> Error (sprintf "transactions failed inputs validation due to %A" err)
                     | Ok (_,acs) ->
                         let set = UtxoSet.handleTransaction getUTXO txHash tx set
@@ -312,8 +313,22 @@ let connect chain getUTXO contractsPath parent timestamp set acs ema =
         else
             Error "commitments mismatch"
 
+    let checkWeight (block,ema) = result {
+        let! weight = Weight.blockWeight getUTXO utxoSet block
+        let maxWeight = chain.maxBlockWeight
+        if weight <= maxWeight
+        then
+            return block,ema
+        else
+            let err = sprintf
+                        "Block weight of %A is greater than maximum block weight %A" weight maxWeight
+            return! Error err
+    }
+
+
     checkBlockNumber
     >=> checkDifficulty
+    >=> checkWeight
     >=> checkTxInputs
     >=> checkCommitments
 

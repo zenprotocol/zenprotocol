@@ -2,7 +2,7 @@
 
 open NUnit.Framework
 open Consensus
-open ChainParameters
+open Chain
 open Address
 open Hash
 open FsCheck.NUnit

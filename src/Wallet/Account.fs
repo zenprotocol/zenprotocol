@@ -1,7 +1,7 @@
 module Wallet.Account
 
 open Consensus
-open Consensus.ChainParameters
+open Consensus.Chain
 open Consensus.Hash
 open Consensus.Crypto
 open Consensus.Types
@@ -59,7 +59,10 @@ let private handleTransaction txHash (tx:Transaction) account outputs =
             Map.add outpoint (Spent output) outputs
         | _ -> outputs
 
-    let outputs = List.fold handleInput outputs tx.inputs
+    let outputs =
+        tx.inputs
+        |> List.choose (function | Outpoint outpoint -> Some outpoint | Mint _ -> None)
+        |> List.fold handleInput outputs
 
     let outputsWithIndex = List.mapi (fun i output -> (uint32 i,output)) tx.outputs
     List.fold handleOutput outputs outputsWithIndex
@@ -97,7 +100,10 @@ let undoBlock block account =
             | Some (Spent output) -> Map.add input (Unspent output) outputs
             | _ -> outputs
 
-        let outputs' = List.fold handleInput outputs tx.inputs
+        let outputs' =
+            tx.inputs
+            |> List.choose (function | Outpoint outpoint -> Some outpoint | Mint _ -> None)
+            |> List.fold handleInput outputs
 
         let outputsWithIndex = List.mapi (fun i output -> (uint32 i,output)) tx.outputs
         let outputs' = List.fold handleOutput outputs' outputsWithIndex
@@ -140,7 +146,7 @@ let sync chain tipBlockHash (getHeader:Hash.Hash -> BlockHeader) (getBlock:Hash.
 
     let rec sync' currentBlockHash =
         // If new account and genesis block handle genesis block
-        if account.tip = Hash.zero && currentBlockHash = ChainParameters.getGenesisHash chain then
+        if account.tip = Hash.zero && currentBlockHash = chain.genesisHash then
             let block = getBlock currentBlockHash
             handleBlock currentBlockHash block account
         // If we found the account tip we stop the recursion and start syncing up
@@ -181,7 +187,11 @@ let addTransaction txHash (tx:Transaction) account =
         | _ -> false) tx.outputs
 
     let unspentOutputs = getUnspentOutputs account
-    let anyInputs = List.exists (fun input -> Map.containsKey input unspentOutputs) tx.inputs
+
+    let anyInputs =
+        tx.inputs
+        |> List.choose (function | Outpoint outpoint -> Some outpoint | Mint _ -> None)
+        |> List.exists (fun input -> Map.containsKey input unspentOutputs)
 
     if anyInputs || anyOutput then
         let mempool = List.add (txHash,tx) account.mempool
@@ -222,11 +232,11 @@ let private getInputs account spend =
     else
         Error "Not enough tokens"
 
-let createTransaction chain account pkHash spend = result  {
+let createTransactionFromLock account lk spend = result {
     let! (inputs, keys, amount) = getInputs account spend
-    let inputPoints = List.map fst inputs
+    let inputPoints = List.map (fst >> Outpoint) inputs
     let outputs =
-        {spend=spend;lock=PK pkHash}
+        {spend=spend;lock=lk}
      :: if amount = spend.amount then [] else
         // Create change if needed
         [{
@@ -241,20 +251,38 @@ let createTransaction chain account pkHash spend = result  {
 
     }
 
-let createActivateContractTransaction account code =
-    let unspent = getUnspentOutputs account
+let createTransaction account pkHash spend =
+    createTransactionFromLock account (PK pkHash) spend
+
+let createActivateContractTransaction chain account code (numberOfBlocks:uint32) =
+    let codeLength = String.length code |> uint64
+
+    let activationSacrifice = chain.sacrificePerByteBlock * codeLength * (uint64 numberOfBlocks)
+    let spend = {amount=activationSacrifice;asset=Constants.Zen}
+
     result {
-    let! hints = Contract.recordHints code
-    let input, output = Map.toSeq unspent |> Seq.head
-    let output' = {output with lock=PK account.publicKeyHash}
-    return Transaction.sign
-        [ account.keyPair ]
-        {
-            inputs=[ input ];
-            outputs=[ output' ];
-            witnesses=[];
-            contract = Some (code, hints)
-        }
+        let! (inputs,keys,amount) = getInputs account spend
+        let inputPoints = List.map (fst >> Outpoint) inputs
+
+        let! hints = Contract.recordHints code
+
+        let outputs =
+                {lock=ActivationSacrifice;spend=spend}
+             :: if amount = spend.amount then [] else
+                // Create change if needed
+                [{
+                    spend={spend with amount=(amount-spend.amount)};
+                    lock=PK account.publicKeyHash
+                }]
+
+        return Transaction.sign
+            keys
+            {
+                inputs=inputPoints
+                outputs=outputs
+                witnesses=[];
+                contract = Some (code, hints)
+            }
     }
 
 let rootAccount =
