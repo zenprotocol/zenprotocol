@@ -55,7 +55,7 @@ let handleRequest chain client (request,reply) =
         let json =
             balances
             |> Map.toSeq
-            |> Seq.map (fun (key,value) -> new BalanceResponseJson.Root(Hash.toString key, int64 value))
+            |> Seq.map (fun ((asset, assetType), amount) -> new BalanceResponseJson.Root(Hash.toString asset, Hash.toString assetType, int64 amount))
             |> Seq.map (fun balance -> balance.JsonValue)
             |> Seq.toArray
             |> JsonValue.Array

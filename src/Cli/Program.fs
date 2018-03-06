@@ -4,7 +4,7 @@ open FSharp.Data
 open Api.Types
 
 type SpendArgs =
-    | [<MainCommand("COMMAND");ExactlyOnce>] Spend_Arguments of asset:string * amount:int64 * address:string
+    | [<MainCommand("COMMAND");ExactlyOnce>] Spend_Arguments of asset:string * assetType:string * amount:int64 * address:string
     interface IArgParserTemplate with
         member arg.Usage = ""
 
@@ -14,7 +14,7 @@ type ActivateContractArgs =
         member arg.Usage = ""
 
 type ExecuteContractArgs =
-    | [<MainCommand("COMMAND");ExactlyOnce>] ExecuteContract_Arguments of address:string * command:string * data:string * asset:string * amount:int64
+    | [<MainCommand("COMMAND");ExactlyOnce>] ExecuteContract_Arguments of address:string * command:string * data:string * asset:string * assetType:string * amount:int64
     interface IArgParserTemplate with
         member arg.Usage = ""
 
@@ -76,8 +76,8 @@ let main argv =
 
     match results.TryGetSubCommand() with
     | Some (Spend args) ->
-        let asset,amount,address = args.GetResult <@ Spend_Arguments @>
-        let send = new SpendRequestJson.Root(address, new SpendRequestJson.Spend(asset, amount))
+        let asset,assetType,amount,address = args.GetResult <@ Spend_Arguments @>
+        let send = new SpendRequestJson.Root(address, new SpendRequestJson.Spend(asset, assetType, amount))
 
         let response = send.JsonValue.Request (getUri "wallet/spend")
 
@@ -93,7 +93,7 @@ let main argv =
         printfn "============================"
 
         Array.iter (fun (assertBalance:BalanceResponseJson.Root) ->
-            printfn " %s\t| %d" assertBalance.Asset assertBalance.Balance) balance
+            printfn " %s %s\t| %d" assertBalance.Asset assertBalance.AssetType assertBalance.Balance) balance
     | Some (Address _) ->
         let address =
             AddressJson.Load (getUri "wallet/address")
@@ -116,8 +116,8 @@ let main argv =
                     | code, HttpResponseBody.Text text -> printfn "Failed %d %s" code text
                     | code,_ -> printfn "Failed %d with binary response" code
     | Some (Execute args) ->
-        let address,command,data,asset,amount = args.GetResult <@ ExecuteContract_Arguments @>
-        let execute = new ContractExecuteRequestJson.Root(address,command,data, [| new ContractExecuteRequestJson.Spend(asset, amount) |])
+        let address,command,data,asset,assetType,amount = args.GetResult <@ ExecuteContract_Arguments @>
+        let execute = new ContractExecuteRequestJson.Root(address,command,data, [| new ContractExecuteRequestJson.Spend(asset, assetType, amount) |])
 
         let response = execute.JsonValue.Request (getUri "wallet/contract/execute")
 

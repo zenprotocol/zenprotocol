@@ -7,18 +7,16 @@ open Consensus.Types
 open FsBech32
 open System.Text
 
-let private getSpend' asset amount =
-    match Base16.decode asset with
-    | None ->
-        Error "Could not decode asset"
-    | Some decoded when Array.length decoded = 64 ->
-        match Hash.fromBytes decoded.[0..31], Hash.fromBytes decoded.[31..63] with
-        | Some assetContract, Some assetToken ->
-            Ok { asset = assetContract, assetToken; amount = uint64 amount }
-        | _ ->
-            Error ("Invalid asset hash length")
-    | _ ->
-        Error "Invalid asset data length"
+let private getSpend' asset assetType amount =
+    match Hash.fromString asset, Hash.fromString assetType with
+    | Ok asset, Ok assetType ->
+        Ok { asset = asset, assetType; amount = uint64 amount }
+    | Error msg, Ok _ ->
+        Error <| sprintf "Asset: %s" msg
+    | Ok _, Error msg ->
+        Error <| sprintf "AssetType: %s" msg
+    | Error msg1, Error msg2->
+        Error <| sprintf "Asset: %s, AssetType %s" msg1 msg2
 
 let getSpend chain json =
     try
@@ -30,7 +28,7 @@ let getSpend chain json =
             Error ("Address is invalid: " + err)
         | Ok pkHash ->
             let s = json.Spend
-            getSpend' s.Asset s.Amount
+            getSpend' s.Asset s.AssetType s.Amount
             |> Result.map (fun spend -> (pkHash, spend))
     with _ as ex ->
         Error ("Json invalid: " + ex.Message)
@@ -45,14 +43,21 @@ let getContractExecute chain json =
             let mutable errors = List.empty
 
             for item in json.Spends do
-                getSpend' item.Asset item.Amount
+                getSpend' item.Asset item.AssetType item.Amount
                 |> function
                 | Ok spend -> spends <- Map.add spend.asset spend.amount spends
                 | Error err -> errors <- err :: errors
                 |> ignore
 
             if List.isEmpty errors then
-                Ok (cHash, json.Command, json.Data |> Encoding.ASCII.GetBytes |> Data , spends)
+                let data =
+                    match json.Data with 
+                    | "None" -> Contract.EmptyData 
+                    | b16DataString -> 
+                        match Base16.decode b16DataString with 
+                        | Some data -> Data data
+                        | None -> failwith "Invalid Data"
+                Ok (cHash, json.Command, data, spends)
             else
                 errors
                 |> String.concat " "

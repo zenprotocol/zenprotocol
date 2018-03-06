@@ -86,7 +86,7 @@ let ``Contract should activate and execute - API``() =
         | FSharp.Data.Text string -> string
         | _ -> failwith "unexpected response type"
     let response' = ContractActivateResponseJson.Parse responseBody
-    let execute = new ContractExecuteRequestJson.Root(response'.Address,"", "", [| new ContractExecuteRequestJson.Spend("", int64 0) |])
+    let execute = new ContractExecuteRequestJson.Root(response'.Address,"", "", [| new ContractExecuteRequestJson.Spend("", "", int64 0) |])
     let response = execute.JsonValue.Request ("http://" + apiUri + "/wallet/contract/execute")
     response.StatusCode |> should equal 200
     true
