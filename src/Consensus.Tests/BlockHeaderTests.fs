@@ -16,24 +16,24 @@ let ``validating block header with invalid proof of work``(header: BlockHeader) 
     
     let expected :Result<BlockHeader, string> = Error "proof of work failed"
     
-    BlockHeader.validate Chain.localParameters header = expected
+    Block.validateHeader Chain.localParameters header = expected
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]  
 let ``validating block header with correct proof of work``(header:BlockHeader) = 
     // changing the difficulty to easiest one
     let header = {header with difficulty = 0x20fffffful }
   
-    BlockHeader.validate Chain.localParameters header = Ok header
+    Block.validateHeader Chain.localParameters header = Ok header
     
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]  
 let ``seralizing and deserialing yield same header``(header:BlockHeader) = 
-    let roundTrip = BlockHeader.serialize >> BlockHeader.deserialize
+    let roundTrip = Serialization.serializeHeader >> Serialization.deserializeHeader
     
     roundTrip header = Some header   
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]      
 let ``header with wrong size doesn't deserialize``(header) =
-    Array.length header <> BlockHeader.Size ==> (BlockHeader.deserialize header = None)
+    Array.length header <> Serialization.SerializedHeaderSize ==> (Serialization.deserializeHeader header = None)
     
  
         

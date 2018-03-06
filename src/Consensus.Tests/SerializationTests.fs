@@ -57,5 +57,5 @@ let ``Block hash size should be 32``(tx:Transaction) =
 [<Property>]
 let ``Different blocks don't produce same hashing result``(bk1:Block) (bk2:Block) =
     (bk1 <> bk2) ==> lazy (
-        Block.hash bk1 <> Block.hash bk2
+        Block.hash bk1.header <> Block.hash bk2.header
     )

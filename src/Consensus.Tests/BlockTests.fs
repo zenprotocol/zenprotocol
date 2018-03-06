@@ -105,7 +105,7 @@ let ``connecting block should fail when commitments are wrong``(parent:BlockHead
 
     let header = {
         version = parent.version
-        parent = BlockHeader.hash parent
+        parent = Block.hash parent
         blockNumber = parent.blockNumber + 1ul
         commitments = Hash.zero
         timestamp = timestamp
