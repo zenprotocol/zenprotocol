@@ -62,7 +62,6 @@
     <Compile Include="Contract.fs" />
     <Compile Include="ActiveContractSet.fs" />
     <Compile Include="TransactionValidation.fs" />
-    <Compile Include="BlockHeader.fs" />
     <Compile Include="Block.fs" />
     <Content Include="Consensus.fsproj.paket.template" />
     <Content Include="paket.references" />
