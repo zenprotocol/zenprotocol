@@ -159,7 +159,7 @@ let transportHandler transport seeds client msg (connector,addressBook,ownAddres
             //TODO: log non-deserializable block
             connector,addressBook,ownAddress
     | InProcMessage.Tip blockHeader ->
-        match BlockHeader.deserialize blockHeader with
+        match Serialization.deserializeHeader blockHeader with
         | Some blockHeader ->
             Blockchain.handleTip client blockHeader
             connector,addressBook,ownAddress
@@ -167,7 +167,7 @@ let transportHandler transport seeds client msg (connector,addressBook,ownAddres
             //TODO: log non-deserializable blockheader
             connector,addressBook,ownAddress
     | InProcMessage.NewBlock {peerId=peerId;blockHeader=blockHeader} ->
-        match BlockHeader.deserialize blockHeader with
+        match Serialization.deserializeHeader blockHeader with
         | Some blockHeader ->
             Blockchain.validateNewBlockHeader client peerId blockHeader
             connector,addressBook,ownAddress
@@ -198,14 +198,14 @@ let commandHandler transport command (state:State) =
         Transport.sendBlock transport peerId bytes         
         state
     | Command.SendTip (peerId,blockHeader) ->
-        let bytes = BlockHeader.serialize blockHeader
+        let bytes = Serialization.serializeHeader blockHeader
         Transport.sendTip transport peerId bytes
         state
     | Command.GetBlock blockHash ->
         Transport.getBlock transport (Hash.bytes blockHash)
         state
     | Command.PublishBlock blockHeader ->
-        let bytes = BlockHeader.serialize blockHeader
+        let bytes = Serialization.serializeHeader blockHeader
         Transport.publisNewBlock transport bytes
 
         state
