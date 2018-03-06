@@ -10,46 +10,20 @@ open FsNetMQ
 open FsNetMQ.Stream
 open FsNetMQ.Stream.Reader
 
+[<Literal>]
+let SerializedHeaderSize = 100 
+
 type TransactionSerializationMode =
     | Full
     | WithoutWitness
 
-// Input discriminators
-[<Literal>]
-let private Outpoint = 1uy
-// Spend discriminators (can be considered as a continuation of the Input discriminators list)
-[<Literal>]
-let private SpendZen = 2uy
-[<Literal>]
-let private SpendDefault = 3uy
-[<Literal>]
-let private Spend = 4uy
+module private Hash = 
+    let write hash = writeBytes (Hash.bytes hash) Hash.Length
+    let read = readBytes Hash.Length
 
-// Witness discriminators
-[<Literal>]
-let private PKWitness = 1uy
-[<Literal>]
-let private ContractWitness = 2uy
-
-// Outputs discriminators
-[<Literal>]
-let private PK = 1uy
-[<Literal>]
-let private Contract = 2uy
-[<Literal>]
-let private Coinbase = 3uy
-[<Literal>]
-let private Fee = 4uy
-[<Literal>]
-let private ActivationSacrifice = 5uy
-[<Literal>]
-let private Destroy = 6uy
-
-// Option discriminators
-[<Literal>]
-let private None = 0uy
-[<Literal>]
-let private Some = 1uy
+module private Byte =
+    let write byte = writeNumber1 byte
+    let read = readNumber1
 
 type private Operations<'a> = {
     writeHash: Hash.Hash -> 'a -> 'a
@@ -61,20 +35,9 @@ type private Operations<'a> = {
     writeNumber8: uint64 -> 'a -> 'a
 }
 
-let private writeByte byte =
-    writeNumber1 byte
-let private writeHash hash =
-    writeBytes (Hash.bytes hash) Hash.Length
-let private writeOption ops writerFn = function
-    | Option.Some value ->
-        ops.writeByte Some
-        >> writerFn value
-    | Option.None ->
-        ops.writeByte None
-
 let private serializers: Operations<Stream.T> = {
-    writeHash = writeHash
-    writeByte = writeByte
+    writeHash = Hash.write
+    writeByte = Byte.write
     writeBytes = writeBytes
     writeString = writeString
     writeLongString = writeLongString
@@ -92,321 +55,355 @@ let private counters: Operations<int32> = {
     writeNumber8 = fun _ l -> l + 8
 }
 
-let private writeSpend ops = function
-    | { asset = cHash, token; amount = amount } when cHash = Hash.zero && token = Hash.zero ->
-        ops.writeByte SpendZen
-        >> ops.writeNumber8 amount
-    | { asset = cHash, token; amount = amount } when cHash <> Hash.zero && token = Hash.zero ->
-        ops.writeByte SpendDefault
-        >> ops.writeHash cHash
-        >> ops.writeNumber8 amount
-    | { asset = cHash, token; amount = amount } when cHash <> Hash.zero && token <> Hash.zero ->
-        ops.writeByte Spend
-        >> ops.writeHash cHash
-        >> ops.writeHash token
-        >> ops.writeNumber8 amount
-    | { asset = cHash, token; amount = _ } when cHash = Hash.zero && token <> Hash.zero ->
-        failwithf "Not supported"
-    | _ ->
-        failwithf "Not expected"
+let fail stream =
+    None, stream 
+    
+module private Option =
+    [<Literal>]
+    let private None = 0uy
+    [<Literal>]
+    let private Some = 1uy
 
-let private writeInput ops = function
-    | Types.Outpoint { txHash = txHash; index = index } ->
-        ops.writeByte Outpoint
-        >> ops.writeHash txHash
-        >> ops.writeNumber4 index
-    | Types.Mint spend ->
-        writeSpend ops spend
-
-let private writeWitness ops = function
-    | Types.PKWitness (bytes, Signature signature) ->
-        ops.writeByte PKWitness
-        >> ops.writeBytes bytes Crypto.SerializedPublicKeyLength
-        >> ops.writeBytes signature Crypto.SerializedSignatureLength
-    | Types.ContractWitness cw ->
-        let (Data data) = cw.data
-        let dataLength = Array.length data
-        ops.writeByte ContractWitness
-        >> ops.writeHash cw.cHash
-        >> ops.writeString cw.command
-        >> ops.writeNumber4 (uint32 dataLength)
-        >> ops.writeBytes data dataLength
-        >> writeOption ops ops.writeNumber4 cw.returnAddressIndex
-        >> ops.writeNumber4 cw.beginInputs
-        >> ops.writeNumber4 cw.beginOutputs
-        >> ops.writeNumber4 cw.inputsLength
-        >> ops.writeNumber4 cw.outputsLength
-        >> ops.writeNumber4 cw.cost
-    | _ ->
-        failwithf "Not expected"
-
-let private writeLock ops = function
-    | Types.PK hash ->
-        ops.writeByte PK
-        >> ops.writeHash hash
-    | Types.Contract hash ->
-        ops.writeByte Contract
-        >> ops.writeHash hash
-    | Types.Coinbase (blockNumber, pkHash) ->
-        ops.writeByte Coinbase
-        >> ops.writeNumber4 blockNumber
-        >> ops.writeHash pkHash
-    | Types.Fee ->
-        ops.writeByte Fee
-    | Types.ActivationSacrifice ->
-        ops.writeByte ActivationSacrifice
-    | Types.Destroy ->
-        ops.writeByte Destroy
-
-let private writeOutput ops = fun { lock = lock; spend = spend } ->
-    writeLock ops lock
-    >> writeSpend ops spend
-
-let private writeContract ops =
-    writeOption ops (fun (code, hints) ->
-        ops.writeLongString code
-        >> ops.writeLongString hints)
-
-let private writeList ops writerFn list =
-    let writeList list writerFn stream = //TODO: use fold?
-        let mutable stream = stream
-        for item in list do
-            stream <- writerFn ops item stream
-        stream
-    ops.writeNumber4 (List.length list |> uint32)
-    >> writeList list writerFn
-
-let private writeTx mode ops tx =
-    writeList ops writeInput tx.inputs
-    >> writeList ops writeOutput tx.outputs
-    >> writeContract ops tx.contract
-    >> match mode with
-    | Full -> writeList ops writeWitness tx.witnesses
-    | WithoutWitness -> id
-
-let serializeTransaction mode tx =
-    writeTx mode counters tx 0
-    |> create 
-    |> writeTx mode serializers tx
-    |> getBuffer
-
-let serializeBlock bk =
-    let writeCommitment ops hash = ops.writeHash hash
-    let writeTransaction ops tx = writeTx Full ops tx
-
-    let writeBk ops =
-        ops.writeNumber4 bk.header.version
-        >> ops.writeHash bk.header.parent
-        >> ops.writeNumber4 bk.header.blockNumber
-        >> ops.writeHash bk.header.commitments
-        >> ops.writeNumber8 bk.header.timestamp
-        >> ops.writeNumber4 bk.header.difficulty
-        >> ops.writeNumber8 (fst bk.header.nonce)
-        >> ops.writeNumber8 (snd bk.header.nonce)
-        >> writeList ops writeCommitment ([ bk.txMerkleRoot; bk.witnessMerkleRoot; bk.activeContractSetMerkleRoot ] @ bk.commitments)
-        >> writeList ops writeTransaction bk.transactions
-
-    writeBk counters 0
-    |> create
-    |> writeBk serializers
-    |> getBuffer
-
-// Deserialization 
-
-let readByte =
-    readNumber1
-let readHash =
-    readBytes Hash.Length
-let readList readerFn = reader {
-    let! length = readNumber4
-    let! list = reader {
-        for _ in [1..int length] do
+    let write ops writerFn = function
+        | Option.Some value ->
+            ops.writeByte Some
+            >> writerFn value
+        | Option.None ->
+            ops.writeByte None
+    let read readerFn =reader {
+        let! discriminator = Byte.read
+        match discriminator with
+        | Some ->
             let! item = readerFn
-            return item
+            return Option.Some item
+        | None ->
+            return Option.None
+        | _ ->
+            yield! fail
     }
-    return List.ofSeq list
-}
 
-let private readSpendZen = reader {
-    let! amount = readNumber8
-    return { asset = Constants.Zen; amount = amount }
-}
-
-let private readSpendDefault = reader {
-    let! cHash = readHash
-    let! amount = readNumber8
-    return { asset = Hash.Hash cHash, Hash.zero; amount = amount }
-}
-
-let private readSpendInner = reader {
-    let! cHash = readHash
-    let! token = readHash
-    let! amount = readNumber8
-    return { asset = Hash.Hash cHash, Hash.Hash token; amount = amount }
-}
-
-let private readSpend = reader {
-    let! discriminator = readByte
-    match discriminator with
-    | SpendZen ->
-        let! spend = readSpendZen
-        return spend
-    | SpendDefault ->
-        let! spend = readSpendDefault
-        return spend
-    | Spend ->
-        let! spend = readSpendInner
-        return spend
-    | _ ->
-        return raise <| Exception "Not expected: spend discriminator"
-}
-
-let private readInput = reader {
-    let! discriminator = readByte
-    match discriminator with
-    | Outpoint->
-        let! txHash = readHash
-        let! index = readNumber4
-        return Types.Outpoint { txHash = Hash.Hash txHash; index = index }
-    | SpendZen ->
-        let! spend = readSpendZen
-        return Mint spend
-    | SpendDefault ->
-        let! spend = readSpendDefault
-        return Mint spend
-    | Spend ->
-        let! spend = readSpendInner
-        return Mint spend
-    | _ ->
-        return raise <| Exception "Not expected: input discriminator"
-}
-
-let private readOption readerFn =reader {
-    let! discriminator = readByte
-    
-    match discriminator with
-    | Some ->
-        let! item = readerFn
-        return Option.Some item
-    | None ->
-        return Option.None
-    | _ ->
-        return raise <| Exception "Not expected: option discriminator"
-}
-
-let private readWitness = reader {
-    let! discriminator = readByte
-    match discriminator with
-    | PKWitness ->
-        let! publicKey = readBytes Crypto.SerializedPublicKeyLength
-        let! signature = readBytes Crypto.SerializedSignatureLength
-        return Types.PKWitness (publicKey, Signature signature)
-    | ContractWitness ->
-        let! cHash = readHash
-        let! command = readString
-        let! dataLength = readNumber4
-        let! data = readBytes (int dataLength)
-        let! returnAddressIndex = readOption readNumber4
-        let! beginInputs = readNumber4
-        let! beginOutputs = readNumber4
-        let! inputsLength = readNumber4
-        let! outputsLength = readNumber4
-        let! cost = readNumber4
-        return Types.ContractWitness {
-            cHash = Hash.Hash cHash
-            command = command
-            data = Data data
-            returnAddressIndex = returnAddressIndex
-            beginInputs = beginInputs
-            beginOutputs = beginOutputs
-            inputsLength = inputsLength
-            outputsLength = outputsLength
-            cost = cost
+module private List =
+    let read readerFn = reader {
+        let! length = readNumber4
+        let! list = reader {
+            for _ in [1..int length] do
+                let! item = readerFn
+                return item
         }
-    | _ ->
-        return raise <| Exception "Not expected: witness discriminator"
-}
-
-let private readLock = reader {
-    let! discriminator = readByte
-    match discriminator with
-    | PK ->
-        let! hash = readHash
-        return Lock.PK (Hash.Hash hash)
-    | Contract ->
-        let! hash = readHash
-        return Lock.Contract (Hash.Hash hash)
-    | Coinbase ->
-        let! blockNumber = readNumber4
-        let! pkHash = readHash
-        return Lock.Coinbase (blockNumber, Hash.Hash pkHash)
-    | Fee ->
-        return Lock.Fee
-    | ActivationSacrifice ->
-        return Lock.ActivationSacrifice
-    | Destroy ->
-        return Lock.Destroy
-    | _ ->
-        return raise <| Exception "Not expected: output discriminator"
-}
-
-let private readOutput = reader {
-    let! lock = readLock
-    let! spend = readSpend
-    return { lock = lock; spend = spend }
-}
-
-let private readContract = reader {
-    let readContract = reader {
-        let! code = readLongString
-        let! hints = readLongString
-        return code, hints
+        return List.ofSeq list
     }
-    let! contract = readOption readContract
-    return contract
-}
+    let write ops writerFn list =
+        let write list writerFn stream = //TODO: use fold?
+            let mutable stream = stream //TODO: this is not 'stream' if ops are Counters
+            for item in list do
+                stream <- writerFn ops item stream
+            stream
+        ops.writeNumber4 (List.length list |> uint32)
+        >> write list writerFn
 
-let private readTx mode = reader {
-    let! inputs = readList readInput
-    let! outputs = readList readOutput
-    let! contract = readContract
-    let! witnesses = reader {
-        match mode with
-        | Full -> yield! readList readWitness
-        | WithoutWitness -> return []
-    }
-    return { inputs = inputs; witnesses = witnesses; outputs = outputs; contract = contract }
-}
-
-let deserializeTransaction mode bytes =
-    Stream (bytes, 0)
-    |> run (readTx mode)
+module private Asset = 
+    let write ops = fun (cHash, token) ->
+        ops.writeHash cHash
+        >> ops.writeHash token
     
-let deserializeBlock bytes =
-    let readBk = reader {
+    let read = reader {
+        let! cHash = Hash.read
+        let! token = Hash.read
+        return Hash.Hash cHash, Hash.Hash token
+    }
+    
+module private Spend =
+    let write ops = fun { asset = asset; amount = amount } ->
+        Asset.write ops asset
+        >> ops.writeNumber8 amount
+    let read = reader {
+        let! asset = Asset.read
+        let! amount = readNumber8
+        return { asset = asset; amount = amount }
+    }
+    
+module private Input =
+    [<Literal>]
+    let private SerializedOutpoint = 1uy
+    [<Literal>]
+    let private SerializedMint = 2uy
+
+    let write ops = function
+        | Outpoint { txHash = txHash; index = index } ->
+            ops.writeByte SerializedOutpoint
+            >> ops.writeHash txHash
+            >> ops.writeNumber4 index
+        | Mint spend ->
+            ops.writeByte SerializedMint
+            >> Spend.write ops spend
+    let read = reader {
+        let! discriminator = Byte.read
+        match discriminator with
+        | SerializedOutpoint ->
+            let! txHash = Hash.read
+            let! index = readNumber4
+            return Outpoint { txHash = Hash.Hash txHash; index = index }
+        | SerializedMint ->
+            let! spend = Spend.read
+            return (Mint spend)
+        | _ ->
+            yield! fail
+    }
+
+module private Witness =
+    [<Literal>]
+    let private SerializedPKWitness = 1uy
+    [<Literal>]
+    let private SerializedContractWitness = 2uy
+
+    let write ops = function
+        | PKWitness (bytes, Signature signature) ->
+            ops.writeByte SerializedPKWitness
+            >> ops.writeBytes bytes Crypto.SerializedPublicKeyLength
+            >> ops.writeBytes signature Crypto.SerializedSignatureLength
+        | ContractWitness cw ->
+            let (Data data) = cw.data
+            let dataLength = Array.length data
+            ops.writeByte SerializedContractWitness
+            >> ops.writeHash cw.cHash
+            >> ops.writeString cw.command
+            >> ops.writeNumber4 (uint32 dataLength)
+            >> ops.writeBytes data dataLength
+            >> Option.write ops ops.writeNumber4 cw.returnAddressIndex
+            >> ops.writeNumber4 cw.beginInputs
+            >> ops.writeNumber4 cw.beginOutputs
+            >> ops.writeNumber4 cw.inputsLength
+            >> ops.writeNumber4 cw.outputsLength
+            >> ops.writeNumber4 cw.cost
+    let read = reader {
+        let! discriminator = Byte.read
+        match discriminator with
+        | SerializedPKWitness ->
+            let! publicKey = readBytes Crypto.SerializedPublicKeyLength
+            let! signature = readBytes Crypto.SerializedSignatureLength
+            return PKWitness (publicKey, Signature signature)
+        | SerializedContractWitness ->
+            let! cHash = Hash.read
+            let! command = readString
+            let! dataLength = readNumber4
+            let! data = readBytes (int dataLength)
+            let! returnAddressIndex = Option.read readNumber4
+            let! beginInputs = readNumber4
+            let! beginOutputs = readNumber4
+            let! inputsLength = readNumber4
+            let! outputsLength = readNumber4
+            let! cost = readNumber4
+            return ContractWitness {
+                cHash = Hash.Hash cHash
+                command = command
+                data = Data data
+                returnAddressIndex = returnAddressIndex
+                beginInputs = beginInputs
+                beginOutputs = beginOutputs
+                inputsLength = inputsLength
+                outputsLength = outputsLength
+                cost = cost
+            }
+        | _ ->
+            yield! fail
+    }
+
+module private Lock =
+    [<Literal>]
+    let private SerializedPK = 1uy
+    [<Literal>]
+    let private SerializedContract = 2uy
+    [<Literal>]
+    let private SerializedCoinbase = 3uy
+    [<Literal>]
+    let private SerializedFee = 4uy
+    [<Literal>]
+    let private SerializedActivationSacrifice = 5uy
+    [<Literal>]
+    let private SerializedDestroy = 6uy
+
+    let write ops = function
+        | PK hash ->
+            ops.writeByte SerializedPK
+            >> ops.writeHash hash
+        | Contract hash ->
+            ops.writeByte SerializedContract
+            >> ops.writeHash hash
+        | Coinbase (blockNumber, pkHash) ->
+            ops.writeByte SerializedCoinbase
+            >> ops.writeNumber4 blockNumber
+            >> ops.writeHash pkHash
+        | Fee ->
+            ops.writeByte SerializedFee
+        | ActivationSacrifice ->
+            ops.writeByte SerializedActivationSacrifice
+        | Destroy ->
+            ops.writeByte SerializedDestroy
+    let read = reader {
+        let! discriminator = Byte.read
+        match discriminator with
+        | SerializedPK ->
+            let! hash = Hash.read
+            return Lock.PK (Hash.Hash hash)
+        | SerializedContract ->
+            let! hash = Hash.read
+            return Lock.Contract (Hash.Hash hash)
+        | SerializedCoinbase ->
+            let! blockNumber = readNumber4
+            let! pkHash = Hash.read
+            return Lock.Coinbase (blockNumber, Hash.Hash pkHash)
+        | SerializedFee ->
+            return Lock.Fee
+        | SerializedActivationSacrifice ->
+            return Lock.ActivationSacrifice
+        | SerializedDestroy ->
+            return Lock.Destroy
+        | _ ->
+            yield! fail
+    }
+
+module private Output =
+    let write ops = fun { lock = lock; spend = spend } ->
+        Lock.write ops lock
+        >> Spend.write ops spend
+    let read = reader {
+        let! lock = Lock.read
+        let! spend = Spend.read
+        return { lock = lock; spend = spend }
+    }
+
+module private Contract =
+    let write ops =
+        Option.write ops (fun (code, hints) ->
+            ops.writeLongString code
+            >> ops.writeLongString hints)
+    let read = reader {
+        let readContract = reader {
+            let! code = readLongString
+            let! hints = readLongString
+            return code, hints
+        }
+        let! contract = Option.read readContract
+        return contract
+    }
+
+module private Nonce =
+    let write ops = fun (nonce1, nonce2) ->
+        ops.writeNumber8 nonce1
+        >> ops.writeNumber8 nonce2
+    let read = reader {
+        let! nonce1 = readNumber8
+        let! nonce2 = readNumber8
+        return nonce1,nonce2
+    }
+
+module private Transaction =
+    let write mode ops = fun tx ->
+        List.write ops Input.write tx.inputs
+        >> List.write ops Output.write tx.outputs
+        >> Contract.write ops tx.contract
+        >> 
+        match mode with
+        | Full -> List.write ops Witness.write tx.witnesses
+        | WithoutWitness -> id
+    let read mode = reader {
+        let! inputs = List.read Input.read
+        let! outputs = List.read Output.read
+        let! contract = Contract.read
+        let! witnesses = reader {
+            match mode with
+            | Full -> yield! List.read Witness.read
+            | WithoutWitness -> return []
+        }
+        return { inputs = inputs; witnesses = witnesses; outputs = outputs; contract = contract }
+    }
+
+module private Header =
+    let write ops = fun header ->
+        ops.writeNumber4 header.version
+        >> ops.writeHash header.parent
+        >> ops.writeNumber4 header.blockNumber
+        >> ops.writeHash header.commitments
+        >> ops.writeNumber8 header.timestamp
+        >> ops.writeNumber4 header.difficulty
+        >> Nonce.write ops header.nonce
+    let read = reader {
         let! version = readNumber4
-        let! parent = readHash
+        let! parent = Hash.read
         let! blockNumber = readNumber4
-        let! commitments = readHash
+        let! commitments = Hash.read
         let! timestamp = readNumber8
         let! difficulty = readNumber4
-        let! nonceFst = readNumber8
-        let! nonceSnd = readNumber8
-        let! commitmentsList = readList readHash
-        let! transactions = readList (readTx Full)
-    
-        let blockHeader = {
+        let! nonce = Nonce.read
+        return {
             version = version
             parent = Hash.Hash parent
             blockNumber = blockNumber
             commitments = Hash.Hash commitments
             timestamp = timestamp
             difficulty = difficulty
-            nonce = nonceFst, nonceSnd
+            nonce = nonce
         }
+    }
+
+module private Block =
+    let write ops bk =
+        Header.write ops bk.header
+        >> List.write ops (fun ops hash -> ops.writeHash hash) ([ bk.txMerkleRoot; bk.witnessMerkleRoot; bk.activeContractSetMerkleRoot ] @ bk.commitments)
+        >> List.write ops (fun ops tx -> Transaction.write Full ops tx) bk.transactions
+    let read = reader {
+        let! header = Header.read
+        let! commitments = List.read Hash.read
+        let! transactions = List.read (Transaction.read Full)
+        
+        if List.length commitments < 3 then
+            yield! fail
+        else return {
+            header = header
+            txMerkleRoot = Hash.Hash commitments.[0]
+            witnessMerkleRoot = Hash.Hash commitments.[1]
+            activeContractSetMerkleRoot = Hash.Hash commitments.[2]
+            commitments = List.map Hash.Hash commitments.[3 .. List.length commitments - 1]
+            transactions = transactions
+        }
+    }
+
+let serializeTransaction mode tx =
+    Transaction.write mode counters tx 0
+    |> create 
+    |> Transaction.write mode serializers tx
+    |> getBuffer
+
+let serializeHeader header =
+    create SerializedHeaderSize
+    |> Header.write serializers header
+    |> getBuffer
+
+let serializeBlock bk =
+    Block.write counters bk 0
+    |> create
+    |> Block.write serializers bk
+    |> getBuffer
+
+let deserializeTransaction mode bytes =
+    Stream (bytes, 0)
+    |> run (Transaction.read mode)
+
+let deserializeHeader bytes =
+    if Array.length bytes <> SerializedHeaderSize then
+        None
+    else
+        Stream (bytes, 0)
+        |> run Header.read
+
+let deserializeBlock bytes =
+    let readBk = reader {
+        let! header = Header.read
+        let! commitmentsList = List.read Hash.read
+        let! transactions = List.read (Transaction.read Full)
         
         return {
-            header = blockHeader
+            header = header
             txMerkleRoot = Hash.Hash commitmentsList.[0]
             witnessMerkleRoot = Hash.Hash commitmentsList.[1]
             activeContractSetMerkleRoot = Hash.Hash commitmentsList.[2]
