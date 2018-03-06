@@ -37,6 +37,7 @@ let private foldSpends =
 let private checkSpends m =
     Map.forall (fun _ v -> Option.isSome v) m
 
+// name is misleading
 let private activateContract (chainParams : Chain.ChainParameters) contractPath blockNumber acs (tx : Types.Transaction) =
     let getActivationSacrifice tx = result {
         let activationSacrifices = List.filter(fun output -> output.lock = ActivationSacrifice) tx.outputs
@@ -276,15 +277,13 @@ let private checkDuplicateInputs tx =
     else GeneralError "inputs duplicated"
 
 let private checkStructure =
-    let isInvalidHash = fun hash ->
-        hash 
-        |> Hash.isValid 
-        |> not
+    let isInvalidHash = Hash.isValid >> not
 
-    let isInvalidAsset = fun asset ->
-        asset |> fst |> isInvalidHash ||
-        asset |> snd |> isInvalidHash
-    
+    let isInvalidAsset = fun (cHash, token) ->
+        cHash |> isInvalidHash ||
+        token |> isInvalidHash ||
+        (cHash = Hash.zero && token <> Hash.zero)
+
     (fun tx -> 
         match tx.contract with
         | Some (code, hints) when not <| (String.length code > 0 && String.length hints > 0) ->
