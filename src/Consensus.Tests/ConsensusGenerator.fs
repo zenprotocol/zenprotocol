@@ -149,26 +149,27 @@ type ConsensusGenerator =
                 return {lock=lock;spend={asset=asset;amount=amount}}
             }
 
-//        let contractGenerator =
-//            gen {
-//                let! shouldHaveContract = Gen.choose (1,10)
-//                let! NonEmptyString contract = Arb.generate<NonEmptyString>
-//
-//                let contract =
-//                    if shouldHaveContract = 1 then
-//                        Some contract
-//                    else
-//                        None
-//
-//                return contract
-//            }
+        let contractGenerator =
+            gen {
+                let! shouldHaveContract = Gen.choose (1,0)
+                let! NonEmptyString code = Arb.generate<NonEmptyString>
+                let! NonEmptyString hints = Arb.generate<NonEmptyString>
+
+                let contract =
+                    if shouldHaveContract = 1 then
+                        Some (code, hints)
+                    else
+                        None
+
+                return contract
+            }
 
         Arb.fromGen (gen {
                 let! inputs = Gen.nonEmptyListOf inputGenerator
                 let! outputs = Gen.nonEmptyListOf outputGenerator
-//                let! contract = contractGenerator
+                let! contract = contractGenerator
 
-                return {inputs=inputs;outputs=outputs;contract=None;witnesses=[]}
+                return {inputs=inputs;outputs=outputs;contract=contract;witnesses=[]}
             })
 
         static member TxSkeleton() =
@@ -209,12 +210,7 @@ type ConsensusGenerator =
 
             let outputGenerator =
                 gen {
-                    let notCoinbaseLock lock =
-                        match lock with
-                        | Coinbase _ -> false
-                        | _ -> true
-
-                    let! lock = Arb.generate<Lock> |> Gen.filter notCoinbaseLock
+                    let! lock = Arb.generate<Lock>
                     let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
                     let asset = Hash.Hash asset, Hash.zero
                     let! amount = Arb.generate<uint64> |> Gen.filter ((<>) 0UL)

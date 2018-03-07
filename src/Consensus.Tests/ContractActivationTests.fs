@@ -89,7 +89,6 @@ let ``Contract activation with asset other than zen should fail``() =
     let expected:TxResult = General "Sacrifice must be paid in Zen" |> Error
 
     validateInContext 1ul ActiveContractSet.empty utxoSet txHash tx
-    //|> printfn "%A"
     |> should equal expected
 
 [<Test>]

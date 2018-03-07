@@ -110,10 +110,10 @@ let private PublicKeyLength = 64
 let private SignatureLength = 64
 
 [<Literal>] 
-let private SerializedPublicKeyLength = 33
+let SerializedPublicKeyLength = 33
 
 [<Literal>]
-let private SerializedSignatureLength = 64
+let SerializedSignatureLength = 64
 
 [<Literal>]
 let MessageLength = 32

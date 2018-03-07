@@ -54,7 +54,7 @@ let ``sending get request``() =
     let result = Http.RequestString "http://127.0.0.1:45123/hello/"
     
     result |> should equal "get"
-
+    
 [<Test;IgnoreAttribute("Currently flapping")>]
 let ``post json body`` () = 
     use agent = runServer ()

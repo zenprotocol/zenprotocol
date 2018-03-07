@@ -21,7 +21,7 @@ let balanceShouldBe asset expected account =
 
     actual |> should equal expected
 
-let anotherAsset = Hash.zero, Hash.compute "anotherasset"B
+let anotherAsset = Hash.compute "anotherasset"B, Hash.compute "anotherasset"B
 
 [<Test>]
 let ``received tokens``() =
@@ -212,7 +212,7 @@ let ``account sync up``() =
     }
 
     let account =
-        {Account.create () with tip = BlockHeader.hash startBlockHeader}
+        {Account.create () with tip = Block.hash startBlockHeader}
 
     let output = {lock = PK account.publicKeyHash; spend={asset=Constants.Zen;amount=10UL}}
     let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
@@ -224,7 +224,7 @@ let ``account sync up``() =
 
     let header = {
         version = 0ul
-        parent = BlockHeader.hash startBlockHeader
+        parent = Block.hash startBlockHeader
         blockNumber = 3ul
         commitments = Hash.zero
         timestamp = 0UL
@@ -241,7 +241,7 @@ let ``account sync up``() =
         commitments= []
     }
 
-    let blockHash = Block.hash block
+    let blockHash = Block.hash block.header
 
     let account' = Account.sync chainParams blockHash (fun _ -> startBlockHeader) (fun _ -> block) account
 
@@ -274,7 +274,7 @@ let ``sync up from empty wallet``() =
         commitments = []
     }
 
-    let blockHash = Block.hash block
+    let blockHash = Block.hash block.header
 
     let account = Account.sync chainParams blockHash (fun _ -> failwith "unexpected")
                     (fun blockHash ->
@@ -300,7 +300,7 @@ let ``account reorg``() =
     }
 
     let account =
-        {Account.create () with tip = BlockHeader.hash startBlockHeader}
+        {Account.create () with tip = Block.hash startBlockHeader}
 
     let output = {lock = PK account.publicKeyHash; spend={asset=Constants.Zen;amount=10UL}}
     let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
@@ -310,7 +310,7 @@ let ``account reorg``() =
 
     let header = {
         version = 0ul
-        parent = BlockHeader.hash startBlockHeader
+        parent = Block.hash startBlockHeader
         blockNumber = 3ul
         commitments = Hash.zero
         timestamp = 0UL
@@ -327,14 +327,14 @@ let ``account reorg``() =
         commitments= []
     }
 
-    let blockHash = Block.hash block
+    let blockHash = Block.hash block.header
 
     let account = Account.sync chainParams blockHash (fun _ -> startBlockHeader) (fun _ -> block) account
     account.tip |> should equal blockHash
 
     let header2 = {
        version = 0ul
-       parent = BlockHeader.hash startBlockHeader
+       parent = Block.hash startBlockHeader
        blockNumber = 3ul
        commitments = Hash.zero
        timestamp = 0UL
@@ -351,7 +351,7 @@ let ``account reorg``() =
        commitments= []
     }
 
-    let blockHash2 = Block.hash block2
+    let blockHash2 = Block.hash block2.header
 
     let account = Account.sync chainParams blockHash2 (fun _ -> block.header)
                         (fun bh ->
@@ -426,7 +426,7 @@ let ``wallet spend coinbase when come from block``() =
 
     let block = {header=header;transactions=[origin];commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero;}
 
-    let rootAccount = Account.handleBlock (Block.hash block) block rootAccount
+    let rootAccount = Account.handleBlock (Block.hash block.header) block rootAccount
 
     Account.createTransaction rootAccount rootAccount.publicKeyHash { asset = Constants.Zen; amount = 1UL }
     |> should be ok

@@ -39,8 +39,8 @@ let minerTask chain busName (collection:Queue) =
                 
         let block = {block with header=header}
         
-        match BlockHeader.validate chain header with
-        | Result.Ok header ->
+        match Block.validateHeader chain header with
+        | Result.Ok _ ->
             Log.info "new block mined"
         
             // We found a block            

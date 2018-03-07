@@ -118,7 +118,7 @@ let private extract (code, hints, limits) moduleName =
 #endif    
 
 let calculateMetrics hints = 
-    let oDir, file = initOutputDir "" //as for now, using the filesystem as temprary solution
+    let oDir, file = initOutputDir "" //as for now, using the filesystem as temporary solution
     let hintsFile = changeExtention ".fst.hints" file
 
     File.WriteAllText(hintsFile, hints)

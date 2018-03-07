@@ -1,24 +1,21 @@
 module Consensus.Block
-
-open Consensus
-open Consensus.Types
-
 open MBrace.FsPickler.Combinators
-
 open Consensus
-open Consensus
+open Types
 open Infrastructure
+open Serialization
+open Chain
 
 [<Literal>]
 let Version = 0ul
+
+let pickler = Pickler.auto<Block>
 
 let TwoPow256 = bigint.Pow (2I, 256)
 
 let MaxTimeInFuture = 2UL * 60UL * 60UL * 1000UL // 2 hours in milliseconds
 
 let genesisParent = {version=Version;parent=Hash.zero;blockNumber=0ul;commitments=Hash.zero;timestamp=0UL;difficulty=0ul;nonce=0UL,0UL}
-
-let pickler = Pickler.auto<Block>
 
 let private (>=>) f1 f2 x = Result.bind f2 (f1 x)
 
@@ -29,25 +26,19 @@ let private createCommitments txMerkleRoot witnessMerkleRoot acsMerkleRoot rest 
 
 let private computeCommitmentsRoot = MerkleTree.computeRoot
 
-let hash (block:Block) = BlockHeader.hash block.header
+let hash = 
+    Serialization.serializeHeader 
+    >> Hash.compute 
+    
 
-let serialize block =
-
-    Binary.pickle pickler block
-
-let deserialize block =
-    try
-        Some (Binary.unpickle pickler block) with
-    | _ -> None
-
-let toHex = serialize >> FsBech32.Base16.encode
+let toHex = serializeBlock >> FsBech32.Base16.encode
 
 let fromHex hex =
     FsBech32.Base16.decode hex
-    |> Option.bind deserialize
+    |> Option.bind deserializeBlock
 
 let isGenesis (chain:Chain.ChainParameters) block =
-    let blockHash = hash block
+    let blockHash = hash block.header
 
     chain.genesisHash = blockHash
 
@@ -154,7 +145,7 @@ let createTemplate chain (parent:BlockHeader) timestamp (ema:EMA.T) acs transact
     let acs = ActiveContractSet.expireContracts blockNumber acs
     let acsMerkleRoot = SparseMerkleTree.root acs
 
-    let parentHash = BlockHeader.hash parent
+    let parentHash = hash parent
 
     // TODO: add utxo commitments
     let commitments =
@@ -174,13 +165,21 @@ let createTemplate chain (parent:BlockHeader) timestamp (ema:EMA.T) acs transact
 
     {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot;witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot}
 
+let validateHeader chain header  =                 
+    let h = hash header
+    
+    let difficulty = Difficulty.uncompress header.difficulty
+    let proofOfWorkLimit = chain.proofOfWorkLimit
+    
+    if difficulty <= proofOfWorkLimit && h <= difficulty then Ok header else Error "proof of work failed"        
+
 // TODO: Refactor to avoid chained state-passing style
 let validate chain =
     let checkTxNotEmpty (block:Block) =
         if List.isEmpty block.transactions then Error "transactions is empty" else Ok block
 
     let checkHeader (block:Block) =
-        BlockHeader.validate chain block.header
+        validateHeader chain block.header
         |> Result.map (fun _ -> block)
 
     let checkCoinbase (block:Block) =
@@ -212,7 +211,7 @@ let validate chain =
     let checkCommitments (block:Block) =
         let txMerkleRoot =
             block.transactions
-            |> List.map Transaction.hash
+            |> List.map Transaction.hash //hashes should be computed once and pass threaded forward
             |> MerkleTree.computeRoot
 
         let witnessMerkleRoot =
@@ -258,10 +257,12 @@ let connect chain getUTXO contractsPath parent timestamp utxoSet acs ema =
         else
             Ok (block,nextEma)
 
+//name is misleading, e.i. UtxoSet.handleTransaction does something else but checking
+//where is transaction unorphaning from the mempool?
     let checkTxInputs (block,ema) =
         if isGenesis chain block then
             let set = List.fold (fun set tx ->
-                let txHash = (Transaction.hash tx)
+                let txHash = (Transaction.hash tx) // hashing is repeated thoughout the code, is not expenssive?
                 UtxoSet.handleTransaction getUTXO txHash tx set) utxoSet block.transactions
             Ok (block,set,acs,ema)
         else

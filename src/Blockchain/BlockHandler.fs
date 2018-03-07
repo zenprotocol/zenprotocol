@@ -2,6 +2,7 @@ module Blockchain.BlockHandler
 
 open Blockchain
 open Consensus
+open Types
 open Infrastructure
 open Blockchain.EffectsWriter
 open Messaging.Events
@@ -173,6 +174,7 @@ let rec private undoBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:Extend
 
 // After applying block or blocks we must readd mempool transactions to the ACS and UTXO
 let getMemoryState chainParams session contractPath blockNumber mempool orphanPool acs =
+    
     // We start with an empty mempool and current orphan pool
     // We first validate all orphan transactions according to the new state
     // We loop through existing mempool and adding it as we go to a new mempool
@@ -181,11 +183,12 @@ let getMemoryState chainParams session contractPath blockNumber mempool orphanPo
     let memoryState = {utxoSet=UtxoSet.asDatabase;
                         activeContractSet=acs;mempool=MemPool.empty;orphanPool=orphanPool}
 
+
     let memoryState = TransactionHandler.validateOrphanTransactions chainParams session contractPath blockNumber memoryState
 
     Map.fold (fun writer txHash tx ->
-
         Writer.bind writer (fun memoryState ->
+        
             TransactionHandler.validateInputs chainParams session contractPath blockNumber txHash tx memoryState false)) memoryState mempool
 
 let rollForwardChain chainParams contractPath timestamp state session block persistentBlock acs ema =
@@ -230,7 +233,7 @@ let private handleGenesisBlock chainParams contractPath session timestamp (state
         match Block.connect chainParams (getUTXO session) contractPath Block.genesisParent timestamp UtxoSet.asDatabase
                 state.tipState.activeContractSet state.tipState.ema block with
         | Error error ->
-            Log.info "Failed connecting genesis block %A due to %A" (Block.hash block) error
+            Log.info "Failed connecting genesis block %A due to %A" (Block.hash block.header) error
             return state
         | Ok (block,utxoSet,acs,ema) ->
             Log.info "Genesis block received"
@@ -257,7 +260,7 @@ let private handleMainChain chain contractPath session timestamp (state:State) (
         match Block.connect chain (getUTXO session) contractPath parent.header timestamp UtxoSet.asDatabase
                 state.tipState.activeContractSet state.tipState.ema block with
         | Error error ->
-            Log.info "Failed connecting block %A due to %A" (Block.hash block) error
+            Log.info "Failed connecting block %A due to %A" (Block.hash block.header) error
             return state
         | Ok (block,utxoSet,acs,ema) ->
             Log.info "New block #%d %A" block.header.blockNumber blockHash
@@ -351,7 +354,7 @@ let rec requestOrphanChainRoot session (header:ExtendedBlockHeader.T) (state:Sta
 
 let validateBlock chainParams contractPath session timestamp block mined (state:State) =
     effectsWriter {
-        let blockHash = Block.hash block
+        let blockHash = Block.hash block.header
 
         let blockRequest = Map.tryFind blockHash state.blockRequests
 
@@ -393,6 +396,7 @@ let validateBlock chainParams contractPath session timestamp block mined (state:
                         let blockRequests = Map.add block.header.parent ParentBlock state.blockRequests
                         do! getBlock block.header.parent
 
+                        // there should not be a condition in which there is more than one request, it is impossible becase the parent of the parent is unknown
                         return {state with blockRequests=blockRequests}
                     else
                         return state
@@ -423,7 +427,7 @@ let validateBlock chainParams contractPath session timestamp block mined (state:
 
 let private handleHeader chain session get reason header state =
     effectsWriter {
-        let blockHash = BlockHeader.hash header
+        let blockHash = Block.hash header
 
         if (not <| Map.containsKey blockHash state.blockRequests) then
             match BlockRepository.tryGetHeader session blockHash with
@@ -433,7 +437,7 @@ let private handleHeader chain session get reason header state =
                 else
                     return state
             | None ->
-                match BlockHeader.validate chain header with
+                match Block.validateHeader chain header with
                 | Ok header ->
 
                     Log.info "Request block #%d %A from peers due to %A" header.blockNumber blockHash reason

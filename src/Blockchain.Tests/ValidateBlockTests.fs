@@ -46,7 +46,7 @@ let isAccountInSet session (account:Account.T) =
 let rootAccount = Account.createTestAccount ()
 
 let createTransaction account =
-    Result.get <| Account.createTransaction account account.publicKeyHash {asset=Constants.Zen;amount=1UL}
+    Result.get <| Account.createTransaction account account.publicKeyHash {asset=Constants.Zen;amount=100000000UL}
 
 
 // Default initial state of mempool and utxoset
@@ -56,9 +56,9 @@ let orphanPool = OrphanPool.create()
 let acs = ActiveContractSet.empty
 let ema = EMA.create chain
 let genesisBlock = Block.createGenesis chain [Transaction.rootTx] (0UL,0UL)
-let genesisBlockHash = Block.hash genesisBlock
+let genesisBlockHash = Block.hash genesisBlock.header
 
-let hashBlock b = Block.hash b, b
+let hashBlock b = Block.hash b.header, b
 
 let state = {
     memoryState =
@@ -122,7 +122,7 @@ let ``genesis block accepted``() =
     use session = DatabaseContext.createSession databaseContext
 
     let block = Block.createGenesis chain [Transaction.rootTx] (0UL,0UL)
-    let blockHash = Block.hash block
+    let blockHash = Block.hash block.header
 
     let events, state' =
         BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state
@@ -169,7 +169,7 @@ let ``validate new valid block which extended main chain``() =
 
     let tx = createTransaction rootAccount
     let block = Block.createTemplate chain genesisBlock.header timestamp state.tipState.ema acs [tx] Hash.zero
-    let blockHash = Block.hash block
+    let blockHash = Block.hash block.header
 
 
     // Mark the block as new so we will also have network command
@@ -259,7 +259,7 @@ let ``validate new block which connect orphan chain which extend main chain``() 
 
     let ema = EMA.add chain genesisBlock.header.timestamp ema
     let block = Block.createTemplate chain genesisBlock.header timestamp ema acs [tx] Hash.zero
-    let blockHash = Block.hash block
+    let blockHash = Block.hash block.header
 
     // Sending orphan block first
     let _, state =
@@ -328,7 +328,7 @@ let ``orphan chain become longer than main chain``() =
 
     // Check that the alternative chain, which is now main, is marked as main
     List.iter (fun block ->
-        let blockHash = Block.hash block
+        let blockHash = Block.hash block.header
         let extendedHeader = BlockRepository.getHeader session blockHash
         extendedHeader.status |> should equal ExtendedBlockHeader.MainChain) alternativeChain
 
@@ -340,13 +340,13 @@ let ``orphan chain become longer than main chain``() =
 
     // Making sure all the alternative chain status changed to Connected
     List.iter (fun block ->
-        let blockHash = Block.hash block
+        let blockHash = Block.hash block.header
         let extendedHeader = BlockRepository.getHeader session blockHash
         extendedHeader.status |> should equal ExtendedBlockHeader.Connected) alternativeChain
 
     // Making sure all the new main chain status changed to Main
     List.iter (fun block ->
-        let blockHash = Block.hash block
+        let blockHash = Block.hash block.header
         let extendedHeader = BlockRepository.getHeader session blockHash
         extendedHeader.status |> should equal ExtendedBlockHeader.MainChain) mainChain
 
@@ -479,7 +479,7 @@ let ``2 orphan chains, two longer than main, one is longer``() =
     isAccountInSet session sideChainAccount UtxoSet.asDatabase |> should equal true
 
 [<Test>]
-let ``2 orphan chains, two longer than main, longest is invalid, shuld pick second long``() =
+let ``2 orphan chains, two longer than main, longest is invalid, should pick second long``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
@@ -566,7 +566,7 @@ let ``orphan transactions added to mempool after origin tx found in block``() =
         Account.addTransaction txHash1 tx1 account
         |> createTransaction
     let txHash2 = Transaction.hash tx2
-
+    
     let orphanPool =
         state.memoryState.orphanPool
         |> OrphanPool.add txHash2 tx2
@@ -643,7 +643,7 @@ let ``validate new block header should ask for block``() =
         |> Writer.unwrap
 
     events |> should haveLength 1
-    events.[0] |> should equal (EffectsWriter.NetworkCommand (GetNewBlock (Array.empty,(Block.hash block))))
+    events.[0] |> should equal (EffectsWriter.NetworkCommand (GetNewBlock (Array.empty,(Block.hash block.header))))
 
 [<Test>]
 let ``validate new block header which we already asked for``() =
@@ -722,7 +722,7 @@ let ``validate new tip should ask for block``() =
         |> Writer.unwrap
 
     events |> should haveLength 1
-    events.[0] |> should equal (EffectsWriter.NetworkCommand (GetBlock (Block.hash block)))
+    events.[0] |> should equal (EffectsWriter.NetworkCommand (GetBlock (Block.hash block.header)))
 
 [<Test>]
 let ``validate new tip which we already asked for``() =
@@ -819,7 +819,7 @@ let ``Valid template for two transactions which don't depend on each other``() =
         BlockHandler.validateBlock chain session.context.contractPath session (timestamp+100UL) twoTxBlock false splitState
         |> Writer.unwrap
     withTxsState.tipState.tip.hash |> should not' (equal oldHash)
-    withTxsState.tipState.tip.hash |> should equal (Block.hash twoTxBlock)
+    withTxsState.tipState.tip.hash |> should equal (Block.hash twoTxBlock.header)
 
 [<Test>]
 let ``Two transactions in the same block which depend on each other are valid``() =
@@ -848,7 +848,7 @@ let ``Two transactions in the same block which depend on each other are valid``(
         BlockHandler.validateBlock chain session.context.contractPath session timestamp twoTxBlock false genesisState
         |> Writer.unwrap
     twoTxState.tipState.tip.hash |> should not' (equal oldHash)
-    twoTxState.tipState.tip.hash |> should equal (Block.hash twoTxBlock)
+    twoTxState.tipState.tip.hash |> should equal (Block.hash twoTxBlock.header)
 
 [<Test>]
 let ``Two transactions in the same block which depend on each other are invalid if in reversed order``() =
@@ -876,7 +876,7 @@ let ``Two transactions in the same block which depend on each other are invalid 
     let _, twoTxState =
         BlockHandler.validateBlock chain session.context.contractPath session timestamp twoTxBlock false genesisState
         |> Writer.unwrap
-    twoTxState.tipState.tip.hash |> should not' (equal (Block.hash twoTxBlock))
+    twoTxState.tipState.tip.hash |> should not' (equal (Block.hash twoTxBlock.header))
     twoTxState.tipState.tip.hash |> should equal oldHash
 
 [<Test>]
@@ -909,7 +909,7 @@ let ``Template builder uses two transactions in the same block which depend on e
         BlockHandler.validateBlock chain session.context.contractPath session (timestamp+1UL) twoTxBlock false genesisState
         |> Writer.unwrap
     twoTxState.tipState.tip.hash |> should not' (equal oldHash)
-    twoTxState.tipState.tip.hash |> should equal (Block.hash twoTxBlock)
+    twoTxState.tipState.tip.hash |> should equal (Block.hash twoTxBlock.header)
     List.length twoTxBlock.transactions |> should equal 3       // includes coinbase tx
 
 [<Test>]
