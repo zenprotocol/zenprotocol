@@ -101,7 +101,7 @@ let isSkeletonOf txSkeleton tx outputs =
     && outputs = outputsFromSkeleton
     && tx.outputs = txSkeleton.outputs
 
-let getContractWitness cHash command data returnAddress initialTxSkelton finalTxSkeleton (cost:bigint) =
+let getContractWitness cHash command data returnAddress initialTxSkelton finalTxSkeleton (cost:int64) =
     let length list = List.length list |> uint32
 
     let returnAddressIndex =

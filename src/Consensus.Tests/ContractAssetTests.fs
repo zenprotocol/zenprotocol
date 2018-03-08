@@ -49,7 +49,7 @@ let ``Should generate assets from a string and from an int``() =
 
         module ET = Zen.ErrorT
         module Tx = Zen.TxSkeleton
-        module S = Zen.String
+        module S = FStar.String
 
         val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 11
         let cf _ _ _ _ #l _ = ret (64 + (64 + (64 + 64 + 0)) + 23)
@@ -58,7 +58,7 @@ let ``Should generate assets from a string and from an int``() =
         let main txSkeleton contractHash command data returnAddress #l wallet =
             let str = "Test" in
 
-            if S.byteCount str < 29 then
+            if S.length str < 29 then
             begin
                 let! assetString = Zen.Asset.fromString contractHash str in
                 let! assetInt = Zen.Asset.fromInt contractHash 9999999ul in

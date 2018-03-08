@@ -602,7 +602,7 @@ let ``block with a contract activation is added to chain``() =
     let contract = {
         hash = cHash
         fn = fun _ _ _ _ _ tx -> Ok (tx,None)
-        costFn = fun _ _ _ _ _ -> 1I
+        costFn = fun _ _ _ _ _ -> 1L
         expiry=1002ul
         size=100ul
     }

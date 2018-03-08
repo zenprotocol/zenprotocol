@@ -24,8 +24,16 @@ let unCost (Cost.C inj:Zen.Cost.Realized.cost<'Aa, 'An>) : 'Aa = inj.Force()
 
 let pickler = Pickler.auto<Zen.Types.Data.data>
 
+let fsToFstString (s:string) =
+    if String.forall(fun c -> Char.code c <= 255) s
+    then System.Text.Encoding.ASCII.GetBytes s
+    else failwithf "Cannot encode string as ASCII: \"%s\"" s
+
+let fstToFsString : Prims.string -> string =
+    System.Text.Encoding.ASCII.GetString
+    
 let toResult = function
-    | ERR err -> Error err
+    | ERR err -> Error (fstToFsString err)
     | EX err -> Error err.Message //TODO: remove EX
     | OK value -> Ok value
 
@@ -108,12 +116,12 @@ let private fsToFstOutpointOutputTuple (outpoint:Types.Outpoint, output) : (outp
 
 let private vectorToList (z:Zen.Vector.t<'Aa, _>) : List<'Aa> =
      // 0I's are eraseable
-     Zen.Vector.foldl 0I 0I (fun acc e -> Cost.ret (e::acc)) [] z
+     Zen.Vector.foldl 0L 0L (fun acc e -> Cost.ret (e::acc)) [] z
      |> unCost
 
 let private listToVector (ls:List<'Aa>) : Zen.Vector.t<'Aa, _> =
     let len = List.length ls
-    let lsIndexed = List.mapi (fun i elem -> bigint (len - i - 1), elem) ls // vectors are reverse-zero-indexed
+    let lsIndexed = List.mapi (fun i elem -> int64 (len - i - 1), elem) ls // vectors are reverse-zero-indexed
     List.fold (fun acc (i,x) -> Zen.Vector.VCons (i, x, acc)) Zen.Vector.VNil lsIndexed
 
 let private fstToFsTx : txSkeleton -> _ = function
@@ -145,7 +153,7 @@ let fstTofsMessage = function
     | Native.option.Some ({ cHash = cHash; command = command; data = data } : Zen.Types.Main.message) ->
         ({
             cHash = Hash.Hash cHash
-            command = command
+            command = fstToFsString command
             data = fstToFsData data
         } : Consensus.Types.Message)
         |> Some
@@ -180,5 +188,5 @@ let fsToFstTxSkeleton (txSkeleton:TxSkeleton.T) : txSkeleton =
 
 let vectorLength v =
     match v with
-    | VCons (l,_,_) -> l + 1I
-    | VNil -> 0I
+    | VCons (l,_,_) -> l + 1L
+    | VNil -> 0L

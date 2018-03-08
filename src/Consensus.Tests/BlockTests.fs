@@ -248,7 +248,7 @@ let ``can connect block with a contract``() =
         {
             hash=Contract.computeHash SampleContract.sampleContractCode
             fn= fun _ _ _ _ _ tx -> Ok (tx,None)
-            costFn = fun _ _ _ _ _ -> 0I
+            costFn = fun _ _ _ _ _ -> 0L
             expiry=1001ul
             size=100ul
         }
@@ -280,7 +280,7 @@ let ``block with invalid contract failed connecting``() =
         {
             hash=Contract.computeHash "ada"
             fn= fun _ _ _ _ _ tx -> Ok (tx,None)
-            costFn = fun _ _ _ _ _ -> 0I
+            costFn = fun _ _ _ _ _ -> 0L
             expiry=1000ul
             size=100ul
         }
@@ -628,7 +628,7 @@ let ``contract get removed when expiring arrive``() =
         {
             hash=Contract.computeHash SampleContract.sampleContractCode
             fn= fun _ _ _ _ _ tx -> Ok (tx,None)
-            costFn = fun _ _ _ _ _ -> 0I
+            costFn = fun _ _ _ _ _ -> 0L
             expiry=1ul
             size=100ul
         }

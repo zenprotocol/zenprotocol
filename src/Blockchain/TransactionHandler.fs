@@ -151,7 +151,7 @@ let executeContract session txSkeleton cHash command data returnAddress state =
                 )
             )
 
-    run cHash command data txSkeleton [] 0I
+    run cHash command data txSkeleton [] 0L
     |> Result.map (fun (finalTxSkeleton, witnesses, totalCost) ->
         Log.info "Running contract chain with cost: %A" totalCost
 
