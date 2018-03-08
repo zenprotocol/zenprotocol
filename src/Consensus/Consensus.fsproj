@@ -53,6 +53,7 @@
     <Compile Include="Constants.fs" />
     <Compile Include="Difficulty.fs" />
     <Compile Include="TxSkeleton.fs" />
+    <Compile Include="Serialization.fs" />
     <Compile Include="Transaction.fs" />
     <Compile Include="UtxoSet.fs" />
     <Compile Include="Weight.fs" />
@@ -62,7 +63,6 @@
     <Compile Include="Contract.fs" />
     <Compile Include="ActiveContractSet.fs" />
     <Compile Include="TransactionValidation.fs" />
-    <Compile Include="BlockHeader.fs" />
     <Compile Include="Block.fs" />
     <Content Include="Consensus.fsproj.paket.template" />
     <Content Include="paket.references" />

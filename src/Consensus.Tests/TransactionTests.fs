@@ -69,17 +69,82 @@ let ``Transaction validation should fail with duplicate inputs error``() =
     basicValidationMsg "inputs duplicated" tx
     |> shouldEqual
 
+let tx = { inputs = []; witnesses = []; outputs = []; contract = None }
+
 [<Test>]
-let ``Transaction validation should fail with inputs structurally invalid error``() =
-    let invalidHash = Hash (Array.create 31 1uy) // an invalid hash with length 31
-    let tx = {
-        inputs = [ Outpoint { txHash = invalidHash; index = 0ul } ]
-        witnesses = []
-        outputs = [ { lock = PK testHash; spend = { asset = Constants.Zen; amount = 1UL } } ]
-        contract = None
-    }
-    basicValidationMsg "inputs structurally invalid" tx
+let ``Transaction validation should fail with structurally invalid contract data error``() =
+    let msg = "structurally invalid contract data"
+    { tx with contract = Some ("", "") }
+    |> basicValidationMsg msg
     |> shouldEqual
+    { tx with contract = Some ("x", "") }
+    |> basicValidationMsg msg
+    |> shouldEqual
+    { tx with contract = Some ("", "x") }
+    |> basicValidationMsg msg
+    |> shouldEqual
+    { tx with contract = Some (null, "x") }
+    |> basicValidationMsg msg
+    |> shouldEqual
+    { tx with contract = Some ("x", null) }
+    |> basicValidationMsg msg
+    |> shouldEqual
+
+let invalidHash = Hash (Array.create (Hash.Length - 1) 1uy)
+
+[<Test>]
+let ``Transaction validation should fail with structurally invalid input data error``() =
+    let msg = "structurally invalid input data"
+    // test with malformatted outpoint
+    { tx with inputs = [ Outpoint { txHash = invalidHash; index = 0ul } ] }
+    |> basicValidationMsg msg
+    |> shouldEqual
+    // test with malformatted mint spend
+    { tx with inputs = [ Mint { asset = invalidHash, Hash.zero; amount = 10UL } ] }
+    |> basicValidationMsg msg
+    |> shouldEqual
+
+[<Test>]
+let ``Transaction validation should fail with structurally invalid output data``() =
+    let msg = "structurally invalid output data"
+    // test with malformatted lock
+    { tx with outputs = [ { lock = PK invalidHash; spend = { asset = Constants.Zen; amount = 10UL } } ] }
+    |> basicValidationMsg msg
+    |> shouldEqual
+    // test with malformatted spend
+    { tx with outputs = [ { lock = PK Hash.zero; spend = { asset = Hash.zero, invalidHash; amount = 10UL } } ] }
+    |> basicValidationMsg msg
+    |> shouldEqual
+    // test with malformatted spend
+    { tx with outputs = [ { lock = PK Hash.zero; spend = { asset = invalidHash, Hash.zero; amount = 10UL } } ] }
+    |> basicValidationMsg msg
+    |> shouldEqual
+
+[<Test>]
+let ``Transaction validation should fail with structurally invalid witness data``() =
+
+    let msg = "structurally invalid witness data"
+    // test with malformatted PKWitness - invalid serialized publicKey
+    let invalidSerializedPublicKeyData = Array.create (Crypto.SerializedPublicKeyLength - 1) 1uy
+    let validSerializedSignatureData = Array.create Crypto.SerializedSignatureLength 1uy
+    { tx with witnesses = [ PKWitness (invalidSerializedPublicKeyData, Signature validSerializedSignatureData) ] }
+    |> basicValidationMsg msg
+    |> shouldEqual
+    // test with malformatted PKWitness - invalid serialized sigature
+    let validSerializedPublicKeyData = Array.create Crypto.SerializedPublicKeyLength 1uy
+    let invalidSerializedSignatureData = Array.create (Crypto.SerializedSignatureLength - 1) 1uy
+    { tx with witnesses = [ PKWitness (validSerializedPublicKeyData, Signature invalidSerializedSignatureData) ] }
+    |> basicValidationMsg msg
+    |> shouldEqual    
+    // test with malformatted ContractWitness
+    { tx with witnesses = [ ContractWitness {   cHash = invalidHash; command = "" 
+                                                data = Contract.EmptyData
+                                                returnAddressIndex = None
+                                                beginInputs = 0ul; beginOutputs = 0ul
+                                                inputsLength = 0ul; outputsLength = 0ul
+                                                cost = 0ul } ] }
+    |> basicValidationMsg msg
+    |> shouldEqual    
 
 [<Test>]
 let ``Signed transaction should be valid``() =

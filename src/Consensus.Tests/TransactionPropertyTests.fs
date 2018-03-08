@@ -92,12 +92,12 @@ let ``Transaction should have invalid amounts`` ({ utxos = utxos; tx = tx; keys 
     | _ -> true
 
 [<Property>]
-let ``Transaction validation should fail with inputs empty error`` (tx:Transaction) =
+let ``Transaction validation should fail with inputs empty error`` ({ utxos = _; tx = tx; keys = _ }) =
     basicValidationMsg "inputs empty" { tx with inputs = List.empty }
     |> shouldEqual
 
 [<Property>]
-let ``Transaction validation should fail with outputs empty error`` (tx:Transaction) =
+let ``Transaction validation should fail with outputs empty error`` ({ utxos = _; tx = tx; keys = _ }) =
     not <| List.isEmpty tx.inputs ==> lazy (
         basicValidationMsg "outputs empty" { tx with outputs = List.empty }
         |> shouldEqual

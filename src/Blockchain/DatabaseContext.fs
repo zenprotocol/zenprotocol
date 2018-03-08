@@ -2,11 +2,12 @@ module Blockchain.DatabaseContext
 
 open DataAccess
 open Consensus
-open Consensus.Types
-open Consensus.UtxoSet
+open Types
+open UtxoSet
 open FStar
 open Infrastructure
 open MBrace.FsPickler
+open Serialization
 
 // TODO:Move to own file
 // TODO:Implement serialize and deserialize for persistence
@@ -90,7 +91,7 @@ let create dataPath =
     let blockTransactions = Collection.create session "blockTransactions" Hash.bytes serializeHashes deserializeHashes
 
     let transactions = Collection.create session "transactions" Hash.bytes
-                        (Transaction.serialize Transaction.Full) (Transaction.deserialize >> Option.get)
+                        (serializeTransaction Full) (deserializeTransaction Full >> Option.get)
 
     let transactionBlocks = MultiCollection.create session "transactionBlocks"
                                 Hash.bytes Hash.bytes Hash.Hash

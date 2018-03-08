@@ -431,7 +431,7 @@ let ``Transaction already in db but not part of the main chain``() =
         }
     let extendedHeader : ExtendedBlockHeader.T =
         {
-            hash = BlockHeader.hash header
+            hash = Block.hash header
             header = header
             status = ExtendedBlockHeader.Connected
             chainWork = None
@@ -479,7 +479,7 @@ let ``Transaction already in db and part of the main chain is ignored``() =
         }
     let extendedHeader : ExtendedBlockHeader.T =
         {
-            hash = BlockHeader.hash header
+            hash = Block.hash header
             header = header
             status = ExtendedBlockHeader.MainChain
             chainWork = None

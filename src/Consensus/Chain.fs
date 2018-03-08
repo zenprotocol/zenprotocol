@@ -42,7 +42,7 @@ let testParameters =
 let localParameters = {
     testParameters with
         genesisHash =
-            get <| Hash.fromString "13319403fd078d87a2f91543a4d1ed2c0d8fe64b0657b123e709a362d59a3fb6";
+            get <| Hash.fromString "7ffa8c6b1525b8b98ba7847a524a0383659d111d793d5249f4b39b0c84d06b4c";
         genesisTime=1515594186383UL
 }
 
@@ -50,7 +50,7 @@ let getChainParameters = function
     | Main -> mainParameters
     | Test -> testParameters
     | Local -> localParameters
-    
+
 let proofOfWorkLimit chain =
     let p = getChainParameters chain
     p.proofOfWorkLimit
@@ -70,7 +70,7 @@ let getGenesisHash =
         Hash.fromString "9c38be3ee5e1a3d6e3c4f7184ff1b1cc99b44dfa12ce2cfc8ba437eeaa33627a" |>
         function | Ok value -> value | Error error -> failwith error
     | Local ->
-        Hash.fromString "13319403fd078d87a2f91543a4d1ed2c0d8fe64b0657b123e709a362d59a3fb6" |>
+        Hash.fromString "7ffa8c6b1525b8b98ba7847a524a0383659d111d793d5249f4b39b0c84d06b4c" |>
         function | Ok value -> value | Error error -> failwith error
 
 let getGenesisTime =
@@ -79,7 +79,7 @@ let getGenesisTime =
     | Test -> 1517828985040UL
     | Local -> 1515594186383UL
 
-let getContractSacrificePerBytePerBlock (_:Chain) = ContractSacrificePerBytePerBlock
+let getContractSacrificePerBytePerBlock (_:ChainParameters) = ContractSacrificePerBytePerBlock
 
 let getMaximumBlockWeight chain =
     let p = getChainParameters chain
