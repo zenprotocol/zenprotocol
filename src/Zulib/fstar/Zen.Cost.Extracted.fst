@@ -113,6 +113,35 @@ unfold let ( *>) #_ #_ #_ #_ mx mf = ap mf mx
 val (<~>) (#a #b:Type)(#n:nat): cost (a->b) n -> a -> cost b n
 let (<~>) #_ #_ #_ mf = ret >> ap mf
 
+val refine_prop_in(#a:Type)(#n:nat):
+    p:(a -> prop)
+    -> mx:cost a n{p (force mx)}
+    -> cost (x:a{p x}) n
+let refine_prop_in #a #n p mx =
+    force_prop p;
+    retype (cost (x:a{p x}) n) mx
+
+val refine_prop_out(#a:Type)(#n:nat):
+    p:(a -> prop)
+    -> cost (x:a{p x}) n
+    -> mx:cost a n{p (force mx)}
+let refine_prop_out #a #n p mx =
+    force_prop p;
+    retype (mx:cost a n{p (force mx)}) mx
+
+val refine_eq_in(#a:Type)(#n:nat):
+    mx:cost a n
+    -> cost (x:a{x == force mx}) n
+let refine_eq_in #_ #_ mx =
+    refine_prop_in (fun x -> x == force (mx)) mx
+
+val refine_eq_out(#a:Type)(#n:nat):
+    x:a ->
+    cost (y:a{y==x}) n
+    -> mx:cost a n{force mx == x}
+let refine_eq_out #_ #_ x mx =
+    refine_prop_out (fun y -> y == x) mx
+
 // These functions are intentionally not implemented. They cannot be used in actual code.
 // Nevertheless, they are very useful for theorem proving.
 val force_map(#a #b:Type)(#n:nat): f:(a -> b) -> mx: cost a n

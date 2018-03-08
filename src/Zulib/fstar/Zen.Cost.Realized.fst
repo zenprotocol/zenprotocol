@@ -62,3 +62,16 @@ val force_bind(#a #b:Type)(#m #n:nat): mx:cost a m -> f:(a -> cost b n)
   -> Lemma(force (f (force mx)) == force (bind mx f))
      [SMTPat (bind mx f)]
 let force_bind #_ #_ #_ #_ _ _ = ()
+
+val refine: a:Type u#t -> p:(a -> prop) -> Type u#t
+let refine a p = x:a{p x}
+
+assume val force_prop(#a:Type):
+    p:(a -> prop)
+    -> Lemma (forall (n:nat). cost (x:a{p x}) n == mx:cost a n{p (force mx)})
+
+val force_bind_inc(#a #b:Type)(#m #n:nat):
+    mx:cost a m
+    -> f:(a -> cost b n)
+    -> Lemma (mx `bind` f == inc (f (force mx)) m)
+let force_bind_inc #_ #_ #_ #_ _ _ = ()

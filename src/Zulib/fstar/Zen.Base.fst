@@ -6,6 +6,9 @@ let id(#_) x = x
 val const_(#a #b:Type): a -> b -> a
 let const_ #_ #_ x _ = x
 
+val retype(#a:Type): b:Type{b==a} -> a -> b
+let retype #_ _ x = x
+
 (** [|>] is equivalent to F#'s [|>]. *)
 val ( |> ) (#a #b:Type): a -> (a->b) -> b
 let ( |> ) #_ #_ x f = f x
