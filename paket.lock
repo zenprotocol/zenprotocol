@@ -4,6 +4,7 @@ NUGET
     Argu (5.0.1)
       FSharp.Core (>= 4.0.0.1)
     AsyncIO (0.1.40)
+    Base58Check (0.2)
     Baseclass.Contrib.Nuget.Output (2.4.3)
     BouncyCastle (1.8.1)
     FAKE (4.64.9)

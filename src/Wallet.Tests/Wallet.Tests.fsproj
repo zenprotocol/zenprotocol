@@ -44,10 +44,18 @@
   <ItemGroup>
     <Compile Include="AccountTests.fs" />
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="ExtendedKey\Constants.fs" />
+    <Compile Include="ExtendedKey\Expected.fs" />
+    <Compile Include="ExtendedKey\Helpers.fs" />
+    <Compile Include="ExtendedKey\Tests.fs" />
     <Content Include="paket.references" />
     <ProjectReference Include="..\Consensus\Consensus.fsproj">
       <Project>{5ec4457b-615a-4bbd-b3d5-d0e311b9d5e9}</Project>
       <Name>Consensus</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Infrastructure\Infrastructure.fsproj">
+      <Project>{81161f64-d019-422c-a3cf-321cde6ca209}</Project>
+      <Name>Infrastructure</Name>
     </ProjectReference>
     <ProjectReference Include="..\Messaging\Messaging.fsproj">
       <Project>{44277422-32e3-4f1b-bd6d-153b7a621444}</Project>
@@ -79,6 +87,17 @@
       <PropertyGroup>
         <__paket__zen_secp256k1_linux_targets>net40\zen_secp256k1_linux</__paket__zen_secp256k1_linux_targets>
       </PropertyGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
+      <ItemGroup>
+        <Reference Include="Base58Check">
+          <HintPath>..\..\packages\Base58Check\lib\Net40\Base58Check.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
     </When>
   </Choose>
   <Choose>
