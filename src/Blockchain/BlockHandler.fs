@@ -174,7 +174,7 @@ let rec private undoBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:Extend
 
 // After applying block or blocks we must readd mempool transactions to the ACS and UTXO
 let getMemoryState chainParams session contractPath blockNumber mempool orphanPool acs =
-    
+
     // We start with an empty mempool and current orphan pool
     // We first validate all orphan transactions according to the new state
     // We loop through existing mempool and adding it as we go to a new mempool
@@ -188,7 +188,7 @@ let getMemoryState chainParams session contractPath blockNumber mempool orphanPo
 
     Map.fold (fun writer txHash tx ->
         Writer.bind writer (fun memoryState ->
-        
+
             TransactionHandler.validateInputs chainParams session contractPath blockNumber txHash tx memoryState false)) memoryState mempool
 
 let rollForwardChain chainParams contractPath timestamp state session block persistentBlock acs ema =
@@ -231,7 +231,7 @@ let rollForwardChain chainParams contractPath timestamp state session block pers
 let private handleGenesisBlock chainParams contractPath session timestamp (state:State) blockHash block =
     effectsWriter {
         match Block.connect chainParams (getUTXO session) contractPath Block.genesisParent timestamp UtxoSet.asDatabase
-                state.tipState.activeContractSet state.tipState.ema block with
+                ActiveContractSet.empty (EMA.create chainParams) block with
         | Error error ->
             Log.info "Failed connecting genesis block %A due to %A" (Block.hash block.header) error
             return state
