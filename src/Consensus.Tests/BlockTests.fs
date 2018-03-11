@@ -479,7 +479,7 @@ let ``block with coinbase with multiple asset as reward should fail``() =
             inputs = [];
             outputs=
                 [
-                    {lock= Coinbase (15ul,Hash.zero);spend={amount=Block.getBlockReward 15ul;asset=Constants.Zen}}
+                    {lock= Coinbase (15ul,Hash.zero);spend={amount=Block.blockReward 15ul;asset=Constants.Zen}}
                     {lock= Coinbase (15ul,Hash.zero);spend={amount=1UL;asset=Hash.Hash (Array.create 32 1uy), Hash.zero}}
                 ]
             witnesses=[]
@@ -531,8 +531,8 @@ let ``coinbase reward split over multiple outputs``() =
             inputs = [];
             outputs=
                 [
-                    {lock= Coinbase (15ul,Hash.zero);spend={amount=(Block.getBlockReward 15ul) / 2UL;asset=Constants.Zen}}
-                    {lock= Coinbase (15ul,Hash.zero);spend={amount=(Block.getBlockReward 15ul) / 2UL;asset=Constants.Zen}}
+                    {lock= Coinbase (15ul,Hash.zero);spend={amount=(Block.blockReward 15ul) / 2UL;asset=Constants.Zen}}
+                    {lock= Coinbase (15ul,Hash.zero);spend={amount=(Block.blockReward 15ul) / 2UL;asset=Constants.Zen}}
                 ]
             witnesses=[]
             contract=None
