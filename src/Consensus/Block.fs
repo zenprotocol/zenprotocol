@@ -51,9 +51,10 @@ let getChainWork (prevWork:bigint) header =
 
     prevWork + proof
 
-let getBlockReward blockNumber =
-    //TODO: implement this method
-    50UL * 100000000UL
+let blockReward blockNumber =
+    let period = (int blockNumber) / 800_000    // 800K blocks = 6 years
+    let initial = 50UL * 100_000_000UL
+    initial >>> period
 
 let createGenesis (chain:Chain.ChainParameters) transactions nonce =
     let txMerkleRoot =
@@ -105,7 +106,7 @@ let getBlockCoinbase chain acs blockNumber transactions coinbasePkHash =
                       Map.add output.spend.asset (output.spend.amount + amount) totals) Map.empty
             let totalZen = defaultArg (Map.tryFind Constants.Zen blockFees) 0UL
             let blockSacrifice = getBlockSacrificeAmount chain acs
-            let blockReward = getBlockReward blockNumber
+            let blockReward = blockReward blockNumber
 
             Map.add Constants.Zen (totalZen + blockReward + blockSacrifice) blockFees
 
@@ -311,7 +312,7 @@ let connect chain getUTXO contractsPath parent timestamp utxoSet acs ema =
                 let totalZen = defaultArg (Map.tryFind Constants.Zen blockFees) 0UL
 
                 let blockSacrifice = getBlockSacrificeAmount chain acs
-                let blockReward = getBlockReward block.header.blockNumber
+                let blockReward = blockReward block.header.blockNumber
 
                 Map.add Constants.Zen (totalZen + blockSacrifice + blockReward) blockFees
 
