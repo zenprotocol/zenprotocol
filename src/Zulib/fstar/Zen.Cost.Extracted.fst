@@ -142,6 +142,14 @@ val refine_eq_out(#a:Type)(#n:nat):
 let refine_eq_out #_ #_ x mx =
     refine_prop_out (fun y -> y == x) mx
 
+val ifBang(#a:Type)(#m #n:nat):
+    mx:cost bool m
+    -> (b:bool{b = force mx} -> cost a n)
+    -> cost a (n + m)
+let ifBang #_ #_ #_ mx f =
+    refine_eq_in mx `bind` f
+
+
 // These functions are intentionally not implemented. They cannot be used in actual code.
 // Nevertheless, they are very useful for theorem proving.
 val force_map(#a #b:Type)(#n:nat): f:(a -> b) -> mx: cost a n
