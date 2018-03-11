@@ -263,7 +263,7 @@ let private handleMainChain chain contractPath session timestamp (state:State) (
             Log.info "Failed connecting block %A due to %A" (Block.hash block.header) error
             return state
         | Ok (block,utxoSet,acs,ema) ->
-            Log.info "New block #%d %A" block.header.blockNumber blockHash
+            Log.info "New block #%d with %d txs %A" block.header.blockNumber (List.length block.transactions) blockHash
 
             let extendedHeader = ExtendedBlockHeader.createMain parent blockHash block
 
@@ -361,7 +361,7 @@ let validateBlock chainParams contractPath session timestamp block mined (state:
         let blockRequests = Map.remove blockHash state.blockRequests
         let state = {state with blockRequests = blockRequests}
 
-        Log.info "Validating new block #%d %A" block.header.blockNumber blockHash
+        Log.info "Validating new block #%d with %d txs %A" block.header.blockNumber (List.length block.transactions) blockHash
 
         // checking if block already exist
         if BlockRepository.contains session blockHash then return state else
