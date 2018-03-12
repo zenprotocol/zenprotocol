@@ -7,6 +7,7 @@ open Infrastructure
 open Consensus
 open Consensus.Transaction
 open Consensus.TransactionValidation
+open Consensus.Types
 open State
 
 let getUTXO = UtxoSetRepository.get
@@ -134,14 +135,22 @@ let executeContract session txSkeleton cHash command data returnAddress state =
                 ContractUtxoRepository.getContractUtxo session cHash state.utxoSet
                 |> List.reject (isInTxSkeleton txSkeleton)
 
-            let cost = Contract.getCost contract command data (Some returnAddress) contractWallet txSkeleton
-            let totalCost = cost + totalCost
-
             Contract.run contract command data (Some returnAddress) contractWallet txSkeleton
             |> Result.bind (fun (tx, message) ->
+
                 TxSkeleton.checkPrefix txSkeleton tx
                 |> Result.bind (fun finalTxSkeleton ->
-                    let witnesses = List.add (TxSkeleton.getContractWitness contract.hash command data returnAddress txSkeleton finalTxSkeleton cost) witnesses
+                    let witness = TxSkeleton.getContractWitness contract.hash command data returnAddress txSkeleton finalTxSkeleton 0I
+
+                    // To commit to the cost we need the real contract wallet
+                    let contractWallet = TransactionValidation.getContractWallet tx witness
+                    let cost = Contract.getCost contract command data (Some returnAddress) contractWallet txSkeleton
+                    let totalCost = cost + totalCost
+
+                    // We can now commit to the cost, so lets alter it with the real cost
+                    let witness = {witness with cost = uint32 cost}
+
+                    let witnesses = List.add (ContractWitness witness) witnesses
 
                     match message with
                     | Some {cHash=cHash; command=command; data=data} ->

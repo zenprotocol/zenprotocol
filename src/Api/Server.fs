@@ -35,6 +35,36 @@ let handleRequest chain client (request,reply) =
             reply StatusCode.OK NoContent
 
     match request with
+    | Get ("/network/connections/count", _) ->
+        let count = Network.getConnectionCount client
+
+        reply StatusCode.OK (JsonContent (JsonValue.Number (count |> decimal)))
+
+    | Get ("/blockchain/info", _) ->
+        let info = Blockchain.getBlockChainInfo client
+
+        let json = (
+            new BlockChainInfoJson.Root(
+                info.chain,
+                info.blocks|> int,
+                info.headers |> int,
+                info.difficulty |> decimal,
+                info.medianTime |> int64)).JsonValue
+
+        reply StatusCode.OK (JsonContent json)
+
+    | Get ("/contract/active", _) ->
+        let activeContracts = Blockchain.getActiveContracts client
+        let json =
+            activeContracts
+            |> List.map (fun contract ->
+                let address = Address.encode chain (Address.Contract contract.contractHash)
+                new ActiveContractsJson.Root(Hash.toString contract.contractHash,address, contract.expiry |> int,contract.code))
+            |> List.map (fun balance -> balance.JsonValue)
+            |> List.toArray
+            |> JsonValue.Array
+
+        reply StatusCode.OK (JsonContent json)
     | Get ("/contract/hash", query) ->
         match Map.tryFind "address" query with
         | None ->

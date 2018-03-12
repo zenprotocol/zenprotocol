@@ -14,6 +14,20 @@ type ActivateContractTransactionResult = Result<Transaction * Hash, string>
 module Blockchain =
     let serviceName = "blockchain"
 
+    type ActiveContract = {
+        contractHash:Hash
+        code:string
+        expiry:uint32
+    }
+
+    type BlochChainInfo = {
+        chain:string
+        blocks:uint32
+        headers:uint32
+        difficulty:float
+        medianTime:uint64
+    }
+
     type Command =
         | ValidateTransaction of Types.Transaction
         | RequestMemPool of peerId:byte[]
@@ -32,6 +46,8 @@ module Blockchain =
         | GetTip
         | GetBlock of Hash.Hash
         | GetBlockHeader of Hash.Hash
+        | GetActiveContracts
+        | GetBlockChainInfo
 
     type Response = unit
 
@@ -88,6 +104,12 @@ module Blockchain =
     let getTip client =
         Request.send<Request,(Hash.Hash*BlockHeader) option> client serviceName GetTip
 
+    let getActiveContracts client =
+        Request.send<Request,ActiveContract list> client serviceName GetActiveContracts
+
+    let getBlockChainInfo client =
+        Request.send<Request,BlochChainInfo> client serviceName GetBlockChainInfo
+
 module Network =
     type Command =
         | SendMemPool of peerId:byte[] * Hash.Hash list
@@ -99,11 +121,15 @@ module Network =
         | GetNewBlock of peerId:byte[] * Hash.Hash
         | PublishBlock of BlockHeader
 
-    type Request = unit
+    type Request =
+        GetConnectionCount
 
     type Response = unit
 
     let serviceName = "network"
+
+    let getConnectionCount client =
+        Request.send<Request, uint32> client serviceName GetConnectionCount
 
 module Wallet =
     type Command = unit

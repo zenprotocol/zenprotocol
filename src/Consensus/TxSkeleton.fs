@@ -108,7 +108,7 @@ let getContractWitness cHash command data returnAddress initialTxSkelton finalTx
         List.tryFindIndex (fun output -> output.lock = returnAddress) finalTxSkeleton.outputs
         |> Option.map uint32
 
-    ContractWitness {
+    {
         cHash = cHash
         command = command
         data = data

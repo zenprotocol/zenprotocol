@@ -37,6 +37,7 @@ let mutable state = {
             ema=EMA.create chain
         }
     blockRequests= Map.empty
+    headers = 0ul
 }
 
 let account = Account.createTestAccount ()

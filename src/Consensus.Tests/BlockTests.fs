@@ -251,6 +251,7 @@ let ``can connect block with a contract``() =
             costFn = fun _ _ _ _ _ -> 0I
             expiry=1001ul
             size=String.length SampleContract.sampleContractCode |> uint32
+            code=""
         }
 
     let acs = ActiveContractSet.empty |> ActiveContractSet.add contract.hash contract
@@ -283,6 +284,7 @@ let ``block with invalid contract failed connecting``() =
             costFn = fun _ _ _ _ _ -> 0I
             expiry=1000ul
             size=100ul
+            code=""
         }
 
     let acs = ActiveContractSet.empty |> ActiveContractSet.add contract.hash contract
@@ -647,6 +649,7 @@ let ``contract get removed when expiring arrive``() =
             costFn = fun _ _ _ _ _ -> 0I
             expiry=1ul
             size=100ul
+            code=""
         }
 
     let acs = ActiveContractSet.empty |> ActiveContractSet.add contract.hash contract

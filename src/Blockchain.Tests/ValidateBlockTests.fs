@@ -75,6 +75,7 @@ let state = {
            ema=ema
         }
     blockRequests= Map.empty
+    headers=0ul
 }
 
 let createChain (length:int) nonce start ema account =
@@ -566,7 +567,7 @@ let ``orphan transactions added to mempool after origin tx found in block``() =
         Account.addTransaction txHash1 tx1 account
         |> createTransaction
     let txHash2 = Transaction.hash tx2
-    
+
     let orphanPool =
         state.memoryState.orphanPool
         |> OrphanPool.add txHash2 tx2
@@ -605,6 +606,7 @@ let ``block with a contract activation is added to chain``() =
         costFn = fun _ _ _ _ _ -> 1I
         expiry=1002ul
         size=String.length sampleContractCode |> uint32
+        code = ""
     }
 
     let acs = ActiveContractSet.add cHash contract state.tipState.activeContractSet
