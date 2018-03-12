@@ -35,6 +35,18 @@ let handleRequest chain client (request,reply) =
             reply StatusCode.OK NoContent
 
     match request with
+    | Get ("/contract/active", _) ->
+        let activeContracts = Blockchain.getActiveContracts client
+        let json =
+            activeContracts
+            |> List.map (fun contract ->
+                let address = Address.encode chain (Address.Contract contract.contractHash)
+                new ActiveContractsJson.Root(Hash.toString contract.contractHash,address, contract.expiry |> int,contract.code))
+            |> List.map (fun balance -> balance.JsonValue)
+            |> List.toArray
+            |> JsonValue.Array
+
+        reply StatusCode.OK (JsonContent json)
     | Get ("/contract/hash", query) ->
         match Map.tryFind "address" query with
         | None ->

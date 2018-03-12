@@ -63,3 +63,14 @@ type PublishBlockJson = JsonProvider<"""
     "block": "somehex"
 }
 """>
+
+type ActiveContractsJson = JsonProvider<"""
+[
+    {
+        "contractHash": "hash",
+        "address":"address",
+        "expire": 666,
+        "code": "printfn hello world"
+    }
+]
+""">

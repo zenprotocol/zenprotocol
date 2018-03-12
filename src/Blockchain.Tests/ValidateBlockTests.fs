@@ -605,6 +605,7 @@ let ``block with a contract activation is added to chain``() =
         costFn = fun _ _ _ _ _ -> 1I
         expiry=1002ul
         size=String.length sampleContractCode |> uint32
+        code = ""
     }
 
     let acs = ActiveContractSet.add cHash contract state.tipState.activeContractSet

@@ -109,6 +109,17 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
             |> requestId.reply<(Hash.Hash*Types.BlockHeader) option>
         else
             requestId.reply<(Hash.Hash*Types.BlockHeader) option> None
+    | GetActiveContracts ->
+        ActiveContractSet.getContracts state.memoryState.activeContractSet
+        |> Seq.map (fun contract ->
+            {
+                contractHash = contract.hash
+                expiry = contract.expiry
+                code = contract.code
+            })
+        |> List.ofSeq
+        |> requestId.reply<ActiveContract list>
+
     ret state
 
 let handleEvent event session timestamp state =
