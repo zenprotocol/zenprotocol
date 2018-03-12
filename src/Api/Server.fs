@@ -35,6 +35,11 @@ let handleRequest chain client (request,reply) =
             reply StatusCode.OK NoContent
 
     match request with
+    | Get ("/network/connections/count", _) ->
+        let count = Network.getConnectionCount client
+
+        reply StatusCode.OK (JsonContent (JsonValue.Number (count |> decimal)))
+
     | Get ("/blockchain/info", _) ->
         let info = Blockchain.getBlockChainInfo client
 

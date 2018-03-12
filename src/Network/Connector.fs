@@ -54,6 +54,13 @@ let private countConnectingOrConnected connector =
         | _ -> false) connector.connections
     |> Map.count
 
+let countConnected connector =
+    Map.filter (fun _ value ->
+            match value with
+            | Connected -> true
+            | _ -> false) connector.connections
+    |> Map.count
+
 let connect transport addressBook connector =
 
     let connectInternal transport addressBook connector exclude =
