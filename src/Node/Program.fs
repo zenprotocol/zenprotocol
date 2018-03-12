@@ -16,6 +16,7 @@ type Argument =
     | Ip of string
     | Wipe
     | Miner
+    | [<AltCommandLine("-t")>] Threads of int
     | [<AltCommandLine("-lr")>] Localhost
     | [<AltCommandLine("-l1")>] Local1
     | [<AltCommandLine("-l2")>] Local2
@@ -31,6 +32,7 @@ type Argument =
                 | Ip _ -> "specify the IP the node should relay to other peers"
                 | Wipe -> "wipe database"
                 | Miner -> "enable miner"
+                | Threads _ -> "number of threads to use for miner"
                 | Localhost -> "specify if the node should local chain host"
                 | Local1 -> "run node with local1 settings, use for tests"
                 | Local2 -> "run node with local1 settings, use for tests"
@@ -71,7 +73,7 @@ let main argv =
     let results = parser.Parse argv
 
     let mutable root = false
-
+    let mutable threads = 1
     let mutable wipe = false
 
     List.iter (fun arg ->
@@ -116,6 +118,8 @@ let main argv =
         | Wipe -> wipe <- true
         | Miner ->
             config.miner <- true
+        | Threads n ->
+            config.threads <- n
         | Seed ->
             root <- true
             config.listen <- true
@@ -142,12 +146,15 @@ let main argv =
 
     use walletActor = Wallet.Main.main dataPath busName chain root
 
-    use minerActor =
+    use minerActors =
         if config.miner then
-            Miner.Main.main busName chainParams
-            |> Disposables.toDisposable
+            List.init config.threads ( fun _ ->
+                Miner.Main.main busName chainParams
+                |> Disposables.toDisposable )
+            |> Disposables.fromList
         else
-            Disposables.empty
+            [ Disposables.empty ]
+            |> Disposables.fromList
 
     use apiActor =
         if config.api.enabled then
