@@ -8,42 +8,42 @@ open Consensus.Types
 open Consensus.Difficulty
 open System
 
-type Command = 
+type Command =
     | NewBlockTemplate of Block
-    | Stop       
+    | Stop
     | Exit
-      
+
 type Queue = System.Collections.Concurrent.BlockingCollection<Command>
 
 let random = new System.Random()
 
 let getRandomNonce () =
-    let array = 
+    let array =
         Array.zeroCreate 64
-    
-    random.NextBytes (array) 
-        
-    System.BitConverter.ToUInt64 (array,0) 
+
+    random.NextBytes (array)
+
+    System.BitConverter.ToUInt64 (array,0)
 
 let minerTask chain busName (collection:Queue) =
     let client = ServiceBus.Client.create busName
- 
+
     let rec findNonce target (block:Block) =
         let n1,n2 = block.header.nonce
-        
-        let header = 
+
+        let header =
             if n1 = UInt64.MaxValue then
                 {block.header with nonce=getRandomNonce(), 0UL }
             else
                 {block.header with nonce=n1, (n2 + 1UL) }
-                
+
         let block = {block with header=header}
-        
+
         match Block.validateHeader chain header with
         | Result.Ok _ ->
             Log.info "new block mined"
-        
-            // We found a block            
+
+            // We found a block
             Messaging.Services.Blockchain.validateMinedBlock client block
             ()
         | Result.Error _ ->
@@ -51,44 +51,49 @@ let minerTask chain busName (collection:Queue) =
             // If message waits, exit function
             // TODO: don't check every time, only once every X iterations
             if collection.Count = 0 then
-                findNonce target block                                                      
-               
-    let mutable shouldStop = false       
-    
-    async {     
+                findNonce target block
+
+    let mutable shouldStop = false
+
+    async {
         while not shouldStop do
             match collection.Take () with
-            | NewBlockTemplate block ->                
+            | NewBlockTemplate block ->
                 let target = Difficulty.uncompress block.header.difficulty
+
+                Log.info "New block to mine #%d with difficulty %x" block.header.blockNumber block.header.difficulty
+
                 findNonce target block
             | Stop -> () // do nothing, we will block on next take call and wait for new block
             | Exit -> shouldStop <- true
     }
-                                                   
-let handleEvent pkHash client (collection:Queue) event =    
-    match event with    
+
+let handleEvent pkHash client (collection:Queue) event =
+    match event with
     | TransactionAddedToMemPool _
-    | TipChanged _ ->                
+    | TipChanged _ ->
         Blockchain.getBlockTemplate client pkHash
         |> NewBlockTemplate
-        |> collection.Add             
-    | _ -> ()                         
-            
+        |> collection.Add
+    | _ -> ()
+
 let main busName chain =
-    Actor.create<unit,unit,Event,unit> busName "Miner" (fun poller sbObservable ebObservable  ->  
+    Actor.create<unit,unit,Event,unit> busName "Miner" (fun poller sbObservable ebObservable  ->
         let client = ServiceBus.Client.create busName
         let collection = new Queue()
-        
+
+        Log.info "Miner running"
+
         let pkHash = Wallet.getAddressPKHash client
         Blockchain.getBlockTemplate client pkHash
             |> NewBlockTemplate
-            |> collection.Add    
-        
-        Async.Start (minerTask chain busName collection)                              
-        
-        let observable = 
+            |> collection.Add
+
+        Async.Start (minerTask chain busName collection)
+
+        let observable =
             ebObservable
-            |> Observable.map (handleEvent pkHash client collection)               
-                                                                                      
+            |> Observable.map (handleEvent pkHash client collection)
+
         Disposables.empty, observable
     )
