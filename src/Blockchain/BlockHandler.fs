@@ -433,6 +433,14 @@ let private handleHeader chain session get reason header state =
             match BlockRepository.tryGetHeader session blockHash with
             | Some extendedBlock ->
                 if extendedBlock.status = ExtendedBlockHeader.Orphan then
+                    let headers =
+                        if state.headers < header.blockNumber then
+                            header.blockNumber
+                        else
+                            state.headers
+
+                    let state = {state with headers = headers}
+
                     return! requestOrphanChainRoot session extendedBlock state
                 else
                     return state
@@ -446,7 +454,13 @@ let private handleHeader chain session get reason header state =
 
                     do! get blockHash
 
-                    return {state with blockRequests = blockRequests}
+                    let headers =
+                        if state.headers < header.blockNumber then
+                            header.blockNumber
+                        else
+                            state.headers
+
+                    return {state with blockRequests = blockRequests; headers=headers}
                 | Error _ ->
                     return state
         else

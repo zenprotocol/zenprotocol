@@ -10,6 +10,7 @@ type Chain =
 
 type ChainParameters =
     {
+        name:string;
         proofOfWorkLimit:Hash.Hash;
         blockInterval:uint64;
         smoothingFactor:float;
@@ -20,7 +21,9 @@ type ChainParameters =
     }
 
 let mainParameters =
-    {   proofOfWorkLimit=Difficulty.uncompress 0x1d00fffful;
+    {
+        name="main"
+        proofOfWorkLimit=Difficulty.uncompress 0x1d00fffful;
         blockInterval=236682UL;
         smoothingFactor=0.0055;
         maxBlockWeight=1000_000_000I;
@@ -30,7 +33,9 @@ let mainParameters =
     }
 
 let testParameters =
-    {   proofOfWorkLimit=Difficulty.uncompress 0x20fffffful;
+    {
+        name="testnet"
+        proofOfWorkLimit=Difficulty.uncompress 0x20fffffful;
         blockInterval=60UL*1000UL;
         smoothingFactor=0.0055;
         maxBlockWeight=1000_000_000I;
@@ -41,6 +46,7 @@ let testParameters =
 
 let localParameters = {
     testParameters with
+        name="local"
         genesisHash =
             get <| Hash.fromString "7ffa8c6b1525b8b98ba7847a524a0383659d111d793d5249f4b39b0c84d06b4c";
         genesisTime=1515594186383UL

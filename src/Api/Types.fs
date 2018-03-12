@@ -74,3 +74,12 @@ type ActiveContractsJson = JsonProvider<"""
     }
 ]
 """>
+
+type BlockChainInfoJson = JsonProvider<"""
+{
+    "chain": "string",
+    "blocks":100,
+    "headers":100,
+    "difficulty":0.1,
+    "medianTime":2147483648
+}""">

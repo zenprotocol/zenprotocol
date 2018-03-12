@@ -119,6 +119,34 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
             })
         |> List.ofSeq
         |> requestId.reply<ActiveContract list>
+    | GetBlockChainInfo ->
+        let tip = state.tipState.tip.header
+
+        let difficulty =
+            if state.tipState.tip.header.blockNumber = 0ul then
+                1.0
+            else
+                let mutable shift = (tip.difficulty >>> 24) &&& 0xfful;
+                let mutable diff =
+                    float 0x0000ffff / float (tip.difficulty &&& 0x00fffffful)
+
+                while shift < 29ul do
+                    diff <- diff * 256.0
+                    shift <- shift + 1ul
+
+                while shift > 29ul do
+                    diff <- diff / 256.0
+                    shift <- shift - 1ul
+
+                diff
+        {
+            chain = chain.name
+            blocks = state.tipState.tip.header.blockNumber
+            headers = state.headers
+            medianTime = EMA.earliest state.tipState.ema
+            difficulty = difficulty
+        }
+        |> requestId.reply
 
     ret state
 

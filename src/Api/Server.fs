@@ -35,6 +35,19 @@ let handleRequest chain client (request,reply) =
             reply StatusCode.OK NoContent
 
     match request with
+    | Get ("/blockchain/info", _) ->
+        let info = Blockchain.getBlockChainInfo client
+
+        let json = (
+            new BlockChainInfoJson.Root(
+                info.chain,
+                info.blocks|> int,
+                info.headers |> int,
+                info.difficulty |> decimal,
+                info.medianTime |> int64)).JsonValue
+
+        reply StatusCode.OK (JsonContent json)
+
     | Get ("/contract/active", _) ->
         let activeContracts = Blockchain.getActiveContracts client
         let json =

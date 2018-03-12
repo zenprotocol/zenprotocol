@@ -20,6 +20,14 @@ module Blockchain =
         expiry:uint32
     }
 
+    type BlochChainInfo = {
+        chain:string
+        blocks:uint32
+        headers:uint32
+        difficulty:float
+        medianTime:uint64
+    }
+
     type Command =
         | ValidateTransaction of Types.Transaction
         | RequestMemPool of peerId:byte[]
@@ -39,6 +47,7 @@ module Blockchain =
         | GetBlock of Hash.Hash
         | GetBlockHeader of Hash.Hash
         | GetActiveContracts
+        | GetBlockChainInfo
 
     type Response = unit
 
@@ -97,6 +106,9 @@ module Blockchain =
 
     let getActiveContracts client =
         Request.send<Request,ActiveContract list> client serviceName GetActiveContracts
+
+    let getBlockChainInfo client =
+        Request.send<Request,BlochChainInfo> client serviceName GetBlockChainInfo
 
 module Network =
     type Command =

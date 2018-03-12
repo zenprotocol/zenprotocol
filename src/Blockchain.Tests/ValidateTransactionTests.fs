@@ -63,6 +63,7 @@ let state = {
             ema=EMA.create chain
     }
     blockRequests= Map.empty
+    headers=0ul
 }
 
 [<Test>]
