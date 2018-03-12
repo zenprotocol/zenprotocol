@@ -4,15 +4,17 @@ open Consensus.Types
 
 type T  = {
     difficulty: uint32;
-    interval: uint64;
     delayed: uint64 list;
 }
+
+[<Literal>]
+let adjustment = 0.984
 
 let clamp lower upper x = min upper (max lower x)
 
 let create (chain:ChainParameters) =
     let difficulty = Difficulty.compress chain.proofOfWorkLimit
-    {difficulty = difficulty; interval=chain.blockInterval; delayed=[]}
+    {difficulty = difficulty; delayed=[]}
 
 let push newTimestamp (timestamps:uint64 list) =
     if List.length timestamps < 11 then
@@ -30,15 +32,14 @@ let add chain header ema =
     let newDelayed = push header ema.delayed
     if List.length ema.delayed < 11 then {ema with delayed = newDelayed} else // First 11 blocks don't alter difficulty
     let alpha = chain.smoothingFactor
-    let oldDelayed = ema.delayed
-    let currentInterval = median newDelayed - median oldDelayed
-    let nextEstimatedInterval = float ema.interval * (1.0 - alpha) + float currentInterval * alpha |> uint64
+    let currentInterval = float <| newDelayed.[10]-newDelayed.[9]
     let currentTarget = Hash.toBigInt <| Difficulty.uncompress ema.difficulty
+    let estimate = float currentTarget * ((1.0-alpha) + (alpha * currentInterval) / (float chain.blockInterval * adjustment))
     let nextTarget = clamp  (Hash.toBigInt <| Difficulty.maximum)   // maximum difficulty => low target
                             (Hash.toBigInt <| chain.proofOfWorkLimit)   // high target
-                            (currentTarget * bigint nextEstimatedInterval / bigint (chain.blockInterval))
+                            (bigint estimate)
     let nextDifficulty = Difficulty.compress <| Hash.fromBigInt nextTarget
-    {ema with delayed = newDelayed; interval = nextEstimatedInterval; difficulty = nextDifficulty}
+    {ema with delayed = newDelayed; difficulty = nextDifficulty}
 
 let earliest ema =
     //TODO: Refactor genesis block handling so the first case can raise an error.

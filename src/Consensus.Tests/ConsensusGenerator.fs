@@ -24,7 +24,7 @@ type ConsensusGenerator =
             let! timestamp = Arb.generate<uint64>
             let! coinbasePkHash = Arb.generate<Hash.Hash>
             let! blockNumber = Arb.generate<uint32> |> Gen.filter(fun n -> n > 1ul)
-            let reward = Block.getBlockReward blockNumber
+            let reward = Block.blockReward blockNumber
 
             let coinbase = {
                 inputs=[]

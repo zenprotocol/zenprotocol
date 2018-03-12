@@ -174,7 +174,7 @@ let rec private undoBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:Extend
 
 // After applying block or blocks we must readd mempool transactions to the ACS and UTXO
 let getMemoryState chainParams session contractPath blockNumber mempool orphanPool acs =
-    
+
     // We start with an empty mempool and current orphan pool
     // We first validate all orphan transactions according to the new state
     // We loop through existing mempool and adding it as we go to a new mempool
@@ -188,7 +188,7 @@ let getMemoryState chainParams session contractPath blockNumber mempool orphanPo
 
     Map.fold (fun writer txHash tx ->
         Writer.bind writer (fun memoryState ->
-        
+
             TransactionHandler.validateInputs chainParams session contractPath blockNumber txHash tx memoryState false)) memoryState mempool
 
 let rollForwardChain chainParams contractPath timestamp state session block persistentBlock acs ema =
@@ -231,7 +231,7 @@ let rollForwardChain chainParams contractPath timestamp state session block pers
 let private handleGenesisBlock chainParams contractPath session timestamp (state:State) blockHash block =
     effectsWriter {
         match Block.connect chainParams (getUTXO session) contractPath Block.genesisParent timestamp UtxoSet.asDatabase
-                state.tipState.activeContractSet state.tipState.ema block with
+                ActiveContractSet.empty (EMA.create chainParams) block with
         | Error error ->
             Log.info "Failed connecting genesis block %A due to %A" (Block.hash block.header) error
             return state
@@ -263,7 +263,7 @@ let private handleMainChain chain contractPath session timestamp (state:State) (
             Log.info "Failed connecting block %A due to %A" (Block.hash block.header) error
             return state
         | Ok (block,utxoSet,acs,ema) ->
-            Log.info "New block #%d %A" block.header.blockNumber blockHash
+            Log.info "New block #%d with %d txs %A" block.header.blockNumber (List.length block.transactions) blockHash
 
             let extendedHeader = ExtendedBlockHeader.createMain parent blockHash block
 
@@ -361,7 +361,7 @@ let validateBlock chainParams contractPath session timestamp block mined (state:
         let blockRequests = Map.remove blockHash state.blockRequests
         let state = {state with blockRequests = blockRequests}
 
-        Log.info "Validating new block #%d %A" block.header.blockNumber blockHash
+        Log.info "Validating new block #%d with %d txs %A" block.header.blockNumber (List.length block.transactions) blockHash
 
         // checking if block already exist
         if BlockRepository.contains session blockHash then return state else
@@ -433,6 +433,14 @@ let private handleHeader chain session get reason header state =
             match BlockRepository.tryGetHeader session blockHash with
             | Some extendedBlock ->
                 if extendedBlock.status = ExtendedBlockHeader.Orphan then
+                    let headers =
+                        if state.headers < header.blockNumber then
+                            header.blockNumber
+                        else
+                            state.headers
+
+                    let state = {state with headers = headers}
+
                     return! requestOrphanChainRoot session extendedBlock state
                 else
                     return state
@@ -446,7 +454,13 @@ let private handleHeader chain session get reason header state =
 
                     do! get blockHash
 
-                    return {state with blockRequests = blockRequests}
+                    let headers =
+                        if state.headers < header.blockNumber then
+                            header.blockNumber
+                        else
+                            state.headers
+
+                    return {state with blockRequests = blockRequests; headers=headers}
                 | Error _ ->
                     return state
         else

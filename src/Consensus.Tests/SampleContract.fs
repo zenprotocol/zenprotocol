@@ -81,7 +81,7 @@ let sampleOutputTx, _ =
 
 let sampleExpectedResult =
     Transaction.fromTxSkeleton sampleOutputTx
-    |> Transaction.addWitnesses [ TxSkeleton.getContractWitness sampleContractHash "" Contract.EmptyData (PK Hash.zero) sampleInputTx sampleOutputTx 213L ]
+    |> Transaction.addWitnesses [ ContractWitness <| TxSkeleton.getContractWitness sampleContractHash "" Contract.EmptyData (PK Hash.zero) sampleInputTx sampleOutputTx 213L ]
     |> Transaction.sign [ sampleKeyPair ]
 
 let getSampleUtxoset utxos =

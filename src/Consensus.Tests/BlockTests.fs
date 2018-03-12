@@ -251,6 +251,7 @@ let ``can connect block with a contract``() =
             costFn = fun _ _ _ _ _ -> 0L
             expiry=1001ul
             size=String.length SampleContract.sampleContractCode |> uint32
+            code=""
         }
 
     let acs = ActiveContractSet.empty |> ActiveContractSet.add contract.hash contract
@@ -283,6 +284,7 @@ let ``block with invalid contract failed connecting``() =
             costFn = fun _ _ _ _ _ -> 0L
             expiry=1000ul
             size=100ul
+            code=""
         }
 
     let acs = ActiveContractSet.empty |> ActiveContractSet.add contract.hash contract
@@ -479,7 +481,7 @@ let ``block with coinbase with multiple asset as reward should fail``() =
             inputs = [];
             outputs=
                 [
-                    {lock= Coinbase (15ul,Hash.zero);spend={amount=Block.getBlockReward 15ul;asset=Constants.Zen}}
+                    {lock= Coinbase (15ul,Hash.zero);spend={amount=Block.blockReward 15ul;asset=Constants.Zen}}
                     {lock= Coinbase (15ul,Hash.zero);spend={amount=1UL;asset=Hash.Hash (Array.create 32 1uy), Hash.zero}}
                 ]
             witnesses=[]
@@ -531,8 +533,8 @@ let ``coinbase reward split over multiple outputs``() =
             inputs = [];
             outputs=
                 [
-                    {lock= Coinbase (15ul,Hash.zero);spend={amount=(Block.getBlockReward 15ul) / 2UL;asset=Constants.Zen}}
-                    {lock= Coinbase (15ul,Hash.zero);spend={amount=(Block.getBlockReward 15ul) / 2UL;asset=Constants.Zen}}
+                    {lock= Coinbase (15ul,Hash.zero);spend={amount=(Block.blockReward 15ul) / 2UL;asset=Constants.Zen}}
+                    {lock= Coinbase (15ul,Hash.zero);spend={amount=(Block.blockReward 15ul) / 2UL;asset=Constants.Zen}}
                 ]
             witnesses=[]
             contract=None
@@ -647,6 +649,7 @@ let ``contract get removed when expiring arrive``() =
             costFn = fun _ _ _ _ _ -> 0L
             expiry=1ul
             size=100ul
+            code=""
         }
 
     let acs = ActiveContractSet.empty |> ActiveContractSet.add contract.hash contract
