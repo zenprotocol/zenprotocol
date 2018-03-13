@@ -1,5 +1,6 @@
 chain: test
 miner: false
+threads: 1
 
 dataPath: ./data 
 

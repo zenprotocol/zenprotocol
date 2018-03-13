@@ -1,5 +1,6 @@
 module Zen.TxSkeleton
 
+open Zen.Base
 open Zen.Cost
 open Zen.Types
 
@@ -10,10 +11,35 @@ val getAvailableTokens: asset -> txSkeleton -> U64.t `cost` 64
 
 val addInput: input -> txSkeleton -> txSkeleton `cost` 64
 
+(*
+val addInput_AvailableTokens:
+    pOut:pointedOutput
+    -> txSkel: txSkeleton
+    -> Lemma ( let open U64 in
+               let spend = (snd pOut).spend in
+               let asset = spend.asset in
+               let txSkel' = addInput (PointedOutput pOut) txSkel
+                             |> force in
+               let previouslyAvailableTokens = getAvailableTokens asset txSkel
+                                               |> force in
+               let availableTokens = getAvailableTokens asset txSkel'
+                                     |> force in
+               availableTokens = previouslyAvailableTokens +%^ spend.amount
+             )
+*)
+
 val addInputs(#n:nat):
-  pointedOutput `V.t` n
+  input `V.t` n
   -> txSkeleton
   -> txSkeleton `cost` (64 * n + 64)
+
+(*
+assume AddInputs_is_fold:
+    forall (#n:nat) (inputs: input `V.t` n) (txSkel: txSkeleton).
+        force (addInputs inputs txSkel)
+        ==
+        force (V.foldl (flip addInput) txSkel inputs)
+*)
 
 val lockToContract:
   asset

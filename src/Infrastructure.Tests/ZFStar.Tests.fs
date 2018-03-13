@@ -88,7 +88,7 @@ let compileAndInvoke fstCode args =
     )
     |> Result.bind (function
         | OK value -> Ok value
-        | ERR err -> Error err
+        | ERR err -> Error (System.Text.Encoding.ASCII.GetString err)
         | EX err -> Error err.Message //TODO: remove EX
     )
 
@@ -114,7 +114,7 @@ let ``Should record hints``() =
 
 [<Test>]
 let ``Should invoke compiled``() =
-    compileAndInvoke fstCode [| input; null; null; null; null; 0I; null |]
+    compileAndInvoke fstCode [| input; null; null; null; null; 0L; null |]
     |> shouldBeOk (input, Native.option<message>.None)
 
 [<Test>]
@@ -131,7 +131,7 @@ let ``Should throw with command's value``() =
         val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) 1
         let main tx chash command data returnAddress #l _ =
             failw command
-        """ [| null; null; "test command";null;null;0I;null |]
+        """ [| null; null; "test command"B ;null;null;0L;null |]
     |> shouldBeError "test command"
 
 [<Test>]

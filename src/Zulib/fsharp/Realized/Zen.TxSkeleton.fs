@@ -31,8 +31,8 @@ let getAvailableTokens (asset : asset) (txSkeleton : txSkeleton) : Cost.t<uint64
 
 let insertInput (input : input)
     (txSkeleton : txSkeleton) : txSkeleton =
-    let { asset = asset; amount = amount } = 
-        match input with 
+    let { asset = asset; amount = amount } =
+        match input with
         | PointedOutput (_, output) -> output.spend
         | Mint spend -> spend
 
@@ -149,7 +149,7 @@ let fromWallet (_: Prims.nat) (asset:asset) (amount:U64.t)
                 (contractHash:hash) (wallet:wallet<Prims.unit>) (txSkeleton:txSkeleton) =
 
     lazy (
-        let n,inputs,collectedAmount = collect asset amount wallet 0I V.VNil 0UL
+        let n,inputs,collectedAmount = collect asset amount wallet 0L V.VNil 0UL
 
         match inputs with
         | V.VNil -> Native.None

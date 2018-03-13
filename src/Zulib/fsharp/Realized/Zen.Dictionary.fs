@@ -1,16 +1,18 @@
 module Zen.Dictionary
 
+module S = FStar.String
 module Cost = Zen.Cost.Realized
+
 
 type dictionary<'a> =
     // A map from strings to `'a`, plus the number of elements in the set
-    Map<string, 'a> * uint32
+    Map<S.t, 'a> * uint32
 
 type t<'a> = dictionary<'a>
 
 let empty : dictionary<'a> = Map.empty, 0u
 
-let add (s:string) (x:'a) ((d, n):dictionary<'a>)
+let add (s:S.t) (x:'a) ((d, n):dictionary<'a>)
     : Cost.t<dictionary<'a>, unit> =
     lazy (
         if d |> Map.containsKey s then Map.add s x d, n
@@ -19,18 +21,18 @@ let add (s:string) (x:'a) ((d, n):dictionary<'a>)
     )
     |> Cost.C
 
-let containsKey (s:string) (d:dictionary<'a>) : Cost.t<bool, unit> =
+let containsKey (s:S.t) (d:dictionary<'a>) : Cost.t<bool, unit> =
     lazy ( Map.containsKey s (fst d) )
     |> Cost.C
 
-let remove (s:string) ((d, n):dictionary<'a>) : Cost.t<dictionary<'a>, unit> =
+let remove (s:S.t) ((d, n):dictionary<'a>) : Cost.t<dictionary<'a>, unit> =
     lazy (
         if not (d |> Map.containsKey s) then d, n
         else Map.remove s d, n - 1u
     )
     |> Cost.C
 
-let tryFind (s:string) ((d, _):dictionary<'a>)
+let tryFind (s:S.t) ((d, _):dictionary<'a>)
     : Cost.t<FStar.Pervasives.Native.option<'a>, unit> =
     lazy (
         d |> Map.tryFind s

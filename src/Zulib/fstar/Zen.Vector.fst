@@ -8,6 +8,7 @@ type vector(a:Type): nat -> Type =
     -> hd:a
     -> tl:vector a l
     -> vector a (l+1)
+
 type t(a:Type): nat -> Type = vector a // For qualified imports
 
 (** [isEmpty v] returns [true] if and only if [v] is empty. *)
@@ -90,6 +91,44 @@ let countWhere #_ #_ #_ f =
   let ctr (acc:nat) hd = f hd $> (fun b -> if b then acc+1 <: nat else acc) in
   admit();
   foldl ctr 0
+
+val forAll(#a:Type)(#l #n:nat):
+    (a -> bool `cost` n)
+    -> vector a l
+    -> bool `cost` ((n+2)*l+2)
+let forAll #_ #_ #_ f =
+    let aux acc x  =
+        let! fx = f x in
+        if acc && fx = true
+        then ret true
+        else ret false
+    in
+    foldl aux true
+
+val sumBy(#a:Type)(#l #n:nat):
+    (a -> int `cost` n)
+    -> vector a l
+    -> int `cost` ((n+2)*l+2)
+let sumBy #_ #_ #_ f =
+    let aux acc x =
+        let! fx = f x in
+        ret (fx + acc)
+    in
+    foldl aux 0
+
+val sumZ(#l:nat):
+    vector int l
+    -> int `cost` (2*l+2)
+let sumZ #_ =
+    sumBy ret
+
+(*
+val sumN(#l:nat):
+    vector nat l
+    -> nat `cost` (2*l+2)
+let sumN #_ =
+    sumBy ret
+*)
 
 val zip(#a #b:Type)(#l:nat):
   vector a l -> vector b l -> cost (vector (a**b) l) (3*l+3)

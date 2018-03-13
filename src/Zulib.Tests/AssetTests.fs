@@ -14,8 +14,7 @@ let unCost (Cost.C inj:Zen.Cost.Realized.cost<'Aa, 'An>) : 'Aa = inj.Force()
 [<Test>]
 let ``Should create asset from string``() =
     let bytes = 
-        Array.create 10 (byte 'A') 
-        |> Encoding.UTF8.GetString
+        Array.create 10 (byte 'A')
         
     let asset = Zen.Asset.fromString Zen.Asset.zeroHash bytes
     

@@ -1,34 +1,37 @@
 #light "off"
 module Prims
+open FSharp.Core.Operators.Checked
 open FSharp.Compatibility.OCaml.Pervasives
 module Obj = FSharp.Compatibility.OCaml.Obj
-module Big_int_Z = FSharp.Compatibility.OCaml.Big_int
 
-
-type int      = Big_int_Z.big_int
+type int      = int64
 type nonzero  = int
-let ( + )     = Big_int_Z.add_big_int
-let ( - )     = Big_int_Z.sub_big_int
-let ( * )     = Big_int_Z.mult_big_int
+let ( + ) : int -> int -> int = ( + )
+let ( - ) : int -> int -> int = ( - )
+let ( * ) : int -> int -> int = ( * )
 let op_Star = (*)
-let ( / )     = Big_int_Z.div_big_int
-let ( <= )    = Big_int_Z.le_big_int
-let ( >= )    = Big_int_Z.ge_big_int
-let ( < )     = Big_int_Z.lt_big_int
-let ( > )     = Big_int_Z.gt_big_int
-let ( mod )   = Big_int_Z.mod_big_int
-let ( ~- )    = Big_int_Z.minus_big_int
-let abs       = Big_int_Z.abs_big_int
-let parse_int = Big_int_Z.big_int_of_string
-let to_string = Big_int_Z.string_of_big_int
+let ( / ) : int -> int -> int = ( / )
+let ( <= ): int -> int -> bool = ( <= )
+let ( >= ): int -> int -> bool = ( >= )
+let ( < ) : int -> int -> bool = ( < )
+let ( > ) : int -> int -> bool = ( > )
+let ( mod ) : int -> int -> int = ( % )
+let ( ~- )  : int -> int = ( ~- )
+let abs     : int -> int = abs
+let parse_int : string -> int = System.Int64.Parse
+let to_string (x:int) : string = x.ToString()
 
 (** Some misc. types defined in Prims *)
 type unit      = Microsoft.FSharp.Core.unit
 type bool      = Microsoft.FSharp.Core.bool
-type string    = Microsoft.FSharp.Core.string
 type 'a array  = 'a Microsoft.FSharp.Core.array
+type string    = byte array
 type exn       = Microsoft.FSharp.Core.exn
+
 type 'a list   = 'a Microsoft.FSharp.Collections.list
+let length (ls:'a list) : int =
+    Microsoft.FSharp.Collections.List.length ls
+    |> int64
 type 'a option = 'a Microsoft.FSharp.Core.option
 
 type range     = unit
@@ -118,10 +121,10 @@ let __proj__Mkdtuple2__item___2 x = match x with
   | Mkdtuple2 (_, x) -> x
 
 let rec pow2 n =
-  if n = 0I then
-    1I
+  if n = 0L then
+    1L
   else
-    2I * pow2 (n - 1I)
+    2L * pow2 (n - 1L)
 
 let __proj__Cons__item__tl = function
   | _::tl -> tl

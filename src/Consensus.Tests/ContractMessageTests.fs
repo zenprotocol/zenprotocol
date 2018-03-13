@@ -133,7 +133,7 @@ let ``Should produce execute contracts with message passed between them``() =
                     ]
             }
 
-        let stringData = Zen.Types.Data.data.String "Some string data"
+        let stringData = Zen.Types.Data.data.String "Some string data"B
 
         let data = ZFStar.fstToFsData stringData
 

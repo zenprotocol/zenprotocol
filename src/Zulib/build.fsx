@@ -41,7 +41,7 @@ let runFStar args files =
     "--no_default_includes";
     "--include";"fstar/"; |]
   //printfn "%s" (join (fstar ++ args ++ zulibFiles));
-  ProcessHelper.Shell.Exec (executable, join (fstar ++ args ++ files))
+  ProcessHelper.Shell.AsyncExec (executable, join (fstar ++ args ++ files))
 
 Target "Clean" (fun _ ->
   CleanDir extractedDir
@@ -55,11 +55,14 @@ Target "RecordHints" (fun _ ->
        "--record_hints"
        "--cache_checked_modules" |]
 
-  let exitCodes = Array.Parallel.map (fun file -> runFStar args [|file|]) zulibFiles
+  let exitCodes = zulibFiles |> Array.map (fun file -> runFStar args [|file|])
+                             |> Async.Parallel
+                             |> Async.RunSynchronously
   if not ( exitCodes |> Array.forall ((=) 0) )
     then failwith "recording Zulib hints failed"
 
 )
+
 Target "Verify" (fun _ ->
   let args =
     [| "--use_hints";
@@ -67,7 +70,9 @@ Target "Verify" (fun _ ->
        "--cache_checked_modules"
     |]
 
-  let exitCodes = Array.Parallel.map (fun file -> runFStar args [|file|]) zulibFiles
+  let exitCodes = zulibFiles |> Array.map (fun file -> runFStar args [|file|])
+                             |> Async.Parallel
+                             |> Async.RunSynchronously
   if not (Array.forall (fun exitCode -> exitCode = 0) exitCodes)
     then failwith "Verifying Zulib failed"
 )
@@ -96,6 +101,7 @@ Target "Extract" (fun _ ->
        "--extract_module";"Zen.Array.Extracted";
        "--extract_module";"Zen.Cost.Extracted";
        "--codegen-lib";"Zen.Cost";
+       "--extract_module";"Zen.List";
        "--codegen-lib";"Zen.Array";
        "--extract_module";"Zen.Types.Extracted";
        "--extract_module";"Zen.Types.Data";
@@ -105,6 +111,7 @@ Target "Extract" (fun _ ->
        "--odir";extractedDir |]
 
   let exitCode = runFStar args zulibFiles
+                 |> Async.RunSynchronously
 
   if exitCode <> 0 then
     failwith "extracting Zulib failed"
@@ -127,13 +134,15 @@ Target "Build" (fun _ ->
       "fsharp/Extracted/Zen.Tuple.fs";
       "fsharp/Realized/Zen.Cost.Realized.fs";
       "fsharp/Extracted/Zen.Cost.Extracted.fs";
+      "fsharp/Realized/FStar.Char.fs";
+      "fsharp/Realized/FStar.String.fs";
       "fsharp/Realized/Zen.Set.fs";
       "fsharp/Realized/Zen.Dictionary.fs";
       "fsharp/Extracted/Zen.OptionT.fs";
       "fsharp/Extracted/Zen.ErrorT.fs";
       "fsharp/Extracted/Zen.TupleT.fs";
+      "fsharp/Extracted/Zen.List.fs";
       "fsharp/Extracted/Zen.Vector.fs";
-      "fsharp/Realized/Zen.String.Realized.fs";
       "fsharp/Realized/Zen.Array.Realized.fs";
       "fsharp/Extracted/Zen.Array.Extracted.fs";
       "fsharp/Extracted/Zen.Types.Extracted.fs";

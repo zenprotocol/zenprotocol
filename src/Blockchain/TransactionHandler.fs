@@ -140,7 +140,7 @@ let executeContract session txSkeleton cHash command data returnAddress state =
 
                 TxSkeleton.checkPrefix txSkeleton tx
                 |> Result.bind (fun finalTxSkeleton ->
-                    let witness = TxSkeleton.getContractWitness contract.hash command data returnAddress txSkeleton finalTxSkeleton 0I
+                    let witness = TxSkeleton.getContractWitness contract.hash command data returnAddress txSkeleton finalTxSkeleton 0L
 
                     // To commit to the cost we need the real contract wallet
                     let contractWallet = TransactionValidation.getContractWallet tx witness
@@ -160,7 +160,7 @@ let executeContract session txSkeleton cHash command data returnAddress state =
                 )
             )
 
-    run cHash command data txSkeleton [] 0I
+    run cHash command data txSkeleton [] 0L
     |> Result.map (fun (finalTxSkeleton, witnesses, totalCost) ->
         Log.info "Running contract chain with cost: %A" totalCost
 

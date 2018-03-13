@@ -84,7 +84,7 @@ let ``Should get expected contract cost``() =
     (compile sampleContractCode
      |> Result.map (fun contract ->
         Contract.getCost contract "" Contract.EmptyData None List.empty sampleInputTx)
-    , (Ok 213I : Result<bigint, string>))
+    , (Ok 213L : Result<int64, string>))
     |> shouldEqual
 
 [<Test>]
@@ -186,7 +186,7 @@ let ``Contract should be able to destroy its own tokens locked to it``() =
 
     let sampleExpectedResult =
         Transaction.fromTxSkeleton sampleOutputTx
-        |> Transaction.addWitnesses [ ContractWitness <| TxSkeleton.getContractWitness sampleContractHash "" Contract.EmptyData (PK Hash.zero) sampleInputTx sampleOutputTx 137I]
+        |> Transaction.addWitnesses [ ContractWitness <| TxSkeleton.getContractWitness sampleContractHash "" Contract.EmptyData (PK Hash.zero) sampleInputTx sampleOutputTx 137L]
         |> Transaction.sign [ sampleKeyPair ]
 
     (compileRunAndValidate sampleInputTx utxoSet sampleContractCode
