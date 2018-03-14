@@ -25,6 +25,7 @@ nuget Zen.FSharp.Compiler.Service 17.0.2
 nuget ZFS-Tools >= 0.0.10
 nuget FSharpx.Extras
 nuget Newtonsoft.Json
+nuget Base58Check
 
 source https://www.myget.org/F/zenprotocol/api/v2
 

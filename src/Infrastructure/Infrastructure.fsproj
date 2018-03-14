@@ -43,6 +43,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="BigInteger.fs" />
     <Compile Include="Endpoint.fs" />
     <Compile Include="List.fs" />
     <Compile Include="Log.fs" />

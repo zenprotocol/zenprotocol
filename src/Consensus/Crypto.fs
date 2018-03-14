@@ -3,8 +3,20 @@ module Consensus.Crypto
 open System.Runtime.InteropServices
 open Consensus.Hash
 
+module secp256k1 =
+    let n =
+        [| 
+            0xFFuy; 0xFFuy; 0xFFuy; 0xFFuy; 
+            0xFFuy; 0xFFuy; 0xFFuy; 0xFFuy; 
+            0xFFuy; 0xFFuy; 0xFFuy; 0xFFuy; 
+            0xFFuy; 0xFFuy; 0xFFuy; 0xFEuy; 
+            0xBAuy; 0xAEuy; 0xDCuy; 0xE6uy; 
+            0xAFuy; 0x48uy; 0xA0uy; 0x3Buy; 
+            0xBFuy; 0xD2uy; 0x5Euy; 0x8Cuy; 
+            0xD0uy; 0x36uy; 0x41uy; 0x41uy;
+        |]
+        
 module Native = 
-    
     type Context = System.IntPtr
     
     type Result = 
@@ -92,6 +104,14 @@ module Native =
         System.IntPtr noncefp,
         System.IntPtr ndata
     );       
+
+    //TODO: see ExtendedKey in Wallet
+//    [<DllImport("secp256k1", CallingConvention=CallingConvention.Cdecl)>]
+//    extern Result secp256k1_ec_pubkey_tweak_add(
+//        Context ctx,
+//        byte[] pubkey,
+//        byte[] tweak
+//    );       
     
     [<DllImport("secp256k1")>]
     extern Result secp256k1_ec_pubkey_create(
@@ -138,7 +158,10 @@ module SecretKey =
         match Native.secp256k1_ec_pubkey_create (context, publicKey, secretKey) with
         | Native.Result.Ok -> Some (PublicKey.PublicKey publicKey)
         | Native.Result.Error ->  None
-        | x -> failwithf "Unexpected result %A" x                    
+        | x -> failwithf "Unexpected result %A" x
+        
+    let serialize (SecretKey secretKey) = 
+        secretKey
     
 module PublicKey =      
     let serialize (PublicKey publicKey) =
@@ -201,7 +224,6 @@ let sign (SecretKey secretKey) (Hash hash) =
     | x -> failwithf "failed to sign %A" x
     
 let verify (PublicKey publicKey) (Signature signature) msg =
-    
     match Native.secp256k1_ecdsa_verify (context, signature, msg, publicKey) with
     | Native.Result.Ok -> Valid
     | _ -> Invalid

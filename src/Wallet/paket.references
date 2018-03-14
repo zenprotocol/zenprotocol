@@ -4,3 +4,4 @@ FSharp.Core
 FsBech32
 FSharp.Compiler.Tools
 FsPickler
+Base58Check
