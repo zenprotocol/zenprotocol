@@ -150,3 +150,11 @@ let encode chainKeyArgs extendedKey = result {
         ++ data
         |> Base58Check.Base58CheckEncoding.Encode
 }
+
+let getKeyPair extendedKey = 
+    result {
+        let! privateKey = getPrivateKey extendedKey
+        let! publicKey = getPublicKey extendedKey
+
+        return (privateKey, publicKey)
+    }

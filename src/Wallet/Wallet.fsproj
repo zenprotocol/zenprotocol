@@ -42,8 +42,8 @@
   <ItemGroup>
     <Compile Include="Address.fs" />
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="Account.fs" />
     <Compile Include="ExtendedKey.fs" />
+    <Compile Include="Account.fs" />
     <Compile Include="Main.fs" />
     <Content Include="paket.references" />
     <ProjectReference Include="..\Consensus\Consensus.fsproj">

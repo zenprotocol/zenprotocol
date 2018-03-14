@@ -1,15 +1,21 @@
 module Wallet.Account
 
 open Consensus
-open Consensus.Chain
-open Consensus.Hash
-open Consensus.Crypto
-open Consensus.Types
+open Chain
+open Hash
+open Crypto
+open Types
 open Infrastructure
+open Infrastructure.Result
+open ExtendedKey
+open Messaging.Services
+open Result
 
 let result = new Infrastructure.Result.ResultBuilder<string>()
 
 type TransactionResult = Messaging.Services.TransactionResult
+
+let private (>>=) a b = Result.bind b a
 
 type OutputStatus =
     | Spent of Output
@@ -28,17 +34,40 @@ let rootSecretKey = SecretKey [|189uy; 140uy; 82uy; 12uy; 79uy; 140uy; 35uy; 59u
                            58uy; 23uy; 63uy; 112uy; 239uy; 45uy; 147uy; 51uy; 246uy; 34uy; 16uy;
                            156uy; 2uy; 111uy; 184uy; 140uy; 218uy; 136uy; 240uy; 57uy; 24uy |]
 
-let create () =
-    let secretKey, publicKey = KeyPair.create ()
+let private zenCoinType = Hardened 258
+let private purpose = Hardened 44
 
-    {
-        outputs = Map.empty
-        keyPair = (secretKey, publicKey)
-        publicKeyHash = PublicKey.hash publicKey
-        mempool = List.empty
-        tip = Hash.zero
-        blockNumber = 0ul
+[<Literal>]
+let seedLength = 32
+
+let create() = 
+    let rng = new System.Security.Cryptography.RNGCryptoServiceProvider()        
+    let seed = Array.create seedLength 0uy   
+    rng.GetBytes seed
+
+    result {
+        let! key =
+            create seed
+            >>= derive purpose
+            >>= derive zenCoinType
+            >>= derive (Hardened 0)
+            >>= derive 0
+            >>= derive 0
+            
+        let! keyPair = getKeyPair key
+    
+        return {
+            outputs = Map.empty
+            keyPair = keyPair
+            publicKeyHash = PublicKey.hash (snd keyPair)
+            mempool = List.empty
+            tip = Hash.zero
+            blockNumber = 0ul
+        }
     }
+    |> function
+    | Ok account -> account
+    | Error err -> failwith err
 
 // update the outputs with transaction
 let private handleTransaction txHash (tx:Transaction) account outputs =
@@ -299,7 +328,6 @@ let createTestAccount () =
     rootAccount
     |> addTransaction Transaction.rootTxHash Transaction.rootTx
 
-
 let createExecuteContractTransaction account executeContract cHash command data spends = result {
     let mutable txSkeleton = TxSkeleton.empty
     let mutable keys = List.empty
@@ -313,4 +341,4 @@ let createExecuteContractTransaction account executeContract cHash command data 
         keys <- List.append keys keys'
     let! unsignedTx = executeContract cHash command data (PK account.publicKeyHash) txSkeleton
     return Transaction.sign keys unsignedTx
-    }
+}
