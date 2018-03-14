@@ -50,6 +50,7 @@
     <Compile Include="UtxoSetRepository.fs" />
     <Compile Include="ContractUtxoRepository.fs" />
     <Compile Include="BlockRepository.fs" />
+    <Compile Include="Tree.fs" />
     <Compile Include="EffectsWriter.fs" />
     <Compile Include="OrphanPool.fs" />
     <Compile Include="MemPool.fs" />

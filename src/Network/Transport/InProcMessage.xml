@@ -11,7 +11,7 @@
     <message name="Connect" id="1">
         <field name="address" type="longstr">Address</field>
     </message>
-    
+
     <message name="Connected" id="2">
         <field name="address" type="longstr">Address</field>
         <field name="peerId" type="octets" size="4">Peer Id</field>
@@ -24,20 +24,20 @@
     <message name="Disconnected" id="4">
         <field name="address" type="longstr">Address</field>
     </message>
-    
+
     <message name="Transaction" id="10">
         <field name="tx" type="chunk">Tx</field>
     </message>
-    
+
     <message name="Send Address" id="11">
         <field name="peerId" type="octets" size="4">Peer Id</field>
         <field name="address" type="longstr">Address</field>
     </message>
-    
+
     <message name="Address" id="12">
         <field name="address" type="longstr">Address</field>
     </message>
-    
+
     <message name="Get Addresses" id="13">
         <field name="peerId" type="octets" size="4">Peer Id</field>
     </message>
@@ -54,12 +54,12 @@
     <message name="Get Mem Pool" id="16">
         <field name="peerId" type="octets" size="4">Peer Id</field>
     </message>
-    
+
     <message name="Mem Pool" id="17">
         <field name="peerId" type="octets" size="4">Peer Id</field>
         <field name="txs" type="chunk">Transactions</field>
     </message>
-    
+
     <message name="Get Transaction" id="18">
         <field name="peerId" type="octets" size="4">Peer Id</field>
         <field name="txHash" type="octets" size="32">TransactionHash</field>
@@ -69,54 +69,76 @@
         <field name="peerId" type="octets" size="4">Peer Id</field>
         <field name="tx" type="chunk">Tx</field>
     </message>
-    
+
     <message name="Block" id="20">
         <field name="block" type="chunk">Block</field>
     </message>
 
     <message name="Tip" id="21">
+        <field name="peerId" type="octets" size="4">Peer Id</field>
         <field name="block header" type="octets" size="100">Block Header</field>
     </message>
-    
+
     <message name="Publish Block" id="22">
         <field name="block header" type="octets" size="100">Block Header</field>
     </message>
-    
+
     <message name="New Block" id="23">
         <field name="block header" type="octets" size="100">Block Header</field>
         <field name="peerId" type="octets" size="4">Peer Id</field>
     </message>
-    
+
     <message name="Get Block" id="24">
         <field name="blockHash" type="octets" size="32">BlockHash</field>
     </message>
-    
+
     <message name="Get New Block" id="25">
         <field name="peerId" type="octets" size="4">Peer Id</field>
         <field name="blockHash" type="octets" size="32">BlockHash</field>
     </message>
-    
+
     <message name="Block Request" id="26">
         <field name="peerId" type="octets" size="4">Peer Id</field>
         <field name="blockHash" type="octets" size="32">BlockHash</field>
     </message>
-    
+
     <message name="Send Block" id="27">
         <field name="peerId" type="octets" size="4">Peer Id</field>
         <field name="block" type="chunk">Block</field>
     </message>
-    
+
     <message name="Send Tip" id="28">
         <field name="peerId" type="octets" size="4">Peer Id</field>
         <field name="block header" type="octets" size="100">Block Header</field>
     </message>
-    
+
     <message name="Get Tip" id="29">
         <field name="peerId" type="octets" size="4">Peer Id</field>
     </message>
-    
+
     <message name="Publish Address To All" id="30">
         <field name="address" type="longstr">Address</field>
     </message>
-    
+
+    <message name="Get Headers" id="31">
+        <field name="peerId" type="octets" size="4">Peer Id</field>
+        <field name="blockHash" type="octets" size="32">BlockHash</field>
+        <field name="numberOfHeaders" type="number" size="2">Number of Blocks</field>
+    </message>
+
+    <message name="Headers Request" id="32">
+        <field name="peerId" type="octets" size="4">Peer Id</field>
+        <field name="blockHash" type="octets" size="32">BlockHash</field>
+        <field name="numberOfHeaders" type="number" size="2">Number of Blocks</field>
+    </message>
+
+    <message name="Send Headers" id="33">
+        <field name="peerId" type="octets" size="4">Peer Id</field>
+        <field name="headers" type="chunk">headers</field>
+    </message>
+
+    <message name="Headers" id="34">
+        <field name="peerId" type="octets" size="4">Peer Id</field>
+        <field name="headers" type="chunk">headers</field>
+    </message>
 </class>

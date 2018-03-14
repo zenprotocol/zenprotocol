@@ -18,7 +18,7 @@
         <field name="network" type="number" size="4">Network</field>
         <field name = "version" type = "number" size="4" >Version</field>
     </message>
-    
+
     <message name="Ping" id="3">
         <field name = "nonce" type = "number" size="4" >Nonce</field>
     </message>
@@ -26,7 +26,7 @@
     <message name="Pong" id="4">
         <field name = "nonce" type = "number" size="4" >Nonce</field>
     </message>
-    
+
     <message name="Transaction" id="5">
         <field name="tx" type="chunk">Tx</field>
     </message>
@@ -34,22 +34,22 @@
     <message name="Address" id="6">
         <field name="address" type="longstr">Address</field>
     </message>
-    
+
     <message name="Get Addresses" id="7">
     </message>
-    
+
     <message name="Addresses" id="8">
         <field name="addresses" type="strings"/>
     </message>
-    
+
     <message name="Get Mem Pool" id="9">
-        
+
     </message>
-    
+
     <message name="Mem Pool" id="10">
         <field name="txs" type="chunk">Transactions</field>
     </message>
-    
+
     <message name="Get Transaction" id="11">
         <field name="txHash" type="octets" size="32">TransactionHash</field>
     </message>
@@ -64,13 +64,22 @@
 
     <message name="Get Tip" id="14">
     </message>
-    
+
     <message name="Tip" id="15">
         <field name="block header" type="octets" size="100">block header</field>
     </message>
-    
+
     <message name="New Block" id="16">
         <field name="block header" type="octets" size="100">block header</field>
+    </message>
+
+    <message name="Get Headers" id="17">
+        <field name="blockHash" type="octets" size="32">BlockHash</field>
+        <field name="numberOfHeaders" type="number" size="2">Number of Blocks</field>
+    </message>
+
+    <message name="Headers" id="18">
+        <field name="headers" type="chunk">headers</field>
     </message>
 
     <message name="Unknown Peer" id="100">

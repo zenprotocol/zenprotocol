@@ -328,10 +328,10 @@ let ``orphan chain become longer than main chain``() =
     // validate main chain first
     let _,state = validateChain session alternativeChain state
 
-    // Check that the alternative chain, which is now main, is marked as main
     List.iter (fun block ->
         let blockHash = Block.hash block.header
         let extendedHeader = BlockRepository.getHeader session blockHash
+        printfn "%d %A" extendedHeader.header.blockNumber extendedHeader.status
         extendedHeader.status |> should equal ExtendedBlockHeader.MainChain) alternativeChain
 
     // now validating orphan chain which is longer
@@ -358,8 +358,8 @@ let ``orphan chain become longer than main chain``() =
                            state.tipState.ema))
 
     events |> should haveLength 6
-    events.[0] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock alternativeChain.[0])))
-    events.[1] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock alternativeChain.[1])))
+    events.[0] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock alternativeChain.[1])))
+    events.[1] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock alternativeChain.[0])))
     events.[2] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock mainChain.[0])))
     events.[3] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock mainChain.[1])))
     events.[4] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock mainChain.[2])))
@@ -428,8 +428,8 @@ let ``2 orphan chains, one become longer than main chain``() =
     let tip = List.last sideChain2
 
     events |> should haveLength 6
-    events.[0] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock mainChain.[0])))
-    events.[1] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock mainChain.[1])))
+    events.[0] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock mainChain.[1])))
+    events.[1] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock mainChain.[0])))
     events.[2] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock orphanBlock)))
     events.[3] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock sideChain2.[0])))
     events.[4] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock sideChain2.[1])))
@@ -466,8 +466,8 @@ let ``2 orphan chains, two longer than main, one is longer``() =
     let tip = List.last sideChain2
 
     events |> should haveLength 7
-    events.[0] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock mainChain.[0])))
-    events.[1] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock mainChain.[1])))
+    events.[0] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock mainChain.[1])))
+    events.[1] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock mainChain.[0])))
     events.[2] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock orphanBlock)))
     events.[3] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock sideChain2.[0])))
     events.[4] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock sideChain2.[1])))
@@ -507,8 +507,8 @@ let ``2 orphan chains, two longer than main, longest is invalid, should pick sec
     let tip = List.last sideChain2
 
     events |> should haveLength 6
-    events.[0] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock mainChain.[0])))
-    events.[1] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock mainChain.[1])))
+    events.[0] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock mainChain.[1])))
+    events.[1] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock mainChain.[0])))
     events.[2] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock orphanBlock)))
     events.[3] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock sideChain2.[0])))
     events.[4] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock sideChain2.[1])))
@@ -721,7 +721,7 @@ let ``validate new tip should ask for block``() =
         |> List.head
 
     let events, _ =
-        BlockHandler.handleTip chain session block.header state
+        BlockHandler.handleTip chain session Array.empty block.header state
         |> Writer.unwrap
 
     events |> should haveLength 1
@@ -740,10 +740,10 @@ let ``validate new tip which we already asked for``() =
         |> List.head
 
     let _, state =
-        BlockHandler.handleTip chain session block.header state
+        BlockHandler.handleTip chain session Array.empty block.header state
         |> Writer.unwrap
     let events, _ =
-        BlockHandler.handleTip chain session block.header state
+        BlockHandler.handleTip chain session Array.empty block.header state
         |> Writer.unwrap
 
     events |> should haveLength 0
@@ -761,7 +761,7 @@ let ``tip block should not be publish to network``() =
         |> List.head
 
     let _, state =
-        BlockHandler.handleTip chain session block.header state
+        BlockHandler.handleTip chain session Array.empty block.header state
         |> Writer.unwrap
     let events, _ =
         BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state

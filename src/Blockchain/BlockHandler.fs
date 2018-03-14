@@ -12,56 +12,70 @@ let getUTXO = UtxoSetRepository.get
 let getOutput = TransactionRepository.getOutput
 
 // Change the status of the entire chain from the root orphan block up to all tips from Orphan to Connected
-let rec private unorphanChain session extendedHeader =
-    let unorphanChildChain parent extendedHeader =
-        let extendedHeader =
-            ExtendedBlockHeader.unorphan extendedHeader (Block.getChainWork (ExtendedBlockHeader.chainWork parent) extendedHeader.header)
+let private unorphanChain session (root:ExtendedBlockHeader.T) =
+    let unorphanBlock (block:ExtendedBlockHeader.T) =
+        if root.header <> block.header then
+            let parent = BlockRepository.getHeader session block.header.parent
+            let parentChainWork = ExtendedBlockHeader.chainWork parent
+            let chainWork = Block.getChainWork parentChainWork block.header
 
-        BlockRepository.saveHeader session extendedHeader
+            ExtendedBlockHeader.unorphan block chainWork
+            |> BlockRepository.saveHeader session
 
-        unorphanChain session extendedHeader
-
-    let children =  BlockRepository.getBlockChildren session extendedHeader
-
-    Seq.iter (fun child -> unorphanChildChain extendedHeader child) children
-
+    Tree.iter session unorphanBlock root
 
 // find chains that are longer than the minChainWork
 // this is not final as we also need to check if the chain is connectable
-let rec private findLongerChains session extendedHeader minChainWork =
-    let children = BlockRepository.getBlockChildren session extendedHeader
+let private findLongerChains session extendedHeader minChainWork =
+    let rec getContinuation continuation headers f =
+        if Seq.isEmpty headers then
+            continuation
+        else
+            let head = Seq.head headers
+            let tail = Seq.tail headers
 
-    if Seq.isEmpty children then
-        if ExtendedBlockHeader.chainWork extendedHeader > minChainWork then [extendedHeader] else []
-    else
-        Seq.fold (fun chains child ->
-            let chains' = findLongerChains session child minChainWork
-            chains @ chains'
-            |> List.sortByDescending ExtendedBlockHeader.chainWork
-            ) [] children
+            fun acc -> f head acc (getContinuation continuation tail f)
+
+    let rec findLongerChains' extendedHeader acc continuation =
+        let children = BlockRepository.getBlockChildren session extendedHeader
+
+        if Seq.isEmpty children then
+            if ExtendedBlockHeader.chainWork extendedHeader > minChainWork then
+                continuation (extendedHeader :: acc)
+            else continuation acc
+        else
+            let head = Seq.head children
+            let tail = Seq.tail children
+
+            findLongerChains' head acc (getContinuation continuation tail findLongerChains')
+
+    findLongerChains' extendedHeader [] id
+    |> List.sortByDescending ExtendedBlockHeader.chainWork
 
 // Connect the entire chain, returning the valid tip along with state
-let rec private connectChain chainParams contractPath timestamp session (origin:ExtendedBlockHeader.T) originState (tip:ExtendedBlockHeader.T) =
-    if origin.header = tip.header then
-        tip,originState
-    else
-        let parent = BlockRepository.getHeader session tip.header.parent
+let private connectChain chainParams contractPath timestamp session (origin:ExtendedBlockHeader.T) originState (tip:ExtendedBlockHeader.T) =
+    let rec getHeaders (header:ExtendedBlockHeader.T) headers =
+        if header.header = origin.header then
+            headers
+        else
+            let parent = BlockRepository.getHeader session header.header.parent
 
-        let validTip,(utxoSet, acs, ema, mempool) =
-            connectChain chainParams contractPath timestamp session origin originState parent
+            getHeaders parent (header :: headers)
 
-        // If invalid skip the block
+    let headers = getHeaders tip []
+
+    List.fold (fun ((validTip:ExtendedBlockHeader.T),(utxoSet, acs, ema, mempool)) tip ->
         if not (ExtendedBlockHeader.isValid tip) then
             validTip,(utxoSet,acs,ema, mempool)
-        elif validTip <> parent then
-            // parent block is invalid, so so are we
+        elif validTip.hash <> tip.header.parent then
+            // parent block is invalid, so are we
             BlockRepository.saveHeader session (ExtendedBlockHeader.invalid tip)
 
             validTip,(utxoSet,acs,ema, mempool)
         else
             let block = BlockRepository.getFullBlock session tip
 
-            match Block.connect chainParams (getUTXO session) contractPath parent.header timestamp utxoSet acs ema block with
+            match Block.connect chainParams (getUTXO session) contractPath validTip.header timestamp utxoSet acs ema block with
             | Error error ->
                 BlockRepository.saveHeader session (ExtendedBlockHeader.invalid tip)
 
@@ -73,9 +87,9 @@ let rec private connectChain chainParams contractPath timestamp session (origin:
 
                 let mempool = MemPool.handleBlock block mempool
 
-                tip,(utxoSet,acs,ema, mempool)
+                tip,(utxoSet,acs,ema, mempool)) (origin, originState) headers
 
-let rec private connectLongestChain chainParams contractPath timestamp session origin originState chains minChainWork =
+let private connectLongestChain chainParams contractPath timestamp session origin originState chains minChainWork =
     let connectChain tip (best,state) =
         // We are checking twice if current is longer than the bestChain, once before connecting and once after
         if ExtendedBlockHeader.chainWork tip > ExtendedBlockHeader.chainWork best then
@@ -113,45 +127,50 @@ let rec private findForkBlock session (tip1:ExtendedBlockHeader.T) (tip2:Extende
             let tip2 = BlockRepository.getHeader session tip2.header.parent
             findForkBlock session tip1 tip2
 
+let private getSubChain session (start:ExtendedBlockHeader.T) (tip:ExtendedBlockHeader.T) =
+    let rec getSubChain' (current:ExtendedBlockHeader.T) acc =
+        if current.header = start.header then
+            acc
+        else
+            let parent = BlockRepository.getHeader session current.header.parent
+
+            getSubChain' parent (current :: acc)
+
+    getSubChain' tip []
+
 // Publish BlockRemoved events for a chain from tip to fork block
-let rec private removeBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:ExtendedBlockHeader.T) =
-    if tip.header = forkBlock.header then
-        Writer.ret ()
-    else
-        effectsWriter {
-            let parent = BlockRepository.getHeader session tip.header.parent
+let private removeBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:ExtendedBlockHeader.T) =
+    effectsWriter {
+        let blocks =
+            getSubChain session forkBlock tip
+            |> List.rev
 
-            do! removeBlocks session forkBlock parent
-
+        for block in blocks do
             // Change status of the header from main to connected
-            ExtendedBlockHeader.unmarkAsMain tip
+            ExtendedBlockHeader.unmarkAsMain block
             |> BlockRepository.saveHeader session
 
-            let fullBlock = BlockRepository.getFullBlock session tip
-            do! publish (BlockRemoved (tip.hash, fullBlock))
+            let fullBlock = BlockRepository.getFullBlock session block
+            do! publish (BlockRemoved (block.hash, fullBlock))
 
-            return ()
-        }
+        return ()
+    }
 
 // Publish BlockAdded events for a chain from tip to fork block
 let rec private addBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:ExtendedBlockHeader.T) =
-    if tip.header = forkBlock.header then
-        Writer.ret ()
-    else
-        effectsWriter {
-            let parent = BlockRepository.getHeader session tip.header.parent
+    effectsWriter {
+        let blocks = getSubChain session forkBlock tip
 
-            do! addBlocks session forkBlock parent
-
-            // Change status of the header to main chain
-            ExtendedBlockHeader.markAsMain tip
+        for block in blocks do
+            // Change status of the header from main to connected
+            ExtendedBlockHeader.markAsMain block
             |> BlockRepository.saveHeader session
 
-            let fullBlock = BlockRepository.getFullBlock session tip
-            do! publish (BlockAdded (tip.hash, fullBlock))
+            let fullBlock = BlockRepository.getFullBlock session block
+            do! publish (BlockAdded (block.hash, fullBlock))
 
-            return ()
-        }
+        return ()
+    }
 
 // Undo blocks from current state in order to get the state of the forkblock
 let rec private undoBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:ExtendedBlockHeader.T) utxoSet mempool =
@@ -201,13 +220,14 @@ let rollForwardChain chainParams contractPath timestamp state session block pers
         // find all longer chain and connect the longest, chains are ordered
         let currentChainWork = ExtendedBlockHeader.chainWork persistentBlock
         let chains = findLongerChains session persistentBlock currentChainWork
+
+        Log.info "BlockHandler: Connecting to longest chain"
+
         let chain' =
             connectLongestChain chainParams contractPath timestamp session persistentBlock
                 (UtxoSet.asDatabase,acs,ema, mempool) chains currentChainWork
-
         match chain' with
         | Some (tip,(utxoSet,acs,ema,mempool)) ->
-            Log.info "Rolling forward chain to #%d %A" tip.header.blockNumber tip.hash
 
             let tip = ExtendedBlockHeader.markAsMain tip
 
@@ -220,10 +240,15 @@ let rollForwardChain chainParams contractPath timestamp state session block pers
             let! memoryState = getMemoryState chainParams session contractPath tip.header.blockNumber mempool state.memoryState.orphanPool acs
 
             do! addBlocks session persistentBlock tip
+
+            Log.info "BlockHandler: New tip #%A %A" tipState.tip.header.blockNumber tipState.tip.hash
+
             return {state with tipState=tipState;memoryState=memoryState}
         | None ->
             let tipState = {activeContractSet=acs;ema=ema;tip=persistentBlock}
             let! memoryState = getMemoryState chainParams session contractPath persistentBlock.header.blockNumber mempool state.memoryState.orphanPool acs
+
+            Log.info "BlockHandler: New tip #%A %A" tipState.tip.header.blockNumber tipState.tip.hash
 
             return {state with tipState=tipState;memoryState=memoryState}
     }
@@ -236,7 +261,7 @@ let private handleGenesisBlock chainParams contractPath session timestamp (state
             Log.info "Failed connecting genesis block %A due to %A" (Block.hash block.header) error
             return state
         | Ok (block,utxoSet,acs,ema) ->
-            Log.info "Genesis block received"
+            Log.info "BlockHandler: Genesis block received"
 
             let extendedHeader = ExtendedBlockHeader.createGenesis blockHash block
             BlockRepository.saveHeader session extendedHeader
@@ -263,7 +288,7 @@ let private handleMainChain chain contractPath session timestamp (state:State) (
             Log.info "Failed connecting block %A due to %A" (Block.hash block.header) error
             return state
         | Ok (block,utxoSet,acs,ema) ->
-            Log.info "New block #%d with %d txs %A" block.header.blockNumber (List.length block.transactions) blockHash
+            Log.info "BlockHandler: New block #%d %s with %d txs 0x%x %A" block.header.blockNumber (Timestamp.toString timestamp) (List.length block.transactions) block.header.difficulty blockHash
 
             let extendedHeader = ExtendedBlockHeader.createMain parent blockHash block
 
@@ -331,24 +356,27 @@ let private handleForkChain chain contractPath session timestamp (state:State) p
     }
 
 // find orphan chain root
-let rec requestOrphanChainRoot session (header:ExtendedBlockHeader.T) (state:State) =
-    effectsWriter {
+let requestOrphanChainRoot session (tip:ExtendedBlockHeader.T) (state:State) =
+    let rec findRoot (header:ExtendedBlockHeader.T) =
         match BlockRepository.tryGetHeader session header.header.parent with
-        | Some parent ->
-            return! requestOrphanChainRoot session parent state
-        | None ->
-            if not <| Map.containsKey header.header.parent state.blockRequests then
+        | Some parent -> findRoot parent
+        | None -> header
 
-                Log.info "Request root of orphan chain from network block %d %A"
-                            (header.header.blockNumber - 1ul) header.header.parent
+    let root = findRoot tip
 
-                // asking network for the parent block
-                let blockRequests = Map.add header.header.parent ParentBlock state.blockRequests
-                do! getBlock header.header.parent
+    effectsWriter {
+        if not <| Map.containsKey root.header.parent state.blockRequests then
 
-                return {state with blockRequests=blockRequests}
-            else
-                return state
+            Log.info "Request root of orphan chain from network block %d %A"
+                        (root.header.blockNumber - 1ul) root.header.parent
+
+            // asking network for the parent block
+            let blockRequests = Map.add root.header.parent ParentBlock state.blockRequests
+            do! getBlock root.header.parent
+
+            return {state with blockRequests=blockRequests}
+        else
+            return state
     }
 
 
@@ -425,7 +453,7 @@ let validateBlock chainParams contractPath session timestamp block mined (state:
                         return state'
     }
 
-let private handleHeader chain session get reason header state =
+let private handleHeader chain session get reason header state findRootOrphan =
     effectsWriter {
         let blockHash = Block.hash header
 
@@ -441,7 +469,10 @@ let private handleHeader chain session get reason header state =
 
                     let state = {state with headers = headers}
 
-                    return! requestOrphanChainRoot session extendedBlock state
+                    if findRootOrphan then
+                        return! requestOrphanChainRoot session extendedBlock state
+                    else
+                        return state
                 else
                     return state
             | None ->
@@ -467,8 +498,54 @@ let private handleHeader chain session get reason header state =
             return state
     }
 
-let handleNewBlockHeader chain session peerId header (state:State) =
-    handleHeader chain session (getNewBlock peerId) NewBlock header state
+let requestParentHeaders session peerId header state =
+    effectsWriter {
+        if state.tipState.tip.header.blockNumber < header.blockNumber - 1ul &&
+           not <| BlockRepository.contains session header.parent then
+            let numberOfBlocks =
+                if (header.blockNumber - 1ul) - state.tipState.tip.header.blockNumber > 500ul then
+                    500us
+                else
+                    (header.blockNumber - 1ul) - state.tipState.tip.header.blockNumber |> uint16
 
-let handleTip chain session header (state:State) =
-    handleHeader chain session getBlock Tip header state
+            do! getHeaders peerId header.parent numberOfBlocks
+        else
+            ()
+    }
+
+let handleNewBlockHeader chain session peerId header (state:State) =
+    effectsWriter {
+        do! requestParentHeaders session peerId header state
+
+        return! handleHeader chain session (getNewBlock peerId) NewBlock header state true
+    }
+
+let handleTip chain session peerId header (state:State) =
+    effectsWriter {
+        do! requestParentHeaders session peerId header state
+
+        return! handleHeader chain session getBlock Tip header state true
+    }
+
+let handleHeaders chain session peerId headers (state:State) =
+    effectsWriter {
+        match headers with
+        | [] -> return state
+        | head :: headers ->
+            do! requestParentHeaders session peerId head state
+
+            Log.info "Handling #%A headers, can take a while..." (List.length headers)
+
+            let! state' = handleHeader chain session getBlock ParentBlock head state true
+            let state = ref state'
+
+            for header in headers do
+                let! state' = handleHeader chain session getBlock ParentBlock header !state false
+
+                state := state'
+
+            Log.info "Done handling headers"
+
+            return !state
+    }
+

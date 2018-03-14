@@ -56,6 +56,14 @@ let SendTipMessageId = 28uy
 let GetTipMessageId = 29uy
 [<LiteralAttribute>]
 let PublishAddressToAllMessageId = 30uy
+[<LiteralAttribute>]
+let GetHeadersMessageId = 31uy
+[<LiteralAttribute>]
+let HeadersRequestMessageId = 32uy
+[<LiteralAttribute>]
+let SendHeadersMessageId = 33uy
+[<LiteralAttribute>]
+let HeadersMessageId = 34uy
 
 type Connect =
         string
@@ -114,8 +122,10 @@ type SendTransaction = {
 type Block =
         byte[]
 
-type Tip =
-        byte[]
+type Tip = {
+        peerId : byte[]
+        blockHeader : byte[]
+    }
 
 type PublishBlock =
         byte[]
@@ -154,6 +164,28 @@ type GetTip =
 type PublishAddressToAll =
         string
 
+type GetHeaders = {
+        peerId : byte[]
+        blockHash : byte[]
+        numberOfHeaders : uint16
+    }
+
+type HeadersRequest = {
+        peerId : byte[]
+        blockHash : byte[]
+        numberOfHeaders : uint16
+    }
+
+type SendHeaders = {
+        peerId : byte[]
+        headers : byte[]
+    }
+
+type Headers = {
+        peerId : byte[]
+        headers : byte[]
+    }
+
 type T =
     | Connect of Connect
     | Connected of Connected
@@ -180,6 +212,10 @@ type T =
     | SendTip of SendTip
     | GetTip of GetTip
     | PublishAddressToAll of PublishAddressToAll
+    | GetHeaders of GetHeaders
+    | HeadersRequest of HeadersRequest
+    | SendHeaders of SendHeaders
+    | Headers of Headers
 
 module Connect =
     let getMessageSize (msg:Connect) =
@@ -478,20 +514,30 @@ module Block =
             return msg
         }
 
+
 module Tip =
+    let peerIdSize = 4
     let blockHeaderSize = 100
     let getMessageSize (msg:Tip) =
-            100
+        0 +
+            4 +
+            100 +
+            0
 
     let write (msg:Tip) stream =
         stream
-        |> Stream.writeBytes msg 100
+        |> Stream.writeBytes msg.peerId 4
+        |> Stream.writeBytes msg.blockHeader 100
 
     let read =
         reader {
-            let! msg = Stream.readBytes 100
+            let! peerId = Stream.readBytes 4
+            let! blockHeader = Stream.readBytes 100
 
-            return msg
+            return ({
+                        peerId = peerId;
+                        blockHeader = blockHeader;
+                    }: Tip)
         }
 
 module PublishBlock =
@@ -689,6 +735,120 @@ module PublishAddressToAll =
         }
 
 
+module GetHeaders =
+    let peerIdSize = 4
+    let blockHashSize = 32
+    let getMessageSize (msg:GetHeaders) =
+        0 +
+            4 +
+            32 +
+            2 +
+            0
+
+    let write (msg:GetHeaders) stream =
+        stream
+        |> Stream.writeBytes msg.peerId 4
+        |> Stream.writeBytes msg.blockHash 32
+        |> Stream.writeNumber2 msg.numberOfHeaders
+
+    let read =
+        reader {
+            let! peerId = Stream.readBytes 4
+            let! blockHash = Stream.readBytes 32
+            let! numberOfHeaders = Stream.readNumber2
+
+            return ({
+                        peerId = peerId;
+                        blockHash = blockHash;
+                        numberOfHeaders = numberOfHeaders;
+                    }: GetHeaders)
+        }
+
+
+module HeadersRequest =
+    let peerIdSize = 4
+    let blockHashSize = 32
+    let getMessageSize (msg:HeadersRequest) =
+        0 +
+            4 +
+            32 +
+            2 +
+            0
+
+    let write (msg:HeadersRequest) stream =
+        stream
+        |> Stream.writeBytes msg.peerId 4
+        |> Stream.writeBytes msg.blockHash 32
+        |> Stream.writeNumber2 msg.numberOfHeaders
+
+    let read =
+        reader {
+            let! peerId = Stream.readBytes 4
+            let! blockHash = Stream.readBytes 32
+            let! numberOfHeaders = Stream.readNumber2
+
+            return ({
+                        peerId = peerId;
+                        blockHash = blockHash;
+                        numberOfHeaders = numberOfHeaders;
+                    }: HeadersRequest)
+        }
+
+
+module SendHeaders =
+    let peerIdSize = 4
+    let getMessageSize (msg:SendHeaders) =
+        0 +
+            4 +
+            4 + Array.length msg.headers +
+            0
+
+    let write (msg:SendHeaders) stream =
+        stream
+        |> Stream.writeBytes msg.peerId 4
+        |> Stream.writeNumber4 (uint32 (Array.length msg.headers))
+        |> Stream.writeBytes msg.headers (Array.length msg.headers)
+
+    let read =
+        reader {
+            let! peerId = Stream.readBytes 4
+            let! headersLength = Stream.readNumber4
+            let! headers = Stream.readBytes (int headersLength)
+
+            return ({
+                        peerId = peerId;
+                        headers = headers;
+                    }: SendHeaders)
+        }
+
+
+module Headers =
+    let peerIdSize = 4
+    let getMessageSize (msg:Headers) =
+        0 +
+            4 +
+            4 + Array.length msg.headers +
+            0
+
+    let write (msg:Headers) stream =
+        stream
+        |> Stream.writeBytes msg.peerId 4
+        |> Stream.writeNumber4 (uint32 (Array.length msg.headers))
+        |> Stream.writeBytes msg.headers (Array.length msg.headers)
+
+    let read =
+        reader {
+            let! peerId = Stream.readBytes 4
+            let! headersLength = Stream.readNumber4
+            let! headers = Stream.readBytes (int headersLength)
+
+            return ({
+                        peerId = peerId;
+                        headers = headers;
+                    }: Headers)
+        }
+
+
 let private decode stream =
     let readMessage messageId stream =
             match messageId with
@@ -792,6 +952,22 @@ let private decode stream =
             match PublishAddressToAll.read stream with
             | None,stream -> None,stream
             | Some msg, stream -> Some (PublishAddressToAll msg), stream
+        | GetHeadersMessageId ->
+            match GetHeaders.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (GetHeaders msg), stream
+        | HeadersRequestMessageId ->
+            match HeadersRequest.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (HeadersRequest msg), stream
+        | SendHeadersMessageId ->
+            match SendHeaders.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (SendHeaders msg), stream
+        | HeadersMessageId ->
+            match Headers.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (Headers msg), stream
         | _ -> None, stream
 
     let r = reader {
@@ -848,6 +1024,10 @@ let send socket msg =
         | SendTip msg -> SendTip.write msg
         | GetTip msg -> GetTip.write msg
         | PublishAddressToAll msg -> PublishAddressToAll.write msg
+        | GetHeaders msg -> GetHeaders.write msg
+        | HeadersRequest msg -> HeadersRequest.write msg
+        | SendHeaders msg -> SendHeaders.write msg
+        | Headers msg -> Headers.write msg
 
     let messageId =
         match msg with
@@ -876,6 +1056,10 @@ let send socket msg =
         | SendTip _ -> SendTipMessageId
         | GetTip _ -> GetTipMessageId
         | PublishAddressToAll _ -> PublishAddressToAllMessageId
+        | GetHeaders _ -> GetHeadersMessageId
+        | HeadersRequest _ -> HeadersRequestMessageId
+        | SendHeaders _ -> SendHeadersMessageId
+        | Headers _ -> HeadersMessageId
 
     let messageSize =
         match msg with
@@ -904,6 +1088,10 @@ let send socket msg =
         | SendTip msg -> SendTip.getMessageSize msg
         | GetTip msg -> GetTip.getMessageSize msg
         | PublishAddressToAll msg -> PublishAddressToAll.getMessageSize msg
+        | GetHeaders msg -> GetHeaders.getMessageSize msg
+        | HeadersRequest msg -> HeadersRequest.getMessageSize msg
+        | SendHeaders msg -> SendHeaders.getMessageSize msg
+        | Headers msg -> Headers.getMessageSize msg
 
     //  Signature + message ID + message size
     let frameSize = 2 + 1 + messageSize

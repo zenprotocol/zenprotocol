@@ -471,6 +471,73 @@ let ``NewBlock size fits stream ``() =
     messageSize |> should equal offset
 
 [<Test>]
+let ``send and recv GetHeaders``() =
+    let msg = GetHeaders {
+        blockHash = Array.create 32 123uy;
+        numberOfHeaders = 123us;
+    }
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://GetHeaders.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://GetHeaders.test"
+
+    Network.Message.send server msg
+
+    let msg' = Network.Message.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``GetHeaders size fits stream ``() =
+    let getheaders:GetHeaders = {
+        blockHash = Array.create 32 123uy;
+        numberOfHeaders = 123us;
+    }
+
+    let messageSize = GetHeaders.getMessageSize getheaders
+
+    let stream =
+        Stream.create messageSize
+        |> GetHeaders.write getheaders
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
+let ``send and recv Headers``() =
+    let msg = Headers ("Captcha Diem"B)
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://Headers.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://Headers.test"
+
+    Network.Message.send server msg
+
+    let msg' = Network.Message.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``Headers size fits stream ``() =
+    let headers:Headers =
+        "Captcha Diem"B
+
+    let messageSize = Headers.getMessageSize headers
+
+    let stream =
+        Stream.create messageSize
+        |> Headers.write headers
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
 let ``send and recv UnknownPeer``() =
     let msg = UnknownPeer
 
