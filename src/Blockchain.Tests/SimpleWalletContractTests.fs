@@ -88,23 +88,23 @@ let setUp = fun () ->
     module ET = Zen.ErrorT
     module Tx = Zen.TxSkeleton
 
-    val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 11
-    let cf _ _ _ _ #l _ =
-        let res : nat = (64 + (l * 128 + 192) + 0 + 20) in
-        ret res
-
-    val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) ((64 + (l * 128 + 192) + 0 + 20) <: nat)
+    val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l 
+        -> result (txSkeleton ** option message) `cost` (l * 128 + 277)
     let main txSkeleton contractHash command data returnAddress #l wallet =
-    let! result =
-        Tx.lockToPubKey zenAsset 10UL (hashFromBase64 "DYggLLPq6eXj1YxjiPQ5dSvb/YVqAVNf8Mjnpc9P9BI=") txSkeleton
-        >>= Tx.fromWallet zenAsset 10UL contractHash wallet in
-
-    let result' =
-        match result with
-        | Some tx -> Some (tx, None)
-        | None -> None in
-
-    ET.of_option "not enough Zens" result'
+        let! result =
+            Tx.lockToPubKey zenAsset 10UL (hashFromBase64 "DYggLLPq6eXj1YxjiPQ5dSvb/YVqAVNf8Mjnpc9P9BI=") txSkeleton
+            >>= Tx.fromWallet zenAsset 10UL contractHash wallet in
+        
+        let result' =
+            match result with
+            | Some tx -> Some (tx, None)
+            | None -> None in
+        
+        ET.of_option "not enough Zens" result'
+    
+    val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 5
+        let cf _ _ _ _ #l _ = ret (l * 128 + 277)
+    
     """ account session state
     |> function
     | Ok (state', cHash') ->

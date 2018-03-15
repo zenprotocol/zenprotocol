@@ -88,10 +88,10 @@ open Zen.Asset
 module ET = Zen.ErrorT
 module Tx = Zen.TxSkeleton
 
-val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 7
-let cf _ _ _ _ #l _ = ret (64 + 64 + 0 + 16)
+val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 1
+let cf _ _ _ _ #l _ = ret 146
 
-val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + 64 + 0 + 16)
+val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) 146
 let main txSkeleton contractHash command data returnAddress #l wallet =
     if command = "contract2_test" then
     begin
@@ -102,7 +102,7 @@ let main txSkeleton contractHash command data returnAddress #l wallet =
         ET.ret (txSkeleton, None)
     end
     else
-        ET.autoFailw "unsupported command"
+        ET.incFailw 137 "unsupported command"
     """
 let contract2Hash = Contract.computeHash contract2Code
 
@@ -123,10 +123,10 @@ open Zen.Asset
 module ET = Zen.ErrorT
 module Tx = Zen.TxSkeleton
 
-val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 11
-let cf _ _ _ _ #l _ = ret (64 + (64 + (64 + 64 + 0)) + 25)
+val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 1
+let cf _ _ _ _ #l _ = ret 284
 
-val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + (64 + 64 + 0)) + 25)
+val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) 284
 let main txSkeleton contractHash command data returnAddress #l wallet =
     match returnAddress with
     | Some returnAddress ->
@@ -144,7 +144,7 @@ let main txSkeleton contractHash command data returnAddress #l wallet =
 
         ET.ret (txSkeleton, Some message)
     | None ->
-        ET.autoFailw "returnAddress is required"
+        ET.incFailw 277 "returnAddress is required"
 """
 
 [<Test>]
