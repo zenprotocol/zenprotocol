@@ -20,9 +20,9 @@ nuget FSharp.Configuration
 nuget Argu
 nuget FSharp.Data
 nuget FsBech32 >= 0.1.0.7
-nuget ZFStar >= 0.0.9
+nuget ZFStar = 0.0.9
 nuget Zen.FSharp.Compiler.Service 17.0.2
-nuget ZFS-Tools >= 0.0.10
+nuget ZFS-Tools = 0.0.10
 nuget FSharpx.Extras
 nuget Newtonsoft.Json
 nuget Base58Check
