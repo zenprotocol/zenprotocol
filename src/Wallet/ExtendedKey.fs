@@ -30,14 +30,12 @@ type T = {
     index: int32
 }
 
-let private getPublicKey' prvBytes =
-    match SecretKey.getPublicKey (SecretKey prvBytes) with
-    | Some pulicKey -> Ok pulicKey
-    | None -> Error "private key invalid"        
-
 let private getPublicKey extendedKey = 
     match extendedKey.key with
-    | ExtendedPrivateKey (SecretKey prvBytes) -> getPublicKey' prvBytes
+    | ExtendedPrivateKey (SecretKey prvBytes) -> 
+        match SecretKey.getPublicKey (SecretKey prvBytes) with
+        | Some pulicKey -> Ok pulicKey
+        | None -> Error "private key invalid"        
     | ExtendedPublicKey publicKey -> Ok publicKey
 
 let private getPrivateKey extendedKey = 
