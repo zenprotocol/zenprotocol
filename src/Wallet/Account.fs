@@ -40,11 +40,7 @@ let private purpose = Hardened 44
 [<Literal>]
 let seedLength = 32
 
-let create() = 
-    let rng = new System.Security.Cryptography.RNGCryptoServiceProvider()        
-    let seed = Array.create seedLength 0uy   
-    rng.GetBytes seed
-
+let private fromSeed seed =
     result {
         let! key =
             create seed
@@ -69,6 +65,17 @@ let create() =
     | Ok account -> account
     | Error err -> failwith err
 
+let create() = 
+    let rng = new System.Security.Cryptography.RNGCryptoServiceProvider()        
+    let seed = Array.create seedLength 0uy   
+    rng.GetBytes seed
+    fromSeed seed
+
+let import mnemonic passphrase = 
+    let xmnemonic' = new NBitcoin.Mnemonic(mnemonic, NBitcoin.Wordlist.English);
+    let seed = xmnemonic'.DeriveSeed passphrase
+    fromSeed seed
+    
 // update the outputs with transaction
 let private handleTransaction txHash (tx:Transaction) account outputs =
 
