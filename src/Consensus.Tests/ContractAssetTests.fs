@@ -51,10 +51,8 @@ let ``Should generate assets from a string and from an int``() =
         module Tx = Zen.TxSkeleton
         module S = FStar.String
 
-        val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 11
-        let cf _ _ _ _ #l _ = ret (64 + (64 + (64 + 64 + 0)) + 23)
-
-        val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + (64 + 64 + 0)) + 23)
+        val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l 
+            -> result (txSkeleton ** option message) `cost` (256 + 26)
         let main txSkeleton contractHash command data returnAddress #l wallet =
             let str = "Test" in
 
@@ -69,7 +67,10 @@ let ``Should generate assets from a string and from an int``() =
                 ET.ret (txSkeleton, None)
             end
             else
-                ET.autoFailw "unexpected"
+                ET.incFailw 272 "unexpected"
+                
+        val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 1
+                let cf _ _ _ _ #l _ = ret 282
         """
     compileAndRun contractCode
     |> shouldBeOk

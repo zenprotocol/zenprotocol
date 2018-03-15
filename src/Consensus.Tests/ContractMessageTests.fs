@@ -46,10 +46,8 @@ let setup = fun () ->
     module ET = Zen.ErrorT
     module Tx = Zen.TxSkeleton
 
-    val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 9
-    let cf _ _ _ _ #l _ = ret (64 + (64 + 64 + 0) + 19)
-
-    val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + 64 + 0) + 19)
+    val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l 
+        -> result (txSkeleton ** option message) `cost` 213
     let main txSkeleton contractHash command data returnAddress #l wallet =
         if command = "contract2_test" then
         begin
@@ -60,7 +58,10 @@ let setup = fun () ->
             ET.ret (txSkeleton, None)
         end
         else
-            ET.autoFailw "unsupported command"
+            ET.incFailw 205 "unsupported command"
+            
+    val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 1
+        let cf _ _ _ _ #l _ = ret 213
     """
     let contract2Hash = Contract.computeHash contract2Code
 
@@ -78,10 +79,8 @@ let setup = fun () ->
             module ET = Zen.ErrorT
             module Tx = Zen.TxSkeleton
 
-            val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 9
-            let cf _ _ _ _ #l _ = ret (64 + (64 + 64 + 0) + 24)
-
-            val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + 64 + 0) + 24)
+            val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l 
+                -> result (txSkeleton ** option message) `cost` 218
             let main txSkeleton contractHash command data returnAddress #l wallet =
                 if command = "contract1_test" then
                 begin
@@ -97,7 +96,11 @@ let setup = fun () ->
                     ET.ret (txSkeleton, Some message)
                 end
                 else
-                    ET.autoFailw "unsupported command"
+                    ET.incFailw 210 "unsupported command"
+            
+            val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 1
+            let cf _ _ _ _ #l _ = ret 218
+            
         """
 
     contracts <- result {
