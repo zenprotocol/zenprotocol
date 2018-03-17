@@ -50,15 +50,44 @@ let requestHandler chain client (requestId:RequestId) request session wallet =
     | GetBalance ->
         Account.getBalance wallet
         |> reply
+        wallet
     | GetAddressPKHash ->
         reply wallet.publicKeyHash
+        wallet
     | GetAddress ->
         Account.getAddress chain wallet
         |> reply
+        wallet
+    | ImportSeed words ->
+        match Account.import words "" with 
+        | Result.Ok account -> 
+            ImportResult.Ok ()
+            |> reply
+            match Blockchain.getTip client with
+            | Some (blockHash,header) ->
+
+                if blockHash <> account.tip then
+                    let account =
+                        Account.sync chainParams blockHash
+                            (Blockchain.getBlockHeader client >> Option.get)
+                            (Blockchain.getBlock client >> Option.get)
+                            account
+
+                    Log.info "Account synced to block #%d %A" header.blockNumber blockHash
+                    account
+                else
+                    account
+
+            | _ -> account
+        | Result.Error err -> 
+            ImportResult.Error err
+            |> reply
+            wallet
     | Spend (address, spend) ->
         Account.createTransaction wallet address spend
         |> getTransactionResult
         |> reply
+        wallet
     | ActivateContract (code,numberOfBlocks) ->
         Account.createActivateContractTransaction chainParams wallet code numberOfBlocks
         |> function     // TODO: cleanup
@@ -67,13 +96,14 @@ let requestHandler chain client (requestId:RequestId) request session wallet =
         | Result.Error err ->
             ActivateContractTransactionResult.Error err
         |> reply
+        wallet
     | ExecuteContract (cHash,command,data,spends) ->
         let executeContract = Blockchain.executeContract client
         Account.createExecuteContractTransaction wallet executeContract cHash command data spends
         |> getTransactionResult
         |> reply
+        wallet
 
-    wallet
 
 let main dataPath busName chain root =
     let chainParams = Consensus.Chain.getChainParameters chain
@@ -140,6 +170,7 @@ let main dataPath busName chain root =
             |> Observable.scan (fun state handler ->
                 use session = DatabaseContext.createSession databaseContext
                 let state = handler session state
+
                 Session.commit session
                 state) account
 

@@ -95,6 +95,13 @@ let handleRequest chain client (request,reply) =
         let address = Wallet.getAddress client
         let json = new AddressJson.Root(address)
         reply StatusCode.OK (JsonContent json.JsonValue)
+    | Post ("/wallet/import", Some body) ->
+        match getImportSeed body with
+        | Result.Error error -> replyError error
+        | Result.Ok words ->
+            match Wallet.importSeed client words with
+            | ImportResult.Ok _ -> reply StatusCode.OK NoContent
+            | ImportResult.Error error -> replyError error
     | Post ("/wallet/spend", Some body) ->
         match getSpend chain body with
         | Result.Error error -> replyError error

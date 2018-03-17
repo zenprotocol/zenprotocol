@@ -40,41 +40,43 @@ let private purpose = Hardened 44
 [<Literal>]
 let seedLength = 32
 
-let private fromSeed seed =
-    result {
-        let! key =
-            create seed
-            >>= derive purpose
-            >>= derive zenCoinType
-            >>= derive (Hardened 0)
-            >>= derive 0
-            >>= derive 0
-            
-        let! keyPair = getKeyPair key
-    
-        return {
-            outputs = Map.empty
-            keyPair = keyPair
-            publicKeyHash = PublicKey.hash (snd keyPair)
-            mempool = List.empty
-            tip = Hash.zero
-            blockNumber = 0ul
-        }
+let private fromSeed seed = result {
+    let! key =
+        create seed
+        >>= derive purpose
+        >>= derive zenCoinType
+        >>= derive (Hardened 0)
+        >>= derive 0
+        >>= derive 0
+        
+    let! keyPair = getKeyPair key
+
+    return {
+        outputs = Map.empty
+        keyPair = keyPair
+        publicKeyHash = PublicKey.hash (snd keyPair)
+        mempool = List.empty
+        tip = Hash.zero
+        blockNumber = 0ul
     }
-    |> function
-    | Ok account -> account
-    | Error err -> failwith err
+}
 
 let create() = 
     let rng = new System.Security.Cryptography.RNGCryptoServiceProvider()        
     let seed = Array.create seedLength 0uy   
     rng.GetBytes seed
     fromSeed seed
+    |> function
+    | Ok account -> account
+    | Error err -> failwith err
 
-let import mnemonic passphrase = 
-    let xmnemonic' = new NBitcoin.Mnemonic(mnemonic, NBitcoin.Wordlist.English);
-    let seed = xmnemonic'.DeriveSeed passphrase
-    fromSeed seed
+let import words passphrase = 
+    try 
+        let mnemonicSentence = new NBitcoin.Mnemonic(String.concat " " words, NBitcoin.Wordlist.English)
+        Ok <| mnemonicSentence.DeriveSeed passphrase
+    with _ as ex ->
+        Error ex.Message
+    |> Result.bind fromSeed
     
 // update the outputs with transaction
 let private handleTransaction txHash (tx:Transaction) account outputs =
