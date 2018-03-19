@@ -85,12 +85,13 @@ let setUp = fun () ->
     open Zen.Cost
     open Zen.Asset
 
+    module W = Zen.Wallet
     module ET = Zen.ErrorT
     module Tx = Zen.TxSkeleton
 
-    val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l 
-        -> result (txSkeleton ** option message) `cost` ((64 + (l * 128 + 192) + 0 + 21) <: nat)
-    let main txSkeleton contractHash command data returnAddress #l wallet =
+    val main: txSkeleton -> hash -> string -> data -> option lock -> wallet:wallet
+        -> result (txSkeleton ** option message) `cost` ((64 + (W.size wallet * 128 + 192) + 0 + 21) <: nat)
+    let main txSkeleton contractHash command data returnAddress wallet =
         let! result =
             Tx.lockToPubKey zenAsset 10UL (hashFromBase64 "DYggLLPq6eXj1YxjiPQ5dSvb/YVqAVNf8Mjnpc9P9BI=") txSkeleton
             >>= Tx.fromWallet zenAsset 10UL contractHash wallet in
@@ -102,9 +103,9 @@ let setUp = fun () ->
     
         ET.of_option "not enough Zens" result'
     
-    val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 11
-        let cf _ _ _ _ #l _ =
-            let res : nat = (64 + (l * 128 + 192) + 0 + 21) in
+    val cf: txSkeleton -> string -> data -> option lock -> wallet -> cost nat 12
+        let cf _ _ _ _ wallet =
+            let res : nat = (64 + (W.size wallet * 128 + 192) + 0 + 21) in
             ret res
     """ account session state
     |> function

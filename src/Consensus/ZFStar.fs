@@ -108,6 +108,14 @@ let private fsToFstInput (input: Input) : input =
     | Input.Mint spend ->
         Mint <| fsToFstSpend spend
 
+let rec private fsToFstList : list<'a> -> Prims.list<'a> = function
+    | hd :: tl -> Prims.Cons (hd, (fsToFstList tl))
+    | [] -> Prims.Nil
+
+let rec private fstToFsList : Prims.list<'a> -> list<'a> = function
+    | Prims.Cons(hd, tl) -> hd::fstToFsList tl
+    | Prims.Nil -> []
+
 let private fsToFstPointedOutput ((outpoint, output):PointedOutput) : pointedOutput =
     { txHash = Hash.bytes outpoint.txHash; index = outpoint.index }, fsToFstOutput output
 
@@ -168,9 +176,9 @@ let convertResult (tx, message : message Native.option) =
         |> Result.map (fun tx' -> (tx', message))
     )
 
-let convertWallet (wallet:PointedOutput list) =
+let convertWallet (wallet:PointedOutput list) : Prims.list<pointedOutput>=
     List.map fsToFstPointedOutput wallet
-    |> listToVector
+    |> fsToFstList
 
 let fsToFstTxSkeleton (txSkeleton:TxSkeleton.T) : txSkeleton =
     let insertInput txSkeleton pointedOutput =
@@ -190,3 +198,5 @@ let vectorLength v =
     match v with
     | VCons (l,_,_) -> l + 1L
     | VNil -> 0L
+
+let listLength : Prims.list<'a> -> Prims.nat = Prims.length

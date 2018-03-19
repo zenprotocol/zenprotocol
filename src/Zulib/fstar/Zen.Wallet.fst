@@ -5,4 +5,8 @@ open Zen.Option
 open Zen.Cost
 
 module U64 = FStar.UInt64
-module V = Zen.Vector
+
+type t = wallet
+
+val size : wallet -> nat
+let size = length
