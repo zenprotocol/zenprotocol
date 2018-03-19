@@ -87,6 +87,24 @@ type (' p, ' q, 'dummyP, 'dummyQ) eq3 =  unit
 
 type prop     = Obj.t
 
+type lex_t =
+  | LexTop
+  | LexCons of unit * Obj.t * lex_t
+let (uu___is_LexTop : lex_t -> bool) =
+  fun projectee  ->
+    match projectee with | LexTop  -> true | uu____18 -> false
+
+let (uu___is_LexCons : lex_t -> bool) =
+  fun projectee  ->
+    match projectee with | LexCons (a,_1,_2) -> true | uu____30 -> false
+
+type 'Aprojectee __proj__LexCons__item__a = Obj.t
+let (__proj__LexCons__item___1 :
+  lex_t -> unit __proj__LexCons__item__a) =
+  fun projectee  -> match projectee with | LexCons (a,_1,_2) -> _1
+let (__proj__LexCons__item___2 : lex_t -> lex_t) =
+  fun projectee  -> match projectee with | LexCons (a,_1,_2) -> _2
+
 let cut = ()
 let admit () = failwith "no admits"
 let _assume () = ()
@@ -99,6 +117,7 @@ let range_0 = ()
 let range_of _ = ()
 let mk_range _ _ _ _ _ = ()
 let set_range_of x = x
+
 
 (* for partially variants of the operators *)
 let op_Equality x y = x = y
@@ -126,8 +145,8 @@ let rec pow2 n =
   else
     2L * pow2 (n - 1L)
 
-let __proj__Cons__item__tl = function
-  | _::tl -> tl
-  | _     -> failwith "Impossible"
+let __proj__Cons__item__hd = List.head
+
+let __proj__Cons__item__tl = List.tail
 
 let min = min
