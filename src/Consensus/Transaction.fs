@@ -6,11 +6,11 @@ open Crypto
 open Serialization
 
 let hash =
-    serializeTransaction WithoutWitness >> Hash.compute
+    Transaction.serialize WithoutWitness >> Hash.compute
 
 let witnessHash =
     //TODO: only serialize witness
-    serializeTransaction Full >> Hash.compute
+    Transaction.serialize Full >> Hash.compute
 
 let addWitnesses witnesses tx =
     { tx with witnesses = witnesses @ tx.witnesses }
