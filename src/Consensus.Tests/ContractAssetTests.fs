@@ -52,9 +52,10 @@ let ``Should generate assets from a string and from an int``() =
         module S = FStar.String
 
         val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 11
-        let cf _ _ _ _ #l _ = ret (64 + (64 + (64 + 64 + 0)) + 23)
+        let cf _ _ _ _ #l _ = ret (64 + (64 + (64 + 64 + 0)) + 26)
 
-        val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + (64 + 64 + 0)) + 23)
+        val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l 
+            -> result (txSkeleton ** option message) `cost` (64 + (64 + (64 + 64 + 0)) + 26)
         let main txSkeleton contractHash command data returnAddress #l wallet =
             let str = "Test" in
 

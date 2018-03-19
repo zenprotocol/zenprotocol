@@ -81,9 +81,6 @@ let setUp = fun () ->
     module ET = Zen.ErrorT
     module Tx = Zen.TxSkeleton
 
-    val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 19
-    let cf _ _ _ _ #l _ = ret (64 + (64 + (64 + 64 + (l * 128 + 192) + 0)) + 28 + 22)
-
     let buy txSkeleton contractHash returnAddress =
       let! contractToken = Zen.Asset.getDefault contractHash in
       let! amount = Tx.getAvailableTokens zenAsset txSkeleton in
@@ -110,7 +107,8 @@ let setUp = fun () ->
 
       ET.of_option "contract doesn't have enough zens to pay you" result
 
-    val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + (64 + 64 + (l * 128 + 192) + 0)) + 28 + 22)
+    val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l 
+        -> result (txSkeleton ** option message) `cost` (64 + (64 + (64 + 64 + (l * 128 + 192) + 0)) + 31 + 22)
     let main txSkeleton contractHash command data returnAddress #l wallet =
       match returnAddress with
       | Some returnAddress ->
@@ -123,6 +121,9 @@ let setUp = fun () ->
           ET.autoFailw "unsupported command"
       | None ->
         ET.autoFailw "returnAddress is required"
+    
+    val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 19
+        let cf _ _ _ _ #l _ = ret (64 + (64 + (64 + 64 + (l * 128 + 192) + 0)) + 31 + 22)
     """ account session state
     |> function
     | Ok (state', cHash') ->
