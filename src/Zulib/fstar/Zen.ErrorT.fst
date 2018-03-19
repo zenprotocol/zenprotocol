@@ -16,8 +16,7 @@ let ret(#_) x = ret (OK x)
 
 val retT(#a:Type)(#n:nat): cost a n -> cost (result a) n
 let retT #_ #_ mx =
-   let! x = mx in
-   ret x
+   mx >>= ret
 
 val incFail(#a:Type): n:nat -> exn -> cost (result a) n
 let incFail #_ n e = inc (fail e) n
@@ -55,8 +54,7 @@ let map #_ #_ #_ f mx =
 val ap(#a #b:Type)(#m #n:nat): cost (result (a->b)) m -> cost (result a) n
   -> cost (result b) (n+m)
 let ap #_ #_ #_ #_ mf mx =
-  let! f = mf in
-  f `map` mx
+  bind mf (fun f -> f `map` mx)
 
 val of_option(#a:Type): string -> option a -> cost (result a) 0
 let of_option(#_) msg = function

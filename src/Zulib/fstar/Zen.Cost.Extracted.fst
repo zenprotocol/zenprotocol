@@ -3,6 +3,9 @@ module Zen.Cost.Extracted
 open Zen.Base
 open Zen.Cost.Realized
 
+val letBang(#a #b:Type)(#m #n:nat): cost a m -> (a -> cost b n) -> cost b (m+n)
+let letBang #_ #_ #_ #_ mx f = bind mx f
+
 val bind2(#a #b #c:Type)(#n1 #n2 #n3:nat):
   cost a n1 -> cost b n2 -> (a -> b -> cost c n3) -> cost c (n1+n2+n3)
 let bind2 #_ #_ #_ #_ #_ #_ mx my f = mx `bind` (fun x ->
@@ -142,10 +145,18 @@ val refine_eq_out(#a:Type)(#n:nat):
 let refine_eq_out #_ #_ x mx =
     refine_prop_out (fun y -> y == x) mx
 
+(* A dependent variant of bind, useful if the function that we bind into has a refinement on it's domain *)
+val bind_dep(#a #b:Type)(#m #n:nat):
+    mx:cost a m
+    -> (x:a{x == force mx} -> cost b n)
+    -> cost b (m+n)
+let bind_dep #_ #_ #_ #_ mx f =
+    refine_eq_in mx `bind` f
+
 val ifBang(#a:Type)(#m #n:nat):
     mx:cost bool m
     -> (b:bool{b = force mx} -> cost a n)
-    -> cost a (n + m)
+    -> cost a (m+n)
 let ifBang #_ #_ #_ mx f =
     refine_eq_in mx `bind` f
 
