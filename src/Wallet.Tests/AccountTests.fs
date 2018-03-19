@@ -33,8 +33,6 @@ let ``received tokens``() =
 
     let account' = Account.addTransaction (Transaction.hash tx) tx account
 
-    let balances = Account.getBalance account'
-
     account' |> balanceShouldBe Constants.Zen 10UL
 
 [<Test>]
@@ -129,7 +127,7 @@ let ``picking the correct asset``() =
     let tx = {inputs=[];outputs=[output; output2];witnesses=[];contract=None}
     let bob' = Account.addTransaction (Transaction.hash tx) tx bob
 
-    Account.getUnspentOutputs bob' |> should haveCount 2
+    Account.getUnspentOutputs bob' |> fst |> should haveCount 2
     bob' |> balanceShouldBe anotherAsset 10UL
 
     // sending money to alice
@@ -285,7 +283,7 @@ let ``sync up from empty wallet``() =
 
     account.tip |> should equal blockHash
     account.mempool |> should haveLength 0
-    Account.getUnspentOutputs account |> should haveCount 1
+    Account.getUnspentOutputs account |> fst |> should haveCount 1
 
 [<Test>]
 let ``account reorg``() =
