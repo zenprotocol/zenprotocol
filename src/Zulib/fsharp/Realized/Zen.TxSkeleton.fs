@@ -62,23 +62,23 @@ let insertOutput (output : output) (txSkeleton : txSkeleton) : txSkeleton =
 let addInput (input : input) (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
     lazy (insertInput input txSkeleton) |> Cost.C
 
-let rec private addPointedOutputs (_ : Prims.nat) (pointedOutputs : V.t<pointedOutput, unit>)
+let rec private addPointedOutputs (pointedOutputs : Prims.list<pointedOutput>)
         (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
     lazy (match pointedOutputs with
-          | V.VNil -> txSkeleton
-          | V.VCons(n, pointedOutput, pointedOutputs) ->
+          | Prims.Nil -> txSkeleton
+          | Prims.Cons(pointedOutput, pointedOutputs) ->
               insertInput (PointedOutput pointedOutput) txSkeleton
-              |> addPointedOutputs n pointedOutputs
+              |> addPointedOutputs pointedOutputs
               |> Cost.__force)
     |> Cost.C
 
-let rec addInputs (_ : Prims.nat) (inputs : V.t<input, unit>)
+let rec addInputs (inputs : Prims.list<input>)
         (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
     lazy (match inputs with
-          | V.VNil -> txSkeleton
-          | V.VCons(n, input, inputs) ->
+          | Prims.Nil -> txSkeleton
+          | Prims.Cons(input, inputs) ->
               insertInput input txSkeleton
-              |> addInputs n inputs
+              |> addInputs inputs
               |> Cost.__force)
     |> Cost.C
 
@@ -145,16 +145,16 @@ let destroy (amount : U64.t) (asset : asset)
     |> Cost.C
 
 
-let fromWallet (_: Prims.nat) (asset:asset) (amount:U64.t)
-                (contractHash:hash) (wallet:wallet<Prims.unit>) (txSkeleton:txSkeleton) =
+let fromWallet (asset:asset) (amount:U64.t)
+                (contractHash:hash) (wallet:wallet) (txSkeleton:txSkeleton) =
 
     lazy (
-        let n,inputs,collectedAmount = collect asset amount wallet 0L V.VNil 0UL
+        let inputs,collectedAmount = collect asset amount wallet Prims.Nil 0UL
 
         match inputs with
-        | V.VNil -> Native.None
+        | Prims.Nil -> Native.None
         | _ ->
-            let txSkeleton = addPointedOutputs n inputs txSkeleton |> Cost.__force
+            let txSkeleton = addPointedOutputs inputs txSkeleton |> Cost.__force
 
             // Do we need a change?
             if collectedAmount > amount then

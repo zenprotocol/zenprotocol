@@ -38,7 +38,7 @@ NUGET
     FsNetMQ (0.2.7)
       FSharp.Core
       NetMQ (>= 4.0.0.156-pre)
-    FsPickler (5.1)
+    FsPickler (5.2)
       FSharp.Core (>= 3.1.2)
     FsUnit (3.1)
       FSharp.Core (>= 4.2.3)
@@ -93,7 +93,7 @@ NUGET
       System.Collections.Immutable (>= 1.3.1)
       System.Reflection.Metadata (>= 1.4.2)
     ZFS-Tools (0.0.12)
-    ZFStar (0.0.12)
+    ZFStar (0.0.13)
   remote: https://www.myget.org/F/zenprotocol/api/v2
     zen_secp256k1_linux (0.1.0.26-v6ad5cdb42a1a)
     zen_secp256k1_osx (0.1.0.26-v6ad5cdb42a1a)

@@ -28,10 +28,27 @@ type 'a array  = 'a Microsoft.FSharp.Core.array
 type string    = byte array
 type exn       = Microsoft.FSharp.Core.exn
 
-type 'a list   = 'a Microsoft.FSharp.Collections.list
-let length (ls:'a list) : int =
-    Microsoft.FSharp.Collections.List.length ls
-    |> int64
+type 'a list =
+    | Nil'
+    | Cons' of int*'a*list<'a>
+
+let Cons (head, tail) =
+    match tail with
+    | Cons' (index,_,_) -> Cons' (index+1L, head, tail)
+    | Nil' -> Cons'(1L, head, tail)
+
+let Nil = Nil'
+
+let length : 'a list -> int =
+    function
+    | Nil' -> 0L
+    | Cons'(index, _, _) -> index
+
+let (|Cons|Nil|) list =
+    match list with
+    | Nil' -> Nil
+    | Cons' (_,head,tail) -> Cons (head,tail)
+
 type 'a option = 'a Microsoft.FSharp.Core.option
 
 type range     = unit
@@ -145,8 +162,12 @@ let rec pow2 n =
   else
     2L * pow2 (n - 1L)
 
-let __proj__Cons__item__hd = List.head
+let __proj__Cons__item__hd = function
+    | Cons (hd, _) -> hd
+    | _ -> failwith "impossible"
 
-let __proj__Cons__item__tl = List.tail
+let __proj__Cons__item__tl = function
+    | Cons (_, tl) -> tl
+    | _ -> failwith "impossible"
 
 let min = min

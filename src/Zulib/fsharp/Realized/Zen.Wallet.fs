@@ -9,24 +9,27 @@ module Cost = Zen.Cost.Realized
 module V = Zen.Vector
 module U64 = FStar.UInt64
 
-let rec collect (asset:asset) (amount:U64.t) (wallet:wallet<Prims.unit>) (n1:Prims.nat) collected (collectedAmount:U64.t) =
+type t = Zen.Types.Extracted.wallet
+
+let size : Zen.Types.Extracted.wallet  ->  Prims.nat = Prims.length
+
+let rec collect (asset:asset) (amount:U64.t) (wallet:wallet) collected (collectedAmount:U64.t) =
     match wallet with
-    | V.VNil ->
+    | Prims.Nil ->
         if collectedAmount >= amount then
-            n1,collected,collectedAmount
+            collected, collectedAmount
         else
-            0L,V.VNil,0UL
-    | V.VCons (length,head,tail) ->
+            Prims.Nil, 0UL
+    | Prims.Cons (head,tail) ->
         let input, output = head
 
         if amount > collectedAmount && asset = output.spend.asset then
-            let collected = V.VCons (n1,head,collected)
+            let collected = Prims.Cons (head,collected)
             let collectedAmount = collectedAmount + output.spend.amount
-            let n1 = n1 + 1L
 
-            collect asset amount tail n1 collected collectedAmount
+            collect asset amount tail collected collectedAmount
         else
-            collect asset amount tail n1 collected collectedAmount
+            collect asset amount tail collected collectedAmount
 
 //let getInputs (n:Prims.nat) (asset:asset) (amount:U64.t) (wallet:wallet<Prims.unit>) (txSkeleton:txSkeleton) =
 //    lazy (

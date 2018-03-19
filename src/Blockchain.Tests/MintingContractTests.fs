@@ -78,6 +78,7 @@ let setUp = fun () ->
     open Zen.Cost
     open Zen.Asset
 
+    module W = Zen.Wallet
     module ET = Zen.ErrorT
     module Tx = Zen.TxSkeleton
 
@@ -91,7 +92,7 @@ let setUp = fun () ->
         >>= Tx.lockToAddress contractToken amount returnAddress in
       ET.ret (txSkeleton, None)
 
-    let redeem #l txSkeleton contractHash returnAddress (wallet:wallet l) =
+    let redeem txSkeleton contractHash returnAddress wallet =
       let! contractToken = Zen.Asset.getDefault contractHash in
       let! amount = Tx.getAvailableTokens contractToken txSkeleton in
 
@@ -107,9 +108,9 @@ let setUp = fun () ->
 
       ET.of_option "contract doesn't have enough zens to pay you" result
 
-    val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l 
-        -> result (txSkeleton ** option message) `cost` (64 + (64 + (64 + 64 + (l * 128 + 192) + 0)) + 31 + 22)
-    let main txSkeleton contractHash command data returnAddress #l wallet =
+    val main: txSkeleton -> hash -> string -> data -> option lock -> wallet:wallet
+        -> result (txSkeleton ** option message) `cost` (64 + (64 + (64 + 64 + (W.size wallet * 128 + 192) + 0)) + 31 + 22)
+    let main txSkeleton contractHash command data returnAddress wallet =
       match returnAddress with
       | Some returnAddress ->
         if command = "redeem" then
@@ -122,8 +123,8 @@ let setUp = fun () ->
       | None ->
         ET.autoFailw "returnAddress is required"
     
-    val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 19
-        let cf _ _ _ _ #l _ = ret (64 + (64 + (64 + 64 + (l * 128 + 192) + 0)) + 31 + 22)
+    val cf: txSkeleton -> string -> data -> option lock -> wallet -> cost nat 20
+        let cf _ _ _ _ wallet = ret (64 + (64 + (64 + 64 + (W.size wallet * 128 + 192) + 0)) + 31 + 22)
     """ account session state
     |> function
     | Ok (state', cHash') ->

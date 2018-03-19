@@ -14,6 +14,15 @@ type message =
       command: string;
       data: data }
 
+(*
+type contractArgs = {
+    cHash: hash;
+    command: string;
+    data: data;
+    returnAddress: option lock
+}
+*)
+
 noeq type costFunction =
     | CostFunc:
         #n:nat{n<=maxCost}
@@ -21,8 +30,7 @@ noeq type costFunction =
               -> command:string
               -> data:data
               -> returnAddress:option lock
-              -> #l:nat
-              -> wallet l
+              -> wallet
               -> nat `cost` n)
         -> costFunction
 
@@ -34,8 +42,7 @@ noeq type mainFunction =
                 -> command:string
                 -> data:data
                 -> returnAddress:option lock
-                -> #l:nat
-                -> wallet:wallet l
+                -> wallet:wallet
                 -> result (txSkeleton ** option message) `cost` force ((CostFunc?.f cf) txSkel command data returnAddress wallet)
               )
         -> mainFunction

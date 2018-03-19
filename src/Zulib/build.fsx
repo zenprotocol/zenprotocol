@@ -1,6 +1,6 @@
 
-#r @"../../packages/System.Reflection.Metadata/lib/portable-net45+win8/System.Reflection.Metadata.dll"
-//#r @"../../packages/System.Reflection.Metadata/lib/netstandard1.1/System.Reflection.Metadata.dll"
+//#r @"../../packages/System.Reflection.Metadata/lib/portable-net45+win8/System.Reflection.Metadata.dll"
+#r @"../../packages/System.Reflection.Metadata/lib/netstandard1.1/System.Reflection.Metadata.dll"
 #r @"../../packages/FAKE/tools/FakeLib.dll"
 #r @"../../packages/Zen.FSharp.Compiler.Service/lib/net45/Zen.FSharp.Compiler.Service.dll"
 
@@ -108,6 +108,7 @@ Target "Extract" (fun _ ->
        "--extract_module";"Zen.Types.Main";
        "--codegen-lib";"Zen.Types";
        "--extract_module";"Zen.Data";
+       //"--extract_module"; "Zen.Wallet"
        "--odir";extractedDir |]
 
   let exitCode = runFStar args zulibFiles
@@ -153,6 +154,7 @@ Target "Build" (fun _ ->
       "fsharp/Realized/Zen.Asset.fs";
       "fsharp/Extracted/Zen.Types.Main.fs";
       "fsharp/Realized/Zen.Wallet.fs";
+      //"fsharp/Extracted/Zen.Wallet.fs";
       "fsharp/Realized/Zen.TxSkeleton.fs";
     |]
 

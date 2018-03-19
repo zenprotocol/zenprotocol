@@ -48,20 +48,20 @@ let private invokeMainFn
                 (command : byte[]) 
                 (data : Zen.Types.Data.data ) 
                 (returnAddress : Native.option<lock>)
-                (contractWallet : Zen.Vector.t<pointedOutput, obj>)
+                (contractWallet : Prims.list<pointedOutput>)
                 (input : txSkeleton)
                 : obj =
-    (methodInfo:MethodInfo).Invoke (null, [| input; cHash; command; data; returnAddress; ZFStar.vectorLength contractWallet; contractWallet |])
+    (methodInfo:MethodInfo).Invoke (null, [| input; cHash; command; data; returnAddress; contractWallet |])
 
 let private invokeCostFn 
                 methodInfo 
                 (command : byte[]) 
                 (data : Zen.Types.Data.data ) 
                 (returnAddress : Native.option<lock>)
-                (contractWallet : Zen.Vector.t<pointedOutput, obj>)
+                (contractWallet : Prims.list<pointedOutput>)
                 (input : txSkeleton)
                 : obj =
-    (methodInfo:MethodInfo).Invoke (null, [| input; command; data; returnAddress; ZFStar.vectorLength contractWallet;  contractWallet |])
+    (methodInfo:MethodInfo).Invoke (null, [| input; command; data; returnAddress; contractWallet |])
 
 let private castMainFnOutput output =
     (output:System.Object) :?> cost<result<(txSkeleton * message Native.option)>, unit>
