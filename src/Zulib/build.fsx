@@ -66,6 +66,7 @@ Target "RecordHints" (fun _ ->
 Target "Verify" (fun _ ->
   let args =
     [| "--use_hints";
+       //"--strict_hints";
        "--use_hint_hashes"
        "--cache_checked_modules"
     |]
