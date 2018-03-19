@@ -60,7 +60,7 @@ let handleRequest chain client (request,reply) =
             |> List.map (fun contract ->
                 let address = Address.encode chain (Address.Contract contract.contractHash)
                 new ActiveContractsJson.Root(Hash.toString contract.contractHash,address, contract.expiry |> int,contract.code))
-            |> List.map (fun balance -> balance.JsonValue)
+            |> List.map (fun json -> json.JsonValue)
             |> List.toArray
             |> JsonValue.Array
 
@@ -86,7 +86,7 @@ let handleRequest chain client (request,reply) =
             balances
             |> Map.toSeq
             |> Seq.map (fun ((asset, assetType), amount) -> new BalanceResponseJson.Root(Hash.toString asset, Hash.toString assetType, int64 amount))
-            |> Seq.map (fun balance -> balance.JsonValue)
+            |> Seq.map (fun json -> json.JsonValue)
             |> Seq.toArray
             |> JsonValue.Array
 
@@ -108,6 +108,20 @@ let handleRequest chain client (request,reply) =
         | Result.Ok (pkHash, spend) ->
             Wallet.createTransaction client pkHash spend
             |> validateTx
+    | Get ("/wallet/transactions", _) ->
+        let json =
+            Wallet.getTransactions client
+            |> List.toArray
+            |> Array.map (fun (txHash, amounts) -> 
+                let deltas =
+                    amounts
+                    |> Map.toArray
+                    |> Array.map (fun ((asset, assetType), amount) -> 
+                        new TransactionsResponseJson.Delta(Hash.toString asset, Hash.toString assetType, amount))
+                (new TransactionsResponseJson.Root(Hash.toString txHash, deltas)).JsonValue)
+            |> JsonValue.Array
+        let json = new TransactionsResponseJson.Root(json)
+        reply StatusCode.OK (JsonContent json.JsonValue)
     | Post ("/wallet/contract/activate", Some body) ->
         match getContractActivate body with
         | Result.Error error -> replyError error

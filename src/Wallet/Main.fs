@@ -58,6 +58,10 @@ let requestHandler chain client (requestId:RequestId) request session wallet =
         Account.getAddress chain wallet
         |> reply
         wallet
+    | GetTransactions ->
+        Account.getHistory wallet
+        |> reply
+        wallet
     | ImportSeed words ->
         match Account.import words "" with 
         | Result.Ok account -> 

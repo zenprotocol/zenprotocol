@@ -8,6 +8,7 @@ open Infrastructure.ServiceBus.Client
 
 type ImportResult = Result<unit,string>
 type TransactionResult = Result<Transaction,string>
+type TransactionsResult = List<Hash*Map<Asset,int64>>
 type ActivateContractTransactionResult = Result<Transaction * Hash, string>
 
 module Blockchain =
@@ -136,6 +137,7 @@ module Wallet =
     type Request =
         | GetAddressPKHash
         | GetAddress
+        | GetTransactions
         | GetBalance
         | ImportSeed of string list
         | Spend of Hash * Spend
@@ -164,3 +166,6 @@ module Wallet =
 
     let importSeed client words =
         Request.send<Request, ImportResult> client serviceName (ImportSeed words)
+
+    let getTransactions client =
+        Request.send<Request, TransactionsResult> client serviceName GetTransactions

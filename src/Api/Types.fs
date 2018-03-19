@@ -89,3 +89,18 @@ type ImportSeedJson = JsonProvider<"""
     "words" : []
 }
 """>
+
+type TransactionsResponseJson = JsonProvider<"""
+[
+    {
+        "txHash": "hash",
+        "deltas": [
+            {
+                "asset": "hash",
+                "assetType": "hash",
+                "amount": "-2147483453648"
+            }
+        ]  
+    }
+]
+""">
