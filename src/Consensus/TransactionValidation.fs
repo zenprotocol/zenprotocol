@@ -37,7 +37,6 @@ let private foldSpends =
 let private checkSpends m =
     Map.forall (fun _ v -> Option.isSome v) m
 
-// name is misleading
 let private activateContract (chainParams : Chain.ChainParameters) contractPath blockNumber acs (tx : Types.Transaction) =
     let getActivationSacrifice tx = result {
         let activationSacrifices = List.filter(fun output -> output.lock = ActivationSacrifice) tx.outputs

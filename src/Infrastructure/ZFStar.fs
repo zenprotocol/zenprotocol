@@ -111,8 +111,8 @@ let private extract (code, hints, limits) moduleName =
                 ]
             |> wrapFStar "extract" extractedFile)
     finally    
-#if DEBUG    
-        ()
+#if DEBUG 
+        printfn "extract output directory: %A" oDir
 #else 
         Directory.Delete (oDir, true)
 #endif    
@@ -146,7 +146,7 @@ let calculateMetrics hints =
             Exception.toError "limits" ex
     finally
 #if DEBUG    
-        ()
+        printfn "calculate metrics output directory: %A" oDir
 #else 
         Directory.Delete (oDir, true)
 #endif        
@@ -168,7 +168,7 @@ let recordHints code moduleName =
             |> wrapFStar "record hints" hintsFile)
     finally
 #if DEBUG    
-        ()
+        printfn "record hints output directory: %A" oDir
 #else 
         Directory.Delete (oDir, true)
 #endif 
