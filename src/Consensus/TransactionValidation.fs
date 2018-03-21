@@ -1,10 +1,10 @@
 ﻿module Consensus.TransactionValidation
 
-open Consensus.Types
-open Consensus.UtxoSet
-open Consensus.Crypto
-
 open Consensus
+open Types
+open UtxoSet
+open Crypto
+open Zen.Types.Data
 open Infrastructure
 
 let private (>=>) f1 f2 x = Result.bind f2 (f1 x)
@@ -315,7 +315,23 @@ let private checkStructure =
                 Array.length serializedPublicKey <> Crypto.SerializedPublicKeyLength ||
                 Array.length signature <> Crypto.SerializedSignatureLength
             | ContractWitness cw -> 
-                isInvalidHash cw.cHash
+                let rec validateData = function
+                    | I64Array (Prims.Mkdtuple2 (len, arr)) when Array.length arr <> int len -> false
+                    | ByteArray (Prims.Mkdtuple2 (len, arr)) when Array.length arr <> int len -> false
+                    | U32Array (Prims.Mkdtuple2 (len, arr)) when Array.length arr <> int len -> false
+                    | U64Array (Prims.Mkdtuple2 (len, arr)) when Array.length arr <> int len -> false
+                    | StringArray (Prims.Mkdtuple2 (len, arr)) when Array.length arr <> int len -> false
+                    | HashArray (Prims.Mkdtuple2 (len, arr)) ->
+                        Array.length arr = int len && Array.forall (Consensus.Hash.Hash >> Hash.isValid) arr
+                    | LockArray (Prims.Mkdtuple2 (len, arr)) when Array.length arr <> int len -> false
+                    | Tuple (a, b) -> validateData a && validateData b
+                    | Dict (DataDict (map, len)) ->
+                        let values = Map.toList map |> List.map snd
+                        List.length values = int len && List.forall validateData values
+                    | Hash hash -> Hash.isValid (Consensus.Hash.Hash hash)
+                    | _ -> true
+                    
+                isInvalidHash cw.cHash && validateData cw.data
         ) tx.witnesses then
             GeneralError "structurally invalid witness data"
         else
