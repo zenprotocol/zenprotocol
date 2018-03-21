@@ -30,6 +30,7 @@ type data =
     | LockArray: (l:nat & lock `A.t` l) -> data
     | Tuple of (data ** data)
     | Dict of dataDict
+    | Empty
 
 and dataDict =
     | DataDict of dictionary data
