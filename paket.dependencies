@@ -26,6 +26,7 @@ nuget ZFS-Tools = 0.0.10
 nuget FSharpx.Extras
 nuget Newtonsoft.Json
 nuget Base58Check
+nuget NBitcoin
 
 source https://www.myget.org/F/zenprotocol/api/v2
 

@@ -33,8 +33,6 @@ let ``received tokens``() =
 
     let account' = Account.addTransaction (Transaction.hash tx) tx account
 
-    let balances = Account.getBalance account'
-
     account' |> balanceShouldBe Constants.Zen 10UL
 
 [<Test>]
@@ -129,7 +127,7 @@ let ``picking the correct asset``() =
     let tx = {inputs=[];outputs=[output; output2];witnesses=[];contract=None}
     let bob' = Account.addTransaction (Transaction.hash tx) tx bob
 
-    Account.getUnspentOutputs bob' |> should haveCount 2
+    Account.getUnspentOutputs bob' |> fst |> should haveCount 2
     bob' |> balanceShouldBe anotherAsset 10UL
 
     // sending money to alice
@@ -285,7 +283,7 @@ let ``sync up from empty wallet``() =
 
     account.tip |> should equal blockHash
     account.mempool |> should haveLength 0
-    Account.getUnspentOutputs account |> should haveCount 1
+    Account.getUnspentOutputs account |> fst |> should haveCount 1
 
 [<Test>]
 let ``account reorg``() =
@@ -430,3 +428,61 @@ let ``wallet spend coinbase when come from block``() =
 
     Account.createTransaction rootAccount rootAccount.publicKeyHash { asset = Constants.Zen; amount = 1UL }
     |> should be ok
+
+[<Test>]
+let ``Should get expected deltas``() =
+    let account = Account.create ()
+
+    let output1 = {lock = PK account.publicKeyHash; spend={asset=Constants.Zen;amount=10UL}}
+    let tx1 = {inputs=[];outputs=[output1];witnesses=[];contract=None}
+    let tx1Hash = Transaction.hash tx1
+    let output2A = {lock = PK Hash.zero; spend={asset=Constants.Zen;amount=2UL}}
+    let output2B = {lock = PK account.publicKeyHash; spend={asset=Constants.Zen;amount=8UL}}
+    let tx2 = {inputs=[Outpoint { txHash = tx1Hash; index = 0ul } ];outputs=[output2A;output2B];witnesses=[];contract=None}
+
+    let header = {
+        version = 0ul
+        parent = chainParams.genesisHash
+        blockNumber = 2ul
+        commitments = Hash.zero
+        timestamp = 0UL
+        difficulty = 0ul
+        nonce = 0UL,0UL
+    }
+
+    let block = {
+        header = header
+        transactions = [tx1;tx2]
+        txMerkleRoot = Hash.zero
+        witnessMerkleRoot = Hash.zero
+        activeContractSetMerkleRoot= Hash.zero
+        commitments = []
+    }
+
+    let blockHash = Block.hash block.header
+
+    let account = Account.sync chainParams blockHash (fun _ -> failwith "unexpected")
+                    (fun blockHash ->
+                        if blockHash = chainParams.genesisHash then
+                            Block.createGenesis chainParams [Transaction.rootTx] (0UL,0UL)
+                        else
+                            block) account
+
+    let tx2Hash = Transaction.hash tx2
+    let output3A = {lock = PK Hash.zero; spend={asset=Constants.Zen;amount=3UL}}
+    let output3B = {lock = PK account.publicKeyHash; spend={asset=Constants.Zen;amount=5UL}}
+    let tx3 = {inputs=[Outpoint { txHash = tx2Hash; index = 1ul } ];outputs=[output3A;output3B];witnesses=[];contract=None}
+
+    let expected = [ (tx1Hash, Map.add Constants.Zen 10L Map.empty) ]
+    let expected = expected @ [ (tx2Hash, Map.add Constants.Zen -2L Map.empty) ]
+
+    should equal expected (Account.getHistory account)
+
+    let tx3Hash = Transaction.hash tx3
+    
+    // add tx3 to mempool
+    let account' = Account.addTransaction tx3Hash tx3 account
+
+    let expected = expected @ [ (tx3Hash, Map.add Constants.Zen -3L Map.empty) ]
+
+    should equal expected (Account.getHistory account')

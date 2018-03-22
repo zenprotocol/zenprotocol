@@ -344,7 +344,7 @@ let ``Invalid contract should not be added to ActiveContractSet or mempool``() =
     let cHash = getStringHash contractCode
 
     let tx =
-        let input, output = Account.getUnspentOutputs rootAccount |> Map.toSeq |> Seq.head
+        let input, output = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head
         let output' = {output with lock=PK rootAccount.publicKeyHash}
         { inputs=[ Outpoint input ]; outputs=[ output' ]; witnesses=[]; contract = Some (contractCode, "") }
         |> (Transaction.sign [ rootAccount.keyPair ])

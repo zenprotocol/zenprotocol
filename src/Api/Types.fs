@@ -83,3 +83,24 @@ type BlockChainInfoJson = JsonProvider<"""
     "difficulty":0.1,
     "medianTime":2147483648
 }""">
+
+type ImportSeedJson = JsonProvider<"""
+{
+    "words" : []
+}
+""">
+
+type TransactionsResponseJson = JsonProvider<"""
+[
+    {
+        "txHash": "hash",
+        "deltas": [
+            {
+                "asset": "hash",
+                "assetType": "hash",
+                "amount": "-2147483453648"
+            }
+        ]  
+    }
+]
+""">

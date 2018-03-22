@@ -268,9 +268,9 @@ let ``can connect block with a contract``() =
 let ``block with invalid contract failed connecting``() =
     let rootAccount = Account.createTestAccount ()
 
-    let outpoint = Account.getUnspentOutputs rootAccount |> Map.toSeq |> Seq.head |> fst
+    let outpoint = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
     let output =
-        let output = Account.getUnspentOutputs rootAccount |> Map.toSeq |> Seq.head |> snd
+        let output = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
         {output with lock=ActivationSacrifice}
 
     let tx =
