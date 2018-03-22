@@ -53,13 +53,13 @@
     <Compile Include="Constants.fs" />
     <Compile Include="Difficulty.fs" />
     <Compile Include="TxSkeleton.fs" />
+    <Compile Include="Chain.fs" />
+    <Compile Include="EMA.fs" />
+    <Compile Include="ZFStar.fs" />
     <Compile Include="Serialization.fs" />
     <Compile Include="Transaction.fs" />
     <Compile Include="UtxoSet.fs" />
     <Compile Include="Weight.fs" />
-    <Compile Include="Chain.fs" />
-    <Compile Include="EMA.fs" />
-    <Compile Include="ZFStar.fs" />
     <Compile Include="Contract.fs" />
     <Compile Include="ActiveContractSet.fs" />
     <Compile Include="TransactionValidation.fs" />
@@ -213,17 +213,6 @@
         </Reference>
         <Reference Include="NetMQ">
           <HintPath>..\..\packages\NetMQ\lib\net40\NetMQ.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
-      <ItemGroup>
-        <Reference Include="Newtonsoft.Json">
-          <HintPath>..\..\packages\Newtonsoft.Json\lib\net45\Newtonsoft.Json.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>

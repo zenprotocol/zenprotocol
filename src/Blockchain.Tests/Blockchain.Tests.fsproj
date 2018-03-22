@@ -37,6 +37,9 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
+    <Reference Include="Zulib">
+      <HintPath>..\Zulib\bin\Zulib.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ValidateBlockTests.fs" />
