@@ -24,8 +24,8 @@ let getRandomNonce () =
 let tx = {
     inputs=[];
     outputs = [
-                {lock = PK Transaction.rootPKHash; spend = {asset = Constants.Zen;amount=1UL}}
-                {lock = Contract faucetHash; spend = {asset = Constants.Zen;amount=100000000UL * 100000000UL - 1UL}}
+                {lock = PK Transaction.rootPKHash; spend = {asset = Constants.Zen;amount=100_000_000UL * 20_000_000UL}}
+                //{lock = Contract faucetHash; spend = {asset = Constants.Zen;amount=100000000UL * 100000000UL - 1UL}}
               ]
     contract = None
     witnesses = []

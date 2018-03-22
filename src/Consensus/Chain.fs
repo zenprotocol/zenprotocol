@@ -40,7 +40,7 @@ let testParameters =
         smoothingFactor=0.035;
         maxBlockWeight=1000_000_000I;
         sacrificePerByteBlock=1UL;
-        genesisHash= get <| Hash.fromString "ff8a3da32377e3684c54c75b22c3bee443b0a055a763361877c3646a41b981a2";
+        genesisHash= get <| Hash.fromString "dde83108d46e08e7e273ba14900f7030884e2467ed2d8709cf303497975b7056";
         genesisTime=1517828985040UL
     }
 
@@ -73,7 +73,7 @@ let getGenesisHash =
     function
     | Main -> Hash.zero
     | Test ->
-        Hash.fromString "ff8a3da32377e3684c54c75b22c3bee443b0a055a763361877c3646a41b981a2" |>
+        Hash.fromString "dde83108d46e08e7e273ba14900f7030884e2467ed2d8709cf303497975b7056" |>
         function | Ok value -> value | Error error -> failwith error
     | Local ->
         Hash.fromString "7ffa8c6b1525b8b98ba7847a524a0383659d111d793d5249f4b39b0c84d06b4c" |>
