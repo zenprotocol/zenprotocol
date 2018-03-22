@@ -85,7 +85,6 @@ let private fsToFstOutput (output:Types.Output) : output =
     { lock = fsToFstLock output.lock; spend = fsToFstSpend output.spend }
 
 let private fstToFsOutput (output:output) : Types.Output =
-    let tokenContract, tokenHash = output.spend.asset
     { lock = fstToFsLock output.lock; spend = fstToFsSpend output.spend }
 
 let private fstToFsInput (input: input) : Input =
