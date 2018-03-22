@@ -1,12 +1,12 @@
 ﻿module Consensus.Tests.SerializationTests
 
 open Consensus
-open Consensus.Types
-open Consensus.Hash
+open Hash
+open Types
+open Transaction
 open NUnit.Framework
 open FsCheck
 open FsCheck.NUnit
-open FsUnit
 open Serialization
 
 let txInMode mode tx =
@@ -59,3 +59,16 @@ let ``Different blocks don't produce same hashing result``(bk1:Block) (bk2:Block
     (bk1 <> bk2) ==> lazy (
         Block.hash bk1.header <> Block.hash bk2.header
     )
+
+open Zen.Types.Data
+
+[<Property>]
+let ``Data serialization round trip produces same result``(data:data) =
+    data
+    |> Data.serialize
+    |> Data.deserialize = Some data
+
+[<Property>]
+let ``Different data don't produce same serialization result``(data1:data) (data2:data) =
+    (data1 <> data2) ==> lazy (Data.serialize data1 <> Data.serialize data2)
+
