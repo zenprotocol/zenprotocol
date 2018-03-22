@@ -85,3 +85,18 @@ let getPublishBlock json =
         | None -> Error "invalid block"
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
+        
+let getImportSeed json =
+    try
+        let json = ImportSeedJson.Parse json
+
+        let mutable words = List.empty
+
+        for item in json.Words do
+            words <- item.JsonValue.AsString() :: words
+
+        words
+        |> List.rev
+        |> Ok 
+    with _ as ex ->
+        Error ("Json is invalid: " + ex.Message)

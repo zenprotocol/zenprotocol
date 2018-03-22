@@ -6,9 +6,9 @@ open Hash
 open TxSkeleton
 open Infrastructure.ServiceBus.Client
 
-
+type ImportResult = Result<unit,string>
 type TransactionResult = Result<Transaction,string>
-
+type TransactionsResult = List<Hash*Map<Asset,int64>>
 type ActivateContractTransactionResult = Result<Transaction * Hash, string>
 
 module Blockchain =
@@ -137,7 +137,9 @@ module Wallet =
     type Request =
         | GetAddressPKHash
         | GetAddress
+        | GetTransactions
         | GetBalance
+        | ImportSeed of string list
         | Spend of Hash * Spend
         | ActivateContract of string*uint32
         | ExecuteContract of Hash * string * Data * Map<Asset, uint64>
@@ -153,7 +155,6 @@ module Wallet =
     let getAddress client =
         Request.send<Request, string> client serviceName GetAddress
 
-
     let createTransaction client address spend =
         Request.send<Request, TransactionResult> client serviceName (Spend (address, spend))
 
@@ -162,3 +163,9 @@ module Wallet =
 
     let executeContract client address command data spends =
         Request.send<Request, TransactionResult> client serviceName (ExecuteContract (address,command,data,spends))
+
+    let importSeed client words =
+        Request.send<Request, ImportResult> client serviceName (ImportSeed words)
+
+    let getTransactions client =
+        Request.send<Request, TransactionsResult> client serviceName GetTransactions

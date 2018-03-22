@@ -3,6 +3,11 @@ open System
 open FSharp.Data
 open Api.Types
 
+type ImportArgs =
+    | [<MainCommand("COMMAND");ExactlyOnce>] Import_Arguments of mnemonicSentence:string list
+    interface IArgParserTemplate with
+        member arg.Usage = ""
+
 type SpendArgs =
     | [<MainCommand("COMMAND");ExactlyOnce>] Spend_Arguments of asset:string * assetType:string * amount:int64 * address:string
     interface IArgParserTemplate with
@@ -33,7 +38,9 @@ type Arguments =
     | [<AltCommandLine("-l1")>] Local1
     | [<AltCommandLine("-l2")>] Local2
     | [<CliPrefix(CliPrefix.None)>] Balance of ParseResults<NoArgs>
+    | [<CliPrefix(CliPrefix.None)>] History of ParseResults<NoArgs>
     | [<CliPrefix(CliPrefix.None)>] Address of ParseResults<NoArgs>
+    | [<CliPrefix(CliPrefix.None)>] Import of ParseResults<ImportArgs>
     | [<CliPrefix(CliPrefix.None)>] Spend of ParseResults<SpendArgs>
     | [<CliPrefix(CliPrefix.None)>] Activate of ParseResults<ActivateContractArgs>
     | [<CliPrefix(CliPrefix.None)>] Execute of ParseResults<ExecuteContractArgs>
@@ -45,7 +52,9 @@ type Arguments =
             | Local1 -> "use port of local1 testing node"
             | Local2 -> "use port of local2 testing node"
             | Balance _ -> "get wallet balance"
+            | History _ -> "get wallet transactions"
             | Address _ -> "get wallet address"
+            | Import _ -> "import wallet seed from mnemonic sentence"
             | Spend _ -> "send asset to an address"
             | Activate _ -> "activate contract"
             | Execute _ -> "execute contract"
@@ -94,11 +103,36 @@ let main argv =
 
         Array.iter (fun (assertBalance:BalanceResponseJson.Root) ->
             printfn " %s %s\t| %d" assertBalance.Asset assertBalance.AssetType assertBalance.Balance) balance
+    | Some (History _) ->
+        let transactions =
+            TransactionsResponseJson.Load(getUri "wallet/transactions")
+
+        printfn "TxHash\t| Asset\t| Amount"
+        printfn "=========================================="
+
+        Array.iter (fun (transaction:TransactionsResponseJson.Root) ->
+            printfn "\n%s" transaction.TxHash
+
+            Array.iter (fun (amount:TransactionsResponseJson.Delta) ->
+                printfn "\t| %s %s\t| %d" amount.Asset amount.AssetType amount.Amount
+            ) transaction.Deltas  
+            
+        ) transactions
     | Some (Address _) ->
         let address =
             AddressJson.Load (getUri "wallet/address")
 
         printfn "%s" address.Address
+    | Some (Import args) ->
+        let words = args.GetResult <@ Import_Arguments @>
+        let send = new ImportSeedJson.Root(List.map JsonValue.String words |> List.toArray)
+        
+        let response = send.JsonValue.Request (getUri "wallet/import")
+
+        match response.StatusCode, response.Body with
+        | 200,_ -> printfn "Success"
+        | code, HttpResponseBody.Text text -> printfn "Failed %d %s" code text
+        | code,_ -> printfn "Failed %d with binary response" code
     | Some (Activate args) ->
         let file,numberOfBlocks = args.GetResult <@ ActivateContract_Arguments @>
 

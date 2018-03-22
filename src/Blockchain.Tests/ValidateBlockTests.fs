@@ -38,6 +38,7 @@ let areOutpointsInSet session outpoints set =
 let isAccountInSet session (account:Account.T) =
     let outpoints =
         Account.getUnspentOutputs account
+        |> fst
         |> Map.toList
         |> List.map fst
 
@@ -794,7 +795,7 @@ let ``Valid template for two transactions which don't depend on each other``() =
     let _, splitState =
         BlockHandler.validateBlock chain session.context.contractPath session timestamp splitBlock false genesisState
         |> Writer.unwrap
-    let splitOutputs = Account.getUnspentOutputs account
+    let splitOutputs = Account.getUnspentOutputs account |> fst
 
     let txOfPOutput (outpoint, output) =
         let spend = output.spend

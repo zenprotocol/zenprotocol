@@ -24,8 +24,8 @@ let ``Contract activation without contract sacrifice should fail``() =
 
     let rootAccount = Account.createTestAccount ()
 
-    let outpoint = Account.getUnspentOutputs rootAccount |> Map.toSeq |> Seq.head |> fst
-    let output = Account.getUnspentOutputs rootAccount |> Map.toSeq |> Seq.head |> snd
+    let outpoint = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
+    let output = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
 
     let tx =
         {contract = Some (code,""); inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
@@ -43,9 +43,9 @@ let ``Contract activation with too low contract sacrifice``() =
 
     let rootAccount = Account.createTestAccount ()
 
-    let outpoint = Account.getUnspentOutputs rootAccount |> Map.toSeq |> Seq.head |> fst
+    let outpoint = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
     let outputs =
-        let output = Account.getUnspentOutputs rootAccount |> Map.toSeq |> Seq.head |> snd
+        let output = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
 
         [
             {lock=ActivationSacrifice;spend={amount=1UL;asset=Constants.Zen}}
