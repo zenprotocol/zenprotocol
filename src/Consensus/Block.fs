@@ -27,15 +27,15 @@ let private createCommitments txMerkleRoot witnessMerkleRoot acsMerkleRoot rest 
 let private computeCommitmentsRoot = MerkleTree.computeRoot
 
 let hash = 
-    Serialization.serializeHeader 
+    Header.serialize 
     >> Hash.compute 
     
 
-let toHex = serializeBlock >> FsBech32.Base16.encode
+let toHex = Block.serialize >> FsBech32.Base16.encode
 
 let fromHex hex =
     FsBech32.Base16.decode hex
-    |> Option.bind deserializeBlock
+    |> Option.bind Block.deserialize
 
 let isGenesis (chain:Chain.ChainParameters) block =
     let blockHash = hash block.header

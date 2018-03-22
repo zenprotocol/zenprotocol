@@ -3,6 +3,7 @@ module Consensus.Types
 open System
 open Consensus.Hash
 open Consensus.Crypto
+open Zen.Types.Data
 
 [<LiteralAttribute>]
 let CoinbaseMaturity = 100ul
@@ -38,19 +39,17 @@ type Output = {
 
 type PointedOutput = Outpoint * Output
 
-type Data = Data of Byte[]
-
 type Message = {
     cHash: Hash
     command: string
-    data: Data
+    data: data
 }
 
 type ContractWitness =
     {
         cHash: Hash
         command: string
-        data: Data
+        data: data
         returnAddressIndex : uint32 option
         beginInputs: uint32
         beginOutputs: uint32

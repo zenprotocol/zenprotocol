@@ -185,7 +185,7 @@ let ``create execute contract transaction``() =
 
     let spends = Map.add Constants.Zen 1UL Map.empty
 
-    let result = Account.createExecuteContractTransaction account executeContract Hash.zero "" Contract.EmptyData spends
+    let result = Account.createExecuteContractTransaction account executeContract Hash.zero Zen.Types.Data.Empty Contract.EmptyData spends
 
     result |> should be ok
 

@@ -3,8 +3,9 @@ module Messaging.Services
 open Consensus
 open Types
 open Hash
-open TxSkeleton
+open Zen.Types.Data
 open Infrastructure.ServiceBus.Client
+
 
 type ImportResult = Result<unit,string>
 type TransactionResult = Result<Transaction,string>
@@ -41,7 +42,7 @@ module Blockchain =
         | ValidateMinedBlock of Types.Block
 
     type Request =
-        | ExecuteContract of Hash.Hash * string * Data * Lock * TxSkeleton.T
+        | ExecuteContract of Hash.Hash * string * data * Lock * TxSkeleton.T
         | GetBlockTemplate of pkHash:Hash.Hash
         | GetTip
         | GetBlock of Hash.Hash
@@ -142,7 +143,7 @@ module Wallet =
         | ImportSeed of string list
         | Spend of Hash * Spend
         | ActivateContract of string*uint32
-        | ExecuteContract of Hash * string * Data * Map<Asset, uint64>
+        | ExecuteContract of Hash * string * data * Map<Asset, uint64>
 
     let serviceName = "wallet"
 

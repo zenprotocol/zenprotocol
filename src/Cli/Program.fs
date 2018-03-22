@@ -125,7 +125,7 @@ let main argv =
         printfn "%s" address.Address
     | Some (Import args) ->
         let words = args.GetResult <@ Import_Arguments @>
-        let send = new ImportSeedJson.Root(List.map JsonValue.String words |> List.toArray)
+        let send = new ImportSeedJson.Root(words |> List.toArray)
         
         let response = send.JsonValue.Request (getUri "wallet/import")
 
