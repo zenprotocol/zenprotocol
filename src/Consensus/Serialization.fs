@@ -11,21 +11,21 @@ open FsNetMQ.Stream.Reader
 #nowarn "40"   // Ignore recurssive objects warnings
 
 [<Literal>]
-let SerializedHeaderSize = 100 
+let SerializedHeaderSize = 100
 
 type TransactionSerializationMode =
     | Full
     | WithoutWitness
 
-module private Serialization = 
-    module Hash = 
+module private Serialization =
+    module Hash =
         let write hash = writeBytes (Hash.bytes hash) Hash.Length
         let read = readBytes Hash.Length
-    
+
     module Byte =
         let write byte = writeNumber1 byte
         let read = readNumber1
-    
+
     type Operations<'a> = {
         writeHash: Hash.Hash -> 'a -> 'a
         writeByte: Byte -> 'a -> 'a
@@ -35,7 +35,7 @@ module private Serialization =
         writeNumber4: uint32 -> 'a -> 'a
         writeNumber8: uint64 -> 'a -> 'a
     }
-    
+
     let serializers: Operations<Stream.T> = {
         writeHash = Hash.write
         writeByte = Byte.write
@@ -45,7 +45,7 @@ module private Serialization =
         writeNumber4 = writeNumber4
         writeNumber8 = writeNumber8
     }
-    
+
     let counters: Operations<int32> = {
         writeHash = fun _ l -> l + Hash.Length
         writeByte = fun _ l -> l + 1
@@ -55,16 +55,16 @@ module private Serialization =
         writeNumber4 = fun _ l -> l + 4
         writeNumber8 = fun _ l -> l + 8
     }
-    
+
     let fail stream =
-        None, stream 
-        
+        None, stream
+
     module Option =
         [<Literal>]
         let private None = 0uy
         [<Literal>]
         let private Some = 1uy
-    
+
         let write ops writerFn = function
             | Option.Some value ->
                 ops.writeByte Some
@@ -82,7 +82,7 @@ module private Serialization =
             | _ ->
                 yield! fail
         }
-    
+
     module List =
         let writeBody ops writerFn list =
             let write list writerFn stream = //TODO: use fold?
@@ -107,18 +107,18 @@ module private Serialization =
             let! list = readBody readerFn length
             return List.ofSeq list
         }
-    
-    module Asset = 
+
+    module Asset =
         let write ops = fun (cHash, token) ->
             ops.writeHash cHash
             >> ops.writeHash token
-        
+
         let read = reader {
             let! cHash = Hash.read
             let! token = Hash.read
             return Hash.Hash cHash, Hash.Hash token
         }
-        
+
     module Spend =
         let write ops = fun { asset = asset; amount = amount } ->
             Asset.write ops asset
@@ -128,13 +128,13 @@ module private Serialization =
             let! amount = readNumber8
             return { asset = asset; amount = amount }
         }
-        
+
     module Input =
         [<Literal>]
         let private SerializedOutpoint = 1uy
         [<Literal>]
         let private SerializedMint = 2uy
-    
+
         let write ops = function
             | Outpoint { txHash = txHash; index = index } ->
                 ops.writeByte SerializedOutpoint
@@ -170,7 +170,7 @@ module private Serialization =
         let private SerializedActivationSacrifice = 5uy
         [<Literal>]
         let private SerializedDestroy = 6uy
-    
+
         let write ops = function
             | PK hash ->
                 ops.writeByte SerializedPK
@@ -213,6 +213,8 @@ module private Serialization =
 
     module Data =
         [<Literal>]
+        let private EmptyData = 0uy
+        [<Literal>]
         let private I64Data = 1uy
         [<Literal>]
         let private I64ArrayData = 2uy
@@ -244,40 +246,38 @@ module private Serialization =
         let private TupleData = 15uy
         [<Literal>]
         let private DictData = 16uy
-        [<Literal>]
-        let private EmptyData = 17uy
 
-        module Int64 = 
-            let write ops = uint64 >> ops.writeNumber8 
+        module Int64 =
+            let write ops = uint64 >> ops.writeNumber8
             let read = reader {
                 let! i = readNumber8
                 return int64 i
             }
-            
+
         module Array =
             let write obs fn = Array.toList >> List.write obs fn
             let readDtuple readerFn = reader {
                 let! seq = List.read readerFn
                 return Prims.Mkdtuple2 (int64 (Seq.length seq), Array.ofSeq seq)
             }
-        
-        module Hash = 
+
+        module Hash =
             let write ops = Consensus.Hash.Hash >> ops.writeHash
 
-        module Lock = 
+        module Lock =
             let write ops = ZFStar.fstToFsLock >> Lock.write ops
             let read = reader {
                 let! lock = Lock.read
                 return ZFStar.fsToFstLock lock
             }
 
-        module String = 
-            let write ops = ZFStar.fstToFsString >> ops.writeString 
+        module String =
+            let write ops = ZFStar.fstToFsString >> ops.writeString
             let read = reader {
                 let! s = readString
                 return ZFStar.fsToFstString s
             }
-            
+
         let rec write ops = function
             | I64 i ->
                 ops.writeByte I64Data
@@ -332,7 +332,10 @@ module private Serialization =
                 >> List.writeBody ops String.write (entries |> List.map fst)
                 >> List.writeBody ops write (entries |> List.map snd)
             | Empty ->
-                ops.writeByte EmptyData
+                // TODO: this is a hack to avoid protocol change on the testnet
+                // should be removed for production code
+                // ops.writeByte EmptyData
+                ops.writeNumber4 (EmptyData |> uint32)
 
         let rec read = reader {
             let! discriminator = Byte.read
@@ -390,6 +393,10 @@ module private Serialization =
                 let map = List.zip keys values |> Map.ofSeq
                 return Dict (DataDict (map, len))
             | EmptyData ->
+                // TODO: this is a hack to avoid protocol change on the testnet
+                // remove for production
+                let! _ = readBytes 3
+
                 return Empty
             | _ ->
                 yield! fail
@@ -400,7 +407,7 @@ module private Serialization =
         let private SerializedPKWitness = 1uy
         [<Literal>]
         let private SerializedContractWitness = 2uy
-    
+
         let write ops = function
             | PKWitness (bytes, Signature signature) ->
                 ops.writeByte SerializedPKWitness
@@ -448,7 +455,7 @@ module private Serialization =
             | _ ->
                 yield! fail
         }
-    
+
     module Output =
         let write ops = fun { lock = lock; spend = spend } ->
             Lock.write ops lock
@@ -458,7 +465,7 @@ module private Serialization =
             let! spend = Spend.read
             return { lock = lock; spend = spend }
         }
-    
+
     module Contract =
         let write ops =
             Option.write ops (fun (code, hints) ->
@@ -473,7 +480,7 @@ module private Serialization =
             let! contract = Option.read readContract
             return contract
         }
-    
+
     module Nonce =
         let write ops = fun (nonce1, nonce2) ->
             ops.writeNumber8 nonce1
@@ -483,13 +490,13 @@ module private Serialization =
             let! nonce2 = readNumber8
             return nonce1,nonce2
         }
-    
+
     module Transaction =
         let write mode ops = fun tx ->
             List.write ops Input.write tx.inputs
             >> List.write ops Output.write tx.outputs
             >> Contract.write ops tx.contract
-            >> 
+            >>
             match mode with
             | Full -> List.write ops Witness.write tx.witnesses
             | WithoutWitness -> id
@@ -504,7 +511,7 @@ module private Serialization =
             }
             return { inputs = inputs; witnesses = witnesses; outputs = outputs; contract = contract }
         }
-    
+
     module Header =
         let write ops = fun header ->
             ops.writeNumber4 header.version
@@ -532,7 +539,7 @@ module private Serialization =
                 nonce = nonce
             }
         }
-    
+
     module Block =
         let write ops bk =
             Header.write ops bk.header
@@ -542,7 +549,7 @@ module private Serialization =
             let! header = Header.read
             let! commitments = List.read Hash.read
             let! transactions = List.read (Transaction.read Full)
-            
+
             if List.length commitments < 3 then
                 yield! fail
             else return {
@@ -560,7 +567,7 @@ open Serialization
 module Transaction =
     let serialize mode tx =
         Transaction.write mode counters tx 0
-        |> create 
+        |> create
         |> Transaction.write mode serializers tx
         |> getBuffer
     let deserialize mode bytes =
@@ -590,7 +597,7 @@ module Block =
             let! header = Header.read
             let! commitmentsList = List.read Hash.read
             let! transactions = List.read (Transaction.read Full)
-            
+
             return {
                 header = header
                 txMerkleRoot = Hash.Hash commitmentsList.[0]
@@ -600,14 +607,14 @@ module Block =
                 transactions = transactions
             }
         }
-        
+
         Stream (bytes, 0)
         |> run readBk
 
 module Data =
     let serialize data =
         Data.write counters data 0
-        |> create 
+        |> create
         |> Data.write serializers data
         |> getBuffer
     let deserialize bytes =
