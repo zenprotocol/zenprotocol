@@ -91,6 +91,10 @@ let handleRequest chain client (request,reply) =
             |> JsonValue.Array
 
         reply StatusCode.OK (JsonContent json)
+    | Get ("/wallet/exists", _) ->
+        let result = Wallet.accountExists client
+        let json = new AccountExistsResponseJson.Root(result)
+        reply StatusCode.OK (JsonContent json.JsonValue)
     | Get ("/wallet/address", _) ->
         let address = Wallet.getAddress client
         let json = new AddressJson.Root(address)

@@ -104,3 +104,9 @@ type TransactionsResponseJson = JsonProvider<"""
     }
 ]
 """>
+
+type AccountExistsResponseJson = JsonProvider<"""
+{
+    "accountExists" : false
+}
+""">

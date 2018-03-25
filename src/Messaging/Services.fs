@@ -154,7 +154,8 @@ module Wallet =
         | Spend of Hash * Spend
         | ActivateContract of string*uint32
         | ExecuteContract of Hash * string * data * Map<Asset, uint64>
-
+        | AccountExists
+        
     let serviceName = "wallet"
 
     let getBalance client =
@@ -180,3 +181,6 @@ module Wallet =
 
     let getTransactions client =
         Request.send<Request, TransactionsResult> client serviceName GetTransactions
+
+    let accountExists client =
+        Request.send<Request, bool> client serviceName AccountExists
