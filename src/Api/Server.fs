@@ -116,11 +116,11 @@ let handleRequest chain client (request,reply) =
         let json =
             Wallet.getTransactions client
             |> List.toArray
-            |> Array.map (fun (txHash, amounts) -> 
+            |> Array.map (fun (txHash, amounts) ->
                 let deltas =
                     amounts
                     |> Map.toArray
-                    |> Array.map (fun ((asset, assetType), amount) -> 
+                    |> Array.map (fun ((asset, assetType), amount) ->
                         new TransactionsResponseJson.Delta(Hash.toString asset, Hash.toString assetType, amount))
                 (new TransactionsResponseJson.Root(Hash.toString txHash, deltas)).JsonValue)
             |> JsonValue.Array
@@ -146,6 +146,9 @@ let handleRequest chain client (request,reply) =
         | Result.Ok (cHash, command, data, spends) ->
             Wallet.executeContract client cHash command data spends
             |> validateTx
+    | Post ("/wallet/resync", _) ->
+        Wallet.resyncAccount client
+        reply StatusCode.OK NoContent
     | Post ("/block/publish", Some body) ->
             match getPublishBlock body with
             | Result.Error error -> replyError error

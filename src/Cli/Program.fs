@@ -2,6 +2,7 @@
 open System
 open FSharp.Data
 open Api.Types
+open FSharp.Data
 
 type ImportArgs =
     | [<MainCommand("COMMAND");ExactlyOnce>] Import_Arguments of mnemonicSentence:string list
@@ -45,6 +46,7 @@ type Arguments =
     | [<CliPrefix(CliPrefix.None)>] Balance of ParseResults<NoArgs>
     | [<CliPrefix(CliPrefix.None)>] History of ParseResults<NoArgs>
     | [<CliPrefix(CliPrefix.None)>] Address of ParseResults<NoArgs>
+    | [<CliPrefix(CliPrefix.None)>] Resync of ParseResults<NoArgs>
     | [<CliPrefix(CliPrefix.None)>] Import of ParseResults<ImportArgs>
     | [<CliPrefix(CliPrefix.None)>] Spend of ParseResults<SpendArgs>
     | [<CliPrefix(CliPrefix.None)>] Activate of ParseResults<ActivateContractArgs>
@@ -60,6 +62,7 @@ type Arguments =
             | Balance _ -> "get wallet balance"
             | History _ -> "get wallet transactions"
             | Address _ -> "get wallet address"
+            | Resync _ -> "resync wallet"
             | Import _ -> "import wallet seed from mnemonic sentence"
             | Spend _ -> "send asset to an address"
             | Activate _ -> "activate contract"
@@ -121,18 +124,24 @@ let main argv =
 
             Array.iter (fun (amount:TransactionsResponseJson.Delta) ->
                 printfn "\t| %s %s\t| %d" amount.Asset amount.AssetType amount.Amount
-            ) transaction.Deltas  
-            
+            ) transaction.Deltas
+
         ) transactions
     | Some (Address _) ->
         let address =
             AddressJson.Load (getUri "wallet/address")
 
         printfn "%s" address.Address
+    | Some (Resync _) ->
+        let response = FSharp.Data.Http.Request (getUri "wallet/resync", httpMethod="POST",body=TextRequest "")
+
+        match response.StatusCode with
+        | 200 -> printfn "Success"
+        | code -> printfn "Failed %d" code
     | Some (Import args) ->
         let words = args.GetResult <@ Import_Arguments @>
         let send = new ImportSeedJson.Root(words |> List.toArray)
-        
+
         let response = send.JsonValue.Request (getUri "wallet/import")
 
         match response.StatusCode, response.Body with

@@ -8,6 +8,8 @@ open Wallet
 open ServiceBus.Agent
 open DataAccess
 open MBrace.FsPickler
+open Consensus
+open Account
 
 type AccountCollection = Collection<string, Account.T>
 
@@ -33,8 +35,6 @@ let eventHandler collection event session account =
         Some account
     | _ -> account
 
-let commandHandler command session wallet = wallet
-
 let private sync (account:Account.T) chainParams client =
     match Blockchain.getTip client with
     | Some (blockHash,header) ->
@@ -49,6 +49,20 @@ let private sync (account:Account.T) chainParams client =
             account
         else
             account
+    | _ -> account
+
+let commandHandler collection chain client  command session account =
+    let chainParams = Consensus.Chain.getChainParameters chain
+
+    match account, command with
+    | Some account, Resync ->
+        let account =
+            let account ={account with deltas = List.empty; outputs=Map.empty;tip = Hash.zero; blockNumber = 0ul }
+            sync account chainParams client
+
+        Collection.put collection session MainAccountName account
+        Some account
+
     | _ -> account
 
 let requestHandler collection chain client (requestId:RequestId) request session wallet =
@@ -79,15 +93,15 @@ let requestHandler collection chain client (requestId:RequestId) request session
         |> reply
         Some wallet
     | _, ImportSeed words ->
-        match Account.import words "" with 
-        | Result.Ok account -> 
+        match Account.import words "" with
+        | Result.Ok account ->
             Log.info "Account imported"
             ImportResult.Ok ()
             |> reply
             let account = sync account chainParams client
             Collection.put collection session MainAccountName account
             Some account
-        | Result.Error err -> 
+        | Result.Error err ->
             ImportResult.Error err
             |> reply
             wallet
@@ -146,7 +160,7 @@ let main dataPath busName chain root =
             sbObservable
             |> Observable.map (fun message ->
                 match message with
-                | ServiceBus.Agent.Command c -> commandHandler c
+                | ServiceBus.Agent.Command c -> commandHandler collection chain client c
                 | ServiceBus.Agent.Request (requestId, r) -> requestHandler collection chain client requestId r)
 
         let ebObservable =
