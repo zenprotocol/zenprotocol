@@ -251,7 +251,7 @@ let addTransaction txHash (tx:Transaction) account =
         | Coinbase (_,pkHash) when pkHash = account.publicKeyHash -> true
         | _ -> false) tx.outputs
 
-    let unspentOutputs, deltas = getUnspentOutputs account
+    let unspentOutputs, _ = getUnspentOutputs account
 
     let anyInputs =
         tx.inputs
@@ -261,7 +261,7 @@ let addTransaction txHash (tx:Transaction) account =
     if anyInputs || anyOutput then
         let mempool = List.add (txHash,tx) account.mempool
 
-        {account with mempool = mempool; deltas = deltas}
+        {account with mempool = mempool}
     else
         account
 
