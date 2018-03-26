@@ -1,9 +1,10 @@
 {
   "author":"Zen Protocol",
   "name":"@zen/zen-node",
-  "version":"0.1.30",
+  "version":"0.1.31",
   "main":"index.js",
   "bin": {
-    "zen-node":"zen-node.js"
+    "zen-node":"zen-node.js",
+    "zen-cli":"zen-cli.js"
   }
 }
