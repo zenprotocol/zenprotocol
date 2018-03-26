@@ -143,7 +143,8 @@ module Network =
         Request.send<Request, uint32> client serviceName GetConnectionCount
 
 module Wallet =
-    type Command = unit
+    type Command =
+        | Resync
 
     type Request =
         | GetAddressPKHash
@@ -155,7 +156,7 @@ module Wallet =
         | ActivateContract of string*uint32
         | ExecuteContract of Hash * string * data * Map<Asset, uint64>
         | AccountExists
-        
+
     let serviceName = "wallet"
 
     let getBalance client =
@@ -184,3 +185,6 @@ module Wallet =
 
     let accountExists client =
         Request.send<Request, bool> client serviceName AccountExists
+
+    let resyncAccount client =
+        Command.send client serviceName Resync
