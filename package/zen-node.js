@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 const start = require('./index.js');
 
-const node = start(process.argv);
+const node = start(process.argv.slice(2));
 
 node.stdout.pipe(process.stdout);
 node.stderr.pipe(process.stderr);
