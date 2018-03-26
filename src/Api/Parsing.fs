@@ -53,7 +53,7 @@ let getContractExecute chain json =
             if List.isEmpty errors then
                 let data =
                     match json.Data with 
-                    | "None" -> Contract.EmptyData 
+                    | "" -> Contract.EmptyData 
                     | b16DataString -> 
                         match Base16.decode b16DataString with 
                         | Some data -> 
