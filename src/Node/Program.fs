@@ -85,7 +85,6 @@ let main argv =
             config.listen <- true
             config.seeds.Clear ()
             config.api.enabled <- true
-            config.miner <- true
             root <- true
         | Local1 ->
             config.dataPath <- "./data/l1"
