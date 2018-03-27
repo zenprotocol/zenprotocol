@@ -26,10 +26,10 @@ let private createCommitments txMerkleRoot witnessMerkleRoot acsMerkleRoot rest 
 
 let private computeCommitmentsRoot = MerkleTree.computeRoot
 
-let hash = 
-    Header.serialize 
-    >> Hash.compute 
-    
+let hash =
+    Header.serialize
+    >> Hash.compute
+
 
 let toHex = Block.serialize >> FsBech32.Base16.encode
 
@@ -87,8 +87,9 @@ let createGenesis (chain:Chain.ChainParameters) transactions nonce =
     {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot;witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot}
 
 let getBlockSacrificeAmount chain acs =
+
     let computeContractSacrifice (contract:Contract.T) =
-        (contract.size |> uint64) * (Chain.getContractSacrificePerBytePerBlock chain)
+        (contract.size |> uint64) * chain.contractSacrificePerBytePerBlock
 
     Seq.sumBy computeContractSacrifice (ActiveContractSet.getContracts acs)
 
@@ -166,13 +167,13 @@ let createTemplate chain (parent:BlockHeader) timestamp (ema:EMA.T) acs transact
 
     {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot;witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot}
 
-let validateHeader chain header  =                 
+let validateHeader chain header  =
     let h = hash header
-    
+
     let difficulty = Difficulty.uncompress header.difficulty
     let proofOfWorkLimit = chain.proofOfWorkLimit
-    
-    if difficulty <= proofOfWorkLimit && h <= difficulty then Ok header else Error "proof of work failed"        
+
+    if difficulty <= proofOfWorkLimit && h <= difficulty then Ok header else Error "proof of work failed"
 
 // TODO: Refactor to avoid chained state-passing style
 let validate chain =

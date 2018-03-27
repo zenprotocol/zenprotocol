@@ -27,8 +27,8 @@ let exponentialSumGen n (lambda:float) =
     Gen.listOfLength n (exponentialRandomGen lambda) |> sumListGen
 
 let timestampGen blocktime =
-    Gen.sized <| 
-        fun s -> 
+    Gen.sized <|
+        fun s ->
             Gen.map (List.map (fun f -> (uint64 (f * 1000.))))
                     (exponentialSumGen s blocktime)
 
@@ -55,7 +55,7 @@ type FastIntervalTimestamps =
 let ``Difficulty increases when blocks are generated quickly``(tstamps:uint64 list) =
     let ema = create Chain.mainParameters
     let emas = List.scan (fun e ts -> add Chain.mainParameters ts e) ema tstamps
-    let initTarget = Hash.toBigInt (Chain.proofOfWorkLimit Chain.Main)
+    let initTarget = Hash.toBigInt Chain.mainParameters.proofOfWorkLimit
     let finalTarget =
         List.last emas
         |> fun e -> e.difficulty
@@ -70,9 +70,9 @@ type SlowIntervalTimestamps =
 let ``Difficulty is always more than the chain minimum``(tstamps:uint64 list) =
     let ema = create Chain.mainParameters
     let emas = List.scan (fun e ts -> add Chain.mainParameters ts e) ema tstamps
-    let targetLimit = Hash.toBigInt (Chain.proofOfWorkLimit Chain.Main)
+    let targetLimit = Hash.toBigInt Chain.mainParameters.proofOfWorkLimit
     List.forall
-        (fun e -> 
+        (fun e ->
             e.difficulty
             |> Difficulty.uncompress
             |> Hash.toBigInt <= targetLimit)
