@@ -46,6 +46,8 @@ let HeadersMessageId = 18uy
 let UnknownPeerMessageId = 100uy
 [<LiteralAttribute>]
 let UnknownMessageMessageId = 101uy
+[<LiteralAttribute>]
+let IncorrectNetworkMessageId = 102uy
 
 type Hello = {
         network : uint32
@@ -105,6 +107,7 @@ type Headers =
 type UnknownMessage =
         byte
 
+
 type T =
     | Hello of Hello
     | HelloAck of HelloAck
@@ -126,6 +129,7 @@ type T =
     | Headers of Headers
     | UnknownPeer
     | UnknownMessage of UnknownMessage
+    | IncorrectNetwork
 
 
 module Hello =
@@ -483,6 +487,8 @@ let private decode stream =
             match UnknownMessage.read stream with
             | None,stream -> None,stream
             | Some msg, stream -> Some (UnknownMessage msg), stream
+        | IncorrectNetworkMessageId ->
+            Some IncorrectNetwork, stream
         | _ -> None, stream
 
     let r = reader {
@@ -534,6 +540,7 @@ let send socket msg =
         | Headers msg -> Headers.write msg
         | UnknownPeer -> id
         | UnknownMessage msg -> UnknownMessage.write msg
+        | IncorrectNetwork -> id
 
     let messageId =
         match msg with
@@ -557,6 +564,7 @@ let send socket msg =
         | Headers _ -> HeadersMessageId
         | UnknownPeer _ -> UnknownPeerMessageId
         | UnknownMessage _ -> UnknownMessageMessageId
+        | IncorrectNetwork _ -> IncorrectNetworkMessageId
 
     let messageSize =
         match msg with
@@ -580,6 +588,7 @@ let send socket msg =
         | Headers msg -> Headers.getMessageSize msg
         | UnknownPeer -> 0
         | UnknownMessage msg -> UnknownMessage.getMessageSize msg
+        | IncorrectNetwork -> 0
 
     //  Signature + message ID + message size
     let frameSize = 2 + 1 + messageSize

@@ -586,6 +586,23 @@ let ``UnknownMessage size fits stream ``() =
     messageSize |> should equal offset
 
 [<Test>]
+let ``send and recv IncorrectNetwork``() =
+    let msg = IncorrectNetwork
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://IncorrectNetwork.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://IncorrectNetwork.test"
+
+    Network.Message.send server msg
+
+    let msg' = Network.Message.recv client
+
+    msg' |> should equal (Some msg)
+
+
+[<Test>]
 let ``malformed message return None``() =
     use server = Socket.dealer ()
     Socket.bind server "inproc://NetworkMessage.test"

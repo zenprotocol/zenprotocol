@@ -88,4 +88,7 @@
     <message name="Unknown Message" id="101">
         <field name="message id" type="number" size="1" />
     </message>
+
+    <message name="Incorrect Network" id="102">
+    </message>
 </class>
