@@ -211,13 +211,23 @@ let handleActiveState socket next peer msg =
             next (InProcMessage.Block block)
             peer
         | Message.Tip blockHeader ->
-            next (InProcMessage.Tip blockHeader)
+            next (InProcMessage.Tip {peerId=RoutingId.toBytes peer.routingId;blockHeader=blockHeader})
             peer
         | Message.NewBlock blockHeader ->
             next (InProcMessage.NewBlock {peerId=(RoutingId.toBytes peer.routingId); blockHeader=blockHeader})
             peer
         | Message.GetTip ->
             next (InProcMessage.GetTip (RoutingId.toBytes peer.routingId))
+            peer
+        | Message.GetHeaders request ->
+            next (InProcMessage.HeadersRequest {
+                peerId=(RoutingId.toBytes peer.routingId);
+                blockHash=request.blockHash;
+                numberOfHeaders=request.numberOfHeaders;
+            })
+            peer
+        | Message.Headers headers ->
+            next (InProcMessage.Headers {peerId=(RoutingId.toBytes peer.routingId);headers=headers})
             peer
         | msg ->
             // TODO: unexpected msg, close peer

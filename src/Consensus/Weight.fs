@@ -111,7 +111,7 @@ let txWeight weights
         if weights.dataSize = 0I then 0I
         else
             weights.dataSize *
-            (serializeTransaction Full tx
+            (Transaction.serialize Full tx
                 |> Array.length |> bigint)
     return inputWeights + contractActivationWeight + txSizeWeight
 }

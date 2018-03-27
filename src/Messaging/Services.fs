@@ -3,8 +3,9 @@ module Messaging.Services
 open Consensus
 open Types
 open Hash
-open TxSkeleton
+open Zen.Types.Data
 open Infrastructure.ServiceBus.Client
+
 
 type ImportResult = Result<unit,string>
 type TransactionResult = Result<Transaction,string>
@@ -35,13 +36,15 @@ module Blockchain =
         | RequestBlock of peerId:byte[] * blockHash:Hash.Hash
         | RequestTip of peerId:byte[]
         | HandleMemPool of peerId:byte[] * Hash.Hash list
-        | HandleTip of Types.BlockHeader
+        | HandleTip of peerId:byte[] * Types.BlockHeader
         | ValidateNewBlockHeader of peerId:byte[] * Types.BlockHeader
         | ValidateBlock of Types.Block
         | ValidateMinedBlock of Types.Block
+        | RequestHeaders of peerId:byte[] * blockHash:Hash * numberOfHeaders:uint16
+        | HandleHeaders of peerId:byte[] * BlockHeader list
 
     type Request =
-        | ExecuteContract of Hash.Hash * string * Data * Lock * TxSkeleton.T
+        | ExecuteContract of Hash.Hash * string * data * Lock * TxSkeleton.T
         | GetBlockTemplate of pkHash:Hash.Hash
         | GetTip
         | GetBlock of Hash.Hash
@@ -75,8 +78,8 @@ module Blockchain =
         ValidateMinedBlock block
         |> Command.send client serviceName
 
-    let handleTip client header =
-        HandleTip header
+    let handleTip client peerId header =
+        HandleTip (peerId, header)
         |> Command.send client serviceName
 
     let validateNewBlockHeader client peerId header =
@@ -110,6 +113,12 @@ module Blockchain =
     let getBlockChainInfo client =
         Request.send<Request,BlochChainInfo> client serviceName GetBlockChainInfo
 
+    let requestHeaders client peerId blockHash numberOfHeaders=
+        RequestHeaders (peerId,blockHash,numberOfHeaders) |> Command.send client serviceName
+
+    let handleHeaders client peerId headers =
+        HandleHeaders (peerId,headers) |> Command.send client serviceName
+
 module Network =
     type Command =
         | SendMemPool of peerId:byte[] * Hash.Hash list
@@ -120,6 +129,8 @@ module Network =
         | GetBlock of Hash.Hash
         | GetNewBlock of peerId:byte[] * Hash.Hash
         | PublishBlock of BlockHeader
+        | GetHeaders of peerId:byte[] * blockHash:Hash.Hash * numberOfBlocks:uint16
+        | SendHeaders of peerId:byte[] * BlockHeader list
 
     type Request =
         GetConnectionCount
@@ -132,7 +143,8 @@ module Network =
         Request.send<Request, uint32> client serviceName GetConnectionCount
 
 module Wallet =
-    type Command = unit
+    type Command =
+        | Resync
 
     type Request =
         | GetAddressPKHash
@@ -142,7 +154,8 @@ module Wallet =
         | ImportSeed of string list
         | Spend of Hash * Spend
         | ActivateContract of string*uint32
-        | ExecuteContract of Hash * string * Data * Map<Asset, uint64>
+        | ExecuteContract of Hash * string * data * Map<Asset, uint64>
+        | AccountExists
 
     let serviceName = "wallet"
 
@@ -169,3 +182,9 @@ module Wallet =
 
     let getTransactions client =
         Request.send<Request, TransactionsResult> client serviceName GetTransactions
+
+    let accountExists client =
+        Request.send<Request, bool> client serviceName AccountExists
+
+    let resyncAccount client =
+        Command.send client serviceName Resync

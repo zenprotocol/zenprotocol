@@ -6,7 +6,7 @@ open Zen.Types.Extracted
 module A = Zen.Array
 //module I8  = FStar.Int8
 //module I32 = FStar.Int32
-module I64 = FStar.UInt64
+module I64 = FStar.Int64
 module U8  = FStar.UInt8
 module U32 = FStar.UInt32
 module U64 = FStar.UInt64
@@ -30,6 +30,7 @@ type data =
     | LockArray: (l:nat & lock `A.t` l) -> data
     | Tuple of (data ** data)
     | Dict of dataDict
+    | Empty
 
 and dataDict =
     | DataDict of dictionary data

@@ -8,8 +8,8 @@ open Infrastructure
 
 // TODO: serialize and deserialize for persistence
 
-type BlockStatus = 
-    | Orphan 
+type BlockStatus =
+    | Orphan
     | Connected
     | MainChain
     | Invalid
@@ -18,7 +18,7 @@ type BlockStatus =
 type T = {
     hash:Hash.Hash
     header: BlockHeader
-    status: BlockStatus    
+    status: BlockStatus
     chainWork: bigint option
     txMerkleRoot:Hash.Hash;
     witnessMerkleRoot:Hash.Hash;
@@ -28,77 +28,77 @@ type T = {
 
 let status extendedHeader = extendedHeader.status
 
-let chainWork block = 
+let chainWork block =
      match block.chainWork with
      | Some c -> c
-     | None -> failwith "block doesn't have chainWork"
+     | None -> failwithf "block #%d doesn't have chainWork" block.header.blockNumber
 
-let empty =     
+let empty =
    {
        hash = Hash.zero
        header = Block.genesisParent
-       status = Orphan        
+       status = Orphan
        chainWork = None
        txMerkleRoot = Hash.zero
        witnessMerkleRoot = Hash.zero
        activeContractSetMerkleRoot = Hash.zero
-       commitments = []   
-   } 
+       commitments = []
+   }
 
-let createOrphan blockHash (block:Block) = 
+let createOrphan blockHash (block:Block) =
     {
         hash = blockHash
         header = block.header
-        status = Orphan        
+        status = Orphan
         chainWork = None
         txMerkleRoot = block.txMerkleRoot
         witnessMerkleRoot = block.witnessMerkleRoot
         activeContractSetMerkleRoot = block.activeContractSetMerkleRoot
         commitments = block.commitments
     }
-   
-let createGenesis blockHash (block:Block) = 
-    let chainWork = getChainWork 0I block.header 
-    
-    {     
+
+let createGenesis blockHash (block:Block) =
+    let chainWork = getChainWork 0I block.header
+
+    {
         hash = blockHash
         header = block.header
-        status = MainChain            
-        chainWork = Some chainWork 
+        status = MainChain
+        chainWork = Some chainWork
         txMerkleRoot = block.txMerkleRoot
         witnessMerkleRoot = block.witnessMerkleRoot
-        activeContractSetMerkleRoot = block.activeContractSetMerkleRoot  
+        activeContractSetMerkleRoot = block.activeContractSetMerkleRoot
         commitments = block.commitments
     }
-    
-let private create status prevBlock blockHash (block:Block) =     
+
+let private create status prevBlock blockHash (block:Block) =
     match prevBlock.chainWork with
     | None -> failwith "prevBlock doesn't have chainWork"
-    | Some prevChainWork -> 
-        let chainWork = getChainWork prevChainWork block.header  
-        
-        {     
+    | Some prevChainWork ->
+        let chainWork = getChainWork prevChainWork block.header
+
+        {
             hash = blockHash
             header = block.header
-            status = status                
+            status = status
             chainWork = Some chainWork
             txMerkleRoot = block.txMerkleRoot
             witnessMerkleRoot = block.witnessMerkleRoot
             activeContractSetMerkleRoot = block.activeContractSetMerkleRoot
-            commitments = block.commitments   
-        }    
-        
+            commitments = block.commitments
+        }
+
 let createConnected  = create Connected
-                                         
+
 let createMain = create MainChain
 
 let markAsMain extendedHeader = {extendedHeader with status = MainChain}
 
 let unmarkAsMain extendedHeader = {extendedHeader with status = Connected}
 
-let unorphan extendedHeader chainWork = 
-    { extendedHeader with status = Connected;chainWork= Some chainWork }        
-    
+let unorphan extendedHeader chainWork =
+    { extendedHeader with status = Connected;chainWork= Some chainWork }
+
 let setChainWork chainWork extendedHeader = {extendedHeader with chainWork=Some chainWork}
 
 let invalid extendedHeader = {extendedHeader with status=Invalid}

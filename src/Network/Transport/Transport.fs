@@ -156,6 +156,12 @@ let private handleInprocMessage socket inproc msg (peers:Peers) =
             sendToPeer socket inproc peers routingId (Message.Tip blockHeader)
         | InProcMessage.PublishAddressToAll address ->
             publishMessage socket inproc peers (Message.Address address)
+        | InProcMessage.GetHeaders request ->
+            let routingId = RoutingId.fromBytes request.peerId
+            sendToPeer socket inproc peers routingId (Message.GetHeaders {blockHash=request.blockHash;numberOfHeaders=request.numberOfHeaders})
+        | InProcMessage.SendHeaders request ->
+            let routingId = RoutingId.fromBytes request.peerId
+            sendToPeer socket inproc peers routingId (Message.Headers request.headers)
         | msg -> failwithf "unexpected inproc msg %A" msg
 
 let private onError error =
@@ -212,6 +218,14 @@ let getBlock transport blockHash =
 
 let publishAddressToAll transport ipAddress =
     InProcMessage.PublishAddressToAll ipAddress
+    |> InProcMessage.send transport.inproc
+
+let getHeaders transport peerId blockHash numberOfHeaders =
+    InProcMessage.GetHeaders {peerId=peerId;blockHash=blockHash;numberOfHeaders=numberOfHeaders}
+    |> InProcMessage.send transport.inproc
+
+let sendHeaders transport peerId headers =
+    InProcMessage.SendHeaders {peerId=peerId;headers=headers}
     |> InProcMessage.send transport.inproc
 
 let recv transport =

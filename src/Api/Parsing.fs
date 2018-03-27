@@ -6,6 +6,7 @@ open Consensus
 open Consensus.Types
 open FsBech32
 open System.Text
+open Newtonsoft.Json
 
 let private getSpend' asset assetType amount =
     match Hash.fromString asset, Hash.fromString assetType with
@@ -52,10 +53,12 @@ let getContractExecute chain json =
             if List.isEmpty errors then
                 let data =
                     match json.Data with 
-                    | "None" -> Contract.EmptyData 
+                    | "" -> Contract.EmptyData 
                     | b16DataString -> 
                         match Base16.decode b16DataString with 
-                        | Some data -> Data data
+                        | Some data -> 
+                            Encoding.ASCII.GetString data
+                            |> JsonConvert.DeserializeObject<Zen.Types.Data.data>
                         | None -> failwith "Invalid Data"
                 Ok (cHash, json.Command, data, spends)
             else
@@ -93,7 +96,7 @@ let getImportSeed json =
         let mutable words = List.empty
 
         for item in json.Words do
-            words <- item.JsonValue.AsString() :: words
+            words <- item :: words
 
         words
         |> List.rev

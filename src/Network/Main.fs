@@ -23,7 +23,7 @@ let maxConnections = 3
 let eventHandler transport event (connector,addressBook, ownAddress) =
     match event with
     | Event.TransactionAddedToMemPool (txHash, tx) ->
-        let bytes = serializeTransaction Full tx
+        let bytes = Transaction.serialize Full tx
 
         Transport.publishTransaction transport bytes
         connector,addressBook,ownAddress
@@ -39,7 +39,7 @@ let transportHandler transport seeds client msg (connector,addressBook,ownAddres
 
     match msg with
     | InProcMessage.Transaction msg ->
-        match deserializeTransaction Full msg with
+        match Transaction.deserialize Full msg with
         | Some tx ->
             Services.Blockchain.validateTransaction client tx
             connector,addressBook,ownAddress
@@ -152,29 +152,44 @@ let transportHandler transport seeds client msg (connector,addressBook,ownAddres
         Blockchain.requestTip client peerId
         connector, addressBook,ownAddress
     | InProcMessage.Block block ->
-        match deserializeBlock block with
+        match Block.deserialize block with
         | Some block ->
             Blockchain.validateBlock client block
             connector,addressBook,ownAddress
         | None ->
             //TODO: log non-deserializable block
             connector,addressBook,ownAddress
-    | InProcMessage.Tip blockHeader ->
-        match Serialization.deserializeHeader blockHeader with
+    | InProcMessage.Tip {peerId=peerId;blockHeader=blockHeader} ->
+        match Header.deserialize blockHeader with
         | Some blockHeader ->
-            Blockchain.handleTip client blockHeader
+            Blockchain.handleTip client peerId blockHeader
             connector,addressBook,ownAddress
         | None ->
             //TODO: log non-deserializable blockheader
             connector,addressBook,ownAddress
     | InProcMessage.NewBlock {peerId=peerId;blockHeader=blockHeader} ->
-        match Serialization.deserializeHeader blockHeader with
+        match Header.deserialize blockHeader with
         | Some blockHeader ->
             Blockchain.validateNewBlockHeader client peerId blockHeader
             connector,addressBook,ownAddress
         | None ->
             //TODO: log non-deserializable blockheader
             connector,addressBook,ownAddress
+    | InProcMessage.HeadersRequest {peerId=peerId;blockHash=blockHash;numberOfHeaders=numberOfHeaders} ->
+        match Hash.fromBytes blockHash with
+        | Some blockHash -> Blockchain.requestHeaders client peerId blockHash numberOfHeaders
+        | None -> ()
+
+        connector,addressBook,ownAddress
+    | InProcMessage.Headers {peerId=peerId;headers=headers} ->
+        let headers =
+            Array.chunkBySize Serialization.SerializedHeaderSize headers
+            |> Seq.choose Header.deserialize
+            |> List.ofSeq
+
+        Blockchain.handleHeaders client peerId headers
+
+        connector,addressBook,ownAddress
     | _ ->
         // TODO: log unknown message
         connector, addressBook,ownAddress
@@ -191,27 +206,37 @@ let commandHandler transport command (state:State) =
         Transport.getTransaction transport peerId (Hash.bytes txHash)
         state
     | Command.SendTransaction (peerId, tx) ->
-        let bytes = serializeTransaction Full tx
+        let bytes = Transaction.serialize Full tx
         Transport.sendTransaction transport peerId bytes
         state
     | Command.SendBlock (peerId, block) ->
-        let bytes = serializeBlock block
+        let bytes = Block.serialize block
         Transport.sendBlock transport peerId bytes
         state
     | Command.SendTip (peerId,blockHeader) ->
-        let bytes = Serialization.serializeHeader blockHeader
+        let bytes = Header.serialize blockHeader
         Transport.sendTip transport peerId bytes
         state
     | Command.GetBlock blockHash ->
         Transport.getBlock transport (Hash.bytes blockHash)
         state
     | Command.PublishBlock blockHeader ->
-        let bytes = Serialization.serializeHeader blockHeader
+        let bytes = Header.serialize blockHeader
         Transport.publisNewBlock transport bytes
-
         state
     | Command.GetNewBlock (peerId,blockHash) ->
         Transport.getNewBlock transport peerId (Hash.bytes blockHash)
+        state
+    | Command.GetHeaders (peerId,blockHash,numberOfBlocks) ->
+        Transport.getHeaders transport peerId (Hash.bytes blockHash) numberOfBlocks
+        state
+    | Command.SendHeaders (peerId, headers) ->
+        let headers =
+            List.map Header.serialize headers
+            |> Array.ofList
+            |> Array.concat
+
+        Transport.sendHeaders transport peerId headers
         state
 
 let handleIpAddressFound bind transport ipAddress (connector,addressBook,ownAddress) =

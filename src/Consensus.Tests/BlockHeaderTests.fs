@@ -1,9 +1,9 @@
 ﻿module Consensus.Tests.BlockHeaderTests
 
 open Consensus
-open Consensus
-open Consensus.Types
-open Consensus.Chain
+open Types
+open Chain
+open Serialization
 open NUnit.Framework
 open FsUnit
 open FsCheck
@@ -27,16 +27,10 @@ let ``validating block header with correct proof of work``(header:BlockHeader) =
     
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]  
 let ``seralizing and deserialing yield same header``(header:BlockHeader) = 
-    let roundTrip = Serialization.serializeHeader >> Serialization.deserializeHeader
+    let roundTrip = Header.serialize >> Header.deserialize
     
     roundTrip header = Some header   
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]      
 let ``header with wrong size doesn't deserialize``(header) =
-    Array.length header <> Serialization.SerializedHeaderSize ==> (Serialization.deserializeHeader header = None)
-    
- 
-        
-    
-    
-            
+    Array.length header <> SerializedHeaderSize ==> (Header.deserialize header = None)

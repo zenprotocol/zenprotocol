@@ -4,3 +4,4 @@ FSharp.Control.Reactive
 FSharp.Data
 FSharp.Compiler.Tools
 FsBech32
+Newtonsoft.Json

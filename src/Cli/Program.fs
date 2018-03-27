@@ -2,6 +2,7 @@
 open System
 open FSharp.Data
 open Api.Types
+open FSharp.Data
 
 type ImportArgs =
     | [<MainCommand("COMMAND");ExactlyOnce>] Import_Arguments of mnemonicSentence:string list
@@ -24,7 +25,12 @@ type ExecuteContractArgs =
         member arg.Usage = ""
 
 type PublishBlockArgs =
-    | [<MainCommand("COMMAND");ExactlyOnce>] Publish_Block_Arguments of block:string
+    | [<MainCommand("COMMAND");ExactlyOnce>] PublishBlock_Arguments of block:string
+    interface IArgParserTemplate with
+        member arg.Usage = ""
+
+type AccountExistsArgs =
+    | [<MainCommand("COMMAND");ExactlyOnce>] AccountExists_Arguments
     interface IArgParserTemplate with
         member arg.Usage = ""
 
@@ -40,11 +46,13 @@ type Arguments =
     | [<CliPrefix(CliPrefix.None)>] Balance of ParseResults<NoArgs>
     | [<CliPrefix(CliPrefix.None)>] History of ParseResults<NoArgs>
     | [<CliPrefix(CliPrefix.None)>] Address of ParseResults<NoArgs>
+    | [<CliPrefix(CliPrefix.None)>] Resync of ParseResults<NoArgs>
     | [<CliPrefix(CliPrefix.None)>] Import of ParseResults<ImportArgs>
     | [<CliPrefix(CliPrefix.None)>] Spend of ParseResults<SpendArgs>
     | [<CliPrefix(CliPrefix.None)>] Activate of ParseResults<ActivateContractArgs>
     | [<CliPrefix(CliPrefix.None)>] Execute of ParseResults<ExecuteContractArgs>
-    | [<CliPrefix(CliPrefix.None)>] Publish_Block of ParseResults<PublishBlockArgs>
+    | [<CliPrefix(CliPrefix.None)>] PublishBlock of ParseResults<PublishBlockArgs>
+    | [<CliPrefix(CliPrefix.None)>] AccountExists of ParseResults<NoArgs>
     interface IArgParserTemplate with
         member arg.Usage =
             match arg with
@@ -54,12 +62,13 @@ type Arguments =
             | Balance _ -> "get wallet balance"
             | History _ -> "get wallet transactions"
             | Address _ -> "get wallet address"
+            | Resync _ -> "resync wallet"
             | Import _ -> "import wallet seed from mnemonic sentence"
             | Spend _ -> "send asset to an address"
             | Activate _ -> "activate contract"
             | Execute _ -> "execute contract"
-            | Publish_Block _ -> "publish block to the network"
-
+            | PublishBlock _ -> "publish block to the network"
+            | AccountExists _ -> "check for an existing account" 
 
 [<EntryPoint>]
 let main argv =
@@ -115,18 +124,24 @@ let main argv =
 
             Array.iter (fun (amount:TransactionsResponseJson.Delta) ->
                 printfn "\t| %s %s\t| %d" amount.Asset amount.AssetType amount.Amount
-            ) transaction.Deltas  
-            
+            ) transaction.Deltas
+
         ) transactions
     | Some (Address _) ->
         let address =
             AddressJson.Load (getUri "wallet/address")
 
         printfn "%s" address.Address
+    | Some (Resync _) ->
+        let response = FSharp.Data.Http.Request (getUri "wallet/resync", httpMethod="POST",body=TextRequest "")
+
+        match response.StatusCode with
+        | 200 -> printfn "Success"
+        | code -> printfn "Failed %d" code
     | Some (Import args) ->
         let words = args.GetResult <@ Import_Arguments @>
-        let send = new ImportSeedJson.Root(List.map JsonValue.String words |> List.toArray)
-        
+        let send = new ImportSeedJson.Root(words |> List.toArray)
+
         let response = send.JsonValue.Request (getUri "wallet/import")
 
         match response.StatusCode, response.Body with
@@ -159,8 +174,8 @@ let main argv =
             | 200,_ -> printfn "Success"
             | code, HttpResponseBody.Text text -> printfn "Failed %d %s" code text
             | code,_ -> printfn "Failed %d with binary response" code
-    | Some (Publish_Block args) ->
-        let block = args.GetResult <@ Publish_Block_Arguments @>
+    | Some (PublishBlock args) ->
+        let block = args.GetResult <@ PublishBlock_Arguments @>
         let publishBlock = new PublishBlockJson.Root(block)
         let response = publishBlock.JsonValue.Request (getUri "block/publish")
 
@@ -168,6 +183,14 @@ let main argv =
         | 200,_ -> printfn "Success"
         | code, HttpResponseBody.Text text -> printfn "Failed %d %s" code text
         | code,_ -> printfn "Failed %d with binary response" code
+    | Some (AccountExists _) ->
+        let result =
+            AccountExistsResponseJson.Load(getUri "wallet/exists")
+
+        if result.AccountExists then
+            printfn "Account is initialized"
+        else
+            printfn "Account is not initialized"
     | _ -> ()
 
     printfn ""

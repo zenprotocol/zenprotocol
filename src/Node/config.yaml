@@ -2,12 +2,12 @@ chain: test
 miner: false
 threads: 1
 
-dataPath: ./data 
+dataPath: ./data
 
 externalIp: null
-listen: false
+listen: true
 bind: "*:29555"
-seeds: 
+seeds:
   - 52.36.171.220:29555
 
 api:

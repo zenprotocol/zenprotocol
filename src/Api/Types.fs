@@ -86,7 +86,7 @@ type BlockChainInfoJson = JsonProvider<"""
 
 type ImportSeedJson = JsonProvider<"""
 {
-    "words" : []
+    "words" : [ "word" ]
 }
 """>
 
@@ -98,9 +98,15 @@ type TransactionsResponseJson = JsonProvider<"""
             {
                 "asset": "hash",
                 "assetType": "hash",
-                "amount": "-2147483453648"
+                "amount": -2147483453648
             }
         ]  
     }
 ]
+""">
+
+type AccountExistsResponseJson = JsonProvider<"""
+{
+    "accountExists" : false
+}
 """>

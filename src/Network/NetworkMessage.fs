@@ -39,6 +39,10 @@ let TipMessageId = 15uy
 [<LiteralAttribute>]
 let NewBlockMessageId = 16uy
 [<LiteralAttribute>]
+let GetHeadersMessageId = 17uy
+[<LiteralAttribute>]
+let HeadersMessageId = 18uy
+[<LiteralAttribute>]
 let UnknownPeerMessageId = 100uy
 [<LiteralAttribute>]
 let UnknownMessageMessageId = 101uy
@@ -89,6 +93,14 @@ type Tip =
 type NewBlock =
         byte[]
 
+type GetHeaders = {
+        blockHash : byte[]
+        numberOfHeaders : uint16
+    }
+
+type Headers =
+        byte[]
+
 
 type UnknownMessage =
         byte
@@ -110,6 +122,8 @@ type T =
     | GetTip
     | Tip of Tip
     | NewBlock of NewBlock
+    | GetHeaders of GetHeaders
+    | Headers of Headers
     | UnknownPeer
     | UnknownMessage of UnknownMessage
 
@@ -336,6 +350,48 @@ module NewBlock =
             return msg
         }
 
+
+module GetHeaders =
+    let blockHashSize = 32
+    let getMessageSize (msg:GetHeaders) =
+        0 +
+            32 +
+            2 +
+            0
+
+    let write (msg:GetHeaders) stream =
+        stream
+        |> Stream.writeBytes msg.blockHash 32
+        |> Stream.writeNumber2 msg.numberOfHeaders
+
+    let read =
+        reader {
+            let! blockHash = Stream.readBytes 32
+            let! numberOfHeaders = Stream.readNumber2
+
+            return ({
+                        blockHash = blockHash;
+                        numberOfHeaders = numberOfHeaders;
+                    }: GetHeaders)
+        }
+
+module Headers =
+    let getMessageSize (msg:Headers) =
+            4 + Array.length msg
+
+    let write (msg:Headers) stream =
+        stream
+        |> Stream.writeNumber4 (uint32 (Array.length msg))
+        |> Stream.writeBytes msg (Array.length msg)
+
+    let read =
+        reader {
+            let! msgLength = Stream.readNumber4
+            let! msg = Stream.readBytes (int msgLength)
+
+            return msg
+        }
+
 module UnknownMessage =
     let getMessageSize (msg:UnknownMessage) =
             1
@@ -413,6 +469,14 @@ let private decode stream =
             match NewBlock.read stream with
             | None,stream -> None,stream
             | Some msg, stream -> Some (NewBlock msg), stream
+        | GetHeadersMessageId ->
+            match GetHeaders.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (GetHeaders msg), stream
+        | HeadersMessageId ->
+            match Headers.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (Headers msg), stream
         | UnknownPeerMessageId ->
             Some UnknownPeer, stream
         | UnknownMessageMessageId ->
@@ -466,6 +530,8 @@ let send socket msg =
         | GetTip -> id
         | Tip msg -> Tip.write msg
         | NewBlock msg -> NewBlock.write msg
+        | GetHeaders msg -> GetHeaders.write msg
+        | Headers msg -> Headers.write msg
         | UnknownPeer -> id
         | UnknownMessage msg -> UnknownMessage.write msg
 
@@ -487,6 +553,8 @@ let send socket msg =
         | GetTip _ -> GetTipMessageId
         | Tip _ -> TipMessageId
         | NewBlock _ -> NewBlockMessageId
+        | GetHeaders _ -> GetHeadersMessageId
+        | Headers _ -> HeadersMessageId
         | UnknownPeer _ -> UnknownPeerMessageId
         | UnknownMessage _ -> UnknownMessageMessageId
 
@@ -508,6 +576,8 @@ let send socket msg =
         | GetTip -> 0
         | Tip msg -> Tip.getMessageSize msg
         | NewBlock msg -> NewBlock.getMessageSize msg
+        | GetHeaders msg -> GetHeaders.getMessageSize msg
+        | Headers msg -> Headers.getMessageSize msg
         | UnknownPeer -> 0
         | UnknownMessage msg -> UnknownMessage.getMessageSize msg
 

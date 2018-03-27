@@ -125,7 +125,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Zulib", "Zulib", "{0CA87DC0
 		Zulib\fsharp\Realized\Zen.Wallet.fs = Zulib\fsharp\Realized\Zen.Wallet.fs
 		Zulib\fstar\Zen.String.fsti = Zulib\fstar\Zen.String.fsti
 		Zulib\fsharp\Realized\Zen.String.Realized.fs = Zulib\fsharp\Realized\Zen.String.Realized.fs
+<<<<<<< HEAD
 		Zulib\fstar\Zen.Wallet.fst = Zulib\fstar\Zen.Wallet.fst
+=======
+		Zulib\fstar\Zen.Types.Data.fst = Zulib\fstar\Zen.Types.Data.fst
+>>>>>>> 6e72cf6e744f228f735bcd6e2baf1f83bddb52d8
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ContractExamples", "ContractExamples", "{38137384-85D5-41FE-B40B-27E4F54898D0}"
@@ -145,6 +149,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "package", "package", "{A4AF
 		..\package\index.js = ..\package\index.js
 		..\package\package.json = ..\package\package.json
 		..\package\zen-node.js = ..\package\zen-node.js
+		..\package\zen-cli.js = ..\package\zen-cli.js
 	EndProjectSection
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Zulib.Tests", "Zulib.Tests\Zulib.Tests.fsproj", "{72AAB622-79A2-4FAC-B2B6-78173DE52EDC}"

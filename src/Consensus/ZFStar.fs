@@ -6,7 +6,6 @@ open Operators.Checked
 open Consensus
 open Consensus.Types
 open Consensus.Hash
-open Consensus.SparseMerkleTree
 open Consensus.TxSkeleton
 open FSharp.Compatibility.OCaml
 open Zen.Types.Extracted
@@ -15,7 +14,6 @@ open Zen.TxSkeleton
 open Zen.Types.Main
 open FStar.Pervasives
 open Zen.Vector
-open Newtonsoft.Json
 open MBrace.FsPickler.Combinators
 
 module Cost = Zen.Cost.Realized
@@ -24,9 +22,9 @@ let unCost (Cost.C inj:Zen.Cost.Realized.cost<'Aa, 'An>) : 'Aa = inj.Force()
 
 let pickler = Pickler.auto<Zen.Types.Data.data>
 
-let fsToFstString (s:string) =
+let fsToFstString (s : string) =
     if String.forall(fun c -> Char.code c <= 255) s
-    then System.Text.Encoding.ASCII.GetBytes s
+    then System.Text.Encoding.ASCII.GetBytes s : Prims.string
     else failwithf "Cannot encode string as ASCII: \"%s\"" s
 
 let fstToFsString : Prims.string -> string =
@@ -63,7 +61,7 @@ let fsToFstLock (outputLock:Types.Lock) : lock =
         CoinbaseLock (blockNumber,pkHash)
 
 
-let private fstToFsLock (outputLock:lock) : Types.Lock =
+let fstToFsLock (outputLock:lock) : Types.Lock =
     match outputLock with
     | PKLock pkHash ->
         PK (Hash.Hash pkHash)
@@ -87,7 +85,6 @@ let private fsToFstOutput (output:Types.Output) : output =
     { lock = fsToFstLock output.lock; spend = fsToFstSpend output.spend }
 
 let private fstToFsOutput (output:output) : Types.Output =
-    let tokenContract, tokenHash = output.spend.asset
     { lock = fstToFsLock output.lock; spend = fstToFsSpend output.spend }
 
 let private fstToFsInput (input: input) : Input =
@@ -146,23 +143,12 @@ let private fstToFsTx : txSkeleton -> _ = function
             |> List.map (snd >> fstToFsOutput)
         Ok {pInputs=inputs; outputs=outputs}
 
-let fstToFsData =
-//    Binary.pickle pickler
-    JsonConvert.SerializeObject
-    >> System.Text.Encoding.ASCII.GetBytes
-    >> Types.Data
-
-let fsToFstData (Data data) =
-//    Binary.unpickle pickler
-    System.Text.Encoding.ASCII.GetString data
-    |> JsonConvert.DeserializeObject<Zen.Types.Data.data>
-
 let fstTofsMessage = function
     | Native.option.Some ({ cHash = cHash; command = command; data = data } : Zen.Types.Main.message) ->
         ({
             cHash = Hash.Hash cHash
             command = fstToFsString command
-            data = fstToFsData data
+            data = data
         } : Consensus.Types.Message)
         |> Some
         |> Ok

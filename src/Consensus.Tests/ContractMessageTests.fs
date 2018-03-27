@@ -137,15 +137,12 @@ let ``Should produce execute contracts with message passed between them``() =
 
         let stringData = Zen.Types.Data.data.String "Some string data"B
 
-        let data = ZFStar.fstToFsData stringData
-
-        let! (tx, message) = Contract.run contract1 "contract1_test" data None List.empty TxSkeleton.empty
+        let! (tx, message) = Contract.run contract1 "contract1_test" stringData None List.empty TxSkeleton.empty
 
         let command =
             match message with
             | Some {cHash=cHash;command=command;data=data} when cHash = contract2.hash ->
                 data
-                |> ZFStar.fsToFstData
                 |> should equal stringData
 
                 command

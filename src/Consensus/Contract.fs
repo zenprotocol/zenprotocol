@@ -1,24 +1,22 @@
 module Consensus.Contract
 
+open Microsoft.FSharp.Core
 open System.Reflection
 open System.Text
 open FsBech32
 open Hash
-open Consensus.TxSkeleton
+open Types
 open Infrastructure
 open Zen.Types.Extracted
 open FStar.Pervasives
-open Microsoft.FSharp.Core
 open Zen.Cost.Realized
-open Zen.Types.Extracted
 open Zen.Types.Realized
-open Exception
-open Consensus.Types
+open Zen.Types.Data
 open Zen.Types.Main
 
 type ContractWallet = PointedOutput list
-type ContractFn = Hash -> string -> Data -> Lock option -> ContractWallet -> TxSkeleton.T -> Result<(TxSkeleton.T * Message Option),string>
-type ContractCostFn = string -> Data -> Lock option -> ContractWallet -> TxSkeleton.T -> int64
+type ContractFn = Hash -> string -> data -> Lock option -> ContractWallet -> TxSkeleton.T -> Result<(TxSkeleton.T * Message Option),string>
+type ContractCostFn = string -> data -> Lock option -> ContractWallet -> TxSkeleton.T -> int64
 
 type T = {
     hash: Hash
@@ -29,7 +27,7 @@ type T = {
     code:string
 }
 
-let EmptyData = Data [||]
+let EmptyData = Empty
 
 let private findMethods assembly =
     try
@@ -46,7 +44,7 @@ let private invokeMainFn
                 methodInfo 
                 (cHash : byte[]) 
                 (command : byte[]) 
-                (data : Zen.Types.Data.data ) 
+                (data : Zen.Types.Data.data) 
                 (returnAddress : Native.option<lock>)
                 (contractWallet : Prims.list<pointedOutput>)
                 (input : txSkeleton)
@@ -56,7 +54,7 @@ let private invokeMainFn
 let private invokeCostFn 
                 methodInfo 
                 (command : byte[]) 
-                (data : Zen.Types.Data.data ) 
+                (data : Zen.Types.Data.data) 
                 (returnAddress : Native.option<lock>)
                 (contractWallet : Prims.list<pointedOutput>)
                 (input : txSkeleton)
@@ -75,10 +73,9 @@ let private wrap (mainMethodInfo, costMethodInfo) =
         let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
         let contractWallet' = ZFStar.convertWallet contractWallet
         let returnAddress' = ZFStar.fsToFstOption ZFStar.fsToFstLock returnAddress
-        let data' = ZFStar.fsToFstData data
         let command' = ZFStar.fsToFstString command
         
-        invokeMainFn mainMethodInfo cHash command' data' returnAddress' contractWallet' txSkeleton'
+        invokeMainFn mainMethodInfo cHash command' data returnAddress' contractWallet' txSkeleton'
         |> castMainFnOutput
         |> ZFStar.unCost
         |> ZFStar.toResult
@@ -88,10 +85,9 @@ let private wrap (mainMethodInfo, costMethodInfo) =
         let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
         let contractWallet' = ZFStar.convertWallet contractWallet
         let returnAddress' = ZFStar.fsToFstOption ZFStar.fsToFstLock returnAddress
-        let data' = ZFStar.fsToFstData data
         let command' = ZFStar.fsToFstString command
 
-        invokeCostFn costMethodInfo command' data' returnAddress' contractWallet' txSkeleton'
+        invokeCostFn costMethodInfo command' data returnAddress' contractWallet' txSkeleton'
         |> castCostFnOutput
         |> ZFStar.unCost
     )

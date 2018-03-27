@@ -8,6 +8,7 @@ open Messaging.Events
 open Consensus
 open Blockchain
 open Blockchain.EffectsWriter
+open Consensus.Types
 open State
 open DatabaseContext
 
@@ -57,8 +58,8 @@ let handleCommand chainParams command session timestamp (state:State) =
         BlockHandler.validateBlock chainParams contractPath session timestamp block false state
     | ValidateMinedBlock block ->
         BlockHandler.validateBlock chainParams contractPath session timestamp block true state
-    | HandleTip header ->
-        BlockHandler.handleTip chainParams session header state
+    | HandleTip (peerId,header) ->
+        BlockHandler.handleTip chainParams session peerId header state
     | ValidateNewBlockHeader (peerId, header) ->
         BlockHandler.handleNewBlockHeader chainParams session peerId header state
     | RequestTip peerId ->
@@ -78,7 +79,31 @@ let handleCommand chainParams command session timestamp (state:State) =
 
                 return state
         }
+    | RequestHeaders (peerId, blockHash, numberOfHeaders) ->
+        let rec getHeaders blockHash headers left =
+            if left = 0us then
+                headers
+            else
+                match BlockRepository.tryGetHeader session blockHash with
+                | None -> headers
+                | Some exHeader ->
+                    if blockHash <> chainParams.genesisHash then
+                        getHeaders exHeader.header.parent (exHeader.header :: headers) (left - 1us)
+                    else
+                        (exHeader.header :: headers)
 
+        effectsWriter {
+
+            let numberOfHeaders = if numberOfHeaders > 500us then 500us else numberOfHeaders
+
+            let headers = getHeaders blockHash [] numberOfHeaders
+
+            do! sendHeaders peerId headers
+
+            return state
+        }
+    | HandleHeaders (peerId,headers) ->
+       BlockHandler.handleHeaders chainParams session peerId headers state
 
 let handleRequest chain (requestId:RequestId) request session timestamp state =
     match request with
