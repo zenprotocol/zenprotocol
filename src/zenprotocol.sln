@@ -82,7 +82,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Zulib", "Zulib", "{0CA87DC0
 		Zulib\fsharp\Realized\Zen.ArrayRealized.fs = Zulib\fsharp\Realized\Zen.ArrayRealized.fs
 		Zulib\fsharp\Realized\Zen.Cost.Realized.fs = Zulib\fsharp\Realized\Zen.Cost.Realized.fs
 		Zulib\fsharp\Realized\Zen.Cost.fs = Zulib\fsharp\Realized\Zen.Cost.fs
-		Zulib\fsharp\Realized\Zen.Crypto.fs = Zulib\fsharp\Realized\Zen.Crypto.fs
 		Zulib\fsharp\Realized\Zen.Float.fs = Zulib\fsharp\Realized\Zen.Float.fs
 		Zulib\fsharp\Realized\Zen.Types.Realized.fs = Zulib\fsharp\Realized\Zen.Types.Realized.fs
 		Zulib\fsharp\Realized\Zen.TxSkeleton.fs = Zulib\fsharp\Realized\Zen.TxSkeleton.fs
@@ -105,7 +104,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Zulib", "Zulib", "{0CA87DC0
 		Zulib\fstar\Zen.Cost.Extracted.fst = Zulib\fstar\Zen.Cost.Extracted.fst
 		Zulib\fstar\Zen.Cost.Realized.fst = Zulib\fstar\Zen.Cost.Realized.fst
 		Zulib\fstar\Zen.Cost.fst = Zulib\fstar\Zen.Cost.fst
-		Zulib\fstar\Zen.Crypto.fsti = Zulib\fstar\Zen.Crypto.fsti
 		Zulib\fstar\Zen.Error.fst = Zulib\fstar\Zen.Error.fst
 		Zulib\fstar\Zen.ErrorT.fst = Zulib\fstar\Zen.ErrorT.fst
 		Zulib\fstar\Zen.Option.fst = Zulib\fstar\Zen.Option.fst
@@ -125,11 +123,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Zulib", "Zulib", "{0CA87DC0
 		Zulib\fsharp\Realized\Zen.Wallet.fs = Zulib\fsharp\Realized\Zen.Wallet.fs
 		Zulib\fstar\Zen.String.fsti = Zulib\fstar\Zen.String.fsti
 		Zulib\fsharp\Realized\Zen.String.Realized.fs = Zulib\fsharp\Realized\Zen.String.Realized.fs
-<<<<<<< HEAD
-		Zulib\fstar\Zen.Wallet.fst = Zulib\fstar\Zen.Wallet.fst
-=======
 		Zulib\fstar\Zen.Types.Data.fst = Zulib\fstar\Zen.Types.Data.fst
->>>>>>> 6e72cf6e744f228f735bcd6e2baf1f83bddb52d8
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ContractExamples", "ContractExamples", "{38137384-85D5-41FE-B40B-27E4F54898D0}"
