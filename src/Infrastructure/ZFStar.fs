@@ -84,10 +84,10 @@ let private wrapFStar errorResult outputFile fstarFn =
     |> Result.mapError (fun _ -> errorResult)
     |> Result.map (fun _ -> File.ReadAllText outputFile)
 
-let private initOutputDir moduleName = 
+let initOutputDir moduleName = 
     let oDir = Platform.normalizeNameToFileSystem (Path.GetTempPath()) / Path.GetRandomFileName()
     Directory.CreateDirectory oDir |> ignore
-    oDir, oDir / Platform.normalizeNameToFileSystem moduleName
+    oDir, oDir / moduleName
 
 let private extract (code, hints, limits) moduleName = 
     let oDir, file = initOutputDir moduleName

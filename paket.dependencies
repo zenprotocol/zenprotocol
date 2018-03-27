@@ -2,7 +2,7 @@ source https://nuget.org/api/v2
 
 framework: 47
 
-nuget FSharp.Core
+nuget FSharp.Core 4.3.4
 nuget NUnit
 nuget NUnit.ConsoleRunner
 nuget FsUnit
@@ -27,6 +27,8 @@ nuget FSharpx.Extras
 nuget Newtonsoft.Json
 nuget Base58Check
 nuget NBitcoin
+nuget secp256k1_vc141
+nuget LightningDB
 
 source https://www.myget.org/F/zenprotocol/api/v2
 
@@ -34,3 +36,4 @@ nuget zen_z3_linux 4.5.1.8-v1f29cebd4df
 nuget zen_z3_osx 4.5.1.8-v1f29cebd4df6
 nuget zen_secp256k1_linux 0.1.0.26-v6ad5cdb42a1a
 nuget zen_secp256k1_osx 0.1.0.26-v6ad5cdb42a1a
+nuget zen_z3_windows 4.5.1.7-v1f29cebd4df

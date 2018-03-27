@@ -7,13 +7,13 @@ REM but instead use the current NON dotnetcore version
 SET NO_DOTNETCORE_BOOTSTRAP=true 
 
  
-.paket\paket.exe restore 
+..\..\.paket\paket.exe restore 
 if errorlevel 1 ( 
    exit /b %errorlevel% 
 ) 
 
  
-SET FAKE_PATH=packages\FAKE\tools\Fake.exe 
+SET FAKE_PATH=..\..\packages\FAKE\tools\Fake.exe 
 SET Platform= 
 
  

@@ -8,7 +8,6 @@ module RoutingId =
     let toBytes (FsNetMQ.RoutingId.RoutingId bytes) = bytes
     let fromBytes bytes = FsNetMQ.RoutingId.RoutingId bytes
 
-let networkId = 0ul;
 let version = 0ul;
 
 // TODO: those should come from configuration?
@@ -26,6 +25,7 @@ type CloseReason =
     | NoHelloAck
     | ExpectingHelloAck
     | NoPong
+    | IncorrectNetwork
 
 type State =
     | Connecting of sent:System.DateTime
@@ -45,6 +45,7 @@ type Peer = {
     routingId: RoutingId.T;
     state: State;
     ping: PingState;
+    networkId: uint32;
 }
 
 let private random = new System.Random()
@@ -98,21 +99,21 @@ let send socket peer msg =
         Message.send socket msg
         peer
 
-let private create mode routingId state =
-    {mode=mode; routingId = routingId; state = state; ping = NoPing (getNow ())}
+let private create mode routingId networkId state =
+    {mode=mode; routingId = routingId; state = state; networkId=networkId; ping = NoPing (getNow ())}
 
-let connect socket address =
+let connect socket networkId address =
     let routingId = Peer.connect socket (sprintf "tcp://%s" address)
 
     Log.info "Connecting to %s" address
 
-    let peer = create (Connector address) routingId (Connecting (getNow ()))
+    let peer = create (Connector address) routingId networkId (Connecting (getNow ()))
 
     // TODO: use correct values for this
     send socket peer (Message.Hello {version=version; network = networkId;})
 
-let newPeer socket next routingId msg =
-    let createPeer = create Listener routingId
+let newPeer socket networkId next routingId msg =
+    let createPeer = create Listener routingId networkId
 
     match msg with
     | None ->
@@ -121,14 +122,19 @@ let newPeer socket next routingId msg =
         |> disconnect socket
     | Some msg ->
         match msg with
-        | Message.Hello _ ->
-            Log.info "Peer accepted"
+        | Message.Hello hello ->
+            if hello.network <> networkId then
+                let peer = createPeer (Dead IncorrectNetwork)
+                send socket peer (Message.IncorrectNetwork)
+                |> disconnect socket
+            else
+                Log.info "Peer accepted"
 
-            let peer = createPeer Active
+                let peer = createPeer Active
 
-            next (InProcMessage.Accepted (RoutingId.toBytes peer.routingId))
+                next (InProcMessage.Accepted (RoutingId.toBytes peer.routingId))
 
-            send socket peer (Message.HelloAck {version=0ul; network = networkId;})
+                send socket peer (Message.HelloAck {version=0ul; network = networkId;})
         | _ ->
             let peer = createPeer (Dead UnknownPeer)
             send socket peer (Message.UnknownPeer)
@@ -143,18 +149,21 @@ let handleConnectingState socket next peer msg =
         |> closePeer socket UnknownMessage
     | Some msg ->
         match msg with
-        | Message.HelloAck _ ->
-            // TODO: check network match, save version
+        | Message.HelloAck helloAck ->
+            if helloAck.network <> peer.networkId then
+                closePeer socket IncorrectNetwork peer
+            else
+                // TODO: save version
 
-            Log.info "Connected to peer"
+                Log.info "Connected to peer"
 
-            match peer.mode with
-            | Connector address ->
-                let peerId = RoutingId.toBytes peer.routingId
-                next (InProcMessage.Connected {address=address;peerId=peerId})
-            | _ -> ()
+                match peer.mode with
+                | Connector address ->
+                    let peerId = RoutingId.toBytes peer.routingId
+                    next (InProcMessage.Connected {address=address;peerId=peerId})
+                | _ -> ()
 
-            {peer with state=Active; ping=NoPing (getNow ())}
+                {peer with state=Active; ping=NoPing (getNow ())}
         | _ ->
             closePeer socket ExpectingHelloAck peer
 
@@ -172,7 +181,7 @@ let handleActiveState socket next peer msg =
 
             // NetMQ reconnection, just sending Hello again
             let peer = withState peer (Connecting (getNow ()))
-            send socket peer (Message.Hello {version=version;network=networkId})
+            send socket peer (Message.Hello {version=version;network=peer.networkId})
         | Message.Ping nonce ->
             // TODO: should we check when we last answer a ping? the other peer might try to spoof us
             send socket peer (Message.Pong nonce)

@@ -8,5 +8,8 @@ rm -r src/Node/bin/Release
 msbuild src /property:Configuration=Release
 cd package
 cp -r ../src/Node/bin/Release .
+cp ../packages/FSharp.Core/lib/net45/FSharp.Core.dll Release/
+cp fstar.exe.config Release/
+
 touch ./Release/.npmignore
 npm pack .

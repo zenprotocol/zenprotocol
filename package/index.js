@@ -25,7 +25,7 @@ function start(args) {
     });
   }
   else {
-    node = spawn(nodePath,args, {
+    node = proc.spawn(nodePath,args, {
         cwd: workingDirectory
     });
   }

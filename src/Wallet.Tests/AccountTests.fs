@@ -289,7 +289,7 @@ let ``sync up from empty wallet``() =
 let ``account reorg``() =
     let startBlockHeader = {
         version = 0ul
-        parent = Chain.getGenesisHash chain
+        parent = (Chain.getChainParameters chain).genesisHash
         blockNumber = 2ul
         commitments = Hash.zero
         timestamp = 0UL
@@ -479,7 +479,7 @@ let ``Should get expected deltas``() =
     should equal expected (Account.getHistory account)
 
     let tx3Hash = Transaction.hash tx3
-    
+
     // add tx3 to mempool
     let account' = Account.addTransaction tx3Hash tx3 account
 
