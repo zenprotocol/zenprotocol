@@ -40,6 +40,26 @@ let handleRequest chain client (request,reply) =
 
         reply StatusCode.OK (JsonContent (JsonValue.Number (count |> decimal)))
 
+    | Get ("/blockchain/headers", _) ->
+        let headers = Blockchain.getHeaders client
+
+        let json =
+            headers
+            |> List.map (fun header ->
+                let hash = Block.hash header
+                new HeadersResponseJson.Root(
+                                                Hash.toString hash, header.timestamp |> int64,
+                                                Timestamp.toString header.timestamp,
+                                                header.blockNumber |> int,
+                                                "0x" + header.difficulty.ToString("x"),
+                                                Difficulty.uncompress header.difficulty |> Hash.toString
+                                                ))
+            |> List.map (fun json -> json.JsonValue)
+            |> List.toArray
+            |> JsonValue.Array
+
+        reply StatusCode.OK (JsonContent json)
+
     | Get ("/blockchain/info", _) ->
         let info = Blockchain.getBlockChainInfo client
 
