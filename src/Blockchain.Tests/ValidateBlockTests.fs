@@ -85,7 +85,7 @@ let createChain (length:int) nonce start ema account =
         [start.header.blockNumber..(start.header.blockNumber + (uint32 length) - 1ul)]
         |> Seq.fold (fun (blocks,ema,account) i ->
             let parent = List.head blocks
-            let timestamp = timestamp + ((uint64 i) * 1000UL * 60UL * 10UL)
+            let timestamp = timestamp + ((uint64 i) * 1000UL * 60UL * 1UL)
             let tx = createTransaction account
             let block = Block.createTemplate chain parent.header timestamp ema acs [tx] Hash.zero
             let block = {block with header ={ block.header with nonce = uint64 nonce,0UL}}

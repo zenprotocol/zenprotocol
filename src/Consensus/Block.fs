@@ -13,7 +13,7 @@ let pickler = Pickler.auto<Block>
 
 let TwoPow256 = bigint.Pow (2I, 256)
 
-let MaxTimeInFuture = 2UL * 60UL * 60UL * 1000UL // 2 hours in milliseconds
+let MaxTimeInFuture = 15UL * 60UL * 1000UL // 15 minutes in milliseconds
 
 let genesisParent = {version=Version;parent=Hash.zero;blockNumber=0ul;commitments=Hash.zero;timestamp=0UL;difficulty=0ul;nonce=0UL,0UL}
 
