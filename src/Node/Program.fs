@@ -175,10 +175,14 @@ let main argv =
 
     use event = new System.Threading.ManualResetEvent(false)
 
-    System.Console.CancelKeyPress.Add (fun _ ->
+    System.Console.CancelKeyPress.Add (fun e ->
+        e.Cancel <- true
+        printfn "Close requested"
         event.Set() |> ignore
     )
 
-    event.WaitOne() |> ignore
+    event.WaitOne() |> ignore    
+
+    printfn "Closing..."
 
     0 // return an integer exit code

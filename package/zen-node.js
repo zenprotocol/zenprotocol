@@ -7,6 +7,11 @@ node.stdout.pipe(process.stdout);
 node.stderr.pipe(process.stderr);
 
 node.on('exit', function (code) {
-  console.log('child process exited with code ' + code.toString());
+  console.log('Closed');
   process.exit(code);
+});
+
+process.on('SIGINT', function () {
+    console.log('Ctrl+C pressed');
+    node.kill('SIGINT');
 });
