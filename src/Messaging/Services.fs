@@ -6,12 +6,6 @@ open Hash
 open Zen.Types.Data
 open Infrastructure.ServiceBus.Client
 
-
-type ImportResult = Result<unit,string>
-type TransactionResult = Result<Transaction,string>
-type TransactionsResult = List<Hash*Map<Asset,int64>>
-type ActivateContractTransactionResult = Result<Transaction * Hash, string>
-
 module Blockchain =
     let serviceName = "blockchain"
 
@@ -32,10 +26,10 @@ module Blockchain =
     type Command =
         | ValidateTransaction of Types.Transaction
         | RequestMemPool of peerId:byte[]
-        | RequestTransaction of peerId:byte[] * txHash:Hash.Hash
-        | RequestBlock of peerId:byte[] * blockHash:Hash.Hash
+        | RequestTransaction of peerId:byte[] * txHash:Hash
+        | RequestBlock of peerId:byte[] * blockHash:Hash
         | RequestTip of peerId:byte[]
-        | HandleMemPool of peerId:byte[] * Hash.Hash list
+        | HandleMemPool of peerId:byte[] * Hash list
         | HandleTip of peerId:byte[] * Types.BlockHeader
         | ValidateNewBlockHeader of peerId:byte[] * Types.BlockHeader
         | ValidateBlock of Types.Block
@@ -44,11 +38,11 @@ module Blockchain =
         | HandleHeaders of peerId:byte[] * BlockHeader list
 
     type Request =
-        | ExecuteContract of Hash.Hash * string * data * Lock * TxSkeleton.T
-        | GetBlockTemplate of pkHash:Hash.Hash
+        | ExecuteContract of Hash * string * data * Lock * TxSkeleton.T
+        | GetBlockTemplate of pkHash:Hash
         | GetTip
-        | GetBlock of Hash.Hash
-        | GetBlockHeader of Hash.Hash
+        | GetBlock of Hash
+        | GetBlockHeader of Hash
         | GetActiveContracts
         | GetBlockChainInfo
 
@@ -68,7 +62,7 @@ module Blockchain =
 
     let executeContract client cHash command data returnAddress txSkeleton =
         ExecuteContract (cHash,command, data, returnAddress,txSkeleton)
-        |> Request.send<Request, TransactionResult> client serviceName
+        |> Request.send<Request, Result<Transaction,string>> client serviceName
 
     let validateBlock client block =
         ValidateBlock block
@@ -105,7 +99,7 @@ module Blockchain =
         Request.send<Request,Block option> client serviceName (GetBlock blockHash)
 
     let getTip client =
-        Request.send<Request,(Hash.Hash*BlockHeader) option> client serviceName GetTip
+        Request.send<Request,(Hash*BlockHeader) option> client serviceName GetTip
 
     let getActiveContracts client =
         Request.send<Request,ActiveContract list> client serviceName GetActiveContracts
@@ -121,15 +115,15 @@ module Blockchain =
 
 module Network =
     type Command =
-        | SendMemPool of peerId:byte[] * Hash.Hash list
+        | SendMemPool of peerId:byte[] * Hash list
         | SendTransaction of peerId:byte[] * Transaction
         | SendTip of peerId:byte[] * BlockHeader
         | SendBlock of peerId:byte[] * Block
-        | GetTransaction of peerId:byte[] * Hash.Hash
-        | GetBlock of Hash.Hash
-        | GetNewBlock of peerId:byte[] * Hash.Hash
+        | GetTransaction of peerId:byte[] * Hash
+        | GetBlock of Hash
+        | GetNewBlock of peerId:byte[] * Hash
         | PublishBlock of BlockHeader
-        | GetHeaders of peerId:byte[] * blockHash:Hash.Hash * numberOfBlocks:uint16
+        | GetHeaders of peerId:byte[] * blockHash:Hash * numberOfBlocks:uint16
         | SendHeaders of peerId:byte[] * BlockHeader list
 
     type Request =
@@ -143,6 +137,10 @@ module Network =
         Request.send<Request, uint32> client serviceName GetConnectionCount
 
 module Wallet =
+    type BalanceResponse = Map<Asset,uint64>
+    type TransactionsResponse = List<Hash*Map<Asset,int64>>
+    type ActivateContractResponse = Transaction * Hash
+
     type Command =
         | Resync
 
@@ -159,32 +157,35 @@ module Wallet =
 
     let serviceName = "wallet"
 
+    //TODO: apply same convention to other services
+    let private send<'a> = Request.send<Request, Result<'a,string>>
+
     let getBalance client =
-        Request.send<Request, Map<Asset,uint64>> client serviceName GetBalance
+        send<BalanceResponse> client serviceName GetBalance
 
     let getAddressPKHash client =
-        Request.send<Request, Hash.Hash> client serviceName GetAddressPKHash
+        send<Hash> client serviceName GetAddressPKHash
 
     let getAddress client =
-        Request.send<Request, string> client serviceName GetAddress
+        send<string> client serviceName GetAddress
 
     let createTransaction client address spend =
-        Request.send<Request, TransactionResult> client serviceName (Spend (address, spend))
+        send<Transaction> client serviceName (Spend (address, spend))
 
     let activateContract client code numberOfBlocks =
-        Request.send<Request, ActivateContractTransactionResult> client serviceName (ActivateContract (code,numberOfBlocks))
+        send<ActivateContractResponse> client serviceName (ActivateContract (code,numberOfBlocks))
 
     let executeContract client address command data spends =
-        Request.send<Request, TransactionResult> client serviceName (ExecuteContract (address,command,data,spends))
+        send<Transaction> client serviceName (ExecuteContract (address,command,data,spends))
 
     let importSeed client words =
-        Request.send<Request, ImportResult> client serviceName (ImportSeed words)
+        send<unit> client serviceName (ImportSeed words)
 
     let getTransactions client =
-        Request.send<Request, TransactionsResult> client serviceName GetTransactions
+        send<TransactionsResponse> client serviceName GetTransactions
 
     let accountExists client =
-        Request.send<Request, bool> client serviceName AccountExists
+        send<bool> client serviceName AccountExists
 
     let resyncAccount client =
         Command.send client serviceName Resync

@@ -20,8 +20,6 @@ open Blockchain.State
 open Consensus.Tests.SampleContract
 open TestsInfrastructure.Constraints
 
-type TransactionResult = Messaging.Services.TransactionResult
-
 let chain = Chain.getChainParameters Chain.Local
 // Helper functions for the tests
 let getStringBytes (str : string) = System.Text.Encoding.UTF8.GetBytes str

@@ -10,6 +10,10 @@ open DataAccess
 open MBrace.FsPickler
 open Consensus
 open Account
+open Messaging.Services.Wallet
+
+let private (<@>) a b = Result.map b a
+let private (>>=) a b = Result.bind b a
 
 type AccountCollection = Collection<string, Account.T>
 
@@ -51,85 +55,94 @@ let private sync (account:Account.T) chainParams client =
             account
     | _ -> account
 
-let commandHandler collection chain client  command session account =
+let checkWallet =
+    function
+    | Some wallet -> Ok wallet
+    | _ -> Error "no wallet"
+
+let commandHandler chain client command session account =
     let chainParams = Consensus.Chain.getChainParameters chain
-
-    match account, command with
-    | Some account, Resync ->
-        let account =
-            let account ={account with deltas = List.empty; outputs=Map.empty;tip = Hash.zero; blockNumber = 0ul }
-            sync account chainParams client
-
-        Collection.put collection session MainAccountName account
+    let checkWallet = checkWallet account
+    
+    match command with
+    | Resync ->
+        checkWallet
+        <@> fun account ->
+                let account = { account with deltas = List.empty; outputs=Map.empty; tip = Hash.zero; blockNumber = 0ul }
+                sync account chainParams client
+    |> function 
+    | Ok account ->
         Some account
+    | Error error -> 
+        Log.info "Could not handle command due to %A " error
+        account
 
-    | _ -> account
+let private reply<'a> (requestId:RequestId) (value : Result<'a,string>) =
+    requestId.reply value
 
 let requestHandler collection chain client (requestId:RequestId) request session wallet =
     let chainParams = Consensus.Chain.getChainParameters chain
-    let reply =
-        requestId.reply
-    let getTransactionResult =
-        function
-        | Result.Ok tx ->
-            TransactionResult.Ok tx
-        | Result.Error err ->
-            TransactionResult.Error err
+    let checkWallet = checkWallet wallet
 
-    match wallet, request with
-    | Some wallet, GetBalance ->
-        Account.getBalance wallet
-        |> reply
-        Some wallet
-    | Some wallet, GetAddressPKHash ->
-        reply wallet.publicKeyHash
-        Some wallet
-    | Some wallet, GetAddress ->
-        Account.getAddress chain wallet
-        |> reply
-        Some wallet
-    | Some wallet, GetTransactions ->
-        Account.getHistory wallet
-        |> reply
-        Some wallet
-    | _, ImportSeed words ->
-        match Account.import words "" with
-        | Result.Ok account ->
-            Log.info "Account imported"
-            ImportResult.Ok ()
-            |> reply
-            let account = sync account chainParams client
-            Collection.put collection session MainAccountName account
+    match request with
+    | GetBalance ->
+        checkWallet
+        <@> Account.getBalance
+        |> reply<BalanceResponse> requestId
+        wallet
+    | GetAddressPKHash ->
+        checkWallet
+        <@> fun wallet -> wallet.publicKeyHash
+        |> reply<Hash.Hash> requestId
+        wallet
+    | GetAddress ->
+        checkWallet
+        <@> Account.getAddress chain
+        |> reply<string> requestId
+        wallet
+    | GetTransactions ->
+        checkWallet
+        <@> Account.getHistory
+        |> reply<TransactionsResponse> requestId
+        wallet
+    | ImportSeed words ->
+        Account.import words ""
+        <@> fun account -> 
+                Collection.put collection session MainAccountName account
+                Log.info "Account imported"
+                account
+        |> function
+        | Ok account -> 
+            reply<unit> requestId (Ok ())
             Some account
-        | Result.Error err ->
-            ImportResult.Error err
-            |> reply
+        | Error error ->
+            reply<unit> requestId (Error error)
             wallet
-    | Some wallet, Spend (address, spend) ->
-        Account.createTransaction wallet address spend
-        |> getTransactionResult
-        |> reply
-        Some wallet
-    | Some wallet, ActivateContract (code,numberOfBlocks) ->
-        Account.createActivateContractTransaction chainParams wallet code numberOfBlocks
-        |> function     // TODO: cleanup
-        | Result.Ok tx ->
-            ActivateContractTransactionResult.Ok (tx, Consensus.Contract.computeHash code)
-        | Result.Error err ->
-            ActivateContractTransactionResult.Error err
-        |> reply
-        Some wallet
-    | Some wallet, ExecuteContract (cHash,command,data,spends) ->
-        let executeContract = Blockchain.executeContract client
-        Account.createExecuteContractTransaction wallet executeContract cHash command data spends
-        |> getTransactionResult
-        |> reply
-        Some wallet
-    | wallet, AccountExists ->
-        reply (Option.isSome wallet)
+    | Spend (address, spend) ->
+        checkWallet
+        >>= fun wallet -> Account.createTransaction wallet address spend
+        |> reply<Types.Transaction> requestId
+        wallet
+    | ActivateContract (code,numberOfBlocks) ->
+        checkWallet
+        >>= fun wallet -> Account.createActivateContractTransaction chainParams wallet code numberOfBlocks
+        <@> fun tx -> tx, Consensus.Contract.computeHash code
+        |> reply<ActivateContractResponse> requestId
+        wallet
+    | ExecuteContract (cHash,command,data,spends) ->
+        checkWallet
+        >>= fun wallet -> Account.createExecuteContractTransaction wallet (Blockchain.executeContract client) cHash command data spends
+        |> reply<Types.Transaction> requestId
+        wallet
+    | AccountExists ->
+        wallet
+        |> Option.isSome
+        |> Ok
+        |> reply<bool> requestId
         wallet
     | _ ->
-        failwithf "Could not handle %A " request
+        Log.info "Could not handle %A " request
+        wallet
 
 let main dataPath busName chain root =
     let chainParams = Consensus.Chain.getChainParameters chain
@@ -160,7 +173,7 @@ let main dataPath busName chain root =
             sbObservable
             |> Observable.map (fun message ->
                 match message with
-                | ServiceBus.Agent.Command c -> commandHandler collection chain client c
+                | ServiceBus.Agent.Command c -> commandHandler chain client c
                 | ServiceBus.Agent.Request (requestId, r) -> requestHandler collection chain client requestId r)
 
         let ebObservable =

@@ -181,7 +181,7 @@ let ``create execute contract transaction``() =
             |> TxSkeleton.addOutput {lock=Contract Hash.zero;spend={asset=Constants.Zen;amount=1UL}}
             |> Transaction.fromTxSkeleton
 
-        tx |> Messaging.Services.TransactionResult.Ok
+        tx |> Ok
 
     let spends = Map.add Constants.Zen 1UL Map.empty
 

@@ -28,9 +28,9 @@ let handleRequest chain client (request,reply) =
 
     let validateTx result =
         match result with
-        | TransactionResult.Error error ->
+        | Error error ->
             replyError error
-        | TransactionResult.Ok tx ->
+        | Ok tx ->
             Blockchain.validateTransaction client tx
             reply StatusCode.OK NoContent
 
@@ -80,70 +80,86 @@ let handleRequest chain client (request,reply) =
                 |> reply StatusCode.BadRequest
 
     | Get ("/wallet/balance", _) ->
-        let balances = Wallet.getBalance client
-
-        let json =
+        match Wallet.getBalance client with
+        | Ok balances ->
             balances
             |> Map.toSeq
             |> Seq.map (fun ((asset, assetType), amount) -> new BalanceResponseJson.Root(Hash.toString asset, Hash.toString assetType, int64 amount))
             |> Seq.map (fun json -> json.JsonValue)
             |> Seq.toArray
             |> JsonValue.Array
-
-        reply StatusCode.OK (JsonContent json)
+            |> JsonContent
+            |> reply StatusCode.OK
+        | Error error ->
+            replyError error
     | Get ("/wallet/exists", _) ->
-        let result = Wallet.accountExists client
-        let json = new AccountExistsResponseJson.Root(result)
-        reply StatusCode.OK (JsonContent json.JsonValue)
+        match Wallet.accountExists client with
+        | Ok result ->
+            (new AccountExistsResponseJson.Root(result)).JsonValue
+            |> JsonContent
+            |> reply StatusCode.OK
+        | Error error ->
+            replyError error
     | Get ("/wallet/address", _) ->
-        let address = Wallet.getAddress client
-        let json = new AddressJson.Root(address)
-        reply StatusCode.OK (JsonContent json.JsonValue)
+        match Wallet.getAddress client with
+        | Ok address ->
+            (new AddressJson.Root(address)).JsonValue
+            |> JsonContent
+            |> reply StatusCode.OK
+        | Error error ->
+            replyError error
     | Post ("/wallet/import", Some body) ->
         match getImportSeed body with
-        | Result.Error error -> replyError error
-        | Result.Ok words ->
+        | Ok words ->
             match Wallet.importSeed client words with
-            | ImportResult.Ok _ -> reply StatusCode.OK NoContent
-            | ImportResult.Error error -> replyError error
+            | Ok _ -> reply StatusCode.OK NoContent
+            | Error error -> replyError error
+        | Error error ->
+            replyError error
     | Post ("/wallet/spend", Some body) ->
         match getSpend chain body with
-        | Result.Error error -> replyError error
-        | Result.Ok (pkHash, spend) ->
+        | Ok (pkHash, spend) ->
             Wallet.createTransaction client pkHash spend
             |> validateTx
+        | Error error ->
+            replyError error
     | Get ("/wallet/transactions", _) ->
-        let json =
-            Wallet.getTransactions client
-            |> List.toArray
-            |> Array.map (fun (txHash, amounts) ->
-                let deltas =
-                    amounts
-                    |> Map.toArray
-                    |> Array.map (fun ((asset, assetType), amount) ->
-                        new TransactionsResponseJson.Delta(Hash.toString asset, Hash.toString assetType, amount))
-                (new TransactionsResponseJson.Root(Hash.toString txHash, deltas)).JsonValue)
-            |> JsonValue.Array
-        let json = new TransactionsResponseJson.Root(json)
-        reply StatusCode.OK (JsonContent json.JsonValue)
+        match Wallet.getTransactions client with
+        | Ok txs ->
+            let json =
+                txs
+                |> List.toArray
+                |> Array.map (fun (txHash, amounts) ->
+                    let deltas =
+                        amounts
+                        |> Map.toArray
+                        |> Array.map (fun ((asset, assetType), amount) ->
+                            new TransactionsResponseJson.Delta(Hash.toString asset, Hash.toString assetType, amount))
+                    (new TransactionsResponseJson.Root(Hash.toString txHash, deltas)).JsonValue)
+                |> JsonValue.Array
+            (new TransactionsResponseJson.Root(json)).JsonValue
+            |> JsonContent
+            |> reply StatusCode.OK
+        | Error error ->
+            replyError error
     | Post ("/wallet/contract/activate", Some body) ->
         match getContractActivate body with
-        | Result.Error error -> replyError error
-        | Result.Ok (code,numberOfBlocks) ->
+        | Error error -> replyError error
+        | Ok (code,numberOfBlocks) ->
             match Wallet.activateContract client code numberOfBlocks with
-            | ActivateContractTransactionResult.Error error ->
-                replyError error
-            | ActivateContractTransactionResult.Ok (tx, cHash) ->
+            | Ok (tx, cHash) ->
                 let address =
                     Address.Contract cHash
                     |> Address.encode chain
                 Blockchain.validateTransaction client tx
                 let json = new ContractActivateResponseJson.Root (address, Hash.toString cHash)
                 reply StatusCode.OK (JsonContent json.JsonValue)
+            | Error error ->
+                replyError error
     | Post ("/wallet/contract/execute", Some body) ->
         match getContractExecute chain body with
-        | Result.Error error -> replyError error
-        | Result.Ok (cHash, command, data, spends) ->
+        | Error error -> replyError error
+        | Ok (cHash, command, data, spends) ->
             Wallet.executeContract client cHash command data spends
             |> validateTx
     | Post ("/wallet/resync", _) ->
@@ -151,8 +167,8 @@ let handleRequest chain client (request,reply) =
         reply StatusCode.OK NoContent
     | Post ("/block/publish", Some body) ->
             match getPublishBlock body with
-            | Result.Error error -> replyError error
-            | Result.Ok block ->
+            | Error error -> replyError error
+            | Ok block ->
                 Blockchain.validateMinedBlock client block
                 reply StatusCode.OK NoContent
     | _ ->
