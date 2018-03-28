@@ -141,7 +141,7 @@ let main argv =
     use blockchainActor = Blockchain.Main.main dataPath chainParams busName
 
     use networkActor =
-        Network.Main.main busName config.externalIp config.listen config.bind config.seeds
+        Network.Main.main busName chainParams config.externalIp config.listen config.bind config.seeds
 
     use walletActor = Wallet.Main.main dataPath busName chain root
 

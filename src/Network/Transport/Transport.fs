@@ -81,25 +81,25 @@ let private handleTimer socket inproc (peers:Peers) =
 
     cleanDeadPeers inproc peers
 
-let private handleMessage socket inproc routingId msg (peers:Peers) =
+let private handleMessage socket inproc networkId routingId msg (peers:Peers) =
     let next msg = InProcMessage.send inproc msg
 
     let peer =
         match Map.tryFind routingId peers with
         | Some peer -> Peer.handleMessage socket next peer msg
-        | None -> Peer.newPeer socket next routingId msg
+        | None -> Peer.newPeer socket networkId next routingId msg
 
     let peers = Map.add routingId peer peers
 
     cleanDeadPeers inproc peers
 
-let private handleInprocMessage socket inproc msg (peers:Peers) =
+let private handleInprocMessage socket inproc networkId msg (peers:Peers) =
     match msg with
     | None -> failwith "invalid inproc msg"
     | Some msg ->
         match msg with
         | InProcMessage.Connect address ->
-            let peer = Peer.connect socket address
+            let peer = Peer.connect socket networkId address
             let routingId = Peer.routingId peer
 
             Map.add routingId peer peers
@@ -241,7 +241,7 @@ let tryRecv transport timeout =
 let addToPoller poller transport =
     Poller.addSocket poller transport.inproc
 
-let create listen bind =
+let create listen bind networkId =
     let user,inproc = Pair.createPairs ()
 
     let actor = FsNetMQ.Actor.create (fun shim ->
@@ -260,7 +260,7 @@ let create listen bind =
             |> Observable.map (fun _ ->
                 let routingId = RoutingId.get socket
                 let msg =  Message.recv socket
-                handleMessage socket inproc routingId msg)
+                handleMessage socket inproc networkId routingId msg)
 
         let timer = Timer.create timerInterval
         let timerObservable =
@@ -271,7 +271,7 @@ let create listen bind =
             Poller.addSocket poller inproc
             |> Observable.map (fun _ ->
                 let msg = InProcMessage.recv inproc
-                handleInprocMessage socket inproc msg)
+                handleInprocMessage socket inproc networkId msg)
 
         use observer =
             Observable.merge socketObservable timerObservable

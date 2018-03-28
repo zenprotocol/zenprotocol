@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <Target Name="CopyLMDBDependenciesToOutput" AfterTargets="Compile">
+    <Copy SourceFiles="$(SolutionDir)\..\packages\LightningDB\runtimes\win-x64\native\lmdb.dll" DestinationFiles="$(OutDir)\lmdb.dll" />
+    <Copy SourceFiles="$(SolutionDir)\..\packages\LightningDB\runtimes\osx\native\lmdb.dylib" DestinationFiles="$(OutDir)\liblmdb.dylib" />
+  </Target>
+</Project>

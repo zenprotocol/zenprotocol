@@ -15,6 +15,7 @@ open Network
 open Network.Message
 open Network.Transport
 open Serialization
+open Consensus.Chain
 
 type State = Connector.T * AddressBook.T * string option
 
@@ -259,9 +260,9 @@ let requestHandler (requestId:RequestId) request (state:State) =
 
         state
 
-let main busName externalIp listen bind seeds =
+let main busName chainParams externalIp listen bind seeds =
     Actor.create<Command, Request, Event, State> busName serviceName (fun poller sbObservable ebObservable ->
-        let transport = Transport.create listen bind
+        let transport = Transport.create listen bind chainParams.networkId
 
         let addressBook = AddressBook.empty
 

@@ -1,6 +1,6 @@
 
-#r @"../../packages/System.Reflection.Metadata/lib/portable-net45+win8/System.Reflection.Metadata.dll"
-//#r @"../../packages/System.Reflection.Metadata/lib/netstandard1.1/System.Reflection.Metadata.dll"
+//#r @"../../packages/System.Reflection.Metadata/lib/portable-net45+win8/System.Reflection.Metadata.dll"
+#r @"../../packages/System.Reflection.Metadata/lib/netstandard1.1/System.Reflection.Metadata.dll"
 #r @"../../packages/FAKE/tools/FakeLib.dll"
 #r @"../../packages/Zen.FSharp.Compiler.Service/lib/net45/Zen.FSharp.Compiler.Service.dll"
 
@@ -27,12 +27,13 @@ let runFStar args files =
 
   let join = Array.reduce (fun a b -> a + " " + b)
 
-  let primsFile = FileSystemHelper.currentDirectory + "/fstar/prims.fst"
+  let primsFile = "\"" + FileSystemHelper.currentDirectory + "/fstar/prims.fst" + "\""
+  let files = Array.map (fun f -> "\"" + f + "\"") files
 
   let executable,fstarPath,z3Path =
     if EnvironmentHelper.isLinux then ("mono", "../../packages/ZFStar/tools/fstar.exe", "../../packages/zen_z3_linux/output/z3-linux")
     elif EnvironmentHelper.isMacOS then ("mono", "../../packages/ZFStar/tools/fstar.exe", "../../packages/zen_z3_osx/output/z3-osx")
-    else ("../../packages/ZFStar/tools/fstar.exe","","../../packages/zen_z3_linux/output/z3")
+    else ("../../packages/ZFStar/tools/fstar.exe","","../../packages/zen_z3_windows/output/z3.exe")
 
   let fstar = [|
     fstarPath;
@@ -85,8 +86,8 @@ Target "Extract" (fun _ ->
 
   let args =
     [|
-       //"--lax";
-       "--cache_checked_modules"
+       "--lax";
+       //"--cache_checked_modules"
        //"--use_hints";
        //"--use_hint_hashes";
        "--codegen";"FSharp";
