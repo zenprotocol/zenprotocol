@@ -68,15 +68,19 @@ let minerTask chain busName (collection:Queue) =
             | Exit -> shouldStop <- true
     }
 
-let handleEvent pkHash client (collection:Queue) event =
-    match event with
-    | TransactionAddedToMemPool _
-    | TipChanged _ ->
-        Blockchain.getBlockTemplate client pkHash
-        |> NewBlockTemplate
-        |> collection.Add
-    | _ -> ()
-
+let handleEvent client (collection:Queue) event =
+    Wallet.getAddressPKHash client
+    |> Result.map (fun pkHash ->
+        match event with
+        | TransactionAddedToMemPool _
+        | TipChanged _ ->
+            Blockchain.getBlockTemplate client pkHash
+            |> NewBlockTemplate
+            |> collection.Add
+        | _ -> ())
+    |> Result.mapError (Log.info "Miner could not get address due to %A")
+    |> ignore
+    
 let main busName chain =
     Actor.create<unit,unit,Event,unit> busName "Miner" (fun poller sbObservable ebObservable  ->
         let client = ServiceBus.Client.create busName
@@ -84,16 +88,19 @@ let main busName chain =
 
         Log.info "Miner running"
 
-        let pkHash = Wallet.getAddressPKHash client
-        Blockchain.getBlockTemplate client pkHash
+        Wallet.getAddressPKHash client
+        |> Result.map (fun pkHash ->
+            Blockchain.getBlockTemplate client pkHash
             |> NewBlockTemplate
-            |> collection.Add
-
+            |> collection.Add)
+        |> Result.mapError (Log.info "Miner could not get address due to %A")
+        |> ignore
+        
         Async.Start (minerTask chain busName collection)
 
         let observable =
             ebObservable
-            |> Observable.map (handleEvent pkHash client collection)
+            |> Observable.map (handleEvent client collection)
 
         Disposables.empty, observable
     )

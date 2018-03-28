@@ -13,8 +13,6 @@ open Result
 
 let result = new ResultBuilder<string>()
 
-type TransactionResult = Messaging.Services.TransactionResult
-
 let private (>>=) a b = Result.bind b a
 
 type Status<'a> =
