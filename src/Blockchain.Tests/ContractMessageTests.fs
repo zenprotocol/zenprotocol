@@ -88,11 +88,9 @@ open Zen.Asset
 module ET = Zen.ErrorT
 module Tx = Zen.TxSkeleton
 
-val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 7
-let cf _ _ _ _ #l _ = ret (64 + 64 + 0 + 16)
-
-val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + 64 + 0 + 16)
-let main txSkeleton contractHash command data returnAddress #l wallet =
+val main: txSkeleton -> hash -> string -> data -> option lock -> wallet
+    -> result (txSkeleton ** option message) `cost` (64 + 64 + 0 + 18)
+let main txSkeleton contractHash command data returnAddress wallet =
     if command = "contract2_test" then
     begin
         let! tokens = Tx.getAvailableTokens zenAsset txSkeleton in
@@ -103,7 +101,10 @@ let main txSkeleton contractHash command data returnAddress #l wallet =
     end
     else
         ET.autoFailw "unsupported command"
-    """
+
+val cf: txSkeleton -> string -> data -> option lock -> wallet -> cost nat 7
+let cf _ _ _ _ _ = ret (64 + 64 + 0 + 18)
+"""
 let contract2Hash = Contract.computeHash contract2Code
 
 let contract1Code =
@@ -123,11 +124,9 @@ open Zen.Asset
 module ET = Zen.ErrorT
 module Tx = Zen.TxSkeleton
 
-val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 11
-let cf _ _ _ _ #l _ = ret (64 + (64 + (64 + 64 + 0)) + 25)
-
-val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + (64 + 64 + 0)) + 25)
-let main txSkeleton contractHash command data returnAddress #l wallet =
+val main: txSkeleton -> hash -> string -> data -> option lock -> wallet
+    -> result (txSkeleton ** option message) `cost` (64 + (64 + (64 + 64 + 0)) + 28)
+let main txSkeleton contractHash command data returnAddress wallet =
     match returnAddress with
     | Some returnAddress ->
         let! tokens = Tx.getAvailableTokens zenAsset txSkeleton in
@@ -145,6 +144,9 @@ let main txSkeleton contractHash command data returnAddress #l wallet =
         ET.ret (txSkeleton, Some message)
     | None ->
         ET.autoFailw "returnAddress is required"
+
+val cf: txSkeleton -> string -> data -> option lock -> wallet -> cost nat 11
+let cf _ _ _ _ _ = ret (64 + (64 + (64 + 64 + 0)) + 28)
 """
 
 [<Test>]

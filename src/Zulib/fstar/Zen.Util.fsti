@@ -2,7 +2,6 @@ module Zen.Util
 
 open Zen.Types.Extracted
 
-module  C = Zen.Crypto
 module  A = Zen.Array
 module U8 = FStar.UInt8
 

@@ -4,7 +4,7 @@ open Zen.Base
 open Zen.Cost
 open Zen.Types
 
-module V = Zen.Vector
+module W = Zen.Wallet
 module U64 = FStar.UInt64
 
 val getAvailableTokens: asset -> txSkeleton -> U64.t `cost` 64
@@ -28,10 +28,10 @@ val addInput_AvailableTokens:
              )
 *)
 
-val addInputs(#n:nat):
-  input `V.t` n
+val addInputs:
+  inputs: list input
   -> txSkeleton
-  -> txSkeleton `cost` (64 * n + 64)
+  -> txSkeleton `cost` (length inputs * 64 + 64)
 
 (*
 assume AddInputs_is_fold:
@@ -80,12 +80,12 @@ val destroy:
   -> txSkeleton
   -> txSkeleton `cost` 64
 
-val fromWallet(#n:nat):
+val fromWallet:
   asset ->
   amount:U64.t ->
   contractHash ->
-  wallet n ->
+  wallet: wallet ->
   txSkeleton ->
-  option txSkeleton `cost` (n * 128 + 192)
+  option txSkeleton `cost` (W.size wallet * 128 + 192)
 
 val isValid: txSkeleton -> bool `cost` 64

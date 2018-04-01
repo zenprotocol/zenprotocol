@@ -105,6 +105,8 @@ let private extract (code, hints, limits) moduleName =
         |> Result.bind (fun _ ->
             fstar oDir elaboratedFile [
                 "--codegen"; "FSharp"
+                "--use_hints"
+                "--strict_hints"
                 "--extract_module"; moduleName 
                 "--max_fuel"; maxFuel.ToString()
                 "--max_ifuel"; maxIFuel.ToString()

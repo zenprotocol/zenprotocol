@@ -98,12 +98,13 @@ let fstCode = """
     open Zen.Cost
     open Zen.ErrorT
 
-    val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 1
-    let cf _ _ _ _ #l _ = ~!4
-
-    val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) 4
-    let main tx chash command data returnAddress #l _ =
+    val main: txSkeleton -> hash -> string -> data -> option lock -> wallet
+        -> result (txSkeleton ** option message) `cost` 4
+    let main tx chash command data returnAddress _ =
         ret @ (tx, None)
+        
+    val cf: txSkeleton -> string -> data -> option lock -> wallet -> cost nat 1
+        let cf _ _ _ _ _ = ~!4
     """
 
 [<Test>]
@@ -114,7 +115,7 @@ let ``Should record hints``() =
 
 [<Test>]
 let ``Should invoke compiled``() =
-    compileAndInvoke fstCode [| input; null; null; null; null; 0L; null |]
+    compileAndInvoke fstCode [| input; null; null; null; null; null |]
     |> shouldBeOk (input, Native.option<message>.None)
 
 [<Test>]
@@ -125,13 +126,14 @@ let ``Should throw with command's value``() =
         open Zen.Cost
         open Zen.ErrorT
 
-        val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 1
-        let cf _ _ _ _ #l _ = ~!1
-
-        val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) 1
-        let main tx chash command data returnAddress #l _ =
+        val main: txSkeleton -> hash -> string -> data -> option lock -> wallet
+            -> result (txSkeleton ** option message) `cost` 1
+        let main tx chash command data returnAddress _ =
             failw command
-        """ [| null; null; "test command"B ;null;null;0L;null |]
+        
+        val cf: txSkeleton -> string -> data -> option lock -> wallet -> cost nat 1
+                let cf _ _ _ _ _ = ~!1
+        """ [| null; null; "test command"B; null; null; null |]
     |> shouldBeError "test command"
 
 [<Test>]
