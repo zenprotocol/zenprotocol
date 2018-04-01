@@ -144,6 +144,19 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
             })
         |> List.ofSeq
         |> requestId.reply<ActiveContract list>
+    | GetHeaders ->
+        let rec getHeaders tip headers =
+            let header = BlockRepository.getHeader session tip
+
+            if tip = chain.genesisHash then
+                header.header :: headers
+            else
+                getHeaders header.header.parent (header.header :: headers)
+
+        let headers = getHeaders state.tipState.tip.hash []
+
+        requestId.reply headers
+
     | GetBlockChainInfo ->
         let tip = state.tipState.tip.header
 

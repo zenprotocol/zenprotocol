@@ -45,6 +45,7 @@ module Blockchain =
         | GetBlockHeader of Hash
         | GetActiveContracts
         | GetBlockChainInfo
+        | GetHeaders
 
     type Response = unit
 
@@ -112,6 +113,9 @@ module Blockchain =
 
     let handleHeaders client peerId headers =
         HandleHeaders (peerId,headers) |> Command.send client serviceName
+
+    let getHeaders client =
+        GetHeaders |> Request.send<Request, BlockHeader list> client serviceName
 
 module Network =
     type Command =

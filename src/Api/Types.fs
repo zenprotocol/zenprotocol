@@ -100,7 +100,7 @@ type TransactionsResponseJson = JsonProvider<"""
                 "assetType": "hash",
                 "amount": -2147483453648
             }
-        ]  
+        ]
     }
 ]
 """>
@@ -109,4 +109,17 @@ type AccountExistsResponseJson = JsonProvider<"""
 {
     "accountExists" : false
 }
+""">
+
+type HeadersResponseJson = JsonProvider<"""
+[
+    {
+        "hash":"ab1234",
+        "timestamp":2147483648,
+        "date":"date",
+        "blockNumber":1,
+        "difficulty":"0x12345678",
+        "target":"abcd1234"
+    }
+]
 """>
