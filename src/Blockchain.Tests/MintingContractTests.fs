@@ -12,6 +12,7 @@ open Infrastructure
 open Consensus.Tests.ContractTests
 open Blockchain.State
 open TestsInfrastructure.Constraints
+open Zen
 
 let chain = Chain.getChainParameters Chain.Local
 
@@ -77,6 +78,7 @@ let setUp = fun () ->
     open Zen.Base
     open Zen.Cost
     open Zen.Asset
+    open Zen.Data
 
     module W = Zen.Wallet
     module ET = Zen.ErrorT
@@ -108,9 +110,11 @@ let setUp = fun () ->
 
       ET.of_option "contract doesn't have enough zens to pay you" result
 
-    val main: txSkeleton -> hash -> string -> data -> option lock -> wallet:wallet
-        -> result (txSkeleton ** option message) `cost` (64 + (64 + (64 + 64 + (W.size wallet * 128 + 192) + 0)) + 31 + 22)
-    let main txSkeleton contractHash command data returnAddress wallet =
+    val main: txSkeleton -> hash -> string -> data -> wallet:wallet
+        -> result (txSkeleton ** option message) `cost` (2 + 66 + (64 + (64 + (64 + 64 + (Zen.Wallet.size wallet * 128 + 192) + 0)) + 31) + 28)
+    let main txSkeleton contractHash command data wallet =
+      let! returnAddress = tryDict data >?> tryFindLock "returnAddress" in
+
       match returnAddress with
       | Some returnAddress ->
         if command = "redeem" then
@@ -122,9 +126,9 @@ let setUp = fun () ->
           ET.autoFailw "unsupported command"
       | None ->
         ET.autoFailw "returnAddress is required"
-    
-    val cf: txSkeleton -> string -> data -> option lock -> wallet -> cost nat 20
-        let cf _ _ _ _ wallet = ret (64 + (64 + (64 + 64 + (W.size wallet * 128 + 192) + 0)) + 31 + 22)
+
+    val cf: txSkeleton -> string -> data -> wallet -> cost nat 24
+        let cf _ _ _ wallet = ret (2 + 66 + (64 + (64 + (64 + 64 + (Zen.Wallet.size wallet * 128 + 192) + 0)) + 31) + 28)
     """ account session state
     |> function
     | Ok (state', cHash') ->
@@ -153,7 +157,19 @@ let ``Contract should detect unsupported command``() =
             pInputs = [ ]
             outputs = [ ]
         }
-    TransactionHandler.executeContract session inputTx cHash "x" Contract.EmptyData (PK samplePKHash) state.memoryState
+
+    let returnAddress =
+                PK samplePKHash
+                |> ZFStar.fsToFstLock
+                |> Types.Data.Lock
+
+    let data =
+        Dictionary.add "returnAddress"B returnAddress  Dictionary.empty
+        |> Cost.Realized.__force
+        |> Types.Data.DataDict
+        |> Types.Data.Dict
+
+    TransactionHandler.executeContract session inputTx cHash "x" data state.memoryState
     |> shouldBeErrorMessage "unsupported command"
 
 [<Test>]
@@ -179,7 +195,18 @@ let ``Should buy``() =
             outputs = [ ]
         }
 
-    TransactionHandler.executeContract session inputTx cHash "buy" Contract.EmptyData (PK samplePKHash) { state.memoryState with utxoSet = utxoSet }
+    let returnAddress =
+        PK samplePKHash
+        |> ZFStar.fsToFstLock
+        |> Types.Data.Lock
+
+    let data =
+        Dictionary.add "returnAddress"B returnAddress  Dictionary.empty
+        |> Cost.Realized.__force
+        |> Types.Data.DataDict
+        |> Types.Data.Dict
+
+    TransactionHandler.executeContract session inputTx cHash "buy" data { state.memoryState with utxoSet = utxoSet }
     |> function
     | Ok tx ->
         tx.inputs |> should haveLength 2
@@ -197,8 +224,7 @@ let ``Should buy``() =
         let cw = ContractWitness {
              cHash = cHash
              command = "buy"
-             data = Contract.EmptyData
-             returnAddressIndex = Some 1ul
+             data = data
              beginInputs = 1u
              beginOutputs = 0u
              inputsLength = 1u
@@ -244,7 +270,18 @@ let ``Should redeem``() =
             outputs = [ ]
         }
 
-    TransactionHandler.executeContract session inputTx cHash "redeem" Contract.EmptyData (PK samplePKHash) { state.memoryState with utxoSet = utxoSet }
+    let returnAddress =
+        PK samplePKHash
+        |> ZFStar.fsToFstLock
+        |> Types.Data.Lock
+
+    let data =
+        Dictionary.add "returnAddress"B returnAddress  Dictionary.empty
+        |> Cost.Realized.__force
+        |> Types.Data.DataDict
+        |> Types.Data.Dict
+
+    TransactionHandler.executeContract session inputTx cHash "redeem" data { state.memoryState with utxoSet = utxoSet }
     |> function
     | Ok tx ->
         tx.inputs |> should haveLength 2
@@ -263,8 +300,7 @@ let ``Should redeem``() =
         let cw = ContractWitness {
              cHash = cHash
              command = "redeem"
-             data = Contract.EmptyData
-             returnAddressIndex = Some 1ul
+             data = data
              beginInputs = 1u
              beginOutputs = 0u
              inputsLength = 1u

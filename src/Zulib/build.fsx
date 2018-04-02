@@ -157,6 +157,7 @@ Target "Build" (fun _ ->
       "fsharp/Realized/Zen.Wallet.fs";
       //"fsharp/Extracted/Zen.Wallet.fs";
       "fsharp/Realized/Zen.TxSkeleton.fs";
+      "fsharp/Extracted/Zen.Data.fs";
     |]
 
   let checker = FSharpChecker.Create()

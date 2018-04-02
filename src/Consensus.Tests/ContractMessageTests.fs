@@ -46,9 +46,9 @@ let setup = fun () ->
     module ET = Zen.ErrorT
     module Tx = Zen.TxSkeleton
 
-    val main: txSkeleton -> hash -> string -> data -> option lock -> wallet
+    val main: txSkeleton -> hash -> string -> data -> wallet
         -> result (txSkeleton ** option message) `cost` (64 + (64 + 64 + 0) + 21)
-    let main txSkeleton contractHash command data returnAddress wallet =
+    let main txSkeleton contractHash command data wallet =
         if command = "contract2_test" then
         begin
             let! contractToken = Zen.Asset.getDefault contractHash in
@@ -59,9 +59,9 @@ let setup = fun () ->
         end
         else
             ET.autoFailw "unsupported command"
-    
-    val cf: txSkeleton -> string -> data -> option lock -> wallet -> cost nat 9
-        let cf _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 21)
+
+    val cf: txSkeleton -> string -> data -> wallet -> cost nat 9
+        let cf _ _ _ _ = ret (64 + (64 + 64 + 0) + 21)
     """
     let contract2Hash = Contract.computeHash contract2Code
 
@@ -79,9 +79,9 @@ let setup = fun () ->
             module ET = Zen.ErrorT
             module Tx = Zen.TxSkeleton
 
-            val main: txSkeleton -> hash -> string -> data -> option lock -> wallet
+            val main: txSkeleton -> hash -> string -> data -> wallet
                 -> result (txSkeleton ** option message) `cost` (64 + (64 + 64 + 0) + 26)
-            let main txSkeleton contractHash command data returnAddress wallet =
+            let main txSkeleton contractHash command data wallet =
                 if command = "contract1_test" then
                 begin
                     let! asset = Zen.Asset.getDefault contractHash in
@@ -97,9 +97,9 @@ let setup = fun () ->
                 end
                 else
                     ET.autoFailw "unsupported command"
-        
-            val cf: txSkeleton -> string -> data -> option lock -> wallet -> cost nat 9
-            let cf _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 26)
+
+            val cf: txSkeleton -> string -> data -> wallet -> cost nat 9
+            let cf _ _ _ _ = ret (64 + (64 + 64 + 0) + 26)
         """
 
     contracts <- result {
@@ -137,7 +137,7 @@ let ``Should produce execute contracts with message passed between them``() =
 
         let stringData = Zen.Types.Data.data.String "Some string data"B
 
-        let! (tx, message) = Contract.run contract1 "contract1_test" stringData None List.empty TxSkeleton.empty
+        let! (tx, message) = Contract.run contract1 "contract1_test" stringData List.empty TxSkeleton.empty
 
         let command =
             match message with
@@ -149,7 +149,7 @@ let ``Should produce execute contracts with message passed between them``() =
             | _ ->
                 failwithf "should be some message"
 
-        let! (tx, message) = Contract.run contract2 command Contract.EmptyData None List.empty tx
+        let! (tx, message) = Contract.run contract2 command Contract.EmptyData List.empty tx
 
         match message with
         | Some _ ->

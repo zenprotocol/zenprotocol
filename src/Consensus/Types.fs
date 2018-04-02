@@ -50,7 +50,6 @@ type ContractWitness =
         cHash: Hash
         command: string
         data: data
-        returnAddressIndex : uint32 option
         beginInputs: uint32
         beginOutputs: uint32
         inputsLength: uint32

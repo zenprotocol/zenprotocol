@@ -63,17 +63,17 @@ let checkWallet =
 let commandHandler chain client command session account =
     let chainParams = Consensus.Chain.getChainParameters chain
     let checkWallet = checkWallet account
-    
+
     match command with
     | Resync ->
         checkWallet
         <@> fun account ->
                 let account = { account with deltas = List.empty; outputs=Map.empty; tip = Hash.zero; blockNumber = 0ul }
                 sync account chainParams client
-    |> function 
+    |> function
     | Ok account ->
         Some account
-    | Error error -> 
+    | Error error ->
         Log.info "Could not handle command due to %A " error
         account
 
@@ -107,12 +107,12 @@ let requestHandler collection chain client (requestId:RequestId) request session
         wallet
     | ImportSeed words ->
         Account.import words ""
-        <@> fun account -> 
+        <@> fun account ->
                 Collection.put collection session MainAccountName account
                 Log.info "Account imported"
                 account
         |> function
-        | Ok account -> 
+        | Ok account ->
             reply<unit> requestId (Ok ())
             Some account
         | Error error ->
@@ -129,9 +129,9 @@ let requestHandler collection chain client (requestId:RequestId) request session
         <@> fun tx -> tx, Consensus.Contract.computeHash code
         |> reply<ActivateContractResponse> requestId
         wallet
-    | ExecuteContract (cHash,command,data,spends) ->
+    | ExecuteContract (cHash,command,data,provideReturnAddress, spends) ->
         checkWallet
-        >>= fun wallet -> Account.createExecuteContractTransaction wallet (Blockchain.executeContract client) cHash command data spends
+        >>= fun wallet -> Account.createExecuteContractTransaction wallet (Blockchain.executeContract client) cHash command data provideReturnAddress spends
         |> reply<Types.Transaction> requestId
         wallet
     | AccountExists ->

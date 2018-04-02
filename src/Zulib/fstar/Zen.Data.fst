@@ -2,6 +2,7 @@ module Zen.Data
 
 open Zen.Cost
 open Zen.Types
+module OT = Zen.OptionT
 module A = Zen.Array
 //module I8  = FStar.Int8
 //module I32 = FStar.Int32
@@ -68,6 +69,14 @@ val tryLockArray : data -> option (l:nat & lock `A.t` l) `cost` 2
 let tryLockArray = function | LockArray a -> OT.incSome 2 a
                             | _ -> OT.incNone 2
 
+val trySignature: data -> option signature `cost` 2
+let trySignature = function | Signature s -> OT.incSome 2 s
+                            | _ -> OT.incNone 2
+
+val tryPublicKey: data -> option publicKey `cost` 2
+let tryPublicKey = function | PublicKey pk -> OT.incSome 2 pk
+                            | _ -> OT.incNone 2
+
 val tryTuple : data -> option (data**data) `cost` 2
 let tryTuple = function | Tuple l -> OT.incSome 2 l
                         | _ -> OT.incNone 2
@@ -118,8 +127,18 @@ let tryFindLock s (DataDict d) = Dict.tryFind s d `OT.bind` tryLock
 val tryFindLockArray : string -> dataDict -> option (l:nat & lock `A.t` l) `cost` 66
 let tryFindLockArray s (DataDict d) = Dict.tryFind s d `OT.bind` tryLockArray
 
+val tryFindSignature : string -> dataDict -> option signature `cost` 66
+let tryFindSignature s (DataDict d) = Dict.tryFind s d `OT.bind` trySignature
+
+val tryFindPublicKey : string -> dataDict -> option publicKey `cost` 66
+let tryFindPublicKey s (DataDict d) = Dict.tryFind s d `OT.bind` tryPublicKey
+
 val tryFindTuple : string -> dataDict -> option (data**data) `cost` 66
 let tryFindTuple s (DataDict d) = Dict.tryFind s d `OT.bind` tryTuple
 
 val tryFindDict : string -> dataDict -> option dataDict `cost` 66
 let tryFindDict s (DataDict d) = Dict.tryFind s d `OT.bind` tryDict
+
+val (>?>)(#a #b:Type)(#m #n:nat): cost (option a) m -> (a -> cost (option b) n)
+  -> cost (option b) (m+n)
+let (>?>) = OT.bind

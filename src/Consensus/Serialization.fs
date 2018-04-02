@@ -3,10 +3,11 @@ module Consensus.Serialization
 open System
 open Crypto
 open Types
-open Zen.Types.Data
 open FsNetMQ
 open FsNetMQ.Stream
 open FsNetMQ.Stream.Reader
+
+module ZData = Zen.Types.Data
 
 #nowarn "40"   // Ignore recurssive objects warnings
 
@@ -246,6 +247,10 @@ module private Serialization =
         let private TupleData = 15uy
         [<Literal>]
         let private DictData = 16uy
+        [<Literal>]
+        let private SignatureData = 17uy
+        [<Literal>]
+        let private PublicKeyData = 18uy
 
         module Int64 =
             let write ops = uint64 >> ops.writeNumber8
@@ -278,60 +283,82 @@ module private Serialization =
                 return ZFStar.fsToFstString s
             }
 
+        module Signature =
+            let write ops signature = ops.writeBytes signature Crypto.SerializedSignatureLength
+            let read = reader {
+                let! bytes = readBytes Crypto.SerializedSignatureLength
+
+                return bytes
+            }
+
+        module PublicKey =
+            let write ops publicKey = ops.writeBytes publicKey Crypto.SerializedPublicKeyLength
+            let read = reader {
+                let! bytes = readBytes Crypto.SerializedPublicKeyLength
+
+                return bytes
+            }
+
         let rec write ops = function
-            | I64 i ->
+            | ZData.I64 i ->
                 ops.writeByte I64Data
                 >> Int64.write ops i
-            | I64Array (Prims.Mkdtuple2 (_, arr)) ->
+            | ZData.I64Array (Prims.Mkdtuple2 (_, arr)) ->
                 ops.writeByte I64ArrayData
                 >> Array.write ops Int64.write arr
-            | Byte b ->
+            | ZData.Byte b ->
                 ops.writeByte ByteData
                 >> ops.writeByte b
-            | ByteArray (Prims.Mkdtuple2 (_, arr)) ->
+            | ZData.ByteArray (Prims.Mkdtuple2 (_, arr)) ->
                 ops.writeByte ByteArrayData
                 >> Array.write ops (fun ops -> ops.writeByte) arr
-            | U32 i ->
+            | ZData.U32 i ->
                 ops.writeByte U32Data
                 >> ops.writeNumber4 i
-            | U32Array (Prims.Mkdtuple2 (_, arr)) ->
+            | ZData.U32Array (Prims.Mkdtuple2 (_, arr)) ->
                 ops.writeByte U32ArrayData
                 >> Array.write ops (fun ops -> ops.writeNumber4) arr
-            | U64 i ->
+            | ZData.U64 i ->
                 ops.writeByte U64Data
                 >> ops.writeNumber8 i
-            | U64Array (Prims.Mkdtuple2 (_, arr)) ->
+            | ZData.U64Array (Prims.Mkdtuple2 (_, arr)) ->
                 ops.writeByte U64ArrayData
                 >> Array.write ops (fun ops -> ops.writeNumber8) arr
-            | String s ->
+            | ZData.String s ->
                 ops.writeByte StringData
                 >> String.write ops s
-            | StringArray (Prims.Mkdtuple2 (_, arr)) ->
+            | ZData.StringArray (Prims.Mkdtuple2 (_, arr)) ->
                 ops.writeByte StringArrayData
                 >> Array.write ops String.write arr
-            | Hash hash ->
+            | ZData.Hash hash ->
                 ops.writeByte HashData
                 >> Hash.write ops hash
-            | HashArray (Prims.Mkdtuple2 (_, arr)) ->
+            | ZData.HashArray (Prims.Mkdtuple2 (_, arr)) ->
                 ops.writeByte HashArrayData
                 >> Array.write ops Hash.write arr
-            | Lock l ->
+            | ZData.Lock l ->
                 ops.writeByte LockData
                 >> Lock.write ops l
-            | LockArray (Prims.Mkdtuple2 (_, arr)) ->
+            | ZData.LockArray (Prims.Mkdtuple2 (_, arr)) ->
                 ops.writeByte LockArrayData
                 >> Array.write ops Lock.write arr
-            | Tuple (a, b) ->
+            | ZData.Tuple (a, b) ->
                 ops.writeByte TupleData
                 >> write ops a
                 >> write ops b
-            | Dict (DataDict (map, len)) ->
+            | ZData.Signature signature ->
+                ops.writeByte SignatureData
+                >> Signature.write ops signature
+            | ZData.PublicKey publicKey ->
+                ops.writeByte PublicKeyData
+                >> PublicKey.write ops publicKey
+            | ZData.Dict (ZData.DataDict (map, len)) ->
                 let entries = Map.toList map
                 ops.writeByte DictData
                 >> ops.writeNumber4 len
                 >> List.writeBody ops String.write (entries |> List.map fst)
                 >> List.writeBody ops write (entries |> List.map snd)
-            | Empty ->
+            | ZData.Empty ->
                 // TODO: this is a hack to avoid protocol change on the testnet
                 // should be removed for production code
                 // ops.writeByte EmptyData
@@ -342,62 +369,68 @@ module private Serialization =
             match discriminator with
             | I64Data ->
                 let! i = Int64.read
-                return I64 i
+                return ZData.I64 i
             | I64ArrayData ->
                 let! arr = Array.readDtuple Int64.read
-                return I64Array arr
+                return ZData.I64Array arr
             | ByteData ->
                 let! byte = Byte.read
-                return Byte byte
+                return ZData.Byte byte
             | ByteArrayData ->
                 let! arr = Array.readDtuple Byte.read
-                return ByteArray arr
+                return ZData.ByteArray arr
             | U32Data ->
                 let! i = readNumber4
-                return U32 i
+                return ZData.U32 i
             | U32ArrayData ->
                 let! arr = Array.readDtuple readNumber4
-                return U32Array arr
+                return ZData.U32Array arr
             | U64Data ->
                 let! i = readNumber8
-                return U64 i
+                return ZData.U64 i
             | U64ArrayData ->
                 let! arr = Array.readDtuple readNumber8
-                return U64Array arr
+                return ZData.U64Array arr
             | StringData ->
                 let! s = String.read
-                return String s
+                return ZData.String s
             | StringArrayData ->
                 let! arr = Array.readDtuple String.read
-                return StringArray arr
+                return ZData.StringArray arr
             | HashData ->
                 let! hash = Hash.read
-                return Hash hash
+                return ZData.Hash hash
             | HashArrayData ->
                 let! arr = Array.readDtuple Hash.read
-                return HashArray arr
+                return ZData.HashArray arr
             | LockData ->
                 let! lock = Lock.read
-                return Lock lock
+                return ZData.Lock lock
             | LockArrayData ->
                 let! arr = Array.readDtuple Lock.read
-                return LockArray arr
+                return ZData.LockArray arr
+            | SignatureData ->
+                let! signature = Signature.read
+                return ZData.Signature signature
+            | PublicKeyData ->
+                let! publicKey = PublicKey.read
+                return ZData.PublicKey publicKey
             | TupleData ->
                 let! a = read
                 let! b = read
-                return Tuple (a,b)
+                return ZData.Tuple (a,b)
             | DictData ->
                 let! len = readNumber4
                 let! keys = List.readBody String.read len
                 let! values = List.readBody read len
                 let map = List.zip keys values |> Map.ofSeq
-                return Dict (DataDict (map, len))
+                return ZData.Dict (ZData.DataDict (map, len))
             | EmptyData ->
                 // TODO: this is a hack to avoid protocol change on the testnet
                 // remove for production
                 let! _ = readBytes 3
 
-                return Empty
+                return ZData.Empty
             | _ ->
                 yield! fail
         }
@@ -418,7 +451,6 @@ module private Serialization =
                 >> ops.writeHash cw.cHash
                 >> ops.writeString cw.command
                 >> Data.write ops cw.data
-                >> Option.write ops ops.writeNumber4 cw.returnAddressIndex
                 >> ops.writeNumber4 cw.beginInputs
                 >> ops.writeNumber4 cw.beginOutputs
                 >> ops.writeNumber4 cw.inputsLength
@@ -435,7 +467,6 @@ module private Serialization =
                 let! cHash = Hash.read
                 let! command = readString
                 let! data = Data.read
-                let! returnAddressIndex = Option.read readNumber4
                 let! beginInputs = readNumber4
                 let! beginOutputs = readNumber4
                 let! inputsLength = readNumber4
@@ -445,7 +476,6 @@ module private Serialization =
                     cHash = Hash.Hash cHash
                     command = command
                     data = data
-                    returnAddressIndex = returnAddressIndex
                     beginInputs = beginInputs
                     beginOutputs = beginOutputs
                     inputsLength = inputsLength

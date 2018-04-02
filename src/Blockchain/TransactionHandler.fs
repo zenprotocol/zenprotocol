@@ -120,7 +120,7 @@ let validateTransaction chainParams session contractPath blockNumber tx (state:M
                 return! validateInputs chainParams session contractPath blockNumber txHash tx state true
     }
 
-let executeContract session txSkeleton cHash command data returnAddress state =
+let executeContract session txSkeleton cHash command data state =
     let isInTxSkeleton (txSkeleton:TxSkeleton.T) (outpoint,_)  =
         List.exists (fun input ->
             match input with
@@ -135,16 +135,16 @@ let executeContract session txSkeleton cHash command data returnAddress state =
                 ContractUtxoRepository.getContractUtxo session cHash state.utxoSet
                 |> List.reject (isInTxSkeleton txSkeleton)
 
-            Contract.run contract command data (Some returnAddress) contractWallet txSkeleton
+            Contract.run contract command data contractWallet txSkeleton
             |> Result.bind (fun (tx, message) ->
 
                 TxSkeleton.checkPrefix txSkeleton tx
                 |> Result.bind (fun finalTxSkeleton ->
-                    let witness = TxSkeleton.getContractWitness contract.hash command data returnAddress txSkeleton finalTxSkeleton 0L
+                    let witness = TxSkeleton.getContractWitness contract.hash command data txSkeleton finalTxSkeleton 0L
 
                     // To commit to the cost we need the real contract wallet
                     let contractWallet = TransactionValidation.getContractWallet tx witness
-                    let cost = Contract.getCost contract command data (Some returnAddress) contractWallet txSkeleton
+                    let cost = Contract.getCost contract command data contractWallet txSkeleton
                     let totalCost = cost + totalCost
 
                     // We can now commit to the cost, so lets alter it with the real cost

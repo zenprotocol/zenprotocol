@@ -179,8 +179,8 @@ let handleRequest chain client (request,reply) =
     | Post ("/wallet/contract/execute", Some body) ->
         match getContractExecute chain body with
         | Error error -> replyError error
-        | Ok (cHash, command, data, spends) ->
-            Wallet.executeContract client cHash command data spends
+        | Ok (cHash, command, data, returnAddress, spends) ->
+            Wallet.executeContract client cHash command data returnAddress spends
             |> validateTx
     | Post ("/wallet/resync", _) ->
         Wallet.resyncAccount client

@@ -35,17 +35,6 @@ type Weights = {
 // Returns outputs without mints. But they get added back from the inputs.
 let getOutputs = UtxoSet.tryGetOutputs
 
-
-// HACK: Copied from TransactionValidation.fs
-let returnAddress cWit tx =
-    Option.bind (fun (index:uint32) ->
-        let index = int index
-
-        if index < List.length tx.outputs then
-            Some tx.outputs.[index].lock
-        else
-            None) cWit.returnAddressIndex
-
 let pkWitnessWeight : bigint * int * int = 100_000I, 1, 0
 
 let contractWitnessWeight cWit =
@@ -130,7 +119,7 @@ let bkWeight weights getUTXO utxoSet txs =
     let folder accResult next = result {
         let! acc = accResult
         return! inner acc next
-        } 
+        }
     List.fold
         folder
         (Ok (0I, utxoSet))

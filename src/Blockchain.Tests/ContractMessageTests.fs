@@ -14,6 +14,7 @@ open Blockchain.State
 open TestsInfrastructure.Constraints
 open Crypto
 open TxSkeleton
+open Zen
 
 let chain = Chain.getChainParameters Chain.Local
 
@@ -88,9 +89,9 @@ open Zen.Asset
 module ET = Zen.ErrorT
 module Tx = Zen.TxSkeleton
 
-val main: txSkeleton -> hash -> string -> data -> option lock -> wallet
+val main: txSkeleton -> hash -> string -> data -> wallet
     -> result (txSkeleton ** option message) `cost` (64 + 64 + 0 + 18)
-let main txSkeleton contractHash command data returnAddress wallet =
+let main txSkeleton contractHash command data wallet =
     if command = "contract2_test" then
     begin
         let! tokens = Tx.getAvailableTokens zenAsset txSkeleton in
@@ -102,8 +103,8 @@ let main txSkeleton contractHash command data returnAddress wallet =
     else
         ET.autoFailw "unsupported command"
 
-val cf: txSkeleton -> string -> data -> option lock -> wallet -> cost nat 7
-let cf _ _ _ _ _ = ret (64 + 64 + 0 + 18)
+val cf: txSkeleton -> string -> data -> wallet -> cost nat 7
+let cf _ _ _ _ = ret (64 + 64 + 0 + 18)
 """
 let contract2Hash = Contract.computeHash contract2Code
 
@@ -120,13 +121,16 @@ open Zen.Util
 open Zen.Base
 open Zen.Cost
 open Zen.Asset
+open Zen.Data
 
 module ET = Zen.ErrorT
 module Tx = Zen.TxSkeleton
 
-val main: txSkeleton -> hash -> string -> data -> option lock -> wallet
-    -> result (txSkeleton ** option message) `cost` (64 + (64 + (64 + 64 + 0)) + 28)
-let main txSkeleton contractHash command data returnAddress wallet =
+val main: txSkeleton -> hash -> string -> data -> wallet
+    -> result (txSkeleton ** option message) `cost` (2 + 66 + (64 + (64 + (64 + 64 + 0))) + 34)
+let main txSkeleton contractHash command data wallet =
+    let! returnAddress = tryDict data >?> tryFindLock "returnAddress" in
+
     match returnAddress with
     | Some returnAddress ->
         let! tokens = Tx.getAvailableTokens zenAsset txSkeleton in
@@ -145,8 +149,8 @@ let main txSkeleton contractHash command data returnAddress wallet =
     | None ->
         ET.autoFailw "returnAddress is required"
 
-val cf: txSkeleton -> string -> data -> option lock -> wallet -> cost nat 11
-let cf _ _ _ _ _ = ret (64 + (64 + (64 + 64 + 0)) + 28)
+val cf: txSkeleton -> string -> data -> wallet -> cost nat 15
+let cf _ _ _ _ = ret (2 + 66 + (64 + (64 + (64 + 64 + 0))) + 34)
 """
 
 [<Test>]
@@ -184,7 +188,19 @@ let ``Should execute contract chain and get a valid transaction``() =
     result {
         let! (state, cHash1) = activateContract contract1Code account session state
         let! (state, _) = activateContract contract2Code account session state
-        let! tx = TransactionHandler.executeContract session inputTx cHash1 "" Contract.EmptyData (PK samplePKHash) state.memoryState
+
+        let returnAddress =
+            PK samplePKHash
+            |> ZFStar.fsToFstLock
+            |> Types.Data.Lock
+
+        let data =
+            Dictionary.add "returnAddress"B returnAddress  Dictionary.empty
+            |> Cost.Realized.__force
+            |> Types.Data.DataDict
+            |> Types.Data.Dict
+
+        let! tx = TransactionHandler.executeContract session inputTx cHash1 "" data state.memoryState
 
         let tx = Transaction.sign [ sampleKeyPair ] tx
         let txHash = Transaction.hash tx
