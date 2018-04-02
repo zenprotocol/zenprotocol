@@ -101,18 +101,13 @@ let isSkeletonOf txSkeleton tx outputs =
     && outputs = outputsFromSkeleton
     && tx.outputs = txSkeleton.outputs
 
-let getContractWitness cHash command data returnAddress initialTxSkelton finalTxSkeleton (cost:int64) =
+let getContractWitness cHash command data initialTxSkelton finalTxSkeleton (cost:int64) =
     let length list = List.length list |> uint32
-
-    let returnAddressIndex =
-        List.tryFindIndex (fun output -> output.lock = returnAddress) finalTxSkeleton.outputs
-        |> Option.map uint32
 
     {
         cHash = cHash
         command = command
         data = data
-        returnAddressIndex = returnAddressIndex
         beginInputs = length initialTxSkelton.pInputs
         beginOutputs = length initialTxSkelton.outputs
         inputsLength = length finalTxSkeleton.pInputs - length initialTxSkelton.pInputs

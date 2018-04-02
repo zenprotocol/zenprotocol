@@ -135,16 +135,15 @@ let ``Transaction validation should fail with structurally invalid witness data`
     let invalidSerializedSignatureData = Array.create (Crypto.SerializedSignatureLength - 1) 1uy
     { tx with witnesses = [ PKWitness (validSerializedPublicKeyData, Signature invalidSerializedSignatureData) ] }
     |> basicValidationMsg msg
-    |> shouldEqual    
+    |> shouldEqual
     // test with malformatted ContractWitness
-    { tx with witnesses = [ ContractWitness {   cHash = invalidHash; command = "" 
+    { tx with witnesses = [ ContractWitness {   cHash = invalidHash; command = ""
                                                 data = Contract.EmptyData
-                                                returnAddressIndex = None
                                                 beginInputs = 0ul; beginOutputs = 0ul
                                                 inputsLength = 0ul; outputsLength = 0ul
                                                 cost = 0ul } ] }
     |> basicValidationMsg msg
-    |> shouldEqual    
+    |> shouldEqual
 
 [<Test>]
 let ``Signed transaction should be valid``() =

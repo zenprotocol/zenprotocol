@@ -38,7 +38,7 @@ module Blockchain =
         | HandleHeaders of peerId:byte[] * BlockHeader list
 
     type Request =
-        | ExecuteContract of Hash * string * data * Lock * TxSkeleton.T
+        | ExecuteContract of Hash * string * data * TxSkeleton.T
         | GetBlockTemplate of pkHash:Hash
         | GetTip
         | GetBlock of Hash
@@ -61,8 +61,8 @@ module Blockchain =
     let handleMemPool client peerId txHashes =
         Command.send client serviceName (HandleMemPool (peerId,txHashes))
 
-    let executeContract client cHash command data returnAddress txSkeleton =
-        ExecuteContract (cHash,command, data, returnAddress,txSkeleton)
+    let executeContract client cHash command data txSkeleton =
+        ExecuteContract (cHash,command, data, txSkeleton)
         |> Request.send<Request, Result<Transaction,string>> client serviceName
 
     let validateBlock client block =
@@ -156,7 +156,7 @@ module Wallet =
         | ImportSeed of string list
         | Spend of Hash * Spend
         | ActivateContract of string*uint32
-        | ExecuteContract of Hash * string * data * Map<Asset, uint64>
+        | ExecuteContract of Hash * string * data * provideReturnAddress:bool * Map<Asset, uint64>
         | AccountExists
 
     let serviceName = "wallet"
@@ -179,8 +179,8 @@ module Wallet =
     let activateContract client code numberOfBlocks =
         send<ActivateContractResponse> client serviceName (ActivateContract (code,numberOfBlocks))
 
-    let executeContract client address command data spends =
-        send<Transaction> client serviceName (ExecuteContract (address,command,data,spends))
+    let executeContract client address command data provideReturnAddress spends  =
+        send<Transaction> client serviceName (ExecuteContract (address,command,data,provideReturnAddress, spends))
 
     let importSeed client words =
         send<unit> client serviceName (ImportSeed words)

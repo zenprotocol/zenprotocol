@@ -11,6 +11,8 @@ open ExtendedKey
 open Messaging.Services
 open Result
 
+module ZData = Zen.Types.Data
+
 let result = new ResultBuilder<string>()
 
 let private (>>=) a b = Result.bind b a
@@ -26,7 +28,7 @@ type TxDelta = {
     txHash: Hash
     deltas: List<SpendStatus>
 }
-    
+
 type T = {
     deltas: List<TxDelta>
     outputs: Map<Outpoint, OutputStatus>
@@ -55,7 +57,7 @@ let private fromSeed seed = result {
         >>= derive (Hardened 0)
         >>= derive 0
         >>= derive 0
-        
+
     let! keyPair = getKeyPair key
 
     return {
@@ -69,23 +71,23 @@ let private fromSeed seed = result {
     }
 }
 
-let create() = 
-    let rng = new System.Security.Cryptography.RNGCryptoServiceProvider()        
-    let seed = Array.create seedLength 0uy   
+let create() =
+    let rng = new System.Security.Cryptography.RNGCryptoServiceProvider()
+    let seed = Array.create seedLength 0uy
     rng.GetBytes seed
     fromSeed seed
     |> function
     | Ok account -> account
     | Error err -> failwith err
 
-let import words passphrase = 
-    try 
+let import words passphrase =
+    try
         let mnemonicSentence = new NBitcoin.Mnemonic(String.concat " " words, NBitcoin.Wordlist.English)
         Ok <| mnemonicSentence.DeriveSeed passphrase
     with _ as ex ->
         Error ex.Message
     |> Result.bind fromSeed
-    
+
 // update the outputs with transaction
 let private handleTransaction txHash (tx:Transaction) account outputs txDeltas =
     let handleOutput (outputs,deltas) (index,output) =
@@ -112,14 +114,14 @@ let private handleTransaction txHash (tx:Transaction) account outputs txDeltas =
 
     let outputsWithIndex = List.mapi (fun i output -> (uint32 i,output)) tx.outputs
     let outputs, deltas = List.fold handleOutput (outputs, deltas) outputsWithIndex
-    
+
     if List.length deltas > 0 then
         outputs, List.add { txHash = txHash; deltas = deltas } txDeltas
-    else 
+    else
         outputs, txDeltas
 
-let private handleTransactions account transactions = 
-    List.fold (fun (outputs,txDeltas) (txHash,tx) -> 
+let private handleTransactions account transactions =
+    List.fold (fun (outputs,txDeltas) (txHash,tx) ->
        handleTransaction txHash tx account outputs txDeltas
     ) (account.outputs, account.deltas) transactions
 
@@ -133,7 +135,7 @@ let handleBlock blockHash block account =
     let set = Set.ofList txHashes
     let mempool = List.reject (fun (txHash,_) -> Set.contains txHash set) account.mempool
 
-    { account with 
+    { account with
         tip = blockHash;
         blockNumber = block.header.blockNumber;
         mempool = mempool;
@@ -227,8 +229,8 @@ let sync chain tipBlockHash (getHeader:Hash -> BlockHeader) (getBlock:Hash -> Bl
 let getUnspentOutputs account =
     // we first update the account according to the mempool transactions
     let outputs, txDeltas = handleTransactions account account.mempool
-    
-    let outputs = 
+
+    let outputs =
         outputs
         |> Map.filter (fun _ output ->
             match output with
@@ -238,7 +240,7 @@ let getUnspentOutputs account =
             match output with
             | Unspent output -> output
             | _ -> failwith "unexpected")
-            
+
     outputs, txDeltas
 
 let addTransaction txHash (tx:Transaction) account =
@@ -277,18 +279,18 @@ let getHistory account =
     |> List.map (fun txDelta ->
         txDelta.txHash,
         txDelta.deltas
-        |> List.fold (fun amounts spend -> 
+        |> List.fold (fun amounts spend ->
             let asset, amount =
-                match spend with 
+                match spend with
                 | Spent spend -> spend.asset, 0L - int64 spend.amount
                 | Unspent spend -> spend.asset, int64 spend.amount
             let amount' =
                 (match Map.tryFind asset amounts with
-                | Some amount -> amount 
+                | Some amount -> amount
                 | None -> 0L)
             Map.add asset (amount' + amount) amounts
         ) Map.empty
-    ) 
+    )
 
 let getAddress chain account =
     Address.encode chain (Address.PK account.publicKeyHash)
@@ -382,7 +384,7 @@ let createTestAccount () =
     rootAccount
     |> addTransaction Transaction.rootTxHash Transaction.rootTx
 
-let createExecuteContractTransaction account executeContract cHash command data spends = result {
+let createExecuteContractTransaction account executeContract cHash command data provideReturnAddress spends = result {
     let mutable txSkeleton = TxSkeleton.empty
     let mutable keys = List.empty
     for (asset, amount) in Map.toSeq spends do
@@ -393,6 +395,34 @@ let createExecuteContractTransaction account executeContract cHash command data 
             TxSkeleton.addInputs inputs txSkeleton
             |> TxSkeleton.addChange asset collectedAmount amount account.publicKeyHash
         keys <- List.append keys keys'
-    let! unsignedTx = executeContract cHash command data (PK account.publicKeyHash) txSkeleton
+
+    let isDataEmptyOrDict =
+        match data with
+        | ZData.Dict _ -> true
+        | ZData.Empty -> true
+        | _ -> false
+
+    if not isDataEmptyOrDict && provideReturnAddress then
+        return! (Error "cannot provide returnAddress while data is not dictionary or empty")
+
+    let data =
+        if provideReturnAddress then
+            let dict =
+                match data with
+                | ZData.Dict (ZData.DataDict dict) -> dict
+                | ZData.Empty -> Zen.Dictionary.empty
+                | _ -> failwith "data can only be empty or dict"
+
+            let returnAddress = PK account.publicKeyHash
+
+            Zen.Dictionary.add "returnAddress"B (ZData.Lock (ZFStar.fsToFstLock returnAddress)) dict
+            |> Zen.Cost.Realized.__force
+            |> ZData.DataDict
+            |> ZData.Dict
+
+        else
+            data
+
+    let! unsignedTx = executeContract cHash command data txSkeleton
     return Transaction.sign keys unsignedTx
 }

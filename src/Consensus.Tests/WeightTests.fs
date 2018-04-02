@@ -80,7 +80,6 @@ let ``Contract validated transaction should have the right cost``() =
         cHash = cHash;
         command = "foo";
         data = Zen.Types.Data.Empty;
-        returnAddressIndex = None;
         beginInputs = 0u;       //
         beginOutputs = 0u;      //  Consumes entire transaction
         inputsLength = 11u;     //
@@ -118,7 +117,6 @@ let ``Two contracts in sequence should have the right cost``() =
         cHash = cHash;
         command = "foo";
         data = Zen.Types.Data.Empty;
-        returnAddressIndex = None;
         beginInputs = 0u;
         beginOutputs = 0u;
         inputsLength = 5u;
@@ -183,12 +181,12 @@ let ``Contract activation weight should be positive``() =
         Wallet.Account.createActivateContractTransaction
                             (Chain.getChainParameters (Chain.Local)) rootAccount code 1ul
     let actWeight =
-        Result.map 
+        Result.map
                 (fun {Transaction.contract=Some(_,hints)} -> hints)
                 tx
         |> Result.bind activationWeight
-    
-   
+
+
     actWeight |> should be ok
     let (Ok wt) = actWeight
     wt |> should equal 900_000I       // fuel + iFuel = 3

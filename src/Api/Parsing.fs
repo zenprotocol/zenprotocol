@@ -52,15 +52,15 @@ let getContractExecute chain json =
 
             if List.isEmpty errors then
                 let data =
-                    match json.Data with 
-                    | "" -> Contract.EmptyData 
-                    | b16DataString -> 
-                        match Base16.decode b16DataString with 
-                        | Some data -> 
+                    match json.Data with
+                    | "" -> Contract.EmptyData
+                    | b16DataString ->
+                        match Base16.decode b16DataString with
+                        | Some data ->
                             Encoding.ASCII.GetString data
                             |> JsonConvert.DeserializeObject<Zen.Types.Data.data>
                         | None -> failwith "Invalid Data"
-                Ok (cHash, json.Command, data, spends)
+                Ok (cHash, json.Command, data, json.Options.ReturnAddress, spends)
             else
                 errors
                 |> String.concat " "
@@ -88,7 +88,7 @@ let getPublishBlock json =
         | None -> Error "invalid block"
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
-        
+
 let getImportSeed json =
     try
         let json = ImportSeedJson.Parse json
@@ -100,6 +100,6 @@ let getImportSeed json =
 
         words
         |> List.rev
-        |> Ok 
+        |> Ok
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)

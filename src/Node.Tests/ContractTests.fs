@@ -69,7 +69,7 @@ let ``Contract should activate and execute - Bus``() =
     | Ok (contractActivationTx, cHash) ->
         Blockchain.validateTransaction client contractActivationTx
         waitForTx subscriber contractActivationTx
-        match Wallet.executeContract client cHash "" Contract.EmptyData Map.empty with
+        match Wallet.executeContract client cHash "" Contract.EmptyData true Map.empty with
         | Ok _ -> ()
         | Error error ->
             failwith error
@@ -86,6 +86,6 @@ let ``Contract should activate and execute - API``() =
         | FSharp.Data.Text string -> string
         | _ -> failwith "unexpected response type"
     let response' = ContractActivateResponseJson.Parse responseBody
-    let execute = new ContractExecuteRequestJson.Root(response'.Address,"", "", [| new ContractExecuteRequestJson.Spend("", "", int64 0) |])
+    let execute = new ContractExecuteRequestJson.Root(response'.Address,"", "",new ContractExecuteRequestJson.Options(true), [| new ContractExecuteRequestJson.Spend("", "", int64 0) |])
     let response = execute.JsonValue.Request ("http://" + apiUri + "/wallet/contract/execute")
     response.StatusCode |> should equal 200

@@ -40,6 +40,9 @@
     <Reference Include="Zulib">
       <HintPath>..\Zulib\bin\Zulib.dll</HintPath>
     </Reference>
+    <Reference Include="Zulib, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null">
+      <HintPath>..\Zulib\bin\Zulib.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ValidateBlockTests.fs" />

@@ -177,21 +177,13 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
         | Some contract ->
             let contractWallet = getContractWallet fulltxSkeleton cw
 
-            let returnAddress =
-                Option.bind (fun (index:uint32) ->
-                    let index = int index
-
-                    if index < List.length tx.outputs then
-                        Some tx.outputs.[index].lock
-                    else
-                        None) cw.returnAddressIndex
             // Validate true cost (not weight!) of running contract against
             // the witness commitment
-            let cost = Contract.getCost contract cw.command cw.data returnAddress contractWallet inputTx
+            let cost = Contract.getCost contract cw.command cw.data contractWallet inputTx
             if uint32 cost <> cw.cost then
                 GeneralError <| sprintf "Contract witness committed to cost %d, but cost of execution is %d" (uint32 cost) cw.cost
             else
-                Contract.run contract cw.command cw.data returnAddress contractWallet inputTx
+                Contract.run contract cw.command cw.data contractWallet inputTx
                 |> Result.mapError General
                 |> Result.bind checkMessage
                 |> Result.bind checkIssuedAndDestroyed
@@ -283,11 +275,11 @@ let private checkStructure =
         token |> isInvalidHash ||
         (cHash = Hash.zero && token <> Hash.zero)
 
-    (fun tx -> 
+    (fun tx ->
         match tx.contract with
         | Some (code, hints) when not <| (String.length code > 0 && String.length hints > 0) ->
             GeneralError "structurally invalid contract data"
-        | _ -> 
+        | _ ->
             Ok tx)
     >=> (fun tx ->
         if List.exists (function
@@ -314,7 +306,7 @@ let private checkStructure =
             | PKWitness (serializedPublicKey, Crypto.Signature signature) ->
                 Array.length serializedPublicKey <> Crypto.SerializedPublicKeyLength ||
                 Array.length signature <> Crypto.SerializedSignatureLength
-            | ContractWitness cw -> 
+            | ContractWitness cw ->
                 let rec validateData = function
                     | I64Array (Prims.Mkdtuple2 (len, arr)) when Array.length arr <> int len -> false
                     | ByteArray (Prims.Mkdtuple2 (len, arr)) when Array.length arr <> int len -> false
@@ -330,7 +322,7 @@ let private checkStructure =
                         List.length values = int len && List.forall validateData values
                     | Hash hash -> Hash.isValid (Consensus.Hash.Hash hash)
                     | _ -> true
-                    
+
                 isInvalidHash cw.cHash && validateData cw.data
         ) tx.witnesses then
             GeneralError "structurally invalid witness data"

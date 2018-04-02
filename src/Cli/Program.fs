@@ -68,7 +68,7 @@ type Arguments =
             | Activate _ -> "activate contract"
             | Execute _ -> "execute contract"
             | PublishBlock _ -> "publish block to the network"
-            | AccountExists _ -> "check for an existing account" 
+            | AccountExists _ -> "check for an existing account"
 
 [<EntryPoint>]
 let main argv =
@@ -166,7 +166,8 @@ let main argv =
                     | code,_ -> printfn "Failed %d with binary response" code
     | Some (Execute args) ->
         let address,command,data,asset,assetType,amount = args.GetResult <@ ExecuteContract_Arguments @>
-        let execute = new ContractExecuteRequestJson.Root(address,command,data, [| new ContractExecuteRequestJson.Spend(asset, assetType, amount) |])
+        let execute = new ContractExecuteRequestJson.Root(address,command,data,
+            new ContractExecuteRequestJson.Options(true) , [| new ContractExecuteRequestJson.Spend(asset, assetType, amount) |])
 
         let response = execute.JsonValue.Request (getUri "wallet/contract/execute")
 

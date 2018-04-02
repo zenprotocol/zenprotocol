@@ -28,6 +28,8 @@ type data =
     | HashArray: (l:nat & hash `A.t` l) -> data
     | Lock of lock
     | LockArray: (l:nat & lock `A.t` l) -> data
+    | Signature of signature
+    | PublicKey of publicKey
     | Tuple of (data ** data)
     | Dict of dataDict
     | Empty
