@@ -15,7 +15,8 @@ module ZData = Zen.Types.Data
 
 let result = new ResultBuilder<string>()
 
-let private (>>=) a b = Result.bind b a
+[<Literal>]
+let passphrase = ""
 
 type Status<'a> =
     | Spent of 'a
@@ -33,60 +34,57 @@ type T = {
     deltas: List<TxDelta>
     outputs: Map<Outpoint, OutputStatus>
     mempool: (Hash*Transaction) list
-    keyPair: KeyPair
-    publicKeyHash: Hash
     tip: Hash
-    blockNumber:uint32
+    blockNumber: uint32
+    publicKey: PublicKey
 }
-
-let rootSecretKey = SecretKey [|189uy; 140uy; 82uy; 12uy; 79uy; 140uy; 35uy; 59uy; 11uy; 41uy; 199uy;
-                           58uy; 23uy; 63uy; 112uy; 239uy; 45uy; 147uy; 51uy; 246uy; 34uy; 16uy;
-                           156uy; 2uy; 111uy; 184uy; 140uy; 218uy; 136uy; 240uy; 57uy; 24uy |]
 
 let private zenCoinType = Hardened 258
 let private purpose = Hardened 44
 
-[<Literal>]
-let seedLength = 32
+let private getPrivateKey seed =
+    create seed
+    >>= derive purpose
+    >>= derive zenCoinType
+    >>= derive (Hardened 0)
+    >>= derive 0
+    >>= derive 0
+    >>= getPrivateKey
 
-let private fromSeed seed = result {
-    let! key =
-        create seed
-        >>= derive purpose
-        >>= derive zenCoinType
-        >>= derive (Hardened 0)
-        >>= derive 0
-        >>= derive 0
+let private create key privateKey = result {
+    let (SecretKey bytes) = privateKey
 
-    let! keyPair = getKeyPair key
+    let publicKey =
+        match SecretKey.getPublicKey privateKey with
+        | Some publicKey -> publicKey
+        | None -> failwith "unexpected invalid private key"
+
+    let! secured = Secured.create bytes key
 
     return {
         deltas = List.empty
         outputs = Map.empty
-        keyPair = keyPair
-        publicKeyHash = PublicKey.hash (snd keyPair)
         mempool = List.empty
         tip = Hash.zero
         blockNumber = 0ul
-    }
+        publicKey = publicKey
+    }, secured
 }
 
-let create() =
-    let rng = new System.Security.Cryptography.RNGCryptoServiceProvider()
-    let seed = Array.create seedLength 0uy
-    rng.GetBytes seed
-    fromSeed seed
-    |> function
-    | Ok account -> account
-    | Error err -> failwith err
-
-let import words passphrase =
+let private deriveSeed words =
     try
-        let mnemonicSentence = new NBitcoin.Mnemonic(String.concat " " words, NBitcoin.Wordlist.English)
-        Ok <| mnemonicSentence.DeriveSeed passphrase
-    with _ as ex ->
-        Error ex.Message
-    |> Result.bind fromSeed
+         let mnemonicSentence = new NBitcoin.Mnemonic(String.concat " " words, NBitcoin.Wordlist.English)
+         Ok <| mnemonicSentence.DeriveSeed passphrase
+     with _ as ex ->
+         Error ex.Message
+
+let import words key=
+    deriveSeed words
+    >>= getPrivateKey
+    >>= create key
+
+let private isKeyMatch account address =
+    PublicKey.hash account.publicKey = address
 
 // update the outputs with transaction
 let private handleTransaction txHash (tx:Transaction) account outputs txDeltas =
@@ -95,8 +93,8 @@ let private handleTransaction txHash (tx:Transaction) account outputs txDeltas =
             Map.add { txHash = txHash; index = index } (Unspent output) outputs,
             List.add (Unspent output.spend) deltas)
         match output.lock with
-        | Coinbase (_,pkHash) when pkHash = account.publicKeyHash -> add
-        | PK pkHash when pkHash = account.publicKeyHash -> add
+        | Coinbase (_,pkHash) when isKeyMatch account pkHash -> add
+        | PK pkHash when isKeyMatch account pkHash -> add
         | _ -> (outputs, deltas)
 
     let handleInput (outputs,deltas) outpoint =
@@ -148,10 +146,10 @@ let undoBlock block account =
 
         let handleOutput outputs (index,output) =
             match output.lock with
-            | Coinbase (_,pkHash) when pkHash = account.publicKeyHash ->
+            | Coinbase (_,pkHash) when isKeyMatch account pkHash ->
                 let outpoint = {txHash=txHash;index=index;}
                 Map.remove outpoint outputs
-            | PK pkHash when pkHash = account.publicKeyHash ->
+            | PK pkHash when isKeyMatch account pkHash ->
                 let outpoint = {txHash=txHash;index=index;}
                 Map.remove outpoint outputs
             | _ -> outputs
@@ -247,8 +245,8 @@ let addTransaction txHash (tx:Transaction) account =
     // check if the transaction is relevant to the account
     let anyOutput = List.exists (fun output ->
         match output.lock with
-        | PK pkHash when pkHash = account.publicKeyHash -> true
-        | Coinbase (_,pkHash) when pkHash = account.publicKeyHash -> true
+        | PK pkHash when isKeyMatch account pkHash -> true
+        | Coinbase (_,pkHash) when isKeyMatch account pkHash -> true
         | _ -> false) tx.outputs
 
     let unspentOutputs, _ = getUnspentOutputs account
@@ -292,10 +290,7 @@ let getHistory account =
         ) Map.empty
     )
 
-let getAddress chain account =
-    Address.encode chain (Address.PK account.publicKeyHash)
-
-let private getInputs account spend =
+let private collectInputs account spend secretKey =
     let unspent, _ = getUnspentOutputs account
 
     let collectInputs ((inputs, keys), collectedAmount) outpoint output =
@@ -305,7 +300,8 @@ let private getInputs account spend =
             | _ -> true
 
         if isMature && spend.amount > collectedAmount && spend.asset = output.spend.asset then
-            (((outpoint,output) :: inputs, account.keyPair :: keys), output.spend.amount + collectedAmount)
+            let keyPair = secretKey, account.publicKey
+            (((outpoint,output) :: inputs, keyPair :: keys), output.spend.amount + collectedAmount)
         else
             ((inputs, keys), collectedAmount)
 
@@ -316,84 +312,64 @@ let private getInputs account spend =
     else
         Error "Not enough tokens"
 
-let createTransactionFromLock account lk spend = result {
-    let! (inputs, keys, amount) = getInputs account spend
+let private addChange spend amount account output =
+    List.add output (
+        if amount = spend.amount then [] else
+            // Create change if needed
+            [{
+                spend = { spend with amount=(amount-spend.amount) }
+                lock = PK (PublicKey.hash account.publicKey)
+            }]
+        )
+
+let createTransactionFromLock lk spend (account, secretKey) = result {
+    let! (inputs, keys, amount) = collectInputs account spend secretKey
     let inputPoints = List.map (fst >> Outpoint) inputs
-    let outputs =
-        {spend=spend;lock=lk}
-     :: if amount = spend.amount then [] else
-        // Create change if needed
-        [{
-            spend={spend with amount=(amount-spend.amount)};
-            lock=PK account.publicKeyHash
-        }]
+    let outputs = addChange spend amount account { spend = spend; lock = lk }
     return
-        Transaction.sign keys { inputs=inputPoints;
-                                outputs=outputs;
-                                witnesses=[];
-                                contract=None }
+        Transaction.sign keys { inputs = inputPoints
+                                outputs = outputs
+                                witnesses = []
+                                contract = None }
+}
 
-    }
+let createTransaction pkHash spend accoundData =
+    createTransactionFromLock (PK pkHash) spend accoundData
 
-let createTransaction account pkHash spend =
-    createTransactionFromLock account (PK pkHash) spend
-
-let createActivateContractTransaction chain account code (numberOfBlocks:uint32) =
+let createActivateContractTransaction chain code (numberOfBlocks:uint32) (account, secretKey) =
     let codeLength = String.length code |> uint64
 
     let activationSacrifice = chain.sacrificePerByteBlock * codeLength * (uint64 numberOfBlocks)
-    let spend = {amount=activationSacrifice;asset=Constants.Zen}
+    let spend = { amount = activationSacrifice; asset = Constants.Zen }
 
     result {
-        let! (inputs,keys,amount) = getInputs account spend
+        let! (inputs,keys,amount) = collectInputs account spend secretKey
         let inputPoints = List.map (fst >> Outpoint) inputs
 
         let! hints = Contract.recordHints code
 
-        let outputs =
-                {lock=ActivationSacrifice;spend=spend}
-             :: if amount = spend.amount then [] else
-                // Create change if needed
-                [{
-                    spend={spend with amount=(amount-spend.amount)};
-                    lock=PK account.publicKeyHash
-                }]
-
+        let outputs = addChange spend amount account { spend = spend; lock = ActivationSacrifice }
         return Transaction.sign
             keys
             {
-                inputs=inputPoints
-                outputs=outputs
-                witnesses=[];
+                inputs = inputPoints
+                outputs = outputs
+                witnesses = []
                 contract = Some (code, hints)
             }
     }
 
-let rootAccount =
-    {
-        deltas = List.empty
-        outputs = Map.empty
-        keyPair = KeyPair.fromSecretKey rootSecretKey
-        publicKeyHash = Transaction.rootPKHash
-        tip = Hash.zero
-        mempool= List.empty
-        blockNumber=0ul
-    }
-
-let createTestAccount () =
-    rootAccount
-    |> addTransaction Transaction.rootTxHash Transaction.rootTx
-
-let createExecuteContractTransaction account executeContract cHash command data provideReturnAddress spends = result {
+let createExecuteContractTransaction executeContract cHash command data spends (account, secretKey) = result {
     let mutable txSkeleton = TxSkeleton.empty
     let mutable keys = List.empty
+    let pkHash = PublicKey.hash account.publicKey
     for (asset, amount) in Map.toSeq spends do
         let! inputs, keys', collectedAmount =
-            getInputs account {asset=asset;amount=amount}
+            collectInputs account { asset = asset; amount = amount } secretKey
         let inputs = List.map TxSkeleton.Input.PointedOutput inputs
         txSkeleton <-
             TxSkeleton.addInputs inputs txSkeleton
-            |> TxSkeleton.addChange asset collectedAmount amount account.publicKeyHash
+            |> TxSkeleton.addChange asset collectedAmount amount pkHash
         keys <- List.append keys keys'
 
     let isDataEmptyOrDict =
