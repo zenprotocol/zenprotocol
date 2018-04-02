@@ -133,9 +133,9 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
         >>= Account.createActivateContractTransaction chainParams code numberOfBlocks
         <@> fun tx -> tx, Consensus.Contract.computeHash code
         |> reply<ActivateContractResponse> requestId
-        wallet
+        wallet, secretKey
     | ExecuteContract (cHash,command,data,provideReturnAddress, spends) ->
-        checkWallet
+        checkWalletSecured
         >>= Account.createExecuteContractTransaction (Blockchain.executeContract client) cHash command data provideReturnAddress spends
         |> reply<Types.Transaction> requestId
         wallet, secretKey

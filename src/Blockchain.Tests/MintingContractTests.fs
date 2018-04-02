@@ -11,8 +11,11 @@ open Messaging.Events
 open Infrastructure
 open Consensus.Tests.ContractTests
 open Blockchain.State
+open Consensus.Tests
+
 open TestsInfrastructure.Constraints
 open Zen
+open Helper
 
 let chain = Chain.getChainParameters Chain.Local
 
@@ -39,7 +42,7 @@ let mutable state = {
     headers=0ul
 }
 
-let account = Account.createTestAccount ()
+let account = createTestAccount()
 
 let shouldBeErrorMessage message =
     function
@@ -47,7 +50,7 @@ let shouldBeErrorMessage message =
     | Error err -> err |> should equal message
 
 let activateContract code account session state =
-    Account.createActivateContractTransaction chain account code 1ul
+    Account.createActivateContractTransaction chain code 1ul account
     |> Result.map (fun tx ->
         let events, state =
             Handler.handleCommand chain (ValidateTransaction tx) session 1UL state

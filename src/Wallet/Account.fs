@@ -359,7 +359,7 @@ let createActivateContractTransaction chain code (numberOfBlocks:uint32) (accoun
             }
     }
 
-let createExecuteContractTransaction executeContract cHash command data spends (account, secretKey) = result {
+let createExecuteContractTransaction executeContract cHash command data provideReturnAddress spends (account, secretKey) = result {
     let mutable txSkeleton = TxSkeleton.empty
     let mutable keys = List.empty
     let pkHash = PublicKey.hash account.publicKey
@@ -389,7 +389,7 @@ let createExecuteContractTransaction executeContract cHash command data spends (
                 | None -> Zen.Dictionary.empty
                 | _ -> failwith "data can only be empty or dict"
 
-            let returnAddress = PK account.publicKeyHash
+            let returnAddress = PK (PublicKey.hash account.publicKey)
 
             Zen.Dictionary.add "returnAddress"B (ZData.Lock (ZFStar.fsToFstLock returnAddress)) dict
             |> Zen.Cost.Realized.__force

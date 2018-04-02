@@ -53,6 +53,10 @@
     <Compile Include="ExtendedKey\Helpers.fs" />
     <Compile Include="ExtendedKey\Tests.fs" />
     <Content Include="paket.references" />
+    <ProjectReference Include="..\Consensus.Tests\Consensus.Tests.fsproj">
+      <Project>{b5e951fc-ae90-4ef1-9365-3e2b5a56b510}</Project>
+      <Name>Consensus.Tests</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Consensus\Consensus.fsproj">
       <Project>{5ec4457b-615a-4bbd-b3d5-d0e311b9d5e9}</Project>
       <Name>Consensus</Name>

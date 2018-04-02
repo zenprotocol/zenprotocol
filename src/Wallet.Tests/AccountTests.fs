@@ -3,10 +3,11 @@
 open NUnit.Framework
 open FsUnit
 open Consensus
-open Consensus.Chain
-open Consensus.Types
+open Chain
+open Types
 open Wallet
 open TestsInfrastructure.Constraints
+open Consensus.Tests.Helper
 
 let chain = Chain.Local
 let chainParams = Chain.localParameters
@@ -25,9 +26,9 @@ let anotherAsset = Hash.compute "anotherasset"B, Hash.compute "anotherasset"B
 
 [<Test>]
 let ``received tokens``() =
-    let account = Account.create()
+    let account, _ = create()
 
-    let output = {lock = PK account.publicKeyHash; spend={asset=Constants.Zen;amount=10UL}}
+    let output = {lock = PK (publicKeyHash account); spend={asset=Constants.Zen;amount=10UL}}
 
     let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
 
@@ -37,9 +38,9 @@ let ``received tokens``() =
 
 [<Test>]
 let ``tokens spent``() =
-    let account = Account.create()
+    let account, _ = create()
 
-    let output = {lock = PK account.publicKeyHash; spend={asset=Constants.Zen;amount=10UL}}
+    let output = {lock = PK (publicKeyHash account); spend={asset=Constants.Zen;amount=10UL}}
 
     let tx = {inputs=[];outputs=[output;output];witnesses=[];contract=None}
     let txHash = (Transaction.hash tx)
@@ -57,15 +58,16 @@ let ``tokens spent``() =
 
 [<Test>]
 let ``creating, not enough tokens``() =
-    let account = Account.create()
+    let accountData = create()
+    let account, _ = accountData
 
-    let output = {lock = PK account.publicKeyHash; spend={asset=Constants.Zen;amount=10UL}}
+    let output = {lock = PK (publicKeyHash account); spend={asset=Constants.Zen;amount=10UL}}
 
     let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
 
     let account' = Account.addTransaction (Transaction.hash tx) tx account
 
-    let result = Account.createTransaction account account.publicKeyHash { asset = Constants.Zen; amount = 11UL }
+    let result = Account.createTransaction (publicKeyHash account) { asset = Constants.Zen; amount = 11UL } accountData
 
     let expected:Result<Transaction,string> = Error "Not enough tokens"
 
@@ -73,16 +75,16 @@ let ``creating, not enough tokens``() =
 
 [<Test>]
 let ``creating, no change``() =
-    let bob = Account.create ()
-    let alice = Account.create ()
+    let bob, bobKey = create()
+    let alice, _ = create()
 
     // giving some money to bob
-    let output = {lock = PK bob.publicKeyHash; spend={asset=Constants.Zen;amount=10UL}}
+    let output = {lock = PK (publicKeyHash bob); spend={asset=Constants.Zen;amount=10UL}}
     let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
     let bob' = Account.addTransaction (Transaction.hash tx) tx bob
 
     // sending money to alice
-    let result = Account.createTransaction bob' alice.publicKeyHash { asset = Constants.Zen; amount = 10UL }
+    let result = Account.createTransaction (publicKeyHash alice) { asset = Constants.Zen; amount = 10UL } (bob', bobKey)
 
     match result with
     | Error x -> failwithf "expected transaction %s" x
@@ -95,16 +97,16 @@ let ``creating, no change``() =
 
 [<Test>]
 let ``creating, with change``() =
-    let bob = Account.create ()
-    let alice = Account.create ()
+    let bob, bobKey = create()
+    let alice, _ = create()
 
     // giving some money to bob
-    let output = {lock = PK bob.publicKeyHash; spend={asset=Constants.Zen;amount=10UL}}
+    let output = {lock = PK (publicKeyHash bob); spend={asset=Constants.Zen;amount=10UL}}
     let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
     let bob' = Account.addTransaction (Transaction.hash tx) tx bob
 
     // sending money to alice
-    let result = Account.createTransaction bob' alice.publicKeyHash { asset = Constants.Zen; amount = 7UL }
+    let result = Account.createTransaction (publicKeyHash alice) { asset = Constants.Zen; amount = 7UL } (bob', bobKey)
 
     match result with
     | Error x -> failwithf "expected transaction %s" x
@@ -117,12 +119,12 @@ let ``creating, with change``() =
 
 [<Test>]
 let ``picking the correct asset``() =
-    let bob = Account.create ()
-    let alice = Account.create ()
+    let bob, bobKey = create()
+    let alice, _ = create()
 
     // giving some money to bob
-    let output = {lock = PK bob.publicKeyHash; spend={asset=anotherAsset;amount=10UL}}
-    let output2 = {lock = PK bob.publicKeyHash; spend={asset=Constants.Zen;amount=10UL}}
+    let output = {lock = PK (publicKeyHash bob); spend={asset=anotherAsset;amount=10UL}}
+    let output2 = {lock = PK (publicKeyHash bob); spend={asset=Constants.Zen;amount=10UL}}
 
     let tx = {inputs=[];outputs=[output; output2];witnesses=[];contract=None}
     let bob' = Account.addTransaction (Transaction.hash tx) tx bob
@@ -131,7 +133,7 @@ let ``picking the correct asset``() =
     bob' |> balanceShouldBe anotherAsset 10UL
 
     // sending money to alice
-    let result = Account.createTransaction bob' alice.publicKeyHash { asset = Constants.Zen; amount = 7UL }
+    let result = Account.createTransaction (publicKeyHash alice) { asset = Constants.Zen; amount = 7UL } (bob', bobKey)
 
     match result with
     | Error x -> failwithf "expected transaction %s" x
@@ -149,18 +151,18 @@ let ``picking the correct asset``() =
 
 [<Test>]
 let ``picking from multiple inputs``() =
-    let bob = Account.create ()
-    let alice = Account.create ()
+    let bob, bobKey = create()
+    let alice, _ = create()
 
     // giving some money to bob
-    let output = {lock = PK bob.publicKeyHash; spend={asset=Constants.Zen;amount=5UL}}
-    let output2 = {lock = PK bob.publicKeyHash; spend={asset=Constants.Zen;amount=7UL}}
+    let output = {lock = PK (publicKeyHash bob); spend={asset=Constants.Zen;amount=5UL}}
+    let output2 = {lock = PK (publicKeyHash bob); spend={asset=Constants.Zen;amount=7UL}}
 
     let tx = {inputs=[];outputs=[output; output2];witnesses=[];contract=None}
     let bob' = Account.addTransaction (Transaction.hash tx) tx bob
 
     // sending money to alice
-    let result = Account.createTransaction bob' alice.publicKeyHash { asset = Constants.Zen; amount = 10UL }
+    let result = Account.createTransaction (publicKeyHash alice) { asset = Constants.Zen; amount = 10UL } (bob', bobKey)
 
     match result with
     | Error x -> failwithf "expected transaction %s" x
@@ -173,7 +175,7 @@ let ``picking from multiple inputs``() =
 
 [<Test>]
 let ``create execute contract transaction``() =
-    let account = Account.createTestAccount ()
+    let account = createTestAccount ()
 
     let executeContract _ _ _ txSkeleton =
         let tx =
@@ -185,7 +187,7 @@ let ``create execute contract transaction``() =
 
     let spends = Map.add Constants.Zen 1UL Map.empty
 
-    let result = Account.createExecuteContractTransaction account executeContract Hash.zero "" None true spends
+    let result = Account.createExecuteContractTransaction executeContract Hash.zero "" None true spends account
 
     result |> should be ok
 
@@ -209,10 +211,11 @@ let ``account sync up``() =
         nonce = 0UL,0UL
     }
 
+    let accountData = create()
     let account =
-        {Account.create () with tip = Block.hash startBlockHeader}
+        { (fst accountData)  with tip = Block.hash startBlockHeader}
 
-    let output = {lock = PK account.publicKeyHash; spend={asset=Constants.Zen;amount=10UL}}
+    let output = {lock = PK (publicKeyHash account); spend={asset=Constants.Zen;amount=10UL}}
     let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
     let txHash = Transaction.hash tx
 
@@ -248,9 +251,9 @@ let ``account sync up``() =
 
 [<Test>]
 let ``sync up from empty wallet``() =
-    let account = Account.create ()
+    let account, _ = create()
 
-    let output = {lock = PK account.publicKeyHash; spend={asset=Constants.Zen;amount=10UL}}
+    let output = {lock = PK (publicKeyHash account); spend={asset=Constants.Zen;amount=10UL}}
     let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
 
     let header = {
@@ -298,9 +301,9 @@ let ``account reorg``() =
     }
 
     let account =
-        {Account.create () with tip = Block.hash startBlockHeader}
+        {(create() |> fst) with tip = Block.hash startBlockHeader}
 
-    let output = {lock = PK account.publicKeyHash; spend={asset=Constants.Zen;amount=10UL}}
+    let output = {lock = PK (publicKeyHash account); spend={asset=Constants.Zen;amount=10UL}}
     let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
     let txHash = Transaction.hash tx
 
@@ -366,11 +369,12 @@ let ``account reorg``() =
 
 [<Test>]
 let ``wallet won't spend coinbase if not mature enough``() =
-    let rootAccount = {Account.rootAccount with blockNumber=99ul}
+    let rootAccount, rootSecretKey = rootAccountData
+    let rootAccount = {rootAccount with blockNumber=99ul}
     let origin =
             {
                 inputs=[]
-                outputs=[{lock =  Coinbase (1ul, rootAccount.publicKeyHash); spend= {asset = Constants.Zen;amount=100000000UL}}]
+                outputs=[{lock =  Coinbase (1ul, publicKeyHash rootAccount); spend= {asset = Constants.Zen;amount=100000000UL}}]
                 witnesses=[]
                 contract=None
             }
@@ -380,16 +384,17 @@ let ``wallet won't spend coinbase if not mature enough``() =
 
     let expected: Result<Transaction,string>= Error "Not enough tokens"
 
-    Account.createTransaction rootAccount rootAccount.publicKeyHash { asset = Constants.Zen; amount = 1UL }
+    Account.createTransaction (publicKeyHash rootAccount) { asset = Constants.Zen; amount = 1UL } rootAccountData
     |> should equal expected
 
 [<Test>]
 let ``wallet spend coinbase with coinbase mature enough``() =
-    let rootAccount = {Account.rootAccount with blockNumber=100ul}
+    let rootAccount, rootSecretKey = rootAccountData
+    let rootAccount = {rootAccount with blockNumber=100ul}
     let origin =
             {
                 inputs=[]
-                outputs=[{lock =  Coinbase (1ul, rootAccount.publicKeyHash); spend= {asset = Constants.Zen;amount=100000000UL}}]
+                outputs=[{lock =  Coinbase (1ul, publicKeyHash rootAccount); spend= {asset = Constants.Zen;amount=100000000UL}}]
                 witnesses=[]
                 contract=None
             }
@@ -397,16 +402,16 @@ let ``wallet spend coinbase with coinbase mature enough``() =
 
     let rootAccount = Account.addTransaction originHash origin rootAccount
 
-    Account.createTransaction rootAccount rootAccount.publicKeyHash { asset = Constants.Zen; amount = 1UL }
+    Account.createTransaction (publicKeyHash rootAccount) { asset = Constants.Zen; amount = 1UL } (rootAccount, rootSecretKey)
     |> should be ok
 
 [<Test>]
 let ``wallet spend coinbase when come from block``() =
-    let rootAccount = Account.rootAccount
+    let rootAccount, rootSecretKey = rootAccountData
     let origin =
             {
                 inputs=[]
-                outputs=[{lock =  Coinbase (1ul, rootAccount.publicKeyHash); spend= {asset = Constants.Zen;amount=100000000UL}}]
+                outputs=[{lock =  Coinbase (1ul, publicKeyHash rootAccount); spend= {asset = Constants.Zen;amount=100000000UL}}]
                 witnesses=[]
                 contract=None
             }
@@ -426,18 +431,18 @@ let ``wallet spend coinbase when come from block``() =
 
     let rootAccount = Account.handleBlock (Block.hash block.header) block rootAccount
 
-    Account.createTransaction rootAccount rootAccount.publicKeyHash { asset = Constants.Zen; amount = 1UL }
+    Account.createTransaction (publicKeyHash rootAccount) { asset = Constants.Zen; amount = 1UL } (rootAccount, rootSecretKey)
     |> should be ok
 
 [<Test>]
 let ``Should get expected deltas``() =
-    let account = Account.create ()
+    let account, _ = create()
 
-    let output1 = {lock = PK account.publicKeyHash; spend={asset=Constants.Zen;amount=10UL}}
+    let output1 = {lock = PK (publicKeyHash account); spend={asset=Constants.Zen;amount=10UL}}
     let tx1 = {inputs=[];outputs=[output1];witnesses=[];contract=None}
     let tx1Hash = Transaction.hash tx1
     let output2A = {lock = PK Hash.zero; spend={asset=Constants.Zen;amount=2UL}}
-    let output2B = {lock = PK account.publicKeyHash; spend={asset=Constants.Zen;amount=8UL}}
+    let output2B = {lock = PK (publicKeyHash account); spend={asset=Constants.Zen;amount=8UL}}
     let tx2 = {inputs=[Outpoint { txHash = tx1Hash; index = 0ul } ];outputs=[output2A;output2B];witnesses=[];contract=None}
 
     let header = {
@@ -470,7 +475,7 @@ let ``Should get expected deltas``() =
 
     let tx2Hash = Transaction.hash tx2
     let output3A = {lock = PK Hash.zero; spend={asset=Constants.Zen;amount=3UL}}
-    let output3B = {lock = PK account.publicKeyHash; spend={asset=Constants.Zen;amount=5UL}}
+    let output3B = {lock = PK (publicKeyHash account); spend={asset=Constants.Zen;amount=5UL}}
     let tx3 = {inputs=[Outpoint { txHash = tx2Hash; index = 1ul } ];outputs=[output3A;output3B];witnesses=[];contract=None}
 
     let expected = [ (tx1Hash, Map.add Constants.Zen 10L Map.empty) ]

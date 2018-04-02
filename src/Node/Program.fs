@@ -72,7 +72,6 @@ let main argv =
     let parser = ArgumentParser.Create<Argument>(programName = "zen-node.exe", errorHandler = errorHandler)
     let results = parser.Parse argv
 
-    let mutable root = false
     let mutable threads = 1
     let mutable wipe = false
 
@@ -85,7 +84,6 @@ let main argv =
             config.listen <- true
             config.seeds.Clear ()
             config.api.enabled <- true
-            root <- true
         | Local1 ->
             config.dataPath <- "./data/l1"
             config.chain <- "local"
@@ -120,7 +118,6 @@ let main argv =
         | Threads n ->
             config.threads <- n
         | Seed ->
-            root <- true
             config.listen <- true
             config.seeds.Clear ()
             config.miner <- true
@@ -143,7 +140,7 @@ let main argv =
     use networkActor =
         Network.Main.main busName chainParams config.externalIp config.listen config.bind config.seeds
 
-    use walletActor = Wallet.Main.main dataPath busName chain root
+    use walletActor = Wallet.Main.main dataPath busName chain
 
     use minerActors =
         if config.miner then
@@ -164,7 +161,7 @@ let main argv =
 
     printfn "running..."
 
-    if root && chain = Chain.Local then
+    if chain = Chain.Local then
         let block = Block.createGenesis chainParams [Transaction.rootTx] (0UL,0UL)
 
         use client = ServiceBus.Client.create busName
