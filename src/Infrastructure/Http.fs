@@ -21,6 +21,7 @@ type Request =
 type Context = Request * ReplyFunction    
 
 module Server = 
+    open FStar
     
     type T = 
         { listener : System.Net.HttpListener
@@ -37,9 +38,11 @@ module Server =
             | false -> return Ok None
             | true -> 
                 let! bytes = request.InputStream.AsyncRead(int request.ContentLength64)
-                match request.ContentType with
-                | HttpContentTypes.Json -> return Ok(Some(request.ContentEncoding.GetString(bytes)))
-                | _ -> return Error(sprintf "only %s ContentType is supported" HttpContentTypes.Json)
+                
+                if request.ContentType.StartsWith HttpContentTypes.Json then
+                   return Ok(Some(request.ContentEncoding.GetString(bytes)))
+                else
+                   return Error(sprintf "only %s ContentType is supported" HttpContentTypes.Json)
         }
     
     let private writeTextResponse (response : System.Net.HttpListenerResponse) (code : StatusCode) (text : string) = 
