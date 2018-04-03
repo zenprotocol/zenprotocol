@@ -59,7 +59,7 @@ let ``Should generate assets from a string and from an int``() =
         open Zen.Cost
         open Zen.Asset
 
-        module ET = Zen.ErrorT
+        module RT = Zen.ResultT
         module Tx = Zen.TxSkeleton
         module S = FStar.String
 
@@ -76,10 +76,10 @@ let ``Should generate assets from a string and from an int``() =
                     Tx.mint 10UL assetInt txSkeleton
                     >>= Tx.mint 20UL assetString
                 in
-                ET.ret (txSkeleton, None)
+                RT.ok (txSkeleton, None)
             end
             else
-                ET.autoFailw "unexpected"
+                RT.autoFailw "unexpected"
 
         val cf: txSkeleton -> string -> option data -> wallet -> cost nat 11
                 let cf _ _ _ _ = ret (64 + (64 + (64 + 64 + 0)) + 26)
