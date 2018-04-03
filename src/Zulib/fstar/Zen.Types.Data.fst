@@ -32,7 +32,6 @@ type data =
     | PublicKey of publicKey
     | Tuple of (data ** data)
     | Dict of dataDict
-    | Empty
 
 and dataDict =
     | DataDict of dictionary data

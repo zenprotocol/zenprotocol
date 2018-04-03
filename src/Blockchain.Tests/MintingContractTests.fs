@@ -110,10 +110,10 @@ let setUp = fun () ->
 
       ET.of_option "contract doesn't have enough zens to pay you" result
 
-    val main: txSkeleton -> hash -> string -> data -> wallet:wallet
-        -> result (txSkeleton ** option message) `cost` (2 + 66 + (64 + (64 + (64 + 64 + (Zen.Wallet.size wallet * 128 + 192) + 0)) + 31) + 28)
+    val main: txSkeleton -> hash -> string -> option data -> wallet:wallet
+        -> result (txSkeleton ** option message) `cost` (3 + 66 + (64 + (64 + (64 + 64 + (Zen.Wallet.size wallet * 128 + 192) + 0)) + 31) + 28)
     let main txSkeleton contractHash command data wallet =
-      let! returnAddress = tryDict data >?> tryFindLock "returnAddress" in
+      let! returnAddress = data >!> tryDict >?> tryFindLock "returnAddress" in
 
       match returnAddress with
       | Some returnAddress ->
@@ -127,8 +127,8 @@ let setUp = fun () ->
       | None ->
         ET.autoFailw "returnAddress is required"
 
-    val cf: txSkeleton -> string -> data -> wallet -> cost nat 24
-        let cf _ _ _ wallet = ret (2 + 66 + (64 + (64 + (64 + 64 + (Zen.Wallet.size wallet * 128 + 192) + 0)) + 31) + 28)
+    val cf: txSkeleton -> string -> option data -> wallet -> cost nat 24
+        let cf _ _ _ wallet = ret (3 + 66 + (64 + (64 + (64 + 64 + (Zen.Wallet.size wallet * 128 + 192) + 0)) + 31) + 28)
     """ account session state
     |> function
     | Ok (state', cHash') ->
@@ -168,6 +168,7 @@ let ``Contract should detect unsupported command``() =
         |> Cost.Realized.__force
         |> Types.Data.DataDict
         |> Types.Data.Dict
+        |> Some
 
     TransactionHandler.executeContract session inputTx cHash "x" data state.memoryState
     |> shouldBeErrorMessage "unsupported command"
@@ -205,6 +206,7 @@ let ``Should buy``() =
         |> Cost.Realized.__force
         |> Types.Data.DataDict
         |> Types.Data.Dict
+        |> Some
 
     TransactionHandler.executeContract session inputTx cHash "buy" data { state.memoryState with utxoSet = utxoSet }
     |> function
@@ -280,6 +282,7 @@ let ``Should redeem``() =
         |> Cost.Realized.__force
         |> Types.Data.DataDict
         |> Types.Data.Dict
+        |> Some
 
     TransactionHandler.executeContract session inputTx cHash "redeem" data { state.memoryState with utxoSet = utxoSet }
     |> function

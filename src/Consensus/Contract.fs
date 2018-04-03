@@ -15,8 +15,8 @@ open Zen.Types.Data
 open Zen.Types.Main
 
 type ContractWallet = PointedOutput list
-type ContractFn = Hash -> string -> data -> ContractWallet -> TxSkeleton.T -> Result<(TxSkeleton.T * Message Option),string>
-type ContractCostFn = string -> data -> ContractWallet -> TxSkeleton.T -> int64
+type ContractFn = Hash -> string -> data option -> ContractWallet -> TxSkeleton.T -> Result<(TxSkeleton.T * Message Option),string>
+type ContractCostFn = string -> data option -> ContractWallet -> TxSkeleton.T -> int64
 
 type T = {
     hash: Hash
@@ -26,8 +26,6 @@ type T = {
     size: uint32
     code:string
 }
-
-let EmptyData = Empty
 
 let private findMethods assembly =
     try
@@ -44,7 +42,7 @@ let private invokeMainFn
                 methodInfo
                 (cHash : byte[])
                 (command : byte[])
-                (data : Zen.Types.Data.data)
+                (data : Native.option<Zen.Types.Data.data>)
                 (contractWallet : Prims.list<pointedOutput>)
                 (input : txSkeleton)
                 : obj =
@@ -53,7 +51,7 @@ let private invokeMainFn
 let private invokeCostFn
                 methodInfo
                 (command : byte[])
-                (data : Zen.Types.Data.data)
+                (data : Native.option<Zen.Types.Data.data>)
                 (contractWallet : Prims.list<pointedOutput>)
                 (input : txSkeleton)
                 : obj =
@@ -71,8 +69,9 @@ let private wrap (mainMethodInfo, costMethodInfo) =
         let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
         let contractWallet' = ZFStar.convertWallet contractWallet
         let command' = ZFStar.fsToFstString command
+        let data' = ZFStar.fsToFstOption id data
 
-        invokeMainFn mainMethodInfo cHash command' data contractWallet' txSkeleton'
+        invokeMainFn mainMethodInfo cHash command' data' contractWallet' txSkeleton'
         |> castMainFnOutput
         |> ZFStar.unCost
         |> ZFStar.toResult
@@ -82,8 +81,9 @@ let private wrap (mainMethodInfo, costMethodInfo) =
         let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
         let contractWallet' = ZFStar.convertWallet contractWallet
         let command' = ZFStar.fsToFstString command
+        let data' = ZFStar.fsToFstOption id data
 
-        invokeCostFn costMethodInfo command' data contractWallet' txSkeleton'
+        invokeCostFn costMethodInfo command' data' contractWallet' txSkeleton'
         |> castCostFnOutput
         |> ZFStar.unCost
     )

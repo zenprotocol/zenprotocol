@@ -42,14 +42,14 @@ type PointedOutput = Outpoint * Output
 type Message = {
     cHash: Hash
     command: string
-    data: data
+    data: data option
 }
 
 type ContractWitness =
     {
         cHash: Hash
         command: string
-        data: data
+        data: data option
         beginInputs: uint32
         beginOutputs: uint32
         inputsLength: uint32

@@ -38,7 +38,7 @@ module Blockchain =
         | HandleHeaders of peerId:byte[] * BlockHeader list
 
     type Request =
-        | ExecuteContract of Hash * string * data * TxSkeleton.T
+        | ExecuteContract of Hash * string * data option * TxSkeleton.T
         | GetBlockTemplate of pkHash:Hash
         | GetTip
         | GetBlock of Hash
@@ -156,7 +156,7 @@ module Wallet =
         | ImportSeed of string list
         | Spend of Hash * Spend
         | ActivateContract of string*uint32
-        | ExecuteContract of Hash * string * data * provideReturnAddress:bool * Map<Asset, uint64>
+        | ExecuteContract of Hash * string * data option * provideReturnAddress:bool * Map<Asset, uint64>
         | AccountExists
 
     let serviceName = "wallet"

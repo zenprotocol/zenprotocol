@@ -79,7 +79,7 @@ let ``Contract validated transaction should have the right cost``() =
     let cWitness = {
         cHash = cHash;
         command = "foo";
-        data = Zen.Types.Data.Empty;
+        data = None;
         beginInputs = 0u;       //
         beginOutputs = 0u;      //  Consumes entire transaction
         inputsLength = 11u;     //
@@ -116,7 +116,7 @@ let ``Two contracts in sequence should have the right cost``() =
     let cWitness1 = {
         cHash = cHash;
         command = "foo";
-        data = Zen.Types.Data.Empty;
+        data = None;
         beginInputs = 0u;
         beginOutputs = 0u;
         inputsLength = 5u;
@@ -125,7 +125,7 @@ let ``Two contracts in sequence should have the right cost``() =
     }
     let cWitness2 = {
         cWitness1 with
-            data = Zen.Types.Data.Empty;
+            data = None;
             beginInputs = 5u;
             beginOutputs = 2u;
             inputsLength = 5u;
