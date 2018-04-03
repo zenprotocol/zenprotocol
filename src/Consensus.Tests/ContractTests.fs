@@ -48,7 +48,6 @@ let compileAndCheck code =
         contract)
 
 [<Test>]
-[<ParallelizableAttribute>]
 let ``Should compile``() =
     compileAndCheck sampleContractCode
     |> Result.mapError failwith
@@ -88,7 +87,6 @@ let utxoSet =
     getSampleUtxoset (UtxoSet.asDatabase)
 
 [<Test>]
-[<ParallelizableAttribute>]
 let ``Contract generated transaction should be valid``() =
     (compileRunAndValidate sampleInputTx utxoSet sampleContractCode
     , (Ok sampleExpectedResult : Result<Transaction, string>))
