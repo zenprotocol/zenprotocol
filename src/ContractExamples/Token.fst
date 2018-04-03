@@ -8,6 +8,7 @@ open Zen.Data
 module ET = Zen.ErrorT
 module OT = Zen.OptionT
 module Tx = Zen.TxSkeleton
+module CR = Zen.ContractResult.NoMessage
 
 let buy txSkeleton contractHash returnAddress =
   let! tokens = Tx.getAvailableTokens zenAsset txSkeleton in
@@ -19,7 +20,7 @@ let buy txSkeleton contractHash returnAddress =
     >>= Tx.mint tokens contractAsset
     >>= Tx.lockToAddress contractAsset tokens returnAddress in
 
-  ret <| OK (txSkeleton, None)
+  CR.ret txSkeleton
 
 let redeem txSkeleton contractHash returnAddress wallet =
   let! contractAsset = getDefault contractHash in
@@ -30,11 +31,9 @@ let redeem txSkeleton contractHash returnAddress wallet =
     >>= Tx.lockToAddress zenAsset tokens returnAddress
     >>= Tx.fromWallet zenAsset tokens contractHash wallet in
 
-  match txSkeleton with
-  | Some txSkeleton -> ret <| OK (txSkeleton, None)
-  | None -> ret <| ERR "contract doesn't have enough zens to pay you"
+  CR.ofOption "contract doesn't have enough zens to pay you" txSkeleton
 
-val main: txSkeleton -> hash -> string -> option data -> wallet:wallet -> cost (result (txSkeleton ** option message)) (3 + 66 + (64 + (64 + (64 + 64 + (Zen.Wallet.size wallet * 128 + 192) + 0)) + 31) + 28)
+val main: txSkeleton -> hash -> string -> option data -> wallet:wallet -> cost (result (txSkeleton ** option message))  (2 + 66 + (64 + (64 + (64 + 64 + (Zen.Wallet.size wallet * 128 + 192) + 0)) + 25) + 29)
 let main txSkeleton contractHash command data wallet =
   let! returnAddress = data >!> tryDict >?> tryFindLock "returnAddress" in
 
@@ -51,4 +50,4 @@ let main txSkeleton contractHash command data wallet =
       ET.autoFailw "returnAddress is required"
 
 val cf: txSkeleton -> string -> option data -> wallet -> cost nat 24
-let cf _ _ _ wallet = ret (3 + 66 + (64 + (64 + (64 + 64 + (Zen.Wallet.size wallet * 128 + 192) + 0)) + 31) + 28)
+let cf _ _ _ wallet = ret  (2 + 66 + (64 + (64 + (64 + 64 + (Zen.Wallet.size wallet * 128 + 192) + 0)) + 25) + 29)
