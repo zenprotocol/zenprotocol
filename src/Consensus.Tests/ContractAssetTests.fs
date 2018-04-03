@@ -51,6 +51,7 @@ let shouldBeOk result =
     |> ignore
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Should generate assets from a string and from an int``() =
     let contractCode = """
         open Zen.Types

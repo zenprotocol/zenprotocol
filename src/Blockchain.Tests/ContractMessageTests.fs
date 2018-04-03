@@ -162,6 +162,7 @@ let cf _ _ _ _ = ret (3 + 66 + (64 + (64 + (64 + 64 + 0))) + 34)
 """
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Should execute contract chain and get a valid transaction``() =
     let sampleKeyPair = KeyPair.create()
     let _, samplePublicKey = sampleKeyPair
