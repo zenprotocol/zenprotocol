@@ -142,3 +142,7 @@ let tryFindDict s (DataDict d) = Dict.tryFind s d `OT.bind` tryDict
 val (>?>)(#a #b:Type)(#m #n:nat): cost (option a) m -> (a -> cost (option b) n)
   -> cost (option b) (m+n)
 let (>?>) = OT.bind
+
+val (>!>)(#a #b:Type)(#n:nat):
+  (option a) -> (a -> cost (option b) n) -> cost (option b) n
+let (>!>) = OT.retBind

@@ -69,7 +69,7 @@ let ``Contract should activate and execute - Bus``() =
     | Ok (contractActivationTx, cHash) ->
         Blockchain.validateTransaction client contractActivationTx
         waitForTx subscriber contractActivationTx
-        match Wallet.executeContract client cHash "" Contract.EmptyData true Map.empty with
+        match Wallet.executeContract client cHash "" None true Map.empty with
         | Ok _ -> ()
         | Error error ->
             failwith error

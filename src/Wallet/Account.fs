@@ -398,19 +398,19 @@ let createExecuteContractTransaction account executeContract cHash command data 
 
     let isDataEmptyOrDict =
         match data with
-        | ZData.Dict _ -> true
-        | ZData.Empty -> true
+        | Some (ZData.Dict _) -> true
+        | None -> true
         | _ -> false
 
     if not isDataEmptyOrDict && provideReturnAddress then
-        return! (Error "cannot provide returnAddress while data is not dictionary or empty")
+        return! (Error "cannot provide returnAddress while data is not a dictionary")
 
     let data =
         if provideReturnAddress then
             let dict =
                 match data with
-                | ZData.Dict (ZData.DataDict dict) -> dict
-                | ZData.Empty -> Zen.Dictionary.empty
+                | Some (ZData.Dict (ZData.DataDict dict)) -> dict
+                | None -> Zen.Dictionary.empty
                 | _ -> failwith "data can only be empty or dict"
 
             let returnAddress = PK account.publicKeyHash
@@ -419,6 +419,7 @@ let createExecuteContractTransaction account executeContract cHash command data 
             |> Zen.Cost.Realized.__force
             |> ZData.DataDict
             |> ZData.Dict
+            |> Some
 
         else
             data

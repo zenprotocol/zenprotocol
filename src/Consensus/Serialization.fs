@@ -214,8 +214,6 @@ module private Serialization =
 
     module Data =
         [<Literal>]
-        let private EmptyData = 0uy
-        [<Literal>]
         let private I64Data = 1uy
         [<Literal>]
         let private I64ArrayData = 2uy
@@ -358,11 +356,6 @@ module private Serialization =
                 >> ops.writeNumber4 len
                 >> List.writeBody ops String.write (entries |> List.map fst)
                 >> List.writeBody ops write (entries |> List.map snd)
-            | ZData.Empty ->
-                // TODO: this is a hack to avoid protocol change on the testnet
-                // should be removed for production code
-                // ops.writeByte EmptyData
-                ops.writeNumber4 (EmptyData |> uint32)
 
         let rec read = reader {
             let! discriminator = Byte.read
@@ -425,12 +418,6 @@ module private Serialization =
                 let! values = List.readBody read len
                 let map = List.zip keys values |> Map.ofSeq
                 return ZData.Dict (ZData.DataDict (map, len))
-            | EmptyData ->
-                // TODO: this is a hack to avoid protocol change on the testnet
-                // remove for production
-                let! _ = readBytes 3
-
-                return ZData.Empty
             | _ ->
                 yield! fail
         }
@@ -450,7 +437,7 @@ module private Serialization =
                 ops.writeByte SerializedContractWitness
                 >> ops.writeHash cw.cHash
                 >> ops.writeString cw.command
-                >> Data.write ops cw.data
+                >> Option.write ops (Data.write ops) cw.data
                 >> ops.writeNumber4 cw.beginInputs
                 >> ops.writeNumber4 cw.beginOutputs
                 >> ops.writeNumber4 cw.inputsLength
@@ -466,7 +453,7 @@ module private Serialization =
             | SerializedContractWitness ->
                 let! cHash = Hash.read
                 let! command = readString
-                let! data = Data.read
+                let! data = Option.read Data.read
                 let! beginInputs = readNumber4
                 let! beginOutputs = readNumber4
                 let! inputsLength = readNumber4

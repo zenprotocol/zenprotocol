@@ -12,7 +12,7 @@ let maxCost = 200
 type message =
     { cHash: hash;
       command: string;
-      data: data }
+      data: option data }
 
 (*
 type contractArgs = {
@@ -27,7 +27,7 @@ noeq type costFunction =
         #n:nat{n<=maxCost}
         -> f:(txSkeleton
               -> command:string
-              -> data:data
+              -> data:option data
               -> wallet
               -> nat `cost` n)
         -> costFunction
@@ -38,7 +38,7 @@ noeq type mainFunction =
         -> mf:( txSkel:txSkeleton
                 -> contractHash
                 -> command:string
-                -> data:data
+                -> data:option data
                 -> wallet:wallet
                 -> result (txSkeleton ** option message) `cost` force ((CostFunc?.f cf) txSkel command data wallet)
               )

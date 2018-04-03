@@ -29,7 +29,7 @@ let tearDown = fun () ->
 let compileAndRun code =
     compile code
     |> Result.bind (fun contract ->
-        Contract.run contract "" Contract.EmptyData List.empty TxSkeleton.empty
+        Contract.run contract "" None List.empty TxSkeleton.empty
         |> Result.map (fun (tx, _) -> tx)
     )
 
@@ -51,7 +51,7 @@ let ``Should generate assets from a string and from an int``() =
         module Tx = Zen.TxSkeleton
         module S = FStar.String
 
-        val main: txSkeleton -> hash -> string -> data -> wallet
+        val main: txSkeleton -> hash -> string -> option data -> wallet
             -> result (txSkeleton ** option message) `cost` (64 + (64 + (64 + 64 + 0)) + 26)
         let main txSkeleton contractHash command data wallet =
             let str = "Test" in
@@ -69,7 +69,7 @@ let ``Should generate assets from a string and from an int``() =
             else
                 ET.autoFailw "unexpected"
 
-        val cf: txSkeleton -> string -> data -> wallet -> cost nat 11
+        val cf: txSkeleton -> string -> option data -> wallet -> cost nat 11
                 let cf _ _ _ _ = ret (64 + (64 + (64 + 64 + 0)) + 26)
         """
     compileAndRun contractCode

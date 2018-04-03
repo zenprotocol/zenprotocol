@@ -52,13 +52,14 @@ let getContractExecute chain json =
 
             if List.isEmpty errors then
                 let data =
-                    match json.Data with
-                    | "" -> Contract.EmptyData
-                    | b16DataString ->
-                        match Base16.decode b16DataString with
+                    if System.String.IsNullOrEmpty json.Data then
+                        None
+                    else
+                        match Base16.decode json.Data with
                         | Some data ->
-                            Encoding.ASCII.GetString data
-                            |> JsonConvert.DeserializeObject<Zen.Types.Data.data>
+                            match Serialization.Data.deserialize data with
+                            | Some data -> Some data
+                            | None -> failwith "Invalid Data"
                         | None -> failwith "Invalid Data"
                 Ok (cHash, json.Command, data, json.Options.ReturnAddress, spends)
             else

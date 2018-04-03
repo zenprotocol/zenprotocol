@@ -98,12 +98,12 @@ let fstCode = """
     open Zen.Cost
     open Zen.ErrorT
 
-    val main: txSkeleton -> hash -> string -> data -> wallet
+    val main: txSkeleton -> hash -> string -> option data -> wallet
         -> result (txSkeleton ** option message) `cost` 4
     let main tx chash command data _ =
         ret @ (tx, None)
 
-    val cf: txSkeleton -> string -> data -> wallet -> cost nat 1
+    val cf: txSkeleton -> string -> option data -> wallet -> cost nat 1
         let cf _ _ _ _ = ~!4
     """
 
@@ -126,12 +126,12 @@ let ``Should throw with command's value``() =
         open Zen.Cost
         open Zen.ErrorT
 
-        val main: txSkeleton -> hash -> string -> data -> wallet
+        val main: txSkeleton -> hash -> string -> option data -> wallet
             -> result (txSkeleton ** option message) `cost` 1
         let main tx chash command data _ =
             failw command
 
-        val cf: txSkeleton -> string -> data -> wallet -> cost nat 1
+        val cf: txSkeleton -> string -> option data -> wallet -> cost nat 1
                 let cf _ _ _ _ = ~!1
         """ [| null; null; "test command"B; null; null |]
     |> shouldBeError "test command"

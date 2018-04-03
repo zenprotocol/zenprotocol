@@ -121,31 +121,6 @@ let ``Transaction validation should fail with structurally invalid output data``
     |> shouldEqual
 
 [<Test>]
-let ``Transaction validation should fail with structurally invalid witness data``() =
-
-    let msg = "structurally invalid witness data"
-    // test with malformatted PKWitness - invalid serialized publicKey
-    let invalidSerializedPublicKeyData = Array.create (Crypto.SerializedPublicKeyLength - 1) 1uy
-    let validSerializedSignatureData = Array.create Crypto.SerializedSignatureLength 1uy
-    { tx with witnesses = [ PKWitness (invalidSerializedPublicKeyData, Signature validSerializedSignatureData) ] }
-    |> basicValidationMsg msg
-    |> shouldEqual
-    // test with malformatted PKWitness - invalid serialized sigature
-    let validSerializedPublicKeyData = Array.create Crypto.SerializedPublicKeyLength 1uy
-    let invalidSerializedSignatureData = Array.create (Crypto.SerializedSignatureLength - 1) 1uy
-    { tx with witnesses = [ PKWitness (validSerializedPublicKeyData, Signature invalidSerializedSignatureData) ] }
-    |> basicValidationMsg msg
-    |> shouldEqual
-    // test with malformatted ContractWitness
-    { tx with witnesses = [ ContractWitness {   cHash = invalidHash; command = ""
-                                                data = Contract.EmptyData
-                                                beginInputs = 0ul; beginOutputs = 0ul
-                                                inputsLength = 0ul; outputsLength = 0ul
-                                                cost = 0ul } ] }
-    |> basicValidationMsg msg
-    |> shouldEqual
-
-[<Test>]
 let ``Signed transaction should be valid``() =
     let _, publicKey = keys.[0]
     let outputLock = PK (PublicKey.hash publicKey)

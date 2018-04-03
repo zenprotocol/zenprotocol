@@ -16,7 +16,7 @@ open Zen.Cost
 module ET = Zen.ErrorT
 module Tx = Zen.TxSkeleton
 
-val main: txSkeleton -> hash -> string -> data -> wallet
+val main: txSkeleton -> hash -> string -> option data -> wallet
     -> result (txSkeleton ** option message) `cost` (64 + (64 + 64 + 0) + 23)
 let main txSkeleton contractHash command data wallet =
   let! asset = Zen.Asset.getDefault contractHash in
@@ -32,7 +32,7 @@ let main txSkeleton contractHash command data wallet =
 
   ET.ret (txSkeleton, None)
 
-val cf: txSkeleton -> string -> data -> wallet -> cost nat 9
+val cf: txSkeleton -> string -> option data -> wallet -> cost nat 9
 let cf _ _ _ _ = ret (64 + (64 + 64 + 0) + 23)
 """
 
@@ -82,7 +82,7 @@ let sampleOutputTx, _ =
 
 let sampleExpectedResult =
     Transaction.fromTxSkeleton sampleOutputTx
-    |> Transaction.addWitnesses [ ContractWitness <| TxSkeleton.getContractWitness sampleContractHash "" Contract.EmptyData sampleInputTx sampleOutputTx 215L ]
+    |> Transaction.addWitnesses [ ContractWitness <| TxSkeleton.getContractWitness sampleContractHash "" None sampleInputTx sampleOutputTx 215L ]
     |> Transaction.sign [ sampleKeyPair ]
 
 let getSampleUtxoset utxos =
