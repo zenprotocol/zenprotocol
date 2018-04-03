@@ -108,17 +108,20 @@ let fstCode = """
     """
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Should record hints``() =
     ZFStar.recordHints fstCode (getModuleName fstCode)
     |> Result.map (fun _ -> ())
     |> shouldBeOk ()
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Should invoke compiled``() =
     compileAndInvoke fstCode [| input; null; null; null; null |]
     |> shouldBeOk (input, Native.option<message>.None)
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Should throw with command's value``() =
     compileAndInvoke """
         open Zen.Types
@@ -137,6 +140,7 @@ let ``Should throw with command's value``() =
     |> shouldBeError "test command"
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Should get some metrics from hints module``() =
     ZFStar.recordHints fstCode (getModuleName fstCode)
     |> Result.bind (ZFStar.calculateMetrics)

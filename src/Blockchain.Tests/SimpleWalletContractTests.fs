@@ -123,6 +123,7 @@ let tearDown = fun () ->
     clean()
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Wallet using contract should execute``() =
     let output = {lock=Contract cHash;spend={asset=Constants.Zen;amount=10UL}}
     let utxoSet = Map.add {txHash=Hash.zero;index=10ul} (UtxoSet.Unspent output) utxoSet
@@ -131,6 +132,7 @@ let ``Wallet using contract should execute``() =
     |> shouldBeOk
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Contract should not be able to lock more token than available``() =
     let output = {lock=Contract cHash;spend={asset=Constants.Zen;amount=9UL}}
     let utxoSet = Map.add {txHash=Hash.zero;index=1ul} (UtxoSet.Unspent output) utxoSet
@@ -139,12 +141,14 @@ let ``Contract should not be able to lock more token than available``() =
     |> shouldBeErrorMessage "not enough Zens"
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Contract should not have enough tokens when output is missing``() =
 
     TransactionHandler.executeContract session sampleInputTx cHash "" None state.memoryState
     |> shouldBeErrorMessage "not enough Zens"
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Contract should not have enough tokens when output locked to PK address``() =
     let output = {lock=PK cHash;spend={asset=Constants.Zen;amount=10UL}}
     let utxoSet = Map.add {txHash=Hash.zero;index=10ul} (UtxoSet.Unspent output) utxoSet
@@ -153,6 +157,7 @@ let ``Contract should not have enough tokens when output locked to PK address``(
     |> shouldBeErrorMessage "not enough Zens"
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Contract should not have enough tokens when output is spent``() =
     let output = {lock=PK cHash;spend={asset=Constants.Zen;amount=10UL}}
     let utxoSet = Map.add {txHash=Hash.zero;index=10ul} (UtxoSet.Spent output) utxoSet

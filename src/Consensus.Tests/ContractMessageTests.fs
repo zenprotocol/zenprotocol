@@ -114,6 +114,7 @@ let tearDown = fun () ->
     clean ()
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Should produce execute contracts with message passed between them``() =
     result {
         let! (contract1, contract2) = contracts

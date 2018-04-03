@@ -20,6 +20,7 @@ let validateInContext = validateInContext localParams getUTXO contractPath
 type TxResult = Result<Transaction*ActiveContractSet.T,ValidationError>
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Contract activation without contract sacrifice should fail``() =
     let code = SampleContract.sampleContractCode
 
@@ -39,6 +40,7 @@ let ``Contract activation without contract sacrifice should fail``() =
     |> should equal expected
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Contract activation with too low contract sacrifice``() =
     let code = SampleContract.sampleContractCode
 
@@ -64,6 +66,7 @@ let ``Contract activation with too low contract sacrifice``() =
     |> should equal expected
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Contract activation with asset other than zen should fail``() =
     let code = SampleContract.sampleContractCode
 
@@ -93,6 +96,7 @@ let ``Contract activation with asset other than zen should fail``() =
     |> should equal expected
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Contract activation with exact amount``() =
     let code = SampleContract.sampleContractCode
 

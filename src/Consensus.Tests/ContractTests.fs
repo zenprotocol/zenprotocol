@@ -36,12 +36,14 @@ let compileAndCheck code =
         contract)
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Should compile``() =
     compileAndCheck sampleContractCode
     |> Result.mapError failwith
     |> ignore
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Should get 'elaborate' error for invalid code``() =
     (compileAndCheck (sampleContractCode + "###")
     , (Error "elaborate" : Result<Contract.T, string>))
@@ -74,12 +76,14 @@ let utxoSet =
     getSampleUtxoset (UtxoSet.asDatabase)
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Contract generated transaction should be valid``() =
     (compileRunAndValidate sampleInputTx utxoSet sampleContractCode
     , (Ok sampleExpectedResult : Result<Transaction, string>))
     |> shouldEqual
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Should get expected contract cost``() =
     (compile sampleContractCode
      |> Result.map (fun contract ->
@@ -88,6 +92,7 @@ let ``Should get expected contract cost``() =
     |> shouldEqual
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Contract should not be able to create tokens other than its own``() =
     (compileRunAndValidate sampleInputTx utxoSet
          """
@@ -124,6 +129,7 @@ let ``Contract should not be able to create tokens other than its own``() =
     |> shouldEqual
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Contract should be able to destroy its own tokens locked to it``() =
     let sampleContractCode = """
     open Zen.Types
@@ -197,6 +203,7 @@ let ``Contract should be able to destroy its own tokens locked to it``() =
     |> shouldEqual
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Contract should not be able to destroy tokens other than its own - single output``() =
     let contractCode = """
     open Zen.Types
@@ -248,6 +255,7 @@ let ``Contract should not be able to destroy tokens other than its own - single 
     |> shouldEqual
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Contract should not be able to destroy tokens other than its own - multiple (two) outputs``() =
     let contractCode = """
     open Zen.Types

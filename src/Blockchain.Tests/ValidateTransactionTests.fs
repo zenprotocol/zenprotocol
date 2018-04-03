@@ -301,6 +301,7 @@ let ``two orphan transaction spending same input``() =
     OrphanPool.containsTransaction tx2Hash state''.memoryState.orphanPool |> should equal false
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Valid contract should be added to ActiveContractSet``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
@@ -336,6 +337,7 @@ let ``Valid contract should be added to ActiveContractSet``() =
     OrphanPool.containsTransaction txHash state'.memoryState.orphanPool |> should equal false
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Invalid contract should not be added to ActiveContractSet or mempool``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
@@ -369,6 +371,7 @@ let ``Invalid contract should not be added to ActiveContractSet or mempool``() =
     OrphanPool.containsTransaction txHash state'.memoryState.orphanPool |> should equal false
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``contract activation arrived, running orphan transaction``() =
     let getResult = function
         | Ok r -> r

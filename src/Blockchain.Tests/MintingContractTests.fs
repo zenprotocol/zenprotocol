@@ -155,6 +155,7 @@ let samplePKHash = PublicKey.hash samplePublicKey
 let Zen = Constants.Zen
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Contract should detect unsupported command``() =
     let inputTx =
         {
@@ -178,6 +179,7 @@ let ``Contract should detect unsupported command``() =
     |> shouldBeErrorMessage "unsupported command"
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Should buy``() =
     let input = {
         txHash = Hash.zero

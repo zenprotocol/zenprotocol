@@ -239,6 +239,7 @@ let ``can connect block with coinbase only``() =
     |> should be ok
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``can connect block with a contract``() =
     let rootAccount = createTestAccount()
     let tx =
