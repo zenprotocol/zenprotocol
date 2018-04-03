@@ -15,7 +15,7 @@ extern uint16 GetShortPathName(
 
 let platform =
     let platform = Environment.OSVersion.Platform
-    if (platform = PlatformID.Unix 
+    if (platform = PlatformID.Unix
         && Directory.Exists "/Applications"
         && Directory.Exists "/System"
         && Directory.Exists "/Users"
@@ -31,7 +31,7 @@ let private isUnix =
     | _ ->
         false
 
-let normalizeNameToFileSystem = 
+let normalizeNameToFileSystem =
     if isUnix then
         id
     else
@@ -41,7 +41,7 @@ let normalizeNameToFileSystem =
             GetShortPathName(fileName, shortNameBuffer, bufferSize) |> ignore
             shortNameBuffer.ToString()
 
-let workingDirectory = 
+let workingDirectory =
     Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
     |> normalizeNameToFileSystem
 
@@ -54,7 +54,7 @@ let getFrameworkPath =
     | _ -> @"C:\Windows\Microsoft.NET\Framework\v4.0.30319\"
 
 let private monoM =
-    if isUnix then 
+    if isUnix then
         List.tryFind File.Exists //TODO: prioritize
             ["/usr/bin/mono"
              "/usr/local/bin/mono"
@@ -62,7 +62,7 @@ let private monoM =
     else
         Some "unused"
 
-let private mono = 
+let private mono =
     match monoM with
     | Some mono -> mono
     | _ -> failwith "Cannot find mono"
@@ -73,15 +73,15 @@ let getExeSuffix =
 let run exe args =
     let exe, args = if isUnix then mono, exe :: args else exe, args
     let p = new Process();
-    p.StartInfo <- 
+    p.StartInfo <-
         new ProcessStartInfo(
-            FileName = exe, 
+            FileName = exe,
             Arguments = String.concat " " args,
             WorkingDirectory = workingDirectory,
-            //RedirectStandardOutput = true,
+            RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false)
-    let appender (sb : StringBuilder) = 
+    let appender (sb : StringBuilder) =
         let (+) (sb : StringBuilder) (s : string) = sb.Append s |> ignore
         fun (args : DataReceivedEventArgs) ->
             let data = args.Data
@@ -91,32 +91,33 @@ let run exe args =
                 sb + data
     let error = new StringBuilder()
     p.ErrorDataReceived.Add(appender error)
-    //let output = new StringBuilder()
-    //p.OutputDataReceived.Add(appender output)
+    let output = new StringBuilder()
+    p.OutputDataReceived.Add(appender output)
     try
         if p.Start() then
             p.BeginErrorReadLine()
-            //p.BeginOutputReadLine()
+            p.BeginOutputReadLine()
             p.WaitForExit()
-            let error = error.ToString()
-            if error.Length > 0 then
-                Log.info "%A" error
-            //let output = output.ToString()
-            //if output.Length > 0 then
-            //    Log.info "%A" output
-            if p.ExitCode = 0 
-            then Ok ()
-            else Error error
+            if p.ExitCode = 0 then
+                Ok ()
+            else
+                let error = error.ToString()
+                if error.Length > 0 then
+                    Log.info "%A" error
+                let output = output.ToString()
+                if output.Length > 0 then
+                    Log.info "%A" output
+                Error error
         else
             Error "failed to start process"
     with _ as ex ->
         Exception.toError "run" ex
-        
-let removeDirectory path = 
+
+let removeDirectory path =
     if Directory.Exists path then
-        Directory.Delete(path, true)  
-        
+        Directory.Delete(path, true)
+
 let cleanDirectory path =
     removeDirectory path
-    
-    Directory.CreateDirectory path |> ignore                
+
+    Directory.CreateDirectory path |> ignore
