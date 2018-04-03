@@ -52,6 +52,7 @@
     <Compile Include="ServiceBus.fs" />
     <Compile Include="EventBus.fs" />
     <Compile Include="Timestamp.fs" />
+    <Compile Include="Measure.fs" />
     <Compile Include="Writer.fs" />
     <Compile Include="Actor.fs" />
     <Compile Include="Http.fs" />

@@ -10,7 +10,7 @@ let private changeExtention extention path = Path.ChangeExtension (path, extenti
 
 let private (/) a b = Path.Combine (a,b)
 
-let private error s = 
+let private error s =
     sprintf "%s: %s" s
 
 let private compile' path moduleName code =
@@ -21,15 +21,15 @@ let private compile' path moduleName code =
         let tempFileName = Path.GetTempFileName()
         let codeFileName = changeExtention ".fs" tempFileName
         let assemblyPath = Path.Combine(path, sprintf "%s.dll" moduleName)
-        
+
         if File.Exists assemblyPath then
             Ok ()
-        else        
+        else
             File.WriteAllText(codeFileName, code)
-            let (+/) = (/) Platform.getFrameworkPath               
-            
+            let (+/) = (/) Platform.getFrameworkPath
+
             let errors, exitCode =
-                Async.RunSynchronously 
+                Async.RunSynchronously
                 <| fsChecker.Compile(
                     [|"fsc.exe";
                     "--noframework";
@@ -47,7 +47,7 @@ let private compile' path moduleName code =
                 Ok ()
             else
                 errors
-                |> Array.map (fun e -> e.ToString()) 
+                |> Array.map (fun e -> e.ToString())
                 |> String.concat " "
                 |> error "compile"
                 |> Error
@@ -66,12 +66,12 @@ let private elaborate input_filepath output_target =
         Error "elaborate"
 
 let private fstar outDir inputFile args =
-    let z3Name = 
+    let z3Name =
         match Platform.platform with
         | PlatformID.MacOSX -> "z3-osx"
         | PlatformID.Unix -> "z3-linux"
         | _ -> "z3.exe"
-         
+
     [ "--smt"; Platform.workingDirectory / z3Name
       "--prims"; "zulib" / "prims.fst"
       "--include"; "zulib"
@@ -84,12 +84,12 @@ let private wrapFStar errorResult outputFile fstarFn =
     |> Result.mapError (fun _ -> errorResult)
     |> Result.map (fun _ -> File.ReadAllText outputFile)
 
-let initOutputDir moduleName = 
+let initOutputDir moduleName =
     let oDir = Platform.normalizeNameToFileSystem (Path.GetTempPath()) / Path.GetRandomFileName()
     Directory.CreateDirectory oDir |> ignore
     oDir, oDir / moduleName
 
-let private extract (code, hints, limits) moduleName = 
+let private extract (code, hints, limits) moduleName =
     let oDir, file = initOutputDir moduleName
     let originalFile = changeExtention ".orig.fst" file
     let hintsFile = changeExtention ".fst.hints" file
@@ -107,19 +107,20 @@ let private extract (code, hints, limits) moduleName =
                 "--codegen"; "FSharp"
                 "--use_hints"
                 "--strict_hints"
-                "--extract_module"; moduleName 
+                "--use_cached_modules"
+                "--extract_module"; moduleName
                 "--max_fuel"; maxFuel.ToString()
                 "--max_ifuel"; maxIFuel.ToString()
                 ]
             |> wrapFStar "extract" extractedFile)
-    finally    
-#if DEBUG 
+    finally
+#if DEBUG
         printfn "extract output directory: %A" oDir
-#else 
+#else
         Directory.Delete (oDir, true)
-#endif    
+#endif
 
-let calculateMetrics hints = 
+let calculateMetrics hints =
     let oDir, file = initOutputDir "" //as for now, using the filesystem as temporary solution
     let hintsFile = changeExtention ".fst.hints" file
 
@@ -136,7 +137,7 @@ let calculateMetrics hints =
                     hintsMap
                     |> Map.toSeq
                     |> Seq.map snd
-                    |> Seq.map (fun hints -> 
+                    |> Seq.map (fun hints ->
                         List.map getterFn hints
                         |> List.max)
                     |> Seq.max
@@ -147,11 +148,11 @@ let calculateMetrics hints =
         with _ as ex ->
             Exception.toError "limits" ex
     finally
-#if DEBUG    
+#if DEBUG
         printfn "calculate metrics output directory: %A" oDir
-#else 
+#else
         Directory.Delete (oDir, true)
-#endif        
+#endif
 
 let recordHints code moduleName =
     let oDir, file = initOutputDir moduleName
@@ -165,25 +166,26 @@ let recordHints code moduleName =
         elaborate originalFile elaboratedFile
         |> Result.bind (fun _ ->
             fstar oDir elaboratedFile [
+                 "--use_cached_modules"
                  "--record_hints"
                  "--no_default_includes"; elaboratedFile ]
             |> wrapFStar "record hints" hintsFile)
     finally
-#if DEBUG    
+#if DEBUG
         printfn "record hints output directory: %A" oDir
-#else 
+#else
         Directory.Delete (oDir, true)
-#endif 
-   
-let compile path (code,hints) moduleName = 
+#endif
+
+let compile path (code,hints) moduleName =
     calculateMetrics hints
     |> Result.bind (fun limits -> extract (code,hints,limits) moduleName)
     |> Result.bind (compile' path moduleName)
 
-let load path moduleName = 
-    try 
+let load path moduleName =
+    try
         Path.Combine(path, sprintf "%s.dll" moduleName)
-        |> System.Reflection.Assembly.LoadFrom 
+        |> System.Reflection.Assembly.LoadFrom
         |> Ok
     with _ as ex ->
         Error ex.Message

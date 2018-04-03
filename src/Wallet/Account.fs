@@ -346,7 +346,11 @@ let createActivateContractTransaction chain code (numberOfBlocks:uint32) (accoun
         let! (inputs,keys,amount) = collectInputs account spend secretKey
         let inputPoints = List.map (fst >> Outpoint) inputs
 
-        let! hints = Contract.recordHints code
+        let cHash = Contract.computeHash code
+
+        let! hints = Measure.measure
+                        (sprintf "recording hints for contract %A" cHash)
+                        (lazy(Contract.recordHints code))
 
         let outputs = addChange spend amount account { spend = spend; lock = ActivationSacrifice }
         return Transaction.sign
