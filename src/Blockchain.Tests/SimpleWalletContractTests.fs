@@ -89,7 +89,7 @@ let setUp = fun () ->
     open Zen.Asset
 
     module W = Zen.Wallet
-    module ET = Zen.ErrorT
+    module RT = Zen.ResultT
     module Tx = Zen.TxSkeleton
 
     val main: txSkeleton -> hash -> string -> option data -> wallet:wallet
@@ -104,7 +104,7 @@ let setUp = fun () ->
             | Some tx -> Some (tx, None)
             | None -> None in
 
-        ET.of_option "not enough Zens" result'
+        RT.of_option "not enough Zens" result'
 
     val cf: txSkeleton -> string -> option data -> wallet -> cost nat 12
         let cf _ _ _ wallet =

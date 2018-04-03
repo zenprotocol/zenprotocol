@@ -18,6 +18,7 @@ open Crypto
 open TxSkeleton
 open Zen
 open Helper
+module Result = Core.Result
 
 let chain = Chain.getChainParameters Chain.Local
 
@@ -93,7 +94,7 @@ open Zen.Base
 open Zen.Cost
 open Zen.Asset
 
-module ET = Zen.ErrorT
+module RT = Zen.ResultT
 module Tx = Zen.TxSkeleton
 
 val main: txSkeleton -> hash -> string -> option data -> wallet
@@ -105,10 +106,10 @@ let main txSkeleton contractHash command data wallet =
 
         let! txSkeleton =
             Tx.lockToContract zenAsset tokens contractHash txSkeleton in
-        ET.ret (txSkeleton, None)
+        RT.ok (txSkeleton, None)
     end
     else
-        ET.autoFailw "unsupported command"
+        RT.autoFailw "unsupported command"
 
 val cf: txSkeleton -> string -> option data -> wallet -> cost nat 7
 let cf _ _ _ _ = ret (64 + 64 + 0 + 18)
@@ -130,7 +131,7 @@ open Zen.Cost
 open Zen.Asset
 open Zen.Data
 
-module ET = Zen.ErrorT
+module RT = Zen.ResultT
 module Tx = Zen.TxSkeleton
 
 val main: txSkeleton -> hash -> string -> option data -> wallet
@@ -152,9 +153,9 @@ let main txSkeleton contractHash command data wallet =
             data
         } in
 
-        ET.ret (txSkeleton, Some message)
+        RT.ok (txSkeleton, Some message)
     | None ->
-        ET.autoFailw "returnAddress is required"
+        RT.autoFailw "returnAddress is required"
 
 val cf: txSkeleton -> string -> option data -> wallet -> cost nat 15
 let cf _ _ _ _ = ret (3 + 66 + (64 + (64 + (64 + 64 + 0))) + 34)
