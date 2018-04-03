@@ -72,7 +72,7 @@ type ActiveContractsJson = JsonProvider<"""
     {
         "contractHash": "hash",
         "address":"address",
-        "expire": 666,
+        "expire": 555,
         "code": "printfn hello world"
     }
 ]
@@ -89,6 +89,7 @@ type BlockChainInfoJson = JsonProvider<"""
 
 type ImportSeedJson = JsonProvider<"""
 {
+    "key": "secret",
     "words" : [ "word" ]
 }
 """>
@@ -106,6 +107,12 @@ type TransactionsResponseJson = JsonProvider<"""
         ]
     }
 ]
+""">
+
+type UnlockAccountJson = JsonProvider<"""
+{
+    "key": "secret"
+}
 """>
 
 type AccountExistsResponseJson = JsonProvider<"""

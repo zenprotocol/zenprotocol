@@ -43,7 +43,7 @@ let setUp = fun () ->
 
     createBroker () |> ignore
     Blockchain.Main.main dataPath chainParams busName |> ignore
-    Wallet.Main.main dataPath busName chain true |> ignore
+    Wallet.Main.main dataPath busName chain |> ignore
     Api.Main.main chain busName apiUri |> ignore
 
     // initialize genesis block

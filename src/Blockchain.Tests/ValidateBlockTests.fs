@@ -15,8 +15,11 @@ open Wallet
 open Blockchain.DatabaseContext
 open Consensus.Tests.SampleContract
 open Consensus.Contract
+open Consensus.Tests
+
 open TestsInfrastructure.Constraints
 open Messaging.Services
+open Helper
 
 let (>>=) = Writer.bind
 let chain = Chain.getChainParameters Chain.Local
@@ -44,10 +47,11 @@ let isAccountInSet session (account:Account.T) =
 
     areOutpointsInSet session outpoints
 
-let rootAccount = Account.createTestAccount ()
+let rootAccountData = createTestAccount()
+let rootAccount, _ = rootAccountData 
 
 let createTransaction account =
-    Result.get <| Account.createTransaction account account.publicKeyHash {asset=Constants.Zen;amount=100000000UL}
+    Result.get <| Account.createTransaction (publicKeyHash account) {asset=Constants.Zen;amount=100000000UL} (account, snd rootAccountData)
 
 
 // Default initial state of mempool and utxoset
@@ -208,7 +212,7 @@ let ``validate new invalid block which try to extended main chain``() =
         BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state
         |> Writer.unwrap
 
-    let tx = createTransaction rootAccount
+    let tx = createTransaction (fst rootAccountData)
     let block = Block.createTemplate chain genesisBlock.header timestamp state.tipState.ema acs [tx] Hash.zero
     let block = {block with txMerkleRoot = Hash.zero}
 
@@ -235,7 +239,7 @@ let ``validating orphan block yield a request for block from network``() =
 
     use session = DatabaseContext.createSession databaseContext
 
-    let tx = createTransaction rootAccount
+    let tx = createTransaction (fst rootAccountData)
     let block = Block.createTemplate chain genesisBlock.header timestamp state.tipState.ema acs [tx] Hash.zero
 
     let events, state' =
@@ -257,7 +261,7 @@ let ``validate new block which connect orphan chain which extend main chain``() 
 
     use session = DatabaseContext.createSession databaseContext
 
-    let tx = createTransaction rootAccount
+    let tx = createTransaction (fst rootAccountData)
 
     let ema = EMA.add chain genesisBlock.header.timestamp ema
     let block = Block.createTemplate chain genesisBlock.header timestamp ema acs [tx] Hash.zero
@@ -527,7 +531,7 @@ let ``transaction in mempool and not in next block stays in mempool``() =
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session
     let chain,account = createChainFromGenesis 1 0
-    let tx1 = createTransaction rootAccount
+    let tx1 = createTransaction (fst rootAccountData)
     let tx2 = createTransaction account
     let txHash1 = Transaction.hash tx1
     let txHash2 = Transaction.hash tx2
@@ -596,7 +600,7 @@ let ``block with a contract activation is added to chain``() =
 
     let cHash = Contract.computeHash sampleContractCode
     let tx =
-        Account.createActivateContractTransaction chain rootAccount sampleContractCode 1000ul
+        Account.createActivateContractTransaction chain sampleContractCode 1000ul rootAccountData
         |>  function
             | Ok tx -> tx
             | Error error -> failwith error
@@ -783,7 +787,7 @@ let ``Valid template for two transactions which don't depend on each other``() =
     let firstAmount = amount / 4UL
     let secondAmount = amount - firstAmount
     let splitTx =
-        Account.createTransaction rootAccount rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        Account.createTransaction (publicKeyHash rootAccount) {asset=asset;amount=firstAmount} rootAccountData
         |>  Result.get
     let ema' = EMA.add chain genesisBlock.header.timestamp ema
     let splitBlock = Block.createTemplate chain genesisBlock.header timestamp ema' acs [splitTx] Hash.zero
@@ -799,9 +803,9 @@ let ``Valid template for two transactions which don't depend on each other``() =
 
     let txOfPOutput (outpoint, output) =
         let spend = output.spend
-        let outputs = [{spend=spend;lock=PK rootAccount.publicKeyHash}]
+        let outputs = [{spend=spend;lock=PK (publicKeyHash rootAccount)}]
         Transaction.sign
-            [ rootAccount.keyPair ]
+            [ keyPair rootAccount ]
             {
                 inputs = [Outpoint outpoint];
                 outputs = outputs;
@@ -832,16 +836,16 @@ let ``Two transactions in the same block which depend on each other are valid``(
     let _, genesisState =
         BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state
         |> Writer.unwrap
-
+    
     let balances = Account.getBalance rootAccount
     let asset, amount = balances |> Map.toList |> List.head
     let firstAmount = amount
     let firstTx =
-        Account.createTransaction rootAccount rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        Account.createTransaction (publicKeyHash rootAccount) {asset=asset;amount=firstAmount} rootAccountData
         |>  Result.get
     let account = Account.addTransaction (Transaction.hash firstTx) firstTx rootAccount
     let secondTx =
-        Account.createTransaction account rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        Account.createTransaction (publicKeyHash rootAccount) {asset=asset;amount=firstAmount} (account, snd rootAccountData)
         |>  Result.get
     let ema' = EMA.add chain genesisBlock.header.timestamp ema
     let twoTxBlock = Block.createTemplate chain genesisBlock.header timestamp ema' acs [firstTx;secondTx] Hash.zero
@@ -866,11 +870,11 @@ let ``Two transactions in the same block which depend on each other are invalid 
     let asset, amount = balances |> Map.toList |> List.head
     let firstAmount = amount
     let firstTx =
-        Account.createTransaction rootAccount rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        Account.createTransaction (publicKeyHash rootAccount) {asset=asset;amount=firstAmount} rootAccountData
         |>  Result.get
     let account = Account.addTransaction (Transaction.hash firstTx) firstTx rootAccount
     let secondTx =
-        Account.createTransaction account rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        Account.createTransaction (publicKeyHash rootAccount) {asset=asset;amount=firstAmount} (account, snd rootAccountData)
         |>  Result.get
     let ema' = EMA.add chain genesisBlock.header.timestamp ema
     let twoTxBlock = Block.createTemplate chain genesisBlock.header timestamp ema' acs [secondTx;firstTx] Hash.zero
@@ -895,11 +899,11 @@ let ``Template builder uses two transactions in the same block which depend on e
     let asset, amount = balances |> Map.toList |> List.head
     let firstAmount = amount
     let firstTx =
-        Account.createTransaction rootAccount rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        Account.createTransaction (publicKeyHash rootAccount) {asset=asset;amount=firstAmount} rootAccountData
         |>  Result.get
     let account = Account.addTransaction (Transaction.hash firstTx) firstTx rootAccount
     let secondTx =
-        Account.createTransaction account rootAccount.publicKeyHash {asset=asset;amount=firstAmount}
+        Account.createTransaction (publicKeyHash rootAccount) {asset=asset;amount=firstAmount} (account, snd rootAccountData)
         |>  Result.get
     let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction firstTx) session (timestamp+1UL) genesisState
     let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction secondTx) session (timestamp+1UL) updatedState
@@ -927,11 +931,11 @@ let ``Out of order dependent transactions are rearranged``() =
     let balances = Account.getBalance rootAccount
     let asset, amount = balances |> Map.toList |> List.head
     let firstTx =
-        Account.createTransaction rootAccount rootAccount.publicKeyHash {asset=asset;amount=amount}
+        Account.createTransaction (publicKeyHash rootAccount) {asset=asset;amount=amount} rootAccountData
         |>  Result.get
     let account = Account.addTransaction (Transaction.hash firstTx) firstTx rootAccount
     let secondTx =
-        Account.createTransaction account rootAccount.publicKeyHash {asset=asset;amount=amount}
+        Account.createTransaction (publicKeyHash rootAccount) {asset=asset;amount=amount} (account, snd rootAccountData)
         |>  Result.get
     let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction firstTx) session (timestamp+1UL) genesisState
     let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction secondTx) session (timestamp+1UL) updatedState

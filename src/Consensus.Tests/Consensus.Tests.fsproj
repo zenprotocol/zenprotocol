@@ -46,6 +46,7 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="ContractAssetTests.fs" />
+    <Compile Include="Helper.fs" />
     <Compile Include="TransactionHelpers.fs" />
     <Compile Include="TransactionNunitHelpers.fs" />
     <Compile Include="TransactionFsCheckHelpers.fs" />

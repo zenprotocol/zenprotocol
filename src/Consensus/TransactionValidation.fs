@@ -6,8 +6,7 @@ open UtxoSet
 open Crypto
 open Zen.Types.Data
 open Infrastructure
-
-let private (>=>) f1 f2 x = Result.bind f2 (f1 x)
+open Result
 
 type ValidationError =
     | Orphan

@@ -12,6 +12,7 @@ open TransactionNunitHelpers
 open TestsInfrastructure.Nunit
 open TestsInfrastructure.Constraints
 open FsUnit
+open Helper
 
 let acs = ActiveContractSet.empty   // Not used due to mocks
 let getUTXO _ = UtxoSet.NoOutput    // Not testing disk access
@@ -176,10 +177,10 @@ let ``Transaction with too few witnesses should fail``() =
 [<Test>]
 let ``Contract activation weight should be positive``() =
     let code = SampleContract.sampleContractCode
-    let rootAccount = Wallet.Account.createTestAccount ()
+    let rootAccount = createTestAccount()
     let tx =
         Wallet.Account.createActivateContractTransaction
-                            (Chain.getChainParameters (Chain.Local)) rootAccount code 1ul
+                            (Chain.getChainParameters (Chain.Local)) code 1ul rootAccount
     let actWeight =
         Result.map
                 (fun {Transaction.contract=Some(_,hints)} -> hints)

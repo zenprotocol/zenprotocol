@@ -38,7 +38,7 @@ let private getPublicKey extendedKey =
         | None -> Error "private key invalid"        
     | ExtendedPublicKey publicKey -> Ok publicKey
 
-let private getPrivateKey extendedKey = 
+let getPrivateKey extendedKey = 
     match extendedKey.key with
     | ExtendedPrivateKey privateKey-> Ok privateKey
     | _ -> Error "underlying key mismatch"
@@ -148,11 +148,3 @@ let encode chainKeyArgs extendedKey = result {
         ++ data
         |> Base58Check.Base58CheckEncoding.Encode
 }
-
-let getKeyPair extendedKey = 
-    result {
-        let! privateKey = getPrivateKey extendedKey
-        let! publicKey = getPublicKey extendedKey
-
-        return (privateKey, publicKey)
-    }
