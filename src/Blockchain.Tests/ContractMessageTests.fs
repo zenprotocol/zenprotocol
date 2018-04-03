@@ -11,10 +11,13 @@ open Messaging.Events
 open Infrastructure
 open Consensus.Tests.ContractTests
 open Blockchain.State
+open Consensus.Tests
+
 open TestsInfrastructure.Constraints
 open Crypto
 open TxSkeleton
 open Zen
+open Helper
 
 let chain = Chain.getChainParameters Chain.Local
 
@@ -41,7 +44,7 @@ let mutable state = {
     headers = 0ul
 }
 
-let account = Account.createTestAccount ()
+let account = createTestAccount()
 
 let shouldBeErrorMessage message =
     function
@@ -49,7 +52,11 @@ let shouldBeErrorMessage message =
     | Error err -> err |> should equal message
 
 let activateContract code account session state =
-    Account.createActivateContractTransaction chain { account with mempool = Map.toList state.memoryState.mempool } code 1ul
+    let (account:Account.T), secretKey = account
+    let account = { account with mempool = Map.toList state.memoryState.mempool }
+
+    let accountData = account, secretKey
+    Account.createActivateContractTransaction chain code 1ul accountData
     |> Result.map (fun tx ->
         let events, state =
             Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
@@ -89,7 +96,7 @@ open Zen.Asset
 module ET = Zen.ErrorT
 module Tx = Zen.TxSkeleton
 
-val main: txSkeleton -> hash -> string -> data -> wallet
+val main: txSkeleton -> hash -> string -> option data -> wallet
     -> result (txSkeleton ** option message) `cost` (64 + 64 + 0 + 18)
 let main txSkeleton contractHash command data wallet =
     if command = "contract2_test" then
@@ -103,7 +110,7 @@ let main txSkeleton contractHash command data wallet =
     else
         ET.autoFailw "unsupported command"
 
-val cf: txSkeleton -> string -> data -> wallet -> cost nat 7
+val cf: txSkeleton -> string -> option data -> wallet -> cost nat 7
 let cf _ _ _ _ = ret (64 + 64 + 0 + 18)
 """
 let contract2Hash = Contract.computeHash contract2Code
@@ -126,10 +133,10 @@ open Zen.Data
 module ET = Zen.ErrorT
 module Tx = Zen.TxSkeleton
 
-val main: txSkeleton -> hash -> string -> data -> wallet
-    -> result (txSkeleton ** option message) `cost` (2 + 66 + (64 + (64 + (64 + 64 + 0))) + 34)
+val main: txSkeleton -> hash -> string -> option data -> wallet
+    -> result (txSkeleton ** option message) `cost` (3 + 66 + (64 + (64 + (64 + 64 + 0))) + 34)
 let main txSkeleton contractHash command data wallet =
-    let! returnAddress = tryDict data >?> tryFindLock "returnAddress" in
+    let! returnAddress = data >!> tryDict >?> tryFindLock "returnAddress" in
 
     match returnAddress with
     | Some returnAddress ->
@@ -149,8 +156,8 @@ let main txSkeleton contractHash command data wallet =
     | None ->
         ET.autoFailw "returnAddress is required"
 
-val cf: txSkeleton -> string -> data -> wallet -> cost nat 15
-let cf _ _ _ _ = ret (2 + 66 + (64 + (64 + (64 + 64 + 0))) + 34)
+val cf: txSkeleton -> string -> option data -> wallet -> cost nat 15
+let cf _ _ _ _ = ret (3 + 66 + (64 + (64 + (64 + 64 + 0))) + 34)
 """
 
 [<Test>]
@@ -199,6 +206,7 @@ let ``Should execute contract chain and get a valid transaction``() =
             |> Cost.Realized.__force
             |> Types.Data.DataDict
             |> Types.Data.Dict
+            |> Some
 
         let! tx = TransactionHandler.executeContract session inputTx cHash1 "" data state.memoryState
 

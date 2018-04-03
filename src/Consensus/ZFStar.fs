@@ -29,7 +29,7 @@ let fsToFstString (s : string) =
 
 let fstToFsString : Prims.string -> string =
     System.Text.Encoding.ASCII.GetString
-    
+
 let toResult = function
     | ERR err -> Error (fstToFsString err)
     | EX err -> Error err.Message //TODO: remove EX
@@ -44,6 +44,11 @@ let fsToFstOption mapper value =
     match value with
     | FSharp.Core.Some value -> mapper value |> FStar.Pervasives.Native.Some
     | FSharp.Core.None -> FStar.Pervasives.Native.None
+
+let fstToFsOption mapper value =
+    match value with
+    | Native.Some value -> mapper value |> FSharp.Core.Some
+    | Native.None -> FSharp.Core.None
 
 let fsToFstLock (outputLock:Types.Lock) : lock =
     match outputLock with
@@ -148,7 +153,7 @@ let fstTofsMessage = function
         ({
             cHash = Hash.Hash cHash
             command = fstToFsString command
-            data = data
+            data = fstToFsOption id data
         } : Consensus.Types.Message)
         |> Some
         |> Ok

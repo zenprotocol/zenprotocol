@@ -1,5 +1,9 @@
 ﻿module Infrastructure.Result
 
+let (<@>) a b = Result.map b a
+let (>>=) a b = Result.bind b a
+let (>=>) f1 f2 x = Result.bind f2 (f1 x)
+
 type ResultBuilder<'err>() =
     member this.Return<'res> a : Result<'res,'err> = Ok a
     member this.Bind<'a, 'b> (m:Result<'a,'err>, f:'a->Result<'b,'err>) = Result.bind f m
@@ -30,7 +34,6 @@ let isOk<'res,'err> : Result<'res,'err> -> bool = function | Ok _ -> true | Erro
 let isError<'res,'err> : Result<'res,'err> -> bool = isOk >> not
 
 let traverseResultM f xs =
-    let (>>=) x f = Result.bind f x
     let retn = Result.Ok
     let initState = retn []
     let folder h t =

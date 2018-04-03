@@ -3,6 +3,7 @@ open MBrace.FsPickler.Combinators
 open Consensus
 open Types
 open Infrastructure
+open Result
 open Serialization
 open Chain
 
@@ -16,8 +17,6 @@ let TwoPow256 = bigint.Pow (2I, 256)
 let MaxTimeInFuture = 15UL * 60UL * 1000UL // 15 minutes in milliseconds
 
 let genesisParent = {version=Version;parent=Hash.zero;blockNumber=0ul;commitments=Hash.zero;timestamp=0UL;difficulty=0ul;nonce=0UL,0UL}
-
-let private (>=>) f1 f2 x = Result.bind f2 (f1 x)
 
 let result = new Result.ResultBuilder<string>()
 

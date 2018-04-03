@@ -17,15 +17,18 @@ open Messaging.Events
 open Infrastructure
 open Consensus.Tests.ContractTests
 open Blockchain.State
+open Consensus.Tests
+
 open Consensus.Tests.SampleContract
 open TestsInfrastructure.Constraints
+open Helper
 
 let chain = Chain.getChainParameters Chain.Local
 // Helper functions for the tests
 let getStringBytes (str : string) = System.Text.Encoding.UTF8.GetBytes str
 let getStringHash = getStringBytes >> Hash.compute
 let createTransaction address amount account =
-    match Account.createTransaction account address { asset = Constants.Zen; amount = amount } with
+    match Account.createTransaction address { asset = Constants.Zen; amount = amount } account with
     | Result.Ok tx -> tx
     | Result.Error error -> failwith error
 let getTxOutpoints txHash tx = [ for i in 0 .. List.length tx.outputs - 1 -> {txHash=txHash;index= uint32 i} ]
@@ -35,8 +38,8 @@ let areOutpointsInSet session outpoints set =
 
 // Some default transaction to work with during the tests
 let tx =
-    let account = Account.createTestAccount ()
-    createTransaction account.publicKeyHash 1UL account
+    let account = createTestAccount()
+    createTransaction (publicKeyHash (fst account)) 1UL account
 let txHash = Transaction.hash tx
 let txOutpoints = getTxOutpoints txHash tx
 
@@ -152,16 +155,16 @@ let ``origin tx hit mempool, orphan tx should be added to mempool``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
-    let rootAccount = Account.createTestAccount ()
-    let account1 = Account.create ()
-    let account2 = Account.create ()
+    let rootAccount = createTestAccount()
+    let account1, account1Key = create()
+    let account2, _ = create()
 
-    let tx1 = createTransaction account1.publicKeyHash 1UL rootAccount
+    let tx1 = createTransaction (publicKeyHash account1) 1UL rootAccount
     let tx1Hash = Transaction.hash tx1
 
     let tx2 =
-        Account.addTransaction tx1Hash tx1 account1
-        |> createTransaction account2.publicKeyHash 1UL
+        (Account.addTransaction tx1Hash tx1 account1, account1Key)
+        |> createTransaction (publicKeyHash account2) 1UL
     let tx2Hash = Transaction.hash tx2
 
     // Sending orphan transaction first, which should be added to orphan list
@@ -194,23 +197,23 @@ let ``orphan transaction is eventually invalid``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
-    let rootAccount = Account.createTestAccount ()
-    let account1 = Account.create ()
-    let account2 = Account.create ()
+    let rootAccount = createTestAccount()
+    let account1, account1key = create()
+    let account2, _ = create() 
 
-    let tx1 = createTransaction account1.publicKeyHash 2UL rootAccount
+    let tx1 = createTransaction (publicKeyHash account1) 2UL rootAccount
     let tx1Hash = Transaction.hash tx1
 
     let tx2 =
         let tx =
-            Account.addTransaction tx1Hash tx1 account1
-            |> createTransaction account2.publicKeyHash 2UL
+            (Account.addTransaction tx1Hash tx1 account1, account1key)
+            |> createTransaction (publicKeyHash account2) 2UL
         // let's change one of the outputs value and reassign to make invalid tx
         let output = tx.outputs.[0]
         let output' = {output with spend = {amount = output.spend.amount - 1UL; asset = output.spend.asset}}
         let outputs = output' :: List.tail tx.outputs
         let tx' = { tx with outputs = outputs}
-        Transaction.sign [account1.keyPair] tx'
+        Transaction.sign [keyPair account1] tx'
     let tx2Hash = Transaction.hash tx2
 
     // Sending orphan transaction first, which should be added to orphan list
@@ -242,22 +245,22 @@ let ``two orphan transaction spending same input``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
-    let rootAccount = Account.createTestAccount ()
-    let account1 = Account.create ()
-    let account2 = Account.create ()
-    let account3 = Account.create ()
+    let rootAccount = createTestAccount()
+    let account1, account1Key = create()
+    let account2, _ = create()
+    let account3, _ = create()
 
-    let tx1 = createTransaction account1.publicKeyHash 1UL rootAccount
+    let tx1 = createTransaction (publicKeyHash account1) 1UL rootAccount
     let tx1Hash = Transaction.hash tx1
 
     let tx2 =
-        Account.addTransaction tx1Hash tx1 account1
-        |> createTransaction account2.publicKeyHash 1UL
+        (Account.addTransaction tx1Hash tx1 account1, account1Key)
+        |> createTransaction (publicKeyHash account2) 1UL
     let tx2Hash = Transaction.hash tx2
 
     let tx3 =
-        Account.addTransaction tx1Hash tx1 account1
-        |> createTransaction account3.publicKeyHash 1UL
+        (Account.addTransaction tx1Hash tx1 account1, account1Key)
+        |> createTransaction (publicKeyHash account3) 1UL
     let tx3Hash = Transaction.hash tx3
 
     let (>>=) = Writer.bind
@@ -302,11 +305,11 @@ let ``Valid contract should be added to ActiveContractSet``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
-    let rootAccount = Account.createTestAccount ()
+    let rootAccount = createTestAccount()
     let cHash = getStringHash sampleContractCode
 
     let tx =
-        match Account.createActivateContractTransaction chain rootAccount sampleContractCode 1ul with
+        match Account.createActivateContractTransaction chain sampleContractCode 1ul rootAccount with
             | Result.Ok tx ->
                 tx
             | _ ->
@@ -337,15 +340,15 @@ let ``Invalid contract should not be added to ActiveContractSet or mempool``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
-    let rootAccount = Account.createTestAccount ()
+    let rootAccount = createTestAccount() |> fst
     let contractCode = "x"
     let cHash = getStringHash contractCode
 
     let tx =
         let input, output = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head
-        let output' = {output with lock=PK rootAccount.publicKeyHash}
+        let output' = {output with lock=PK (publicKeyHash rootAccount)}
         { inputs=[ Outpoint input ]; outputs=[ output' ]; witnesses=[]; contract = Some (contractCode, "") }
-        |> (Transaction.sign [ rootAccount.keyPair ])
+        |> (Transaction.sign [ keyPair rootAccount ])
 
     let txHash = Transaction.hash tx
 
@@ -374,10 +377,10 @@ let ``contract activation arrived, running orphan transaction``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
-    let account = Account.createTestAccount ()
+    let account = createTestAccount()
 
     let activationTransaction =
-        Account.createActivateContractTransaction chain account sampleContractCode 1ul
+        Account.createActivateContractTransaction chain sampleContractCode 1ul account
         |> getResult
     let activationTxHash = Transaction.hash activationTransaction
 
@@ -388,7 +391,7 @@ let ``contract activation arrived, running orphan transaction``() =
         |> Writer.unwrap
 
     let tx =
-        TransactionHandler.executeContract session sampleInputTx sampleContractHash "" Contract.EmptyData stateWithContract.memoryState
+        TransactionHandler.executeContract session sampleInputTx sampleContractHash "" None stateWithContract.memoryState
         |> getResult
     let txHash = Transaction.hash tx
 

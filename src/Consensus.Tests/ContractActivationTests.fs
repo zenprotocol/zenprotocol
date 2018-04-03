@@ -7,6 +7,7 @@ open Wallet
 open NUnit.Framework
 open FsUnit
 open TestsInfrastructure.Constraints
+open Helper
 
 let chain = Chain.Local
 let localParams = Chain.getChainParameters chain
@@ -22,14 +23,14 @@ type TxResult = Result<Transaction*ActiveContractSet.T,ValidationError>
 let ``Contract activation without contract sacrifice should fail``() =
     let code = SampleContract.sampleContractCode
 
-    let rootAccount = Account.createTestAccount ()
+    let rootAccount = createTestAccount() |> fst
 
     let outpoint = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
     let output = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
 
     let tx =
         {contract = Some (code,""); inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
-        |> Transaction.sign [rootAccount.keyPair]
+        |> Transaction.sign [keyPair rootAccount]
     let txHash = Transaction.hash tx
 
     let expected:TxResult = General "Contract activation must include activation sacrifice" |> Error
@@ -41,7 +42,7 @@ let ``Contract activation without contract sacrifice should fail``() =
 let ``Contract activation with too low contract sacrifice``() =
     let code = SampleContract.sampleContractCode
 
-    let rootAccount = Account.createTestAccount ()
+    let rootAccount = createTestAccount() |> fst
 
     let outpoint = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
     let outputs =
@@ -54,7 +55,7 @@ let ``Contract activation with too low contract sacrifice``() =
 
     let tx =
         {contract = Some (code,""); inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
-        |> Transaction.sign [rootAccount.keyPair]
+        |> Transaction.sign [keyPair rootAccount]
     let txHash = Transaction.hash tx
 
     let expected:TxResult = General "Contract must be activated for at least one block" |> Error
@@ -83,7 +84,7 @@ let ``Contract activation with asset other than zen should fail``() =
 
     let tx =
         {contract = Some (code,""); inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
-        |> Transaction.sign [Account.rootAccount.keyPair]
+        |> Transaction.sign [keyPair (fst rootAccountData)]
     let txHash = Transaction.hash tx
 
     let expected:TxResult = General "Sacrifice must be paid in Zen" |> Error
@@ -95,10 +96,10 @@ let ``Contract activation with asset other than zen should fail``() =
 let ``Contract activation with exact amount``() =
     let code = SampleContract.sampleContractCode
 
-    let rootAccount = Account.createTestAccount ()
+    let rootAccount = createTestAccount()
 
     let tx =
-        Account.createActivateContractTransaction localParams rootAccount code 1ul
+        Account.createActivateContractTransaction localParams code 1ul rootAccount
         |> function | Ok tx -> tx | _ -> failwith "unexpected"
     let txHash = Transaction.hash tx
 

@@ -2,14 +2,12 @@ module Wallet.Tests.ExtendedKey.Tests
 
 open NUnit.Framework
 
+open Infrastructure.Result
 open Wallet.ExtendedKey
 
 open Helpers
 open Constants
 open Expected
-
-let private (>=>) f1 f2 x = Result.bind f2 (f1 x)
-let private (>>=) a b = Result.bind b a
 
 open Vector1
 

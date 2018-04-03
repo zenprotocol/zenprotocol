@@ -43,7 +43,7 @@ let setUp = fun () ->
 
     createBroker () |> ignore
     Blockchain.Main.main dataPath chainParams busName |> ignore
-    Wallet.Main.main dataPath busName chain true |> ignore
+    Wallet.Main.main dataPath busName chain |> ignore
     Api.Main.main chain busName apiUri |> ignore
 
     // initialize genesis block
@@ -69,7 +69,7 @@ let ``Contract should activate and execute - Bus``() =
     | Ok (contractActivationTx, cHash) ->
         Blockchain.validateTransaction client contractActivationTx
         waitForTx subscriber contractActivationTx
-        match Wallet.executeContract client cHash "" Contract.EmptyData true Map.empty with
+        match Wallet.executeContract client cHash "" None true Map.empty with
         | Ok _ -> ()
         | Error error ->
             failwith error

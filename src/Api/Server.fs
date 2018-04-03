@@ -10,6 +10,7 @@ open Api.Types
 open Parsing
 open Messaging.Services
 open Messaging.Services.Wallet
+open Result
 
 type T =
     {
@@ -130,8 +131,8 @@ let handleRequest chain client (request,reply) =
             replyError error
     | Post ("/wallet/import", Some body) ->
         match getImportSeed body with
-        | Ok words ->
-            match Wallet.importSeed client words with
+        | Ok (words, key) ->
+            match Wallet.importSeed client words key with
             | Ok _ -> reply StatusCode.OK NoContent
             | Error error -> replyError error
         | Error error ->
@@ -186,11 +187,20 @@ let handleRequest chain client (request,reply) =
         Wallet.resyncAccount client
         reply StatusCode.OK NoContent
     | Post ("/block/publish", Some body) ->
-            match getPublishBlock body with
-            | Error error -> replyError error
-            | Ok block ->
-                Blockchain.validateMinedBlock client block
-                reply StatusCode.OK NoContent
+        match getPublishBlock body with
+        | Error error -> replyError error
+        | Ok block ->
+            Blockchain.validateMinedBlock client block
+            reply StatusCode.OK NoContent
+    | Get ("/wallet/lock", _) ->
+        Wallet.lock client
+        reply StatusCode.OK NoContent
+    | Post ("/wallet/unlock", Some body) ->
+        getUnlock body
+        >>= Wallet.unlock client
+        |> Result.mapError replyError
+        |> Result.map (fun _ -> reply StatusCode.OK NoContent)
+        |> ignore
     | _ ->
         reply StatusCode.NotFound NoContent
 

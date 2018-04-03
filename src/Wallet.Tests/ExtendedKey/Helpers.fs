@@ -16,8 +16,6 @@ let toPrint =
         sprintf "%s %s" state s
     ) ("")
 
-let private (>>=) a b = Result.bind b a
-
 let getEncodedPair chainArgs extendedKey = result {
     let! encodedPublic = neuter extendedKey >>= encode chainArgs 
     let! encodedPrivate = encode chainArgs extendedKey
