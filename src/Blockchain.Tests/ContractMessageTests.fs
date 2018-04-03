@@ -89,7 +89,6 @@ let contract2Code = """
 // contract 2: this contract receives the remaining tx Zen tokens and locks them to itself
 
 open Zen.Types
-open Zen.Vector
 open Zen.Base
 open Zen.Cost
 open Zen.Asset
@@ -124,7 +123,6 @@ let contract1Code =
 // contract 1: this contract receives Zen tokens; mints and locks it's own tokens to the return-address, and passes a message to contract 2
 
 open Zen.Types
-open Zen.Vector
 open Zen.Util
 open Zen.Base
 open Zen.Cost

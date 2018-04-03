@@ -1,7 +1,6 @@
 module Zen.Types.Extracted
 
 module      A = Zen.Array
-module      V = Zen.Vector
 module     U8 = FStar.UInt8
 module    U32 = FStar.UInt32
 module    U64 = FStar.UInt64

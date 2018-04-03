@@ -106,7 +106,7 @@ let checked_div(#n) a b =
   if fits (a / b) n then Some (a / b) else None
 
 (* Modulo primitives *)
-#set-options "--z3rlimit 25"
+#set-options "--z3rlimit 13616400"
 val mod(#n:pos): a:int_t n -> b:int_t n{b <> 0} -> int_t n
 let mod(#_) a b = a - ((a/b) * b)
 #reset-options

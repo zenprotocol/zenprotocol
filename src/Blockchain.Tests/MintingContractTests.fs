@@ -78,7 +78,6 @@ let setUp = fun () ->
     clean()
     activateContract """
     open Zen.Types
-    open Zen.Vector
     open Zen.Base
     open Zen.Cost
     open Zen.Asset

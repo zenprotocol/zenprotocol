@@ -107,7 +107,6 @@ let ``Contract should not be able to create tokens other than its own``() =
     (compileRunAndValidate sampleInputTx utxoSet
          """
          open Zen.Types
-         open Zen.Vector
          open Zen.Base
          open Zen.Cost
 
@@ -143,7 +142,6 @@ let ``Contract should not be able to create tokens other than its own``() =
 let ``Contract should be able to destroy its own tokens locked to it``() =
     let sampleContractCode = """
     open Zen.Types
-    open Zen.Vector
     open Zen.Base
     open Zen.Cost
 
@@ -217,7 +215,6 @@ let ``Contract should be able to destroy its own tokens locked to it``() =
 let ``Contract should not be able to destroy tokens other than its own - single output``() =
     let contractCode = """
     open Zen.Types
-    open Zen.Vector
     open Zen.Base
     open Zen.Cost
     open Zen.Asset
@@ -269,7 +266,6 @@ let ``Contract should not be able to destroy tokens other than its own - single 
 let ``Contract should not be able to destroy tokens other than its own - multiple (two) outputs``() =
     let contractCode = """
     open Zen.Types
-    open Zen.Vector
     open Zen.Base
     open Zen.Cost
     open Zen.Asset

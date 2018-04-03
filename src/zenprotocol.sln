@@ -125,8 +125,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Zulib", "Zulib", "{0CA87DC0
 		Zulib\fsharp\Realized\Zen.UInt64.fs = Zulib\fsharp\Realized\Zen.UInt64.fs
 		Zulib\fsharp\Realized\Zen.Util.fs = Zulib\fsharp\Realized\Zen.Util.fs
 		Zulib\fstar\Zen.Util.fsti = Zulib\fstar\Zen.Util.fsti
-		Zulib\fsharp\Extracted\Zen.Vector.fs = Zulib\fsharp\Extracted\Zen.Vector.fs
-		Zulib\fstar\Zen.Vector.fst = Zulib\fstar\Zen.Vector.fst
 		Zulib\fsharp\Realized\Zen.Wallet.fs = Zulib\fsharp\Realized\Zen.Wallet.fs
 		Zulib\fstar\Zen.Wallet.fsti = Zulib\fstar\Zen.Wallet.fsti
 		Zulib\fstar\Zen.Data.fst = Zulib\fstar\Zen.Data.fst
@@ -137,6 +135,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Zulib", "Zulib", "{0CA87DC0
 		Zulib\fstar\Zen.ContractResult.Base.fst = Zulib\fstar\Zen.ContractResult.Base.fst
 		Zulib\fstar\Zen.ContractResult.fst = Zulib\fstar\Zen.ContractResult.fst
 		Zulib\fstar\Zen.ContractResult.NoMessage.fst = Zulib\fstar\Zen.ContractResult.NoMessage.fst
+		Zulib\fstar\Zen.Hash.Sha3.fsti = Zulib\fstar\Zen.Hash.Sha3.fsti
+		Zulib\fsharp\Realized\Zen.Hash.Sha3.fs = Zulib\fsharp\Realized\Zen.Hash.Sha3.fs
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ContractExamples", "ContractExamples", "{38137384-85D5-41FE-B40B-27E4F54898D0}"

@@ -1,6 +1,6 @@
 
-//#r @"../../packages/System.Reflection.Metadata/lib/portable-net45+win8/System.Reflection.Metadata.dll"
-#r @"../../packages/System.Reflection.Metadata/lib/netstandard1.1/System.Reflection.Metadata.dll"
+#r @"../../packages/System.Reflection.Metadata/lib/portable-net45+win8/System.Reflection.Metadata.dll"
+//#r @"../../packages/System.Reflection.Metadata/lib/netstandard1.1/System.Reflection.Metadata.dll"
 #r @"../../packages/FAKE/tools/FakeLib.dll"
 #r @"../../packages/Zen.FSharp.Compiler.Service/lib/net45/Zen.FSharp.Compiler.Service.dll"
 
@@ -97,7 +97,6 @@ Target "Extract" (fun _ ->
        "--extract_module";"Zen.Option";
        "--extract_module";"Zen.OptionT";
        "--extract_module";"Zen.Optics";
-       "--extract_module";"Zen.Vector";
        "--extract_module";"Zen.Array.Extracted";
        "--extract_module";"Zen.Cost.Extracted";
        "--codegen-lib";"Zen.Cost";
@@ -144,7 +143,6 @@ Target "Build" (fun _ ->
       "fsharp/Extracted/Zen.OptionT.fs";
       "fsharp/Extracted/Zen.ResultT.fs";
       "fsharp/Extracted/Zen.List.fs";
-      "fsharp/Extracted/Zen.Vector.fs";
       "fsharp/Realized/Zen.Array.Realized.fs";
       "fsharp/Extracted/Zen.Array.Extracted.fs";
       "fsharp/Extracted/Zen.Types.Extracted.fs";
@@ -159,6 +157,7 @@ Target "Build" (fun _ ->
       "fsharp/Extracted/Zen.Data.fs";
       "fsharp/Extracted/Zen.ContractResult.Base.fs";
       "fsharp/Extracted/Zen.ContractResult.NoMessage.fs";
+      "fsharp/Realized/Zen.Hash.Sha3.fs";
     |]
 
   let checker = FSharpChecker.Create()

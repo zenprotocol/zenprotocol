@@ -9,7 +9,6 @@ open Crypto
 
 let sampleContractCode = """
 open Zen.Types
-open Zen.Vector
 open Zen.Base
 open Zen.Cost
 
