@@ -48,6 +48,27 @@ let ( @<< ) #_ #_ #_ f g = fun x -> f (g x)
 val flip(#a #b #c:Type): (a -> b -> c) -> b -> a -> c
 let flip #_ #_ #_ f x y = f y x
 
+val swap(#a #b:Type): a**b -> b**a
+let swap #_ #_ (x,y) = y,x
+
+val curry(#a #b #c:Type): (a**b -> c) -> a -> b -> c
+let curry #_ #_ #_ f x y = f (x,y)
+
+val uncurry(#a #b #c:Type): (a -> b -> c) -> a**b -> c
+let uncurry #_ #_ #_ f = fun (x,y) -> f x y
+
+val curry3(#a #b #c #d:Type): (a**b**c -> d) -> a -> b -> c -> d
+let curry3 #_ #_ #_ #_ f x y z = f (x,y,z)
+
+val uncurry3(#a #b #c #d:Type): (a->b->c->d) -> a**b**c -> d
+let uncurry3 #_ #_ #_ #_ f = fun (x,y,z) -> f x y z
+
+val curry4(#a #b #c #d #e:Type): (a**b**c**d -> e) -> a -> b -> c -> d -> e
+let curry4 #_ #_ #_ #_ #_ f w x y z = f (w,x,y,z)
+
+val uncurry4(#a #b #c #d #e:Type): (a->b->c->d->e) -> a**b**c**d -> e
+let uncurry4 #_ #_ #_ #_ #_ f = fun (w,x,y,z) -> f w x y z
+
 (*) Robocow
 
         (___)

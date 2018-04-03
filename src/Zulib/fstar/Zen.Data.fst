@@ -1,5 +1,6 @@
 module Zen.Data
 
+open Zen.Base
 open Zen.Cost
 open Zen.Types
 module OT = Zen.OptionT
@@ -145,4 +146,4 @@ let (>?>) = OT.bind
 
 val (>!>)(#a #b:Type)(#n:nat):
   (option a) -> (a -> cost (option b) n) -> cost (option b) n
-let (>!>) = OT.retBind
+let (>!>) #_ #_ #_  = OT.liftOpt >> OT.bind

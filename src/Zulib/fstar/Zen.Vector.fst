@@ -13,23 +13,23 @@ type t(a:Type): nat -> Type = vector a // For qualified imports
 
 (** [isEmpty v] returns [true] if and only if [v] is empty. *)
 val isEmpty(#a:Type)(#l:nat): vector a l -> cost bool 3
-let isEmpty #_ #_ = function | VNil      -> 3 +~! true
-                             | VCons _ _ -> 3 +~! false
+let isEmpty #_ #_ = function | VNil      -> 3 `incRet` true
+                             | VCons _ _ -> 3 `incRet` false
 
 (** [hd v] returns the first element of [v].
     Requires [v] to be nonempty.*)
 val hd(#a:Type)(#l:nat): v:vector a l{VCons? v} -> cost a 2
-let hd #_ #_ (VCons hd _) = 2 +~! hd
+let hd #_ #_ (VCons hd _) = 2 `incRet` hd
 
 (** [tl v] returns the tail of [v].
     Requires [v] to be nonempty.*)
 val tl(#a:Type)(#l:nat): v:vector a l{VCons? v} -> cost (vector a (l-1)) 2
-let tl #_ #_ (VCons _ tl) = 2 +~! tl
+let tl #_ #_ (VCons _ tl) = 2 `incRet` tl
 
 (** [nth v i] returns the [i]th element of v, starting at 0. *)
 val nth(#a:Type)(#l:nat): vector a l -> i:nat{i<l} -> cost a (4*(i+1))
 let rec nth #_ #_ (VCons hd tl) = function
-  | 0 -> 4 +~! hd
+  | 0 -> 4 `incRet` hd
   | i -> 4 +! (nth tl (i-1))
 
 (** [append v1 v2] appends the elements of [v2] to the end of [v1]. *)
@@ -65,7 +65,7 @@ let rec flatten #a #l1 #l2 v =
 val init(#a:Type)(#n:nat): l:nat -> (i:nat{i<l} -> cost a n)
   -> cost (vector a l) (n*l+2)
 let rec init #_ #_ l f = match l with
-  | 0 -> 2 +~! VNil
+  | 0 -> 2 `incRet` VNil
   | _ -> let l':nat = l-1 in
          VCons <$> (f 0) <*> (init l' (fun x -> f (x+1)))
 
@@ -74,14 +74,14 @@ let rec init #_ #_ l f = match l with
 val map(#a #b:Type)(#l #n:nat): (a -> cost b n) -> vector a l
   -> cost (vector b l) ((l*n)+(l*2)+2)
 let rec map #_ #b #l #n f = function
- | VNil -> 2 +~! VNil
+ | VNil -> 2 `incRet` VNil
  | VCons hd tl -> 2 +! (VCons <$> (f hd) <*> (map f tl))
 
 val foldl(#a #b:Type)(#l #n:nat):
   (a -> b -> cost a n) -> a -> vector b l
   -> cost a ((n+2)*l+2)
 let rec foldl #_ #_ #_ #_ f acc = function
-  | VNil -> 2 +~! acc
+  | VNil -> 2 `incRet` acc
   | VCons hd tl -> 2 +! (f acc hd >>= (fun acc' -> foldl f acc' tl))
 
 (** [countWhere f v] returns the number of elements [e] in [v] for which [f e] is true. *)
@@ -133,7 +133,7 @@ let sumN #_ =
 val zip(#a #b:Type)(#l:nat):
   vector a l -> vector b l -> cost (vector (a**b) l) (3*l+3)
 let rec zip #_ #_ #_ v1 v2 =
-  match v1 with | VNil -> 3 +~! VNil
+  match v1 with | VNil -> 3 `incRet` VNil
                 | VCons hd1 tl1 ->
   match v2 with | VCons hd2 tl2 -> 3 +! (VCons (hd1,hd2) <$> (zip tl1 tl2))
 

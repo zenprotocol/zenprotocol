@@ -19,7 +19,7 @@ abstract let ret #_ x = C x
 //
 
 abstract val bind(#a #b:Type)(#m #n:nat):
-  cost a n -> (a -> cost b m) -> cost b (n+m)
+  cost a m -> (a -> cost b n) -> cost b (m+n)
 abstract let bind #_ #_ #_ #_ (C x) f = C (C?.inj (f x))
 
 //
