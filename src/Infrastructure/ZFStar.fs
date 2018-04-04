@@ -4,6 +4,7 @@ open System
 open System.IO
 open Microsoft.FSharp.Compiler.SourceCodeServices
 open Exception
+open Infrastructure.Result
 
 let private fsChecker = FSharpChecker.Create()
 let private changeExtention extention path = Path.ChangeExtension (path, extention)
@@ -89,7 +90,7 @@ let initOutputDir moduleName =
     Directory.CreateDirectory oDir |> ignore
     oDir, oDir / moduleName
 
-let private extract (code, hints, limits) moduleName =
+let private extract code hints limits rlimit moduleName = 
     let oDir, file = initOutputDir moduleName
     let originalFile = changeExtention ".orig.fst" file
     let hintsFile = changeExtention ".fst.hints" file
@@ -111,6 +112,7 @@ let private extract (code, hints, limits) moduleName =
                 "--extract_module"; moduleName
                 "--max_fuel"; maxFuel.ToString()
                 "--max_ifuel"; maxIFuel.ToString()
+                "--z3rlimit"; rlimit.ToString()
                 ]
             |> wrapFStar "extract" extractedFile)
     finally
@@ -175,11 +177,11 @@ let recordHints code moduleName =
         printfn "record hints output directory: %A" oDir
 #else
         Directory.Delete (oDir, true)
-#endif
-
-let compile path (code,hints) moduleName =
+#endif 
+   
+let compile path code hints rlimit moduleName = 
     calculateMetrics hints
-    |> Result.bind (fun limits -> extract (code,hints,limits) moduleName)
+    |> Result.bind (fun limits -> extract code hints limits rlimit moduleName)
     |> Result.bind (compile' path moduleName)
 
 let load path moduleName =
@@ -189,3 +191,29 @@ let load path moduleName =
         |> Ok
     with _ as ex ->
         Error ex.Message
+        
+let totalQueries hints =
+    let oDir, file = initOutputDir "" //as for now, using the filesystem as temporary solution
+    let hintsFile = changeExtention ".fst.hints" file
+
+    File.WriteAllText(hintsFile, hints)
+
+    try (
+        try
+            Hints.read_hints hintsFile
+            |> function 
+            | Some hints -> Ok hints
+            | None -> Error "total queries: could not read hints"
+        with _ ->
+            Error "total queries: invalid hints")
+        <@> (fun hintsDb -> 
+                hintsDb.hints
+                |> Hints.hints_to_hintsMap
+                |> Hints.total_num_queries
+                |> uint32)
+    finally
+#if DEBUG
+        printfn "total queries output directory: %A" oDir
+#else 
+        Directory.Delete (oDir, true)
+#endif 
