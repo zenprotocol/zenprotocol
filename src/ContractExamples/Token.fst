@@ -3,13 +3,12 @@ open Zen.Vector
 open Zen.Base
 open Zen.Cost
 open Zen.Asset
+open Zen.Data
 
 module ET = Zen.ErrorT
 module OT = Zen.OptionT
 module Tx = Zen.TxSkeleton
-
-val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 19
-let cf _ _ _ _ #l _ = ret (64 + (64 + (64 + 64 + (l * 128 + 192) + 0)) + 28 + 22)
+module CR = Zen.ContractResult.NoMessage
 
 let buy txSkeleton contractHash returnAddress =
   let! tokens = Tx.getAvailableTokens zenAsset txSkeleton in
@@ -21,9 +20,9 @@ let buy txSkeleton contractHash returnAddress =
     >>= Tx.mint tokens contractAsset
     >>= Tx.lockToAddress contractAsset tokens returnAddress in
 
-  ret <| OK (txSkeleton, None)
+  CR.ret txSkeleton
 
-let redeem #l txSkeleton contractHash returnAddress (wallet:wallet l) =
+let redeem txSkeleton contractHash returnAddress wallet =
   let! contractAsset = getDefault contractHash in
   let! tokens = Tx.getAvailableTokens contractAsset txSkeleton in
 
@@ -32,12 +31,12 @@ let redeem #l txSkeleton contractHash returnAddress (wallet:wallet l) =
     >>= Tx.lockToAddress zenAsset tokens returnAddress
     >>= Tx.fromWallet zenAsset tokens contractHash wallet in
 
-  match txSkeleton with
-  | Some txSkeleton -> ret <| OK (txSkeleton, None)
-  | None -> ret <| ERR "contract doesn't have enough zens to pay you"
+  CR.ofOption "contract doesn't have enough zens to pay you" txSkeleton
 
-val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message)) (64 + (64 + (64 + 64 + (l * 128 + 192) + 0)) + 28 + 22)
-let main txSkeleton contractHash command data returnAddress #l wallet =
+val main: txSkeleton -> hash -> string -> option data -> wallet:wallet -> cost (result (txSkeleton ** option message))  (2 + 66 + (64 + (64 + (64 + 64 + (Zen.Wallet.size wallet * 128 + 192) + 0)) + 25) + 29)
+let main txSkeleton contractHash command data wallet =
+  let! returnAddress = data >!> tryDict >?> tryFindLock "returnAddress" in
+
   match returnAddress with
   | Some returnAddress ->
       if command = "redeem" then
@@ -50,3 +49,5 @@ let main txSkeleton contractHash command data returnAddress #l wallet =
   | None ->
       ET.autoFailw "returnAddress is required"
 
+val cf: txSkeleton -> string -> option data -> wallet -> cost nat 24
+let cf _ _ _ wallet = ret  (2 + 66 + (64 + (64 + (64 + 64 + (Zen.Wallet.size wallet * 128 + 192) + 0)) + 25) + 29)

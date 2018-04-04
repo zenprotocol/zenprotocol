@@ -22,6 +22,8 @@ type contractArgs = {
 }
 *)
 
+type contractResult = result (txSkeleton ** option message)
+
 noeq type costFunction =
     | CostFunc:
         #n:nat{n<=maxCost}
@@ -40,6 +42,6 @@ noeq type mainFunction =
                 -> command:string
                 -> data:option data
                 -> wallet:wallet
-                -> result (txSkeleton ** option message) `cost` force ((CostFunc?.f cf) txSkel command data wallet)
+                -> contractResult `cost` force ((CostFunc?.f cf) txSkel command data wallet)
               )
         -> mainFunction

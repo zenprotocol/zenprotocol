@@ -71,7 +71,9 @@ let private activateContract (chainParams : Chain.ChainParameters) contractPath 
                 let contract = {contract with expiry = contract.expiry + numberOfBlocks}
                 return ActiveContractSet.add cHash contract acs
             | None ->
-                let! contract = Contract.compile contractPath (code,hints) (blockNumber + numberOfBlocks) |> Result.mapError (fun _ -> BadContract)
+                let! contract =
+                    Measure.measure (sprintf "compiling contract %A" cHash)
+                        (lazy(Contract.compile contractPath (code,hints) (blockNumber + numberOfBlocks) |> Result.mapError (fun _ -> BadContract)))
                 return ActiveContractSet.add contract.hash contract acs
         | None ->
             return acs

@@ -44,9 +44,9 @@ let testParameters =
         smoothingFactor=0.035;
         maxBlockWeight=1000_000_000I;
         sacrificePerByteBlock=1UL;
-        genesisHash= get <| Hash.fromString "4c1ac7101fdc53e1415c76b8e08d86ea404f57d8d53d64d1109d81e365c2d70f";
+        genesisHash= get <| Hash.fromString "4d9ab23909ce747917bc1c4b70dd8ae7e8bee358f448fb65d35a482ff396c451";
         genesisTime=1517828985040UL
-        networkId=2001ul
+        networkId=2002ul
         contractSacrificePerBytePerBlock=ContractSacrificePerBytePerBlock
     }
 
