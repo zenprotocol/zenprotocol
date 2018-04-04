@@ -20,7 +20,7 @@ let sign keyPairs tx =
 
     let pkWitnesses =
         List.map (
-            fun ((secretKey, publicKey)) -> PKWitness (PublicKey.serialize publicKey, Crypto.sign secretKey txHash)
+            fun ((secretKey, publicKey)) -> PKWitness (publicKey, Crypto.sign secretKey txHash)
         ) keyPairs
 
     //// TODO: Should we also use sighash and not sign entire transaction?

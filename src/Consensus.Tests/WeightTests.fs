@@ -94,7 +94,7 @@ let ``Contract validated transaction should have the right cost``() =
         witnesses = [ ContractWitness cWitness ]
     }
     let txWeight = transactionWeight getUTXO utxos tx
-    shouldEqual (txWeight,(Ok 200_000I : Result<bigint,string>))
+    shouldEqual (txWeight,(Ok 20_000I : Result<bigint,string>))
 
 [<Test>]
 let ``Two contracts in sequence should have the right cost``() =
@@ -140,7 +140,7 @@ let ``Two contracts in sequence should have the right cost``() =
         witnesses = [ ContractWitness cWitness1; ContractWitness cWitness2 ]
     }
     let txWeight = transactionWeight getUTXO utxos tx
-    shouldEqual (txWeight, (Ok 250_000I : Result<bigint,string>))
+    shouldEqual (txWeight, (Ok 25_000I : Result<bigint,string>))
 
 [<Test>]
 let ``Transaction with too many witnesses should fail``() =

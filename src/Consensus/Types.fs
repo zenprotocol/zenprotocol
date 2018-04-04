@@ -61,7 +61,7 @@ type ContractWitness =
         member x.endInputs = x.beginInputs + x.inputsLength - 1ul
 
 type Witness =
-    | PKWitness of array<byte> * Signature
+    | PKWitness of PublicKey * Signature
     | ContractWitness of ContractWitness
 
 type Contract = {
