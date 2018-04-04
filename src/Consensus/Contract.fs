@@ -108,20 +108,17 @@ let load contractsPath expiry size code hash =
             fn = mainFn
             costFn = costFn
             expiry = expiry
-            size = size
+            size = size //TODO: remove, use: String.length code |> uint32
             code = code
         })
 
-let compile contractsPath (code, hints) expiry =
-    let hash = computeHash code
-
-    let size = String.length code |> uint32
+let compile contractsPath (contract:Consensus.Types.Contract) expiry =
+    let hash = computeHash contract.code
 
     hash
     |> getModuleName
-    |> ZFStar.compile contractsPath (code, hints)
-    |> Result.map (fun _ -> hash)
-    |> Result.bind (load contractsPath expiry size code)
+    |> ZFStar.compile contractsPath contract.code contract.hints contract.rlimit
+    |> Result.bind (fun _ -> load contractsPath expiry (String.length contract.code |> uint32) contract.code hash) //TODO: remove size
 
 let recordHints code =
     code
