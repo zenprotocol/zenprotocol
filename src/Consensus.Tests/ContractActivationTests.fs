@@ -19,6 +19,19 @@ let validateInContext = validateInContext localParams getUTXO contractPath
 
 type TxResult = Result<Transaction*ActiveContractSet.T,ValidationError>
 
+let unwrap = 
+    function
+    | Ok value -> value
+    | Error error -> failwith error
+    
+let recordHints = 
+    Consensus.Contract.recordHints
+    >> unwrap
+
+let totalQueries = 
+    Infrastructure.ZFStar.totalQueries
+    >> unwrap
+
 [<Test>]
 let ``Contract activation without contract sacrifice should fail``() =
     let code = SampleContract.sampleContractCode
@@ -28,8 +41,11 @@ let ``Contract activation without contract sacrifice should fail``() =
     let outpoint = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
     let output = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
 
+    let hints = recordHints code
+    let totalQueries = totalQueries hints
+    
     let tx =
-        {contract = Some (code,""); inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
+        {contract = Some { code=code;hints=hints;rlimit=0u;queries=totalQueries }; inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
         |> Transaction.sign [keyPair rootAccount]
     let txHash = Transaction.hash tx
 
@@ -53,8 +69,11 @@ let ``Contract activation with too low contract sacrifice``() =
             {output with spend={output.spend with amount = output.spend.amount - 1UL}}
         ]
 
+    let hints = recordHints code
+    let totalQueries = totalQueries hints
+
     let tx =
-        {contract = Some (code,""); inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
+        {contract = Some { code=code;hints=hints;rlimit=0u;queries=totalQueries }; inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
         |> Transaction.sign [keyPair rootAccount]
     let txHash = Transaction.hash tx
 
@@ -82,8 +101,11 @@ let ``Contract activation with asset other than zen should fail``() =
     let outpoint = {txHash=originTxHash;index=0ul}
     let output = {lock=ActivationSacrifice;spend={amount=1UL;asset=asset}}
 
+    let hints = recordHints code
+    let totalQueries = totalQueries hints
+
     let tx =
-        {contract = Some (code,""); inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
+        {contract = Some { code=code;hints=hints;rlimit=0u;queries=totalQueries }; inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
         |> Transaction.sign [keyPair (fst rootAccountData)]
     let txHash = Transaction.hash tx
 
@@ -106,4 +128,58 @@ let ``Contract activation with exact amount``() =
     validateInContext 1ul ActiveContractSet.empty utxoSet txHash tx
     |> should be ok
 
+[<Test>]
+let ``Contract activation without hints should fail``() =
+    let code = SampleContract.sampleContractCode
 
+    let rootAccount = createTestAccount() |> fst
+
+    let activationSacrificeAmount = 1000UL
+    let outpoint = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
+    let outputs =
+        let output = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
+
+        [
+            {lock=ActivationSacrifice;spend={amount=activationSacrificeAmount;asset=Constants.Zen}}
+            {output with spend={output.spend with amount = output.spend.amount - activationSacrificeAmount}}
+        ]
+
+    let tx =
+        {contract = Some { code=code;hints="";rlimit=0u;queries=0u }; inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
+        |> Transaction.sign [keyPair rootAccount]
+
+
+    let expected:TxResult = General "total queries: invalid hints" |> Error
+
+    validateInContext 1ul ActiveContractSet.empty utxoSet (Transaction.hash tx) tx
+    |> should equal expected
+
+[<Test>]
+let ``Contract activation with invalid queries should fail``() =
+    let code = SampleContract.sampleContractCode
+
+    let rootAccount = createTestAccount() |> fst
+
+    let activationSacrificeAmount = 1000UL
+    let outpoint = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
+    let outputs =
+        let output = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
+
+        [
+            {lock=ActivationSacrifice;spend={amount=activationSacrificeAmount;asset=Constants.Zen}}
+            {output with spend={output.spend with amount = output.spend.amount - activationSacrificeAmount}}
+        ]
+
+    let hints = recordHints code
+    let totalQueries = totalQueries hints
+
+    let tx =
+        {contract = Some { code=code;hints=hints;rlimit=0u;queries=(totalQueries - 1u) }; inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
+        |> Transaction.sign [keyPair rootAccount]
+
+
+    let expected:TxResult = General "Total queries mismatch" |> Error
+
+    validateInContext 1ul ActiveContractSet.empty utxoSet (Transaction.hash tx) tx
+    |> printfn "%A" //  should equal expected
+    ()

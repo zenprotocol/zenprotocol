@@ -43,6 +43,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="Result.fs" />
     <Compile Include="BigInteger.fs" />
     <Compile Include="Crypto.fs" />
     <Compile Include="Endpoint.fs" />
@@ -64,7 +65,6 @@
     <Compile Include="Exception.fs" />
     <Compile Include="Platform.fs" />
     <Compile Include="ZFStar.fs" />
-    <Compile Include="Result.fs" />
     <Compile Include="Option.fs" />
   </ItemGroup>
   <PropertyGroup>

@@ -155,10 +155,16 @@ type ConsensusGenerator =
                 let! shouldHaveContract = Gen.choose (1,0)
                 let! NonEmptyString code = Arb.generate<NonEmptyString>
                 let! NonEmptyString hints = Arb.generate<NonEmptyString>
+                let notZero = fun value -> value <> 0u
+                let! rlimit = Arb.generate<uint32> |> Gen.filter notZero
+                let! queries = Arb.generate<uint32> |> Gen.filter notZero
 
                 let contract =
                     if shouldHaveContract = 1 then
-                        Some (code, hints)
+                        Some { code = code
+                               hints = hints
+                               rlimit = rlimit
+                               queries = queries }
                     else
                         None
 

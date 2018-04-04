@@ -10,6 +10,10 @@ open Serialization
 
 let result = new ResultBuilder<string>()
 
+//Literal
+let activationFactor = 300000u
+
+
 //UNDONE: Alter this active pattern when Coinbase locks are generalised.
 let (|PKPair|_|) (pInput, witness) =
     match pInput, witness with
@@ -28,7 +32,7 @@ let (|ContractPair|_|) (pInput, witness) =
 type Weights = {
     pk : bigint * int * int;
     contract : ContractWitness -> (bigint * int * int)
-    activation : string -> Result<bigint,string>
+    activation : Consensus.Types.Contract -> bigint
     dataSize : bigint
 }
 
@@ -37,13 +41,11 @@ let getOutputs = UtxoSet.tryGetOutputs
 
 let pkWitnessWeight : bigint * int * int = 100_000I, 1, 0
 
-let contractWitnessWeight cWit =
+let contractWitnessWeight (cWit:ContractWitness) =
     1000I * bigint (cWit.cost), int cWit.inputsLength, int cWit.outputsLength
 
-let activationWeight hints = result {
-    let! fuel, iFuel = calculateMetrics hints
-    return bigint (fuel + iFuel) * 300_000I
-}
+let activationWeight contract =
+    contract.queries * contract.rlimit |> bigint
 
 let realWeights =
     {   pk=pkWitnessWeight;
@@ -92,10 +94,10 @@ let txWeight weights
         with
         | e -> Error "Couldn't make a transaction skeleton"
     let! inputWeights = accumulateWeights weights skeleton tx.witnesses
-    let! contractActivationWeight =
+    let contractActivationWeight =
         match tx.contract with
-        | None -> Ok 0I
-        | Some (_, hints) -> weights.activation hints
+        | None -> 0I
+        | Some contract -> weights.activation contract
     let txSizeWeight =
         if weights.dataSize = 0I then 0I
         else

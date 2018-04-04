@@ -81,7 +81,7 @@ let ``coinbase with contract should fail``() =
          inputs = [];
          outputs=[{lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Constants.Zen}}]
          witnesses=[]
-         contract=Some("ad","ad")
+         contract=Some { code="ad";hints="ad";rlimit=0u;queries=0u }
       }
 
     let expected:Result<Transaction,ValidationError> = Error (General "coinbase transaction cannot activate a contract")

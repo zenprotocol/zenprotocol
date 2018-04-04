@@ -74,19 +74,19 @@ let tx = { inputs = []; witnesses = []; outputs = []; contract = None }
 [<Test>]
 let ``Transaction validation should fail with structurally invalid contract data error``() =
     let msg = "structurally invalid contract data"
-    { tx with contract = Some ("", "") }
+    { tx with contract = Some { code="";hints="";rlimit=0u;queries=0u } }
     |> basicValidationMsg msg
     |> shouldEqual
-    { tx with contract = Some ("x", "") }
+    { tx with contract = Some { code="x";hints="";rlimit=0u;queries=0u } }
     |> basicValidationMsg msg
     |> shouldEqual
-    { tx with contract = Some ("", "x") }
+    { tx with contract = Some { code="";hints="x";rlimit=0u;queries=0u } }
     |> basicValidationMsg msg
     |> shouldEqual
-    { tx with contract = Some (null, "x") }
+    { tx with contract = Some { code=null;hints="x";rlimit=0u;queries=0u } }
     |> basicValidationMsg msg
     |> shouldEqual
-    { tx with contract = Some ("x", null) }
+    { tx with contract = Some { code="x";hints=null;rlimit=0u;queries=0u } }
     |> basicValidationMsg msg
     |> shouldEqual
 

@@ -485,14 +485,23 @@ module private Serialization =
 
     module Contract =
         let write ops =
-            Option.write ops (fun (code, hints) ->
-                ops.writeLongString code
-                >> ops.writeLongString hints)
+            Option.write ops (fun contract ->
+                ops.writeLongString contract.code
+                >> ops.writeLongString contract.hints
+                >> ops.writeNumber4 contract.rlimit
+                >> ops.writeNumber4 contract.queries)
         let read = reader {
             let readContract = reader {
                 let! code = readLongString
                 let! hints = readLongString
-                return code, hints
+                let! rlimit = readNumber4
+                let! queries = readNumber4
+                return {
+                    code = code
+                    hints = hints
+                    rlimit = rlimit
+                    queries = queries
+                }
             }
             let! contract = Option.read readContract
             return contract

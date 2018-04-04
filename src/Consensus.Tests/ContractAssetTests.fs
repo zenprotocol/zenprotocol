@@ -8,9 +8,21 @@ let result = new Infrastructure.Result.ResultBuilder<string>()
 
 let contractPath = "./test"
 
+[<Literal>]
+let rlimit = 2723280u
+
 let compile code = result {
     let! hints = Contract.recordHints code
-    return! Contract.compile contractPath (code, hints) 1000ul
+    let! queries = Infrastructure.ZFStar.totalQueries hints
+
+    let contract : Consensus.Types.Contract = {
+        code = code
+        hints = hints
+        rlimit = rlimit
+        queries = queries
+    }
+    
+    return! Contract.compile contractPath contract 1000ul
 }
 
 let dataPath = ".data"
