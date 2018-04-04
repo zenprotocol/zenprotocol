@@ -18,6 +18,9 @@ let result = new ResultBuilder<string>()
 [<Literal>]
 let passphrase = ""
 
+[<Literal>]
+let rlimit = 2723280u
+
 type Status<'a> =
     | Spent of 'a
     | Unspent of 'a
@@ -351,6 +354,7 @@ let createActivateContractTransaction chain code (numberOfBlocks:uint32) (accoun
         let! hints = Measure.measure
                         (sprintf "recording hints for contract %A" cHash)
                         (lazy(Contract.recordHints code))
+        let! queries = ZFStar.totalQueries hints
 
         let outputs = addChange spend amount account { spend = spend; lock = ActivationSacrifice }
         return Transaction.sign
@@ -359,7 +363,10 @@ let createActivateContractTransaction chain code (numberOfBlocks:uint32) (accoun
                 inputs = inputPoints
                 outputs = outputs
                 witnesses = []
-                contract = Some (code, hints)
+                contract = Some { code = code
+                                  hints = hints
+                                  rlimit = rlimit
+                                  queries = queries }
             }
     }
 
