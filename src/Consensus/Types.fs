@@ -64,11 +64,18 @@ type Witness =
     | PKWitness of array<byte> * Signature
     | ContractWitness of ContractWitness
 
+type Contract = {
+    code: string
+    hints: string
+    rlimit: uint32
+    queries: uint32
+}
+
 type Transaction = {
     inputs: Input list
     outputs: Output list
     witnesses: Witness list
-    contract: (string * string) Option
+    contract: Contract Option
 }
 
 type Nonce = uint64 * uint64
