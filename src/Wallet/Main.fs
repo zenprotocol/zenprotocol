@@ -145,6 +145,12 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
         |> Ok
         |> reply<bool> requestId
         wallet, secretKey
+    | AccountLocked ->
+        secretKey
+        |> Option.isNone
+        |> Ok
+        |> reply<bool> requestId
+        wallet, secretKey
     | Unlock key ->
         wallet,
         match DataAccess.Secured.tryGet dataAccess session with
