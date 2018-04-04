@@ -17,6 +17,9 @@ open Zen.Types.Main
 
 let assemblyDirectory = "./test"
 
+[<Literal>]
+let rlimit = 2723280u
+
 type Message = {
     cHash: byte[]
     command: string
@@ -62,7 +65,7 @@ let compileAndInvoke fstCode args =
     let moduleName = getModuleName fstCode
     ZFStar.recordHints fstCode moduleName
     |> Result.map (fun hints -> (fstCode, hints))
-    |> Result.bind (fun (code, hints) -> ZFStar.compile assemblyDirectory (code, hints) moduleName)
+    |> Result.bind (fun (code, hints) -> ZFStar.compile assemblyDirectory code hints rlimit moduleName)
     |> Result.bind (fun _ -> ZFStar.load assemblyDirectory moduleName)
     |> Result.bind (fun assembly ->
         try
