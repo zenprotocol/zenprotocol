@@ -6,6 +6,7 @@ open UtxoSet
 open Crypto
 open Zen.Types.Data
 open Infrastructure
+open Infrastructure
 open Result
 
 type ValidationError =
@@ -54,12 +55,19 @@ let private activateContract (chainParams : Chain.ChainParameters) contractPath 
 
     result {
         match tx.contract with
-        | Some (code,hints) ->
-            let cHash = Contract.computeHash code
+        | Some contract ->
+            match ZFStar.totalQueries contract.hints with
+            | Error error ->
+                yield! GeneralError error
+            | Ok value when value <> contract.queries ->
+                yield! GeneralError "Total queries mismatch"
+            | _ -> ()
+
+            let cHash = Contract.computeHash contract.code
 
             let! activationSacrifices = getActivationSacrifice tx
 
-            let codeLengthKB = String.length code |> uint64
+            let codeLengthKB = String.length contract.code |> uint64
             let activationSacrificePerBlock = chainParams.sacrificePerByteBlock * codeLengthKB
             let numberOfBlocks = activationSacrifices / activationSacrificePerBlock |> uint32
 
@@ -73,7 +81,7 @@ let private activateContract (chainParams : Chain.ChainParameters) contractPath 
             | None ->
                 let! contract =
                     Measure.measure (sprintf "compiling contract %A" cHash)
-                        (lazy(Contract.compile contractPath (code,hints) (blockNumber + numberOfBlocks) |> Result.mapError (fun _ -> BadContract)))
+                        (lazy(Contract.compile contractPath contract (blockNumber + numberOfBlocks) |> Result.mapError (fun _ -> BadContract)))
                 return ActiveContractSet.add contract.hash contract acs
         | None ->
             return acs
@@ -278,7 +286,11 @@ let private checkStructure =
 
     (fun tx ->
         match tx.contract with
-        | Some (code, hints) when not <| (String.length code > 0 && String.length hints > 0) ->
+        | Some contract when not <|
+            (String.length contract.code > 0 &&
+             String.length contract.hints > 0 &&
+             contract.rlimit > 0u &&
+             contract.queries > 0u) ->
             GeneralError "structurally invalid contract data"
         | _ ->
             Ok tx)
