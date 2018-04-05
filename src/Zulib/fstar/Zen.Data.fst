@@ -146,4 +146,4 @@ let (>?>) = OT.bind
 
 val (>!>)(#a #b:Type)(#n:nat):
   (option a) -> (a -> cost (option b) n) -> cost (option b) n
-let (>!>) #_ #_ #_  = OT.liftOpt >> OT.bind
+let (>!>) #_ #_ #_ = OT.liftOpt >> OT.bind
