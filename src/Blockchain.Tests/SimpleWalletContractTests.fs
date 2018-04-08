@@ -69,7 +69,7 @@ let activateContract code account session state =
     )
 
 let dataPath = ".data"
-let databaseContext = DatabaseContext.createEmpty dataPath
+let databaseContext = DatabaseContext.createTemporary dataPath
 let session = DatabaseContext.createSession databaseContext
 
 let mutable cHash = Hash.zero

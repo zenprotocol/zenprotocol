@@ -69,7 +69,7 @@ let state = {
 
 [<Test>]
 let ``valid transaction raise events and update state``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createTemporary "test"
     use session = DatabaseContext.createSession databaseContext
     let result = Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
 
@@ -90,7 +90,7 @@ let ``valid transaction raise events and update state``() =
 
 [<Test>]
 let ``Invalid tx doesn't raise events or update state``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createTemporary "test"
 
     use session = DatabaseContext.createSession databaseContext
     let invalidTx = {inputs=[];outputs=[];witnesses=[];contract=None}
@@ -113,7 +113,7 @@ let ``Invalid tx doesn't raise events or update state``() =
 
 [<Test>]
 let ``tx already in mempool nothing happen`` () =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createTemporary "test"
 
     use session = DatabaseContext.createSession databaseContext
     let result = Handler.handleCommand chain (ValidateTransaction Transaction.rootTx) session 1UL state
@@ -129,7 +129,7 @@ let ``tx already in mempool nothing happen`` () =
 
 [<Test>]
 let ``orphan tx added to orphan list``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createTemporary "test"
 
     use session = DatabaseContext.createSession databaseContext
     let utxoSet = UtxoSet.asDatabase
@@ -152,7 +152,7 @@ let ``orphan tx added to orphan list``() =
 
 [<Test>]
 let ``origin tx hit mempool, orphan tx should be added to mempool``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createTemporary "test"
 
     use session = DatabaseContext.createSession databaseContext
     let rootAccount = createTestAccount()
@@ -194,7 +194,7 @@ let ``origin tx hit mempool, orphan tx should be added to mempool``() =
 
 [<Test>]
 let ``orphan transaction is eventually invalid``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createTemporary "test"
 
     use session = DatabaseContext.createSession databaseContext
     let rootAccount = createTestAccount()
@@ -242,7 +242,7 @@ let ``orphan transaction is eventually invalid``() =
 
 [<Test>]
 let ``two orphan transaction spending same input``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createTemporary "test"
 
     use session = DatabaseContext.createSession databaseContext
     let rootAccount = createTestAccount()
@@ -303,7 +303,7 @@ let ``two orphan transaction spending same input``() =
 [<Test>]
 [<ParallelizableAttribute>]
 let ``Valid contract should be added to ActiveContractSet``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createTemporary "test"
 
     use session = DatabaseContext.createSession databaseContext
     let rootAccount = createTestAccount()
@@ -339,7 +339,7 @@ let ``Valid contract should be added to ActiveContractSet``() =
 [<Test>]
 [<ParallelizableAttribute>]
 let ``Invalid contract should not be added to ActiveContractSet or mempool``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createTemporary "test"
 
     use session = DatabaseContext.createSession databaseContext
     let rootAccount = createTestAccount() |> fst
@@ -377,7 +377,7 @@ let ``contract activation arrived, running orphan transaction``() =
         | Ok r -> r
         | Error error -> failwithf "%A" error
 
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createTemporary "test"
 
     use session = DatabaseContext.createSession databaseContext
     let account = createTestAccount()
@@ -420,7 +420,7 @@ let ``contract activation arrived, running orphan transaction``() =
 
 [<Test>]
 let ``Transaction already in db but not part of the main chain``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createTemporary "test"
     use session = DatabaseContext.createSession databaseContext
 
     // we need to fake some information
@@ -468,7 +468,7 @@ let ``Transaction already in db but not part of the main chain``() =
 
 [<Test>]
 let ``Transaction already in db and part of the main chain is ignored``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createTemporary "test"
     use session = DatabaseContext.createSession databaseContext
 
     // we need to fake some information
