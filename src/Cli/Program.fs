@@ -53,6 +53,7 @@ type Arguments =
     | [<CliPrefix(CliPrefix.None)>] Execute of ParseResults<ExecuteContractArgs>
     | [<CliPrefix(CliPrefix.None)>] PublishBlock of ParseResults<PublishBlockArgs>
     | [<CliPrefix(CliPrefix.None)>] AccountExists of ParseResults<NoArgs>
+    | [<CliPrefix(CliPrefix.None)>] AccountLocked of ParseResults<NoArgs>
     | [<CliPrefix(CliPrefix.None)>] Lock of ParseResults<NoArgs>
     | [<CliPrefix(CliPrefix.None)>] Unlock of ParseResults<UnlockArgs>
     interface IArgParserTemplate with
@@ -71,6 +72,7 @@ type Arguments =
             | Execute _ -> "execute contract"
             | PublishBlock _ -> "publish block to the network"
             | AccountExists _ -> "check for an existing account"
+            | AccountLocked _ -> "checks if an account is locked"
             | Lock _ -> "lock-protect an accunt"
             | Unlock _ -> "unlock an account using a key"
 
@@ -214,6 +216,18 @@ let main argv =
                 printfn "Account is initialized"
             else
                 printfn "Account is not initialized"
+        with
+            | :? Net.WebException as ex ->
+                printfn "%s" ex.Message
+    | Some (AccountLocked _) ->
+        try
+            let result =
+                AccountLockedResponseJson.Load(getUri "wallet/locked")
+
+            if result.AccountLocked then
+                printfn "Account is locked"
+            else
+                printfn "Account is unlocked"
         with
             | :? Net.WebException as ex ->
                 printfn "%s" ex.Message

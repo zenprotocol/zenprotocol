@@ -121,6 +121,13 @@ type AccountExistsResponseJson = JsonProvider<"""
 }
 """>
 
+type AccountLockedResponseJson = JsonProvider<"""
+{
+    "accountLocked" : false
+}
+""">
+
+
 type HeadersResponseJson = JsonProvider<"""
 [
     {
