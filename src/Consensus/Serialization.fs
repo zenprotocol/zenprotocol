@@ -282,11 +282,15 @@ module private Serialization =
             }
 
         module Signature =
-            let write ops signature = ops.writeBytes signature Crypto.SerializedSignatureLength
+            let write ops signature =
+                let bytes = Signature.serialize (Signature signature)
+                ops.writeBytes signature Crypto.SerializedSignatureLength
             let read = reader {
                 let! bytes = readBytes Crypto.SerializedSignatureLength
 
-                return bytes
+                match Signature.deserialize bytes with
+                | Some (Signature signature) -> return signature
+                | None -> yield! fail
             }
 
         module PublicKey =
@@ -435,10 +439,10 @@ module private Serialization =
         let private SerializedContractWitness = 2uy
 
         let write ops = function
-            | PKWitness (publicKey, Signature signature) ->
+            | PKWitness (publicKey, signature) ->
                 ops.writeByte SerializedPKWitness
                 >> ops.writeBytes (PublicKey.serialize publicKey) Crypto.SerializedPublicKeyLength
-                >> ops.writeBytes signature Crypto.SerializedSignatureLength
+                >> ops.writeBytes (Signature.serialize signature) Crypto.SerializedSignatureLength
             | ContractWitness cw ->
                 ops.writeByte SerializedContractWitness
                 >> ops.writeHash cw.cHash
@@ -456,9 +460,9 @@ module private Serialization =
                 let! publicKey = readBytes Crypto.SerializedPublicKeyLength
                 let! signature = readBytes Crypto.SerializedSignatureLength
 
-                match PublicKey.deserialize publicKey with
-                | Some publicKey -> return PKWitness (publicKey, Signature signature)
-                | None -> yield! fail
+                match PublicKey.deserialize publicKey, Signature.deserialize signature with
+                | Some publicKey,Some signature -> return PKWitness (publicKey, signature)
+                | _ -> yield! fail
             | SerializedContractWitness ->
                 let! cHash = Hash.read
                 let! command = readString
