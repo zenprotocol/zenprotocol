@@ -26,8 +26,8 @@ let bind ( _: Prims.nat)
     |> C
 
 let inc ( _: Prims.nat)
-        ( mx : cost<'Aa, Prims.unit> )
         ( _: Prims.nat )
+        ( mx : cost<'Aa, Prims.unit> )
         : cost<'Aa, Prims.unit> = mx
 
 let left_id ( _: Prims.nat)
