@@ -1,14 +1,14 @@
-module Api.KeyPathParser
+module Wallet.KeyPathParser
 
 type Syntax =
     | EndOfPath
-    | Error
+    | Invalid
     | Derive of int
 
-let rec readNumber chars num =
+let rec private readNumber chars num =
     let addDigit tail digit =
         if (10 * num) + digit < 0 then
-            Error, chars
+            Invalid, chars
         else
             (10 * num) + digit |> readNumber tail
 
@@ -27,7 +27,7 @@ let rec readNumber chars num =
     | '\'' :: [] -> Derive (num + 0x80000000), []
     | '/' :: tail -> Derive num, tail
     | [] -> Derive num, []
-    | _ -> Error, chars
+    | _ -> Invalid, chars
 
 let parse (path:string) =
     let parsePart chars =
@@ -45,13 +45,13 @@ let parse (path:string) =
             | '7'
             | '8'
             | '9' -> readNumber chars 0
-            | _ -> Error, chars
+            | _ -> Invalid, chars
 
     let rec parseAll chars parts =
         match parsePart chars with
-        | EndOfPath,_ -> List.rev parts |> Some
+        | EndOfPath,_ -> List.rev parts |> Ok
         | Derive index, chars -> parseAll chars (index :: parts)
-        | Error,_ -> None
+        | Invalid,_ -> Error "invalid key path"
 
     // first two characters must be m/
     if path.StartsWith "m/" then
@@ -59,4 +59,4 @@ let parse (path:string) =
 
         parseAll chars []
     else
-        None
+        Error "invalid key path"

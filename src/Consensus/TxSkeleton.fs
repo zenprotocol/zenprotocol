@@ -101,7 +101,7 @@ let isSkeletonOf txSkeleton tx outputs =
     && outputs = outputsFromSkeleton
     && tx.outputs = txSkeleton.outputs
 
-let getContractWitness cHash command data initialTxSkelton finalTxSkeleton (cost:int64) =
+let getContractWitness cHash command data initialTxSkelton finalTxSkeleton (cost:int64)  =
     let length list = List.length list |> uint32
 
     {
@@ -112,5 +112,6 @@ let getContractWitness cHash command data initialTxSkelton finalTxSkeleton (cost
         beginOutputs = length initialTxSkelton.outputs
         inputsLength = length finalTxSkeleton.pInputs - length initialTxSkelton.pInputs
         outputsLength = length finalTxSkeleton.outputs - length initialTxSkelton.outputs
+        signature = None
         cost = uint32 cost
     }

@@ -190,7 +190,7 @@ let main argv =
     | Some (Execute args) ->
         let address,command,data,asset,assetType,amount = args.GetResult <@ ExecuteContract_Arguments @>
         let execute = new ContractExecuteRequestJson.Root(address,command,data,
-            new ContractExecuteRequestJson.Options(true) , [| new ContractExecuteRequestJson.Spend(asset, assetType, amount) |])
+            new ContractExecuteRequestJson.Options(true, "") , [| new ContractExecuteRequestJson.Spend(asset, assetType, amount) |])
 
         let response = execute.JsonValue.Request (getUri "wallet/contract/execute")
 

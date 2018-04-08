@@ -54,6 +54,7 @@ type ContractWitness =
         beginOutputs: uint32
         inputsLength: uint32
         outputsLength: uint32
+        signature:(PublicKey * Signature) option
         cost: uint32
     }
     with
@@ -98,3 +99,7 @@ type Block = {
     commitments: Hash.Hash list;
     transactions:Transaction list;
 }
+
+let Anonymous = Zen.Types.Main.Anonymous
+let ContractSender (Hash.Hash cHash)= Zen.Types.Main.Contract cHash
+let PKSender (Crypto.PublicKey publicKey) = Zen.Types.Main.PK publicKey

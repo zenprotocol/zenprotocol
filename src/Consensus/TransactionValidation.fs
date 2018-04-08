@@ -109,7 +109,7 @@ let getContractWallet (txSkeleton:TxSkeleton.T) cw =
         | _ -> None
     )
 
-let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
+let private checkWitnesses blockNumber acs (txHash, tx, inputs) =
     let fulltxSkeleton = TxSkeleton.fromTransaction tx inputs
 
     let checkPKWitness inputTx pInputs publicKey signature =
@@ -130,7 +130,7 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
         | TxSkeleton.Input.PointedOutput (_, {lock=PK pkHash}) :: tail -> verifyPkHash pkHash tail
         | _ -> GeneralError "unexpected PK witness lock type"
 
-    let checkContractWitness inputTx acs cw message pInputs =
+    let checkContractWitness inputTx acs cw callingContract message pInputs =
         let checkMessage (txSkeleton, resultMessage) =
             if message = resultMessage then
                 Ok txSkeleton
@@ -164,6 +164,20 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
             else
                 Ok txSkeleton
 
+        let checkSender =
+            match callingContract, cw.signature with
+            | Some cHash, None ->
+                let cHash = cHash
+                Ok <| ContractSender cHash
+            | None, Some (publicKey, signature) ->
+                match Crypto.verify publicKey signature txHash with
+                | Valid ->
+                    Ok (PKSender publicKey)
+                | Invalid ->
+                    GeneralError "invalid contract witness signature"
+            | None, None -> Ok Anonymous
+            | Some _, Some _ -> GeneralError "invalid contract witness, chained contract cannot have a signature"
+
         let rec popContractsLocksOf cHash pInputs left =
             if left = 0ul then
                 pInputs
@@ -179,36 +193,39 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
                     popContractsLocksOf cHash tail (left - 1ul)
                 | _ -> pInputs
 
-        match ActiveContractSet.tryFind cw.cHash acs with
-        | Some contract ->
-            let contractWallet = getContractWallet fulltxSkeleton cw
+        match checkSender with
+        | Ok sender ->
+            match ActiveContractSet.tryFind cw.cHash acs with
+            | Some contract ->
+                let contractWallet = getContractWallet fulltxSkeleton cw
 
-            // Validate true cost (not weight!) of running contract against
-            // the witness commitment
-            let cost = Contract.getCost contract cw.command cw.data contractWallet inputTx
-            if uint32 cost <> cw.cost then
-                GeneralError <| sprintf "Contract witness committed to cost %d, but cost of execution is %d" (uint32 cost) cw.cost
-            else
-                Contract.run contract cw.command cw.data contractWallet inputTx
-                |> Result.mapError General
-                |> Result.bind checkMessage
-                |> Result.bind checkIssuedAndDestroyed
-                |> Result.bind (fun outputTx ->
-                    if List.length outputTx.pInputs - List.length inputTx.pInputs = int cw.inputsLength &&
-                       List.length outputTx.outputs - List.length inputTx.outputs = int cw.outputsLength then
+                // Validate true cost (not weight!) of running contract against
+                // the witness commitment
+                let cost = Contract.getCost contract cw.command sender cw.data contractWallet inputTx
+                if uint32 cost <> cw.cost then
+                    GeneralError <| sprintf "Contract witness committed to cost %d, but cost of execution is %d" (uint32 cost) cw.cost
+                else
+                    Contract.run contract cw.command sender cw.data contractWallet inputTx
+                    |> Result.mapError General
+                    |> Result.bind checkMessage
+                    |> Result.bind checkIssuedAndDestroyed
+                    |> Result.bind (fun outputTx ->
+                        if List.length outputTx.pInputs - List.length inputTx.pInputs = int cw.inputsLength &&
+                           List.length outputTx.outputs - List.length inputTx.outputs = int cw.outputsLength then
 
-                        Ok (outputTx, popContractsLocksOf cw.cHash pInputs cw.inputsLength)
-                    else GeneralError "input/output length mismatch")
-        | None -> Error ContractNotActive
+                            Ok (outputTx, popContractsLocksOf cw.cHash pInputs cw.inputsLength)
+                        else GeneralError "input/output length mismatch")
+            | None -> Error ContractNotActive
+        | Error error -> Error error
 
-    let witnessesFolder state (witness, message) =
+    let witnessesFolder state (witness, callingContract, message) =
         state
         |> Result.bind (fun (tx', pInputs) ->
             match witness with
             | PKWitness (serializedPublicKey, signature) ->
                 checkPKWitness tx' pInputs serializedPublicKey signature
             | ContractWitness cw ->
-                checkContractWitness tx' acs cw message pInputs
+                checkContractWitness tx' acs cw callingContract message pInputs
         )
 
     let applyMaskIfContract pTx =
@@ -227,18 +244,34 @@ let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
         let! (witnessedSkel, pInputs) =
             List.mapi (fun i witness -> (i, witness)) tx.witnesses
             |> List.map (fun (i, witness) ->
-                witness,
+                let nextMessage =
                     match witness with
                     | ContractWitness _ ->
-                        if i + 1 = List.length tx.witnesses then
+                      if i + 1 = List.length tx.witnesses then
+                          None
+                      else
+                          match tx.witnesses.[i+1] with
+                          | ContractWitness cw ->
+                              Some { cHash = cw.cHash; command = cw.command; data = cw.data }
+                          | _ ->
+                              None
+                    | _ -> None
+
+                let callingContract =
+                    match witness with
+                    | ContractWitness _ ->
+                        if i = 0 then
                             None
                         else
-                            match tx.witnesses.[i+1] with
+                            match tx.witnesses.[i-1] with
                             | ContractWitness cw ->
-                                Some { cHash = cw.cHash; command = cw.command; data = cw.data }
+                                Some cw.cHash
                             | _ ->
                                 None
-                    | _ -> None)
+                    | _ -> None
+
+                witness, callingContract, nextMessage)
+
             |> List.fold witnessesFolder (Ok (masked, fulltxSkeleton.pInputs))
 
         if not <| List.isEmpty pInputs then

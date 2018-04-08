@@ -15,9 +15,9 @@ open Zen.Cost
 module RT = Zen.ResultT
 module Tx = Zen.TxSkeleton
 
-val main: txSkeleton -> hash -> string -> option data -> wallet
+val main: txSkeleton -> hash -> string -> sender -> option data -> wallet
     -> result (txSkeleton ** option message) `cost` (64 + (64 + 64 + 0) + 23)
-let main txSkeleton contractHash command data wallet =
+let main txSkeleton contractHash command sender data wallet =
   let! asset = Zen.Asset.getDefault contractHash in
   let spend = { asset=asset; amount=1000UL } in
   let lock = ContractLock contractHash in
@@ -31,8 +31,8 @@ let main txSkeleton contractHash command data wallet =
 
   RT.ok (txSkeleton, None)
 
-val cf: txSkeleton -> string -> option data -> wallet -> cost nat 9
-let cf _ _ _ _ = ret (64 + (64 + 64 + 0) + 23)
+val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 9
+let cf _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 23)
 """
 
 let sampleContractHash =

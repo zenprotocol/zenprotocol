@@ -48,6 +48,7 @@
   <ItemGroup>
     <Compile Include="Address.fs" />
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="KeyPathParser.fs" />
     <Compile Include="ExtendedKey.fs" />
     <Compile Include="Secured.fs" />
     <Compile Include="Account.fs" />
@@ -94,6 +95,17 @@
       <ItemGroup>
         <Reference Include="Base58Check">
           <HintPath>..\..\packages\Base58Check\lib\Net40\Base58Check.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
+      <ItemGroup>
+        <Reference Include="BouncyCastle.Crypto">
+          <HintPath>..\..\packages\BouncyCastle\lib\BouncyCastle.Crypto.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>

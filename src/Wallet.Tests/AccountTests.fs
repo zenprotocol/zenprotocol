@@ -8,6 +8,7 @@ open Types
 open Wallet
 open TestsInfrastructure.Constraints
 open Consensus.Tests.Helper
+open Infrastructure
 
 let chain = Chain.Local
 let chainParams = Chain.localParameters
@@ -177,7 +178,7 @@ let ``picking from multiple inputs``() =
 let ``create execute contract transaction``() =
     let account = createTestAccount ()
 
-    let executeContract _ _ _ txSkeleton =
+    let executeContract _ _ _ _ txSkeleton =
         let tx =
             txSkeleton
             |> TxSkeleton.addOutput {lock=Contract Hash.zero;spend={asset=Constants.Zen;amount=1UL}}
@@ -187,7 +188,7 @@ let ``create execute contract transaction``() =
 
     let spends = Map.add Constants.Zen 1UL Map.empty
 
-    let result = Account.createExecuteContractTransaction executeContract Hash.zero "" None true spends account
+    let result = Account.createExecuteContractTransaction executeContract Hash.zero "" None true None spends account
 
     result |> should be ok
 
@@ -277,7 +278,7 @@ let ``sync up from empty wallet``() =
 
     let blockHash = Block.hash block.header
 
-    let genesisBlock = Block.createGenesis chainParams [Transaction.rootTx] (0UL,0UL)
+    let genesisBlock = Block.createGenesis chainParams [rootTx] (0UL,0UL)
     let genesisHeader = genesisBlock.header
 
     let getHeader = function
@@ -480,7 +481,7 @@ let ``Should get expected deltas``() =
 
     let blockHash = Block.hash block.header
 
-    let genesisBlock = Block.createGenesis chainParams [Transaction.rootTx] (0UL,0UL)
+    let genesisBlock = Block.createGenesis chainParams [rootTx] (0UL,0UL)
     let genesisHeader = genesisBlock.header
 
     let getHeader = function
@@ -513,3 +514,51 @@ let ``Should get expected deltas``() =
     let expected = expected @ [ (tx3Hash, Map.add Constants.Zen -3L Map.empty) ]
 
     should equal expected (Account.getHistory account')
+
+[<Test>]
+let ``sign contract wintess``() =
+    let account = createTestAccount ()
+
+    let executeContract _ _ _ _ txSkeleton =
+        let tx =
+            txSkeleton
+            |> TxSkeleton.addOutput {lock=Contract Hash.zero;spend={asset=Constants.Zen;amount=1UL}}
+            |> Transaction.fromTxSkeleton
+
+        let tx = {tx with witnesses=[
+                                        ContractWitness {
+                                            cHash = Hash.zero
+                                            command = ""
+                                            data=None
+                                            beginInputs=1ul
+                                            beginOutputs = 0ul
+                                            inputsLength = 0ul
+                                            outputsLength = 1ul
+                                            signature = None
+                                            cost = 8ul
+                                        }]
+        }
+
+        tx |> Ok
+
+    let spends = Map.add Constants.Zen 1UL Map.empty
+
+    let result = Account.createExecuteContractTransaction executeContract Hash.zero "" None true (Some "m/0'") spends account
+
+    result |> should be ok
+
+    let tx:Transaction = Result.get result
+
+    let txHash = Transaction.hash tx
+
+    let publicKey = ExtendedKey.derivePath "m/0'" (snd account) |> Result.get |> ExtendedKey.getPublicKey |> Result.get
+
+    match tx.witnesses.[1] with
+    | ContractWitness cw ->
+        match cw.signature with
+        | Some (publicKey',signature) ->
+            Crypto.verify publicKey signature txHash |> should equal Crypto.Valid
+            publicKey' |> should equal publicKey
+        | None ->
+            failwith "expected signature"
+    | _ -> failwith "expected contract witness"

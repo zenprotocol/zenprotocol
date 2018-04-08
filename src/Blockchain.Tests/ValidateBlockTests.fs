@@ -35,7 +35,7 @@ let getTxOutpoints tx =
     let txHash = Transaction.hash tx
     [ for i in 0 .. List.length tx.outputs - 1 -> {txHash=txHash;index= uint32 i} ]
 
-let rootTxOutpoints = getTxOutpoints Transaction.rootTx
+let rootTxOutpoints = getTxOutpoints rootTx
 let areOutpointsInSet session outpoints set =
     Option.isSome <| UtxoSet.getUtxos (UtxoSetRepository.get session) outpoints set
 let isAccountInSet session (account:Account.T) =
@@ -48,7 +48,7 @@ let isAccountInSet session (account:Account.T) =
     areOutpointsInSet session outpoints
 
 let rootAccountData = createTestAccount()
-let rootAccount, _ = rootAccountData 
+let rootAccount, _ = rootAccountData
 
 let createTransaction account =
     Result.get <| Account.createTransaction (publicKeyHash account) {asset=Constants.Zen;amount=100000000UL} (account, snd rootAccountData)
@@ -60,7 +60,7 @@ let mempool = MemPool.empty
 let orphanPool = OrphanPool.create()
 let acs = ActiveContractSet.empty
 let ema = EMA.create chain
-let genesisBlock = Block.createGenesis chain [Transaction.rootTx] (0UL,0UL)
+let genesisBlock = Block.createGenesis chain [rootTx] (0UL,0UL)
 let genesisBlockHash = Block.hash genesisBlock.header
 
 let hashBlock b = Block.hash b.header, b
@@ -127,7 +127,7 @@ let ``genesis block accepted``() =
     use databaseContext = DatabaseContext.createEmpty "test"
     use session = DatabaseContext.createSession databaseContext
 
-    let block = Block.createGenesis chain [Transaction.rootTx] (0UL,0UL)
+    let block = Block.createGenesis chain [rootTx] (0UL,0UL)
     let blockHash = Block.hash block.header
 
     let events, state' =
@@ -153,7 +153,7 @@ let ``wrong genesis block should be rejected``() =
     use databaseContext = DatabaseContext.createEmpty "test"
 
     use session = DatabaseContext.createSession databaseContext
-    let block = Block.createGenesis chain [Transaction.rootTx] (0UL,1UL)
+    let block = Block.createGenesis chain [rootTx] (0UL,1UL)
     let events, state' =
         BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state
         |> Writer.unwrap
@@ -607,8 +607,8 @@ let ``block with a contract activation is added to chain``() =
 
     let contract = {
         hash = cHash
-        fn = fun _ _ _ _  tx -> Ok (tx,None)
-        costFn = fun _ _ _ _ -> 1L
+        fn = fun _ _ _ _ _ tx -> Ok (tx,None)
+        costFn = fun _ _ _ _ _ -> 1L
         expiry=1002ul
         size=String.length sampleContractCode |> uint32
         code = ""
@@ -805,7 +805,7 @@ let ``Valid template for two transactions which don't depend on each other``() =
         let spend = output.spend
         let outputs = [{spend=spend;lock=PK (publicKeyHash rootAccount)}]
         Transaction.sign
-            [ keyPair rootAccount ]
+            [ rootKeyPair ]
             {
                 inputs = [Outpoint outpoint];
                 outputs = outputs;
@@ -836,7 +836,7 @@ let ``Two transactions in the same block which depend on each other are valid``(
     let _, genesisState =
         BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state
         |> Writer.unwrap
-    
+
     let balances = Account.getBalance rootAccount
     let asset, amount = balances |> Map.toList |> List.head
     let firstAmount = amount

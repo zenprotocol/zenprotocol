@@ -12,3 +12,4 @@ zen_z3_windows
 FSharp.Compiler.Tools
 ZFStar
 System.Reflection.Metadata
+FsBech32
