@@ -159,6 +159,7 @@ module Wallet =
         | ActivateContract of string*uint32
         | ExecuteContract of Hash * string * data option * provideReturnAddress:bool * Map<Asset, uint64>
         | AccountExists
+        | AccountLocked
         | Unlock of byte[]
 
     let serviceName = "wallet"
@@ -192,6 +193,9 @@ module Wallet =
 
     let accountExists client =
         send<bool> client serviceName AccountExists
+
+    let accountLocked client =
+        send<bool> client serviceName AccountLocked
 
     let lock client =
         Command.send client serviceName Lock

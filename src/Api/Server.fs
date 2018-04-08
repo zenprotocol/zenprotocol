@@ -121,6 +121,14 @@ let handleRequest chain client (request,reply) =
             |> reply StatusCode.OK
         | Error error ->
             replyError error
+    | Get ("/wallet/locked", _) ->
+        match Wallet.accountLocked client with
+        | Ok result ->
+            (new AccountLockedResponseJson.Root(result)).JsonValue
+            |> JsonContent
+            |> reply StatusCode.OK
+        | Error error ->
+            replyError error
     | Get ("/wallet/address", _) ->
         match Wallet.getAddress client with
         | Ok address ->
