@@ -13,7 +13,7 @@ open Zen.Vector
 open Zen.Base
 open Zen.Cost
 
-module ET = Zen.ErrorT
+module RT = Zen.ResultT
 module Tx = Zen.TxSkeleton
 
 val main: txSkeleton -> hash -> string -> option data -> wallet
@@ -30,7 +30,7 @@ let main txSkeleton contractHash command data wallet =
     Tx.addInput pInput txSkeleton
     >>= Tx.lockToContract spend.asset spend.amount contractHash in
 
-  ET.ret (txSkeleton, None)
+  RT.ok (txSkeleton, None)
 
 val cf: txSkeleton -> string -> option data -> wallet -> cost nat 9
 let cf _ _ _ _ = ret (64 + (64 + 64 + 0) + 23)

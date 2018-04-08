@@ -99,12 +99,12 @@ let fstCode = """
     open Zen.Types
     open Zen.Base
     open Zen.Cost
-    open Zen.ErrorT
+    open Zen.ResultT
 
     val main: txSkeleton -> hash -> string -> option data -> wallet
         -> result (txSkeleton ** option message) `cost` 4
     let main tx chash command data _ =
-        ret @ (tx, None)
+        ok @ (tx, None)
 
     val cf: txSkeleton -> string -> option data -> wallet -> cost nat 1
         let cf _ _ _ _ = ~!4
@@ -122,12 +122,13 @@ let ``Should invoke compiled``() =
     |> shouldBeOk (input, Native.option<message>.None)
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Should throw with command's value``() =
     compileAndInvoke """
         open Zen.Types
         open Zen.Base
         open Zen.Cost
-        open Zen.ErrorT
+        open Zen.ResultT
 
         val main: txSkeleton -> hash -> string -> option data -> wallet
             -> result (txSkeleton ** option message) `cost` 1

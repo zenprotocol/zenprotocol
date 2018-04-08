@@ -1,131 +1,130 @@
 (** This module defines monad transformers for option and cost. *)
 module Zen.OptionT
 
-open Zen.Cost
 open Zen.Base
+module Cost = Zen.Cost
 module Opt = Zen.Option
 
-val none(#a:Type): cost (option a) 0
-let none #_ = ret None
+type optionT (a:Type) (n:nat) = option a `Cost.t` n
+type t : Type -> nat -> Type = optionT
 
-val some(#a:Type): a -> cost (option a) 0
-let some(#_) = ret << Some
+val some(#a:Type): a -> a `optionT` 0
+let some #_ = Some >> Cost.ret
 
-val incNone(#a:Type): n:nat -> cost (option a) n
-let incNone #_ n = inc none n
+val ret(#a:Type): a -> a `optionT` 0
+let ret #_ = some
 
-val incSome(#a:Type): n:nat -> a -> cost (option a) n
-let incSome(#_) n x = inc (some x) n
+val none(#a:Type): a `optionT` 0
+let none #_ = Cost.ret None
 
-val lift(#a:Type)(#n:nat): cost a n -> cost (option a) n
-let lift #_ #_ = map Some
+val liftOpt(#a:Type): option a -> a `optionT` 0
+let liftOpt #_ = Cost.ret
 
-val incLift(#a:Type)(#m:nat): n:nat -> cost a m -> cost (option a) (m+n)
-let incLift(#_)(#_) n mx = inc (lift mx) n
+val liftCost(#a:Type)(#n:nat): a `Cost.t` n -> a `optionT` n
+let liftCost #_ #_ = Cost.map Some
 
-val bind(#a #b:Type)(#m #n:nat): cost (option a) m -> (a -> cost (option b) n)
-  -> cost (option b) (m+n)
-let bind #_ #_ #_ #n mx f = mx >>= (function | None -> incNone n
-                                             | Some x -> f x)
+val incNone(#a:Type): n:nat -> a `optionT` n
+let incNone #_ n = none `Cost.inc` n
+
+val incSome(#a:Type): n:nat -> a -> a `optionT` n
+let incSome(#_) n x = some x `Cost.inc` n
+
+val autoNone(#a:Type)(#n:nat): a `optionT` n
+let autoNone #_ #_ = Cost.autoInc none
+
+val autoSome(#a:Type)(#n:nat): a -> a `optionT` n
+let autoSome #_ #_ = some >> Cost.autoInc
+
+val autoRet(#a:Type)(#n:nat): a -> a `optionT` n
+let autoRet #_ #_ = autoSome
+
+val bind(#a #b:Type)(#m #n:nat):
+  a `optionT` m
+  -> (a -> b `optionT` n)
+  -> b `optionT` (m+n)
+let bind #_ #_ #_ #n mx f =
+  mx `Cost.bind` (function
+  | Some x -> f x
+  | None -> autoNone)
+
+val (>>=) (#a #b:Type)(#m #n:nat):
+  a `optionT` m
+  -> (a -> b `optionT` n)
+  -> b `optionT` (m+n)
+let (>>=) = bind
+
+val (=<<) (#a #b:Type)(#m #n:nat):
+  (a -> b `optionT` n)
+  -> a `optionT` m
+  -> b `optionT` (m+n)
+let (=<<) #_ #_ #_ #_ f mx = bind mx f
 
 val bind2(#a #b #c:Type)(#n1 #n2 #n3:nat):
- cost (option a) n1 -> cost (option b) n2 -> (a -> b -> cost (option c) n3)
- -> cost (option c) (n1+n2+n3)
-let bind2 #_ #_ #_ #_ #_ #_ mx my f = mx `bind` (fun x ->
-                                      my `bind` (fun y ->
-                                      f x y))
+  a `optionT` n1
+  -> b `optionT` n2
+  -> (a -> b -> c `optionT` n3)
+  -> c `optionT` (n1+n2+n3)
+let bind2 #_ #_ #_ #_ #_ #_ mx my f =
+  mx >>= (fun x ->
+  my >>= (fun y ->
+  f x y))
 
 val bind3(#a #b #c #d:Type)(#n1 #n2 #n3 #n4:nat):
- cost (option a) n1 -> cost (option b) n2 -> cost (option c) n3
- -> (a -> b -> c -> cost (option d) n4)
- -> cost (option d) (n1+n2+n3+n4)
-let bind3 #_ #_ #_ #_ #_ #_ #_ #_ mx my mz f = mx `bind` (fun x ->
-                                               my `bind` (fun y ->
-                                               mz `bind` (fun z ->
-                                               f x y z)))
+  a `optionT` n1
+  -> b `optionT` n2
+  -> c `optionT` n3
+  -> (a -> b -> c -> d `optionT` n4)
+  -> d `optionT` (n1+n2+n3+n4)
+let bind3 #_ #_ #_ #_ #_ #_ #_ #_ mx my mz f =
+  mx >>= (fun x ->
+  my >>= (fun y ->
+  mz >>= (fun z ->
+  f x y z)))
 
-val map(#a #b:Type)(#n:nat): (a->b) -> cost (option a) n -> cost (option b) n
+val join(#a:Type)(#m #n:nat): (a `optionT` n) `optionT` m -> a `optionT` (m+n)
+let join #_ #_ #_ x =
+  x >>= (fun z -> z)
+
+val map(#a #b:Type)(#n:nat): (a -> b) -> a `optionT` n -> b `optionT` n
 let map #_ #_ #_ f mx =
-  mx `bind` (f >> some)
+  mx >>= (f >> some)
 
-val ap(#a #b:Type)(#m #n:nat): cost (option (a->b)) m -> cost (option a) n
-  -> cost (option b) (n+m)
+val (<$>) (#a #b:Type)(#n:nat): (a -> b) -> a `optionT` n -> b `optionT` n
+let (<$>) = map
+
+val ( $>) (#a #b:Type)(#n:nat): a `optionT` n -> (a -> b) -> b `optionT` n
+let ( $>) #_ #_ #_ mx f = f `map` mx
+
+val ap(#a #b:Type)(#m #n:nat):
+  (a->b) `optionT` m
+  -> a `optionT` n
+  -> b `optionT` (m+n)
 let ap #_ #_ #_ #_ mf mx =
-  mf `bind` (fun f -> map f mx)
+  mf >>= (fun f -> f `map` mx)
 
-val map2(#a #b #c:Type)(#m #n:nat): (a->b->c) -> cost (option a) m -> cost (option b) n
-  -> cost (option c) (m+n)
-let map2 #_ #_ #_ #_ #_ f mx = ap (map f mx)
+val (<*>) (#a #b:Type)(#m #n:nat):
+  (a->b) `optionT` m
+  -> a `optionT` n
+  -> b `optionT` (m+n)
+let (<*>) = ap
 
-val map3(#a #b #c #d:Type)(#n1 #n2 #n3:nat):
-  (a->b->c->d) -> cost (option a) n1 -> cost (option b) n2 -> cost (option c) n3
-  -> cost (option d) (n1+n2+n3)
-let map3 #_ #_ #_ #_ #_ #_ #_ f mx my = ap (map2 f mx my)
+val ( *>) (#a #b:Type)(#m #n:nat):
+  a `optionT` m
+  -> (a->b) `optionT` n
+  -> b `optionT` (m+n)
+let ( *>) #_ #b #m #n mx mf = ap mf mx <: b `optionT` (n+m)
 
-val mapBind(#a #b:Type)(#n:nat):
-  (a -> option b) -> cost (option a) n -> cost (option b) n
-let mapBind #_ #_ #_ f mx = mx `bind` (f >> ret)
+val (<~>) (#a #b:Type)(#n:nat):
+  (a->b) `optionT` n
+  -> a
+  -> b `optionT` n
+let (<~>) #_ #_ #_ mf = some >> ap mf
 
-val retBind(#a #b:Type)(#n:nat):
-  (option a) -> (a -> cost (option b) n) -> cost (option b) n
-let retBind #_ #_ #n = ret >> bind
+val (>=>) (#a #b #c:Type)(#m #n:nat):
+  (a -> b `optionT` m) -> (b -> c `optionT` n) -> (a -> c `optionT` (m+n))
+let (>=>) #_ #_ #_ #_ #_ f g =
+  fun x -> f x >>= g
 
-val bindLift(#a #b:Type)(#m #n:nat):
-  cost (option a) n -> (a -> cost b m) -> cost (option b) (n+m)
-let bindLift #_ #_ #_ #_ mx f = bind mx (f >> lift)
-
-val bindLift2(#a #b #c:Type)(#n1 #n2 #n3:nat):
-  cost (option a) n1 -> cost (option b) n2
-  -> (a -> b -> cost c n3) -> cost (option c) (n1+n2+n3)
-let bindLift2 #_ #_ #_ #_ #_ #_ mx my f = bind2 mx my (fun x y -> lift (f x y))
-
-val bindLift3(#a #b #c #d:Type)(#n1 #n2 #n3 #n4:nat):
-  cost (option a) n1 -> cost (option b) n2 -> cost (option c) n3
-  -> (a -> b -> c -> cost d n4) -> cost (option d) (n1+n2+n3+n4)
-let bindLift3 #_ #_ #_ #_ #_ #_ #_ #_ mx my mz f =
-  bind3 mx my mz (fun x y z -> lift (f x y z))
-
-unfold let (+~!) = incSome // infix
-unfold let (~+!) = incSome // prefix
-
-unfold val (>>=) (#a #b:Type)(#m #n:nat):
-  cost (option a) m -> (a -> cost (option b) n) -> cost (option b) (m+n)
-unfold let (>>=) #_ #_ #_ #_ mx f = bind mx f
-
-unfold val (=<<) (#a #b:Type)(#m #n:nat):
-  (a -> cost (option b) n) -> cost (option a) m -> cost (option b) (m+n)
-unfold let (=<<) #_ #_ #_ #_ f mx = bind mx f
-
-unfold val (<$>) (#a #b:Type)(#n:nat):
-  (a->b) -> cost (option a) n -> cost (option b) n
-unfold let (<$>) #_ #_ #_ f mx = map f mx
-
-unfold val ( $>) (#a #b:Type)(#n:nat):
-  cost (option a) n -> (a->b) -> cost (option b) n
-unfold let ( $>) #_ #_ #_ mx f = map f mx
-
-unfold val (<*>) (#a #b:Type)(#m #n:nat): cost (option (a->b)) m -> cost (option a) n
-  -> cost (option b) (n+m)
-unfold let (<*>) #_ #_ #_ #_ mf mx = ap mf mx
-
-unfold val ( *>) (#a #b:Type)(#m #n:nat): cost (option a) n -> cost (option (a->b)) m
-  -> cost (option b) (n+m)
-unfold let ( *>) #_ #_ #_ #_ mx mf = ap mf mx
-
-unfold val (<$$>) (#a #b #c:Type)(#m #n:nat):
-  (a->b->c) -> (cost (option a) m ** cost (option b) n) -> cost (option c) (m+n)
-unfold let (<$$>) #_ #_ #_ #_ #_ f (mx, my) = map2 f mx my
-
-unfold val ( $$>) (#a #b #c:Type)(#m #n:nat):
-  (cost (option a) m ** cost (option b) n) -> (a->b->c) -> cost (option c) (m+n)
-unfold let ( $$>) #_ #_ #_ #_ #_ (mx, my) f = f <$$> (mx, my)
-
-unfold val (<$$$>) (#a #b #c #d:Type)(#n1 #n2 #n3:nat):
-  (a->b->c->d) -> (cost (option a) n1 ** cost (option b) n2 ** cost (option c) n3)
-  -> cost (option d) (n1+n2+n3)
-unfold let (<$$$>) #_ #_ #_ #_ #_ #_ #_ f (mx, my, mz) = map3 f mx my mz
-
-unfold val ( $$$>) (#a #b #c #d:Type)(#n1 #n2 #n3:nat):
-  (cost (option a) n1 ** cost (option b) n2 ** cost (option c) n3) -> (a->b->c->d)
-  -> cost (option d) (n1+n2+n3)
-unfold let ( $$$>) #_ #_ #_ #_ #_ #_ #_ (mx, my, mz) f = f <$$$> (mx, my, mz)
+val (<=<) (#a #b #c:Type)(#m #n:nat):
+  (b -> c `optionT` n) -> (a -> b `optionT` m) -> (a -> c `optionT` (m+n))
+let (<=<) #_ #_ #_ #_ #_ g f = f >=> g

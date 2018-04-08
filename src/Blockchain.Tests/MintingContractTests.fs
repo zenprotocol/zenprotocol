@@ -16,6 +16,7 @@ open Consensus.Tests
 open TestsInfrastructure.Constraints
 open Zen
 open Helper
+module Result = Core.Result
 
 let chain = Chain.getChainParameters Chain.Local
 
@@ -84,7 +85,7 @@ let setUp = fun () ->
     open Zen.Data
 
     module W = Zen.Wallet
-    module ET = Zen.ErrorT
+    module RT = Zen.ResultT
     module Tx = Zen.TxSkeleton
 
     let buy txSkeleton contractHash returnAddress =
@@ -95,7 +96,7 @@ let setUp = fun () ->
         Tx.lockToContract zenAsset amount contractHash txSkeleton
         >>= Tx.mint amount contractToken
         >>= Tx.lockToAddress contractToken amount returnAddress in
-      ET.ret (txSkeleton, None)
+      RT.ok (txSkeleton, None)
 
     let redeem txSkeleton contractHash returnAddress wallet =
       let! contractToken = Zen.Asset.getDefault contractHash in
@@ -111,7 +112,7 @@ let setUp = fun () ->
           | Some tx -> Some (tx, None)
           | None -> None in
 
-      ET.of_option "contract doesn't have enough zens to pay you" result
+      RT.of_option "contract doesn't have enough zens to pay you" result
 
     val main: txSkeleton -> hash -> string -> option data -> wallet:wallet
         -> result (txSkeleton ** option message) `cost` (3 + 66 + (64 + (64 + (64 + 64 + (Zen.Wallet.size wallet * 128 + 192) + 0)) + 31) + 28)
@@ -126,9 +127,9 @@ let setUp = fun () ->
           buy txSkeleton contractHash returnAddress
           |> autoInc
         else
-          ET.autoFailw "unsupported command"
+          RT.autoFailw "unsupported command"
       | None ->
-        ET.autoFailw "returnAddress is required"
+        RT.autoFailw "returnAddress is required"
 
     val cf: txSkeleton -> string -> option data -> wallet -> cost nat 24
         let cf _ _ _ wallet = ret (3 + 66 + (64 + (64 + (64 + 64 + (Zen.Wallet.size wallet * 128 + 192) + 0)) + 31) + 28)

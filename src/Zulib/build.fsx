@@ -92,12 +92,10 @@ Target "Extract" (fun _ ->
        //"--use_hint_hashes";
        "--codegen";"FSharp";
        "--extract_module";"Zen.Base";
-       "--extract_module";"Zen.Error";
-       "--extract_module";"Zen.ErrorT";
+       "--extract_module";"Zen.Result";
+       "--extract_module";"Zen.ResultT";
        "--extract_module";"Zen.Option";
        "--extract_module";"Zen.OptionT";
-       "--extract_module";"Zen.Tuple";
-       "--extract_module";"Zen.TupleT";
        "--extract_module";"Zen.Optics";
        "--extract_module";"Zen.Vector";
        "--extract_module";"Zen.Array.Extracted";
@@ -136,8 +134,7 @@ Target "Build" (fun _ ->
       "fsharp/Realized/FStar.Int64.fs";
       "fsharp/Extracted/Zen.Base.fs";
       "fsharp/Extracted/Zen.Option.fs";
-      "fsharp/Extracted/Zen.Error.fs";
-      "fsharp/Extracted/Zen.Tuple.fs";
+      "fsharp/Extracted/Zen.Result.fs";
       "fsharp/Realized/Zen.Cost.Realized.fs";
       "fsharp/Extracted/Zen.Cost.Extracted.fs";
       "fsharp/Realized/FStar.Char.fs";
@@ -145,8 +142,7 @@ Target "Build" (fun _ ->
       "fsharp/Realized/Zen.Set.fs";
       "fsharp/Realized/Zen.Dictionary.fs";
       "fsharp/Extracted/Zen.OptionT.fs";
-      "fsharp/Extracted/Zen.ErrorT.fs";
-      "fsharp/Extracted/Zen.TupleT.fs";
+      "fsharp/Extracted/Zen.ResultT.fs";
       "fsharp/Extracted/Zen.List.fs";
       "fsharp/Extracted/Zen.Vector.fs";
       "fsharp/Realized/Zen.Array.Realized.fs";

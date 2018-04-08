@@ -55,7 +55,7 @@ let setup = fun () ->
     open Zen.Base
     open Zen.Cost
 
-    module ET = Zen.ErrorT
+    module RT = Zen.ResultT
     module Tx = Zen.TxSkeleton
 
     val main: txSkeleton -> hash -> string -> option data -> wallet
@@ -67,10 +67,10 @@ let setup = fun () ->
             let! txSkeleton =
                 Tx.mint 50UL contractToken txSkeleton
                 >>= Tx.lockToContract contractToken 50UL contractHash in
-            ET.ret (txSkeleton, None)
+            RT.ok (txSkeleton, None)
         end
         else
-            ET.autoFailw "unsupported command"
+            RT.autoFailw "unsupported command"
 
     val cf: txSkeleton -> string -> option data -> wallet -> cost nat 9
         let cf _ _ _ _ = ret (64 + (64 + 64 + 0) + 21)
@@ -88,7 +88,7 @@ let setup = fun () ->
             open Zen.Base
             open Zen.Cost
 
-            module ET = Zen.ErrorT
+            module RT = Zen.ResultT
             module Tx = Zen.TxSkeleton
 
             val main: txSkeleton -> hash -> string -> option data -> wallet
@@ -105,10 +105,10 @@ let setup = fun () ->
                         command = "contract2_test";
                         data = data
                     } in
-                    ET.ret (txSkeleton, Some message)
+                    RT.ok (txSkeleton, Some message)
                 end
                 else
-                    ET.autoFailw "unsupported command"
+                    RT.autoFailw "unsupported command"
 
             val cf: txSkeleton -> string -> option data -> wallet -> cost nat 9
             let cf _ _ _ _ = ret (64 + (64 + 64 + 0) + 26)
@@ -126,6 +126,7 @@ let tearDown = fun () ->
     clean ()
 
 [<Test>]
+[<ParallelizableAttribute>]
 let ``Should produce execute contracts with message passed between them``() =
     result {
         let! (contract1, contract2) = contracts

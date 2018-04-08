@@ -54,7 +54,9 @@ let concat3 #_ #l1 #l2 #l3 a1 a2 a3 =
 (** [split arr i] returns a tuple of the elements of [arr] before [arr.(i)], and the remaining elements. *)
 val split(#a:Type)(#l:nat{l >= 2}): arr:array a l -> i:nat{0 < i /\ i < l}
   -> cost (array a i ** array a (l-i)) (2*(l+2))
-let split #_ #l arr i = Zen.TupleT.join (sub arr 0 i, sub arr i (l-i))
+let split #_ #l arr i =
+    let fst, snd = sub arr 0 i, sub arr i (l-i) in
+    Mktuple2 <$> fst <*> snd
 
 (** [split3 arr i j] returns [(arr.(0..i), arr.(i..j), arr.(j..))] *)
 val split3(#a:Type)(#l:nat{l >= 3}):
@@ -62,18 +64,18 @@ val split3(#a:Type)(#l:nat{l >= 3}):
   -> i:nat{0 < i /\ i < (l-1)}
   -> j:nat{i < j /\ j < l}
   -> cost (array a i ** array a (j-i) ** array a (l-j)) (2*(l+3))
-let split3 #_ #l arr i j = Zen.TupleT.join3 (sub arr 0 i
-                                           , sub arr i (j-i)
-                                           , sub arr j (l-j))
+let split3 #_ #l arr i j =
+    let fst, snd, third = sub arr 0 i, sub arr i (j-i), sub arr j (l-j) in
+    Mktuple3 <$> fst <*> snd <*> third
 
 (** [split4 arr i j] returns [(arr.(0..i), arr.(i..j), arr.(j..k), arr.(j..))] *)
 val split4(#a:Type)(#l:nat{l >= 4}):
- arr: array a l
- -> i:nat{0 < i /\ i < (l-2)}
- -> j:nat{i < j /\ j < (l-1)}
- -> k:nat{j < k /\ k < l}
- -> cost (array a i ** array a (j-i) ** array a (k-j) ** array a (l-k)) (2*(l+4))
-let split4 #_ #l arr i j k = Zen.TupleT.join4 (sub arr 0 i
-                                          , sub arr i (j-i)
-                                          , sub arr j (k-j)
-                                          , sub arr k (l-k))
+  arr: array a l
+  -> i:nat{0 < i /\ i < (l-2)}
+  -> j:nat{i < j /\ j < (l-1)}
+  -> k:nat{j < k /\ k < l}
+  -> cost (array a i ** array a (j-i) ** array a (k-j) ** array a (l-k)) (2*(l+4))
+let split4 #_ #l arr i j k =
+    let fst, snd, third, fourth =
+        sub arr 0 i, sub arr i (j-i), sub arr j (k-j), sub arr k (l-k) in
+    Mktuple4 <$> fst <*> snd <*> third <*> fourth
