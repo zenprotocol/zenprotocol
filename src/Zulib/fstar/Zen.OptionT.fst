@@ -24,10 +24,10 @@ val liftCost(#a:Type)(#n:nat): a `Cost.t` n -> a `optionT` n
 let liftCost #_ #_ = Cost.map Some
 
 val incNone(#a:Type): n:nat -> a `optionT` n
-let incNone #_ n = none `Cost.inc` n
+let incNone #_ n = none |> Cost.inc n
 
 val incSome(#a:Type): n:nat -> a -> a `optionT` n
-let incSome(#_) n x = some x `Cost.inc` n
+let incSome(#_) n = some >> Cost.inc n
 
 val autoNone(#a:Type)(#n:nat): a `optionT` n
 let autoNone #_ #_ = Cost.autoInc none

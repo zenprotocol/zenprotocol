@@ -50,7 +50,7 @@ val rev_append(#a:Type): l1:list a -> l2:list a
     -> list a `cost` (2 * length l1 + 2)
 let rec rev_append #_ l1 l2 = match l1 with
     | [] -> l2 |> incRet 2
-    | hd::tl -> 2 +! rev_append tl (hd::l2)
+    | hd::tl -> rev_append tl (hd::l2) |> inc 2
 
 val rev(#a:Type): ls:list a -> list a `cost` (2 * length ls + 2)
 let rev #_ l = rev_append l []

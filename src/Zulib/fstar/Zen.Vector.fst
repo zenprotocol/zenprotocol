@@ -1,5 +1,6 @@
 module Zen.Vector
 
+open Zen.Base
 open Zen.Cost
 
 type vector(a:Type): nat -> Type =
@@ -30,17 +31,18 @@ let tl #_ #_ (VCons _ tl) = 2 `incRet` tl
 val nth(#a:Type)(#l:nat): vector a l -> i:nat{i<l} -> cost a (4*(i+1))
 let rec nth #_ #_ (VCons hd tl) = function
   | 0 -> 4 `incRet` hd
-  | i -> 4 +! (nth tl (i-1))
+  | i -> nth tl (i-1) |> inc 4
 
 (** [append v1 v2] appends the elements of [v2] to the end of [v1]. *)
 val append(#a:Type)(#l1 #l2:nat):
   vector a l1 -> vector a l2 -> cost (vector a (l1+l2)) (4*l1+4)
 let rec append #a #l1 #l2 v1 v2 =
-  4 +! begin match v1 with
-       | VCons hd tl ->
-           VCons hd <$> append tl v2 <: cost (vector a (l1+l2)) (4*l1)
-       | VNil -> ret v2
-       end
+  begin match v1 with
+  | VCons hd tl ->
+      VCons hd <$> append tl v2 <: cost (vector a (l1+l2)) (4*l1)
+  | VNil -> ret v2
+  end
+  |> inc 4
 
 unfold val (@@) (#a:Type)(#l1 #l2:nat):
   vector a l1 -> vector a l2 -> cost (vector a (l1+l2)) (4*l1+4)
@@ -74,15 +76,20 @@ let rec init #_ #_ l f = match l with
 val map(#a #b:Type)(#l #n:nat): (a -> cost b n) -> vector a l
   -> cost (vector b l) ((l*n)+(l*2)+2)
 let rec map #_ #b #l #n f = function
- | VNil -> 2 `incRet` VNil
- | VCons hd tl -> 2 +! (VCons <$> (f hd) <*> (map f tl))
+  | VNil -> 2 `incRet` VNil
+  | VCons hd tl ->
+      VCons <$> (f hd) <*> (map f tl)
+      |> inc 2
 
 val foldl(#a #b:Type)(#l #n:nat):
   (a -> b -> cost a n) -> a -> vector b l
   -> cost a ((n+2)*l+2)
 let rec foldl #_ #_ #_ #_ f acc = function
   | VNil -> 2 `incRet` acc
-  | VCons hd tl -> 2 +! (f acc hd >>= (fun acc' -> foldl f acc' tl))
+  | VCons hd tl ->
+      f acc hd
+      >>= (fun acc' -> foldl f acc' tl)
+      |> inc 2
 
 (** [countWhere f v] returns the number of elements [e] in [v] for which [f e] is true. *)
 val countWhere(#a:Type)(#l #n:nat): (a -> cost bool n) -> vector a l
@@ -133,9 +140,13 @@ let sumN #_ =
 val zip(#a #b:Type)(#l:nat):
   vector a l -> vector b l -> cost (vector (a**b) l) (3*l+3)
 let rec zip #_ #_ #_ v1 v2 =
-  match v1 with | VNil -> 3 `incRet` VNil
-                | VCons hd1 tl1 ->
-  match v2 with | VCons hd2 tl2 -> 3 +! (VCons (hd1,hd2) <$> (zip tl1 tl2))
+  match v1 with
+  | VNil -> 3 `incRet` VNil
+  | VCons hd1 tl1 ->
+      match v2 with
+      | VCons hd2 tl2 ->
+          VCons (hd1,hd2) <$> (zip tl1 tl2)
+          |> inc 3
 
 val of2(#a:Type): a**a -> cost (vector a 2) 3
 let of2 #_ (x,y) = incRet 3 (VCons x (VCons y VNil))
