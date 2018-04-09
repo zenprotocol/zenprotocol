@@ -154,12 +154,8 @@ module Agent =
                 | Message.RelayCommand c ->
                     Some (Command (binarySerializer.UnPickle<'command> c.payload))
                 | Message.RelayRequest r ->
-                    try
-                        let payload = binarySerializer.UnPickle<'request> r.payload
-                        Some (Request (new RequestId(socket, r.sender), payload))
-                    with
-                    | n ->
-                        failwith "failed"
+                    let payload = binarySerializer.UnPickle<'request> r.payload
+                    Some (Request (new RequestId(socket, r.sender), payload))
                 | _ -> None)
             |> FSharp.Control.Reactive.Observable.publish
 
