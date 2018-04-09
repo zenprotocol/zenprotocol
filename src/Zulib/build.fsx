@@ -1,6 +1,6 @@
 
-//#r @"../../packages/System.Reflection.Metadata/lib/portable-net45+win8/System.Reflection.Metadata.dll"
-#r @"../../packages/System.Reflection.Metadata/lib/netstandard1.1/System.Reflection.Metadata.dll"
+#r @"../../packages/System.Reflection.Metadata/lib/portable-net45+win8/System.Reflection.Metadata.dll"
+//#r @"../../packages/System.Reflection.Metadata/lib/netstandard1.1/System.Reflection.Metadata.dll"
 #r @"../../packages/FAKE/tools/FakeLib.dll"
 #r @"../../packages/Zen.FSharp.Compiler.Service/lib/net45/Zen.FSharp.Compiler.Service.dll"
 
@@ -183,6 +183,7 @@ Target "Build" (fun _ ->
       //"-r"; "../../packages/libsodium-net/lib/Net40/Sodium.dll"
       "-r"; "../../packages/FSharpx.Collections/lib/net40/FSharpx.Collections.dll"
       "-r"; "../../packages/BouncyCastle/lib/BouncyCastle.Crypto.dll"
+      "-r"; "../../packages/FsBech32/lib/net45/FsBech32.dll"
     |]
 
   let messages, exitCode =

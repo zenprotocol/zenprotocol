@@ -181,6 +181,8 @@ module PublicKey =
             | Native.Result.Ok -> Some (PublicKey publicKey)
             | _ -> None
 
+    let toString = serialize >> FsBech32.Base16.encode
+
     let hash = serialize >> Hash.compute
 
 module Signature =

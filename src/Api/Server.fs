@@ -110,7 +110,7 @@ let handleRequest chain client (request,reply) =
         | Some path ->
             match Wallet.getPublicKey client path with
             | Ok key ->
-                let serialized = PublicKey.serialize key |> FsBech32.Base16.encode
+                let serialized = PublicKey.toString key
 
                 TextContent serialized
                 |> reply StatusCode.OK
