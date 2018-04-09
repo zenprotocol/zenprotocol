@@ -161,6 +161,7 @@ module Wallet =
         | AccountExists
         | AccountLocked
         | Unlock of byte[]
+        | GetPublicKey of string
 
     let serviceName = "wallet"
 
@@ -205,3 +206,6 @@ module Wallet =
 
     let resyncAccount client =
         Command.send client serviceName Resync
+
+    let getPublicKey client path =
+        Request.send<Request, Result<Crypto.PublicKey,string>> client serviceName (GetPublicKey path)

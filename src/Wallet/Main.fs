@@ -151,6 +151,18 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
         |> Ok
         |> reply<bool> requestId
         wallet, extendedKey
+    | GetPublicKey path ->
+        try
+            match extendedKey with
+            | None ->
+                reply<PublicKey> requestId (Error "wallet locked")
+            | Some extendedKey ->
+                ExtendedKey.derivePath path extendedKey
+                >>= ExtendedKey.getPublicKey
+                |> reply<PublicKey> requestId
+        with
+        | x -> printfn "%A" x
+        wallet,extendedKey
     | Unlock key ->
         wallet,
         match DataAccess.Secured.tryGet dataAccess session with

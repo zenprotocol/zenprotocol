@@ -1,5 +1,6 @@
 module Api.Server
 
+open System.Security.Cryptography.X509Certificates
 open System.Windows.Input
 open FSharp.Data
 open Consensus
@@ -11,6 +12,8 @@ open Parsing
 open Messaging.Services
 open Messaging.Services.Wallet
 open Result
+open Zen.Crypto
+open Consensus.Crypto
 
 type T =
     {
@@ -99,6 +102,21 @@ let handleRequest chain client (request,reply) =
             | FSharp.Core.Error _ ->
                 TextContent (sprintf "invalid address %A" query)
                 |> reply StatusCode.BadRequest
+    | Get ("/wallet/publickey", query) ->
+        match Map.tryFind "path" query with
+        | None ->
+            TextContent (sprintf "path is missing")
+            |> reply StatusCode.BadRequest
+        | Some path ->
+            match Wallet.getPublicKey client path with
+            | Ok key ->
+                let serialized = PublicKey.serialize key |> FsBech32.Base16.encode
+
+                TextContent serialized
+                |> reply StatusCode.OK
+            | Error error ->
+                 TextContent error
+                 |> reply StatusCode.BadRequest
 
     | Get ("/wallet/balance", _) ->
         match Wallet.getBalance client with
