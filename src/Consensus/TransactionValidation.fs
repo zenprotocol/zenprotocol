@@ -112,16 +112,13 @@ let getContractWallet (txSkeleton:TxSkeleton.T) cw =
 let private checkWitnesses blockNumber acs (Hash.Hash txHash, tx, inputs) =
     let fulltxSkeleton = TxSkeleton.fromTransaction tx inputs
 
-    let checkPKWitness inputTx pInputs serializedPublicKey signature =
+    let checkPKWitness inputTx pInputs publicKey signature =
         let verifyPkHash pkHash tail =
-            match PublicKey.deserialize serializedPublicKey with
-            | Some publicKey ->
-                if PublicKey.hashSerialized serializedPublicKey = pkHash then
-                    match verify publicKey signature txHash with
-                    | Valid -> Ok (inputTx, tail)
-                    | _ -> GeneralError "invalid PK witness signature"
-                else GeneralError "PK witness mismatch"
-            | _ -> GeneralError "invalid PK witness"
+            if PublicKey.hash publicKey = pkHash then
+                match verify publicKey signature txHash with
+                | Valid -> Ok (inputTx, tail)
+                | _ -> GeneralError "invalid PK witness signature"
+            else GeneralError "PK witness mismatch"
 
         match pInputs with
         | [] -> GeneralError "missing PK witness input"

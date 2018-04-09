@@ -55,7 +55,6 @@ let shouldBeOk result =
 let ``Should generate assets from a string and from an int``() =
     let contractCode = """
         open Zen.Types
-        open Zen.Vector
         open Zen.Base
         open Zen.Cost
         open Zen.Asset

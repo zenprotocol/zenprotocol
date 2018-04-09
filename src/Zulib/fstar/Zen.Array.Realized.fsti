@@ -1,7 +1,6 @@
 module Zen.Array.Realized
 
 open Zen.Cost
-module V = Zen.Vector
 
 assume new type array (a:Type u#a) : nat -> Type u#a
 assume Array_hasEq: forall (a:Type) (n:nat). {:pattern (hasEq (array a n))}
@@ -22,9 +21,3 @@ val init_item(#a:Type)(#n:nat): l:nat
   -> f:((i:nat{i<l}) -> cost a n)
   -> i:nat{i < l}
   -> Lemma (force (init l f >>= item i) == force (f i))
-
-(*)
-val ofVec(#a:Type)(#l:nat): V.t a l -> cost (array a l) (2*(l+1))
-val ofVec_item(#a:Type)(#l:nat): v:(a `V.t` l)
-  -> i:nat{i<l}
-  -> Lemma (force (ofVec v >>= item i) == force (V.nth v i))

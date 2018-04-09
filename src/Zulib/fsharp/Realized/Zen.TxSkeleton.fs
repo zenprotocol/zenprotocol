@@ -7,7 +7,6 @@ open Zen.Types.Realized
 open Zen.Wallet
 
 module Cost = Zen.Cost.Realized
-module V = Zen.Vector
 module U64 = FStar.UInt64
 module Native = FStar.Pervasives.Native
 

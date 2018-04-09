@@ -66,7 +66,7 @@ let ``coinbase with witnesses fail``() =
       {
          inputs = []
          outputs=[{lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Constants.Zen}}]
-         witnesses=[PKWitness (Array.empty,Signature Array.empty)]
+         witnesses=[PKWitness (Consensus.Tests.Helper.rootPublicKey ,Signature Array.empty)]
          contract=None
       }
 

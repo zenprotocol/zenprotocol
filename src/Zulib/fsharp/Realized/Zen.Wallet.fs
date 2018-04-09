@@ -6,7 +6,6 @@ open Zen.Types.Realized
 open FSharp.Core.Operators.Checked
 
 module Cost = Zen.Cost.Realized
-module V = Zen.Vector
 module U64 = FStar.UInt64
 
 type t = Zen.Types.Extracted.wallet

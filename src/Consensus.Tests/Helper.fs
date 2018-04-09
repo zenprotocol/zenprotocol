@@ -9,7 +9,9 @@ let rootSecretKey = SecretKey [|189uy; 140uy; 82uy; 12uy; 79uy; 140uy; 35uy; 59u
                            58uy; 23uy; 63uy; 112uy; 239uy; 45uy; 147uy; 51uy; 246uy; 34uy; 16uy;
                            156uy; 2uy; 111uy; 184uy; 140uy; 218uy; 136uy; 240uy; 57uy; 24uy |]
 
-let create() = 
+let rootPublicKey = SecretKey.getPublicKey rootSecretKey |> Option.get
+
+let create() =
     let keyPair = KeyPair.create()
     {
         deltas = List.empty
@@ -18,7 +20,7 @@ let create() =
         mempool = List.empty
         tip = Hash.zero
         blockNumber = 0ul
-    }, fst keyPair 
+    }, fst keyPair
 
 let rootAccountData =
     {
@@ -33,16 +35,16 @@ let rootAccountData =
 let addTransaction txHash tx accountData =
     let account = addTransaction txHash tx (fst accountData)
     account, snd accountData
-    
+
 let createTestAccount () =
     let account =
         rootAccountData
         |> addTransaction Transaction.rootTxHash Transaction.rootTx
 
     account
-    
+
 let publicKeyHash account =
-    PublicKey.hash account.publicKey 
-    
-let keyPair account = 
+    PublicKey.hash account.publicKey
+
+let keyPair account =
     (rootSecretKey, account.publicKey)
