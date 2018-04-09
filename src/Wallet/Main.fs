@@ -43,7 +43,7 @@ let private sync chainParams client account =
     match Blockchain.getTip client with
     | Some (blockHash,header) when blockHash <> account.tip ->
         account
-        |> Account.sync chainParams blockHash
+        |> Account.sync blockHash
             (Blockchain.getBlockHeader client >> Option.get)
             (Blockchain.getBlock client >> Option.get)
         |> fun account ->

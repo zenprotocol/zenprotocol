@@ -244,7 +244,7 @@ let ``account sync up``() =
 
     let blockHash = Block.hash block.header
 
-    let account' = Account.sync chainParams blockHash (fun _ -> startBlockHeader) (fun _ -> block) account
+    let account' = Account.sync blockHash (fun _ -> startBlockHeader) (fun _ -> block) account
 
     account'.tip |> should equal blockHash
     account'.mempool |> should haveLength 0
@@ -277,12 +277,20 @@ let ``sync up from empty wallet``() =
 
     let blockHash = Block.hash block.header
 
-    let account = Account.sync chainParams blockHash (fun _ -> failwith "unexpected")
-                    (fun blockHash ->
-                        if blockHash = chainParams.genesisHash then
-                            Block.createGenesis chainParams [Transaction.rootTx] (0UL,0UL)
-                        else
-                            block) account
+    let genesisBlock = Block.createGenesis chainParams [Transaction.rootTx] (0UL,0UL)
+    let genesisHeader = genesisBlock.header
+
+    let getHeader = function
+    | h when h = chainParams.genesisHash -> genesisHeader
+    | h when h = blockHash -> header
+    | h -> failwithf "unexpected block hash %A" h
+
+    let getBlock = function
+    | h when h = chainParams.genesisHash -> genesisBlock
+    | h when h = blockHash -> block
+    | h -> failwithf "unexpected block hash %A" h
+
+    let account = Account.sync blockHash getHeader getBlock account
 
     account.tip |> should equal blockHash
     account.mempool |> should haveLength 0
@@ -300,8 +308,9 @@ let ``account reorg``() =
         nonce = 0UL,0UL
     }
 
+    let startHash = Block.hash startBlockHeader
     let account =
-        {(create() |> fst) with tip = Block.hash startBlockHeader}
+        {(create() |> fst) with tip = startHash}
 
     let output = {lock = PK (publicKeyHash account); spend={asset=Constants.Zen;amount=10UL}}
     let tx = {inputs=[];outputs=[output];witnesses=[];contract=None}
@@ -330,9 +339,6 @@ let ``account reorg``() =
 
     let blockHash = Block.hash block.header
 
-    let account = Account.sync chainParams blockHash (fun _ -> startBlockHeader) (fun _ -> block) account
-    account.tip |> should equal blockHash
-
     let header2 = {
        version = 0ul
        parent = Block.hash startBlockHeader
@@ -354,14 +360,22 @@ let ``account reorg``() =
 
     let blockHash2 = Block.hash block2.header
 
-    let account = Account.sync chainParams blockHash2 (fun _ -> block.header)
-                        (fun bh ->
-                            if bh = blockHash then
-                                block
-                            else if bh = blockHash2 then
-                                block2
-                            else
-                                failwithf "unexpected %A" bh) account
+    let getHeader = function
+    | h when h = startHash -> startBlockHeader
+    | h when h = blockHash -> header
+    | h when h = blockHash2 -> header2
+    | bh -> failwithf "unexpected %A" bh
+
+    let getBlock = function
+    | h when h = startHash -> failwithf "Unexpected deref of start block"
+    | h when h = blockHash -> block
+    | h when h = blockHash2 -> block2
+    | bh -> failwithf "unexpected %A" bh
+
+    let account = Account.sync blockHash getHeader getBlock account
+    account.tip |> should equal blockHash
+
+    let account = Account.sync blockHash2 getHeader getBlock account
 
     account.tip |> should equal blockHash2
     account.mempool |> should haveLength 1
@@ -466,12 +480,20 @@ let ``Should get expected deltas``() =
 
     let blockHash = Block.hash block.header
 
-    let account = Account.sync chainParams blockHash (fun _ -> failwith "unexpected")
-                    (fun blockHash ->
-                        if blockHash = chainParams.genesisHash then
-                            Block.createGenesis chainParams [Transaction.rootTx] (0UL,0UL)
-                        else
-                            block) account
+    let genesisBlock = Block.createGenesis chainParams [Transaction.rootTx] (0UL,0UL)
+    let genesisHeader = genesisBlock.header
+
+    let getHeader = function
+    | h when h = chainParams.genesisHash -> genesisHeader
+    | h when h = blockHash -> header
+    | h -> failwithf "unexpected block hash %A" h
+
+    let getBlock = function
+    | h when h = chainParams.genesisHash -> genesisBlock
+    | h when h = blockHash -> block
+    | h -> failwithf "unexpected block hash %A" h
+
+    let account = Account.sync blockHash getHeader getBlock account
 
     let tx2Hash = Transaction.hash tx2
     let output3A = {lock = PK Hash.zero; spend={asset=Constants.Zen;amount=3UL}}
