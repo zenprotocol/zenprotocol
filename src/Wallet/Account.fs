@@ -183,49 +183,55 @@ let undoBlock block account =
 
     {account with tip=block.header.parent;blockNumber=block.header.blockNumber - 1ul; outputs=outputs;mempool = mempool}
 
-let sync chain tipBlockHash (getHeader:Hash -> BlockHeader) (getBlock:Hash -> Block) account=
-    let accountTipBlockNumber =
-        if account.tip <> Hash.zero then
-            (getHeader account.tip).blockNumber
+type private SyncAction =
+    | Undo of Block
+    | Add of Block * Hash
+
+let private writer = new Writer.WriterBuilder<SyncAction>()
+
+let sync tipBlockHash (getHeader:Hash -> BlockHeader) (getBlock:Hash -> Block) account =
+    let blockNumber hash =
+        if hash <> Hash.zero then
+            (getHeader hash).blockNumber
         else
             0ul
 
-    // In case the account is not in the main chain, we are looking for the fork block
-    // between the account chain and main chain, undo from account chain up to the fork block and then
-    // redo main chain up to the tip
-    let rec reorg currentBlockHash account =
-        if account.tip = currentBlockHash then
-            // we found the fork block
-            account
-        else
-            let oldBlock = getBlock account.tip
-            let newBlock = getBlock currentBlockHash
+    let log action = Writer.Writer([action],())
 
-            account
-            |> undoBlock oldBlock
-            |> reorg newBlock.header.parent
-            |> handleBlock currentBlockHash newBlock
-
-    let rec sync' currentBlockHash =
-        // If new account and genesis block handle genesis block
-        if account.tip = Hash.zero && currentBlockHash = chain.genesisHash then
-            let block = getBlock currentBlockHash
-            handleBlock currentBlockHash block account
-        // If we found the account tip we stop the recursion and start syncing up
-        elif currentBlockHash = account.tip then
-            account
-        else
-            let block = getBlock currentBlockHash
-
-            if block.header.blockNumber = accountTipBlockNumber then
-                // The account is not in the main chain, we have to start a reorg
-                reorg currentBlockHash account
+    // Find the fork block of the account and the blockchain, logging actions
+    // to perform. Undo each block in the account's chain but not the blockchain,
+    // and add each block in the blockchain but not the account's chain.
+    let rec locate ((x,i),(y,j)) =
+        writer {
+            if x = y && i = j then return ()
+            elif i > j
+            then
+                do! log (Add (getBlock x, x))
+                return! locate (((getHeader x).parent, i-1ul), (y,j))
+            elif i < j
+            then
+                do! log (Undo (getBlock y))
+                return! locate ((x,i), ((getHeader y).parent, j-1ul))
             else
-                // continue looking for the account tip in the chain and then handling the current block
-                sync' block.header.parent
-                |> handleBlock currentBlockHash block
+                do! log (Add (getBlock x, x))
+                do! log (Undo (getBlock y))
+                return! locate (((getHeader x).parent, i-1ul), ((getHeader y).parent, j-1ul))
+        }
 
-    sync' tipBlockHash
+    let (actions, _) =
+        Writer.unwrap
+        <| locate ((tipBlockHash, blockNumber tipBlockHash), (account.tip, blockNumber account.tip))
+    let toUndo, toAddR = List.partition (function | Undo _ -> true | _ -> false) actions
+    let toAdd = List.rev toAddR     // Blocks to be added were found backwards.
+    let sortedActions = toUndo @ toAdd
+
+    List.fold
+        <|  fun accnt ->
+                function
+                | Undo blk -> undoBlock blk accnt
+                | Add (blk,hash) -> handleBlock hash blk accnt
+        <| account
+        <| sortedActions
 
 let getUnspentOutputs account =
     // we first update the account according to the mempool transactions
