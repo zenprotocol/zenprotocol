@@ -107,7 +107,7 @@ let fstCode = """
         ok @ (tx, None)
 
     val cf: txSkeleton -> string -> option data -> wallet -> cost nat 1
-        let cf _ _ _ _ = ~!4
+    let cf _ _ _ _ = Zen.Cost.ret 4
     """
 
 [<Test>]
@@ -136,7 +136,7 @@ let ``Should throw with command's value``() =
             failw command
 
         val cf: txSkeleton -> string -> option data -> wallet -> cost nat 1
-                let cf _ _ _ _ = ~!1
+        let cf _ _ _ _ = Zen.Cost.ret 1
         """ [| null; null; "test command"B; null; null |]
     |> shouldBeError "test command"
 

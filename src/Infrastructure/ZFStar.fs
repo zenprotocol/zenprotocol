@@ -131,8 +131,7 @@ let calculateMetrics hints =
     try
         try
             Hints.read_hints hintsFile
-            |> Option.map (fun hintsDB ->
-                let hintsMap = Hints.hints_to_hintsMap hintsDB.hints
+            |> Option.map (fun hintsMap ->
                 let getFuel hint = int (hint : Hints.Hint).fuel
                 let getIFuel hint = int (hint : Hints.Hint).ifuel
                 let getMax getterFn hintsMap =
@@ -206,11 +205,8 @@ let totalQueries hints =
             | None -> Error "total queries: could not read hints"
         with _ ->
             Error "total queries: invalid hints")
-        <@> (fun hintsDb -> 
-                hintsDb.hints
-                |> Hints.hints_to_hintsMap
-                |> Hints.total_num_queries
-                |> uint32)
+        <@> ( Hints.total_num_queries
+              >> uint32 )
     finally
 #if DEBUG
         printfn "total queries output directory: %A" oDir

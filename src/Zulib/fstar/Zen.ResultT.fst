@@ -28,13 +28,13 @@ val failw: string -> 'a `resultT` 0
 let failw #_ = Res.failw >> liftRes
 
 val incFail(#a:Type): n:nat -> exn -> a `resultT` n
-let incFail #_ n e = Cost.inc (fail e) n
+let incFail #_ n = fail >> Cost.inc n
 
 val incFailw(#a:Type): n:nat -> string -> a `resultT` n
-let incFailw #_ n msg = Cost.inc (failw msg) n
+let incFailw #_ n = failw >> Cost.inc n
 
 val incOK(#a:Type): n:nat -> a -> a `resultT` n
-let incOK #_ n x = Cost.inc (ok x) n
+let incOK #_ n = ok >> Cost.inc n
 
 val incRet(#a:Type): n:nat -> a -> a `resultT` n
 let incRet = incOK

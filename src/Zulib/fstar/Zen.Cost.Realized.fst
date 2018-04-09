@@ -26,8 +26,8 @@ abstract let bind #_ #_ #_ #_ (C x) f = C (C?.inj (f x))
 // Monadic Increment
 //
 
-abstract val inc(#a:Type)(#n: nat): cost a n -> k: nat -> cost a (n+k)
-abstract let inc #_ #_ (C x) k = C x
+abstract val inc(#a:Type)(#n: nat): k:nat -> cost a n -> cost a (n+k)
+abstract let inc #_ #_ k (C x) = C x
 
 
 //
@@ -48,15 +48,15 @@ let assoc #_ #_ #_ #_ #_ #_ _ _ _ = ()
 
 // These functions are intentionally not implemented. They cannot be used in actual code.
 // Nevertheless, they are very useful for theorem proving.
-val force(#a:Type)(#n:nat): cost a n -> GTot a
-let force #_ #_ mx = C?.inj mx
+abstract val force(#a:Type)(#n:nat): cost a n -> GTot a
+abstract let force #_ #_ mx = C?.inj mx
 
 val force_ret(#a:Type): x:a -> Lemma (force (ret x) == x)
                                [SMTPat (ret x)]
 let force_ret #_ x = ()
 val force_inc(#a:Type)(#m:nat):
-  n:nat -> mx: cost a m -> Lemma(force (inc mx n) == force mx)
-                           [SMTPat (inc mx n)]
+  n:nat -> mx: cost a m -> Lemma(force (inc n mx) == force mx)
+                           [SMTPat (inc n mx)]
 let force_inc #_ #_ _ _ = ()
 val force_bind(#a #b:Type)(#m #n:nat): mx:cost a m -> f:(a -> cost b n)
   -> Lemma(force (f (force mx)) == force (bind mx f))
@@ -73,5 +73,5 @@ assume val force_prop(#a:Type):
 val force_bind_inc(#a #b:Type)(#m #n:nat):
     mx:cost a m
     -> f:(a -> cost b n)
-    -> Lemma (mx `bind` f == inc (f (force mx)) m)
+    -> Lemma (mx `bind` f == inc m (f (force mx)))
 let force_bind_inc #_ #_ #_ #_ _ _ = ()

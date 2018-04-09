@@ -32,17 +32,12 @@ val refine_eq_out(#a:Type)(#n:nat):
 let refine_eq_out #_ #_ x mx =
     refine_prop_out (fun y -> y == x) mx
 
-unfold let (~!) = ret
-
-unfold val (+!): #a:Type -> #n:nat -> k:nat -> cost a n -> cost a (n+k)
-unfold let (+!) #_ #_ k x = inc x k
-
 val incRet(#a:Type): n:nat -> a -> cost a n
-let incRet(#_) n x = inc (ret x) n
+let incRet(#_) n x = inc n (ret x)
 
 (** autoInc adds cost to even out branches.*)
 val autoInc(#a:Type)(#m:nat)(#n:nat{m<=n}): cost a m -> cost a n
-let autoInc #_ #m #n mx = inc mx (n-m)
+let autoInc #_ #m #n mx = inc (n-m) mx
 
 val autoRet(#a:Type)(#m:nat): a -> cost a m
 let autoRet #_ #_ = ret >> autoInc
