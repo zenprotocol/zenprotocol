@@ -4,7 +4,7 @@ open Zen.Cost
 open Zen.Asset
 open Zen.Data
 
-module ET = Zen.ErrorT
+module RT = Zen.ResultT
 module OT = Zen.OptionT
 module Tx = Zen.TxSkeleton
 module CR = Zen.ContractResult.NoMessage
@@ -44,9 +44,9 @@ let main txSkeleton contractHash command sender data wallet =
         buy txSkeleton contractHash returnAddress
         |> autoInc
       else
-        ET.autoFailw "unsupported command"
+        RT.autoFailw "unsupported command"
   | None ->
-      ET.autoFailw "returnAddress is required"
+      RT.autoFailw "returnAddress is required"
 
 val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 24
 let cf _ _ _ _ wallet = ret  (2 + 66 + (64 + (64 + (64 + 64 + (Zen.Wallet.size wallet * 128 + 192) + 0)) + 25) + 29)
