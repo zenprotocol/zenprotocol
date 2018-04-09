@@ -133,6 +133,12 @@ let createEmpty pathToFolder =
 
     create pathToFolder
 
+let createTemporary prefix =
+    let tempPath = System.IO.Path.GetTempPath()
+    let unique = String.concat "" [ prefix; System.Guid.NewGuid().ToString() ]
+    let uniquePath = System.IO.Path.Combine(tempPath, unique)
+
+    createEmpty uniquePath
 
 let createChildSession (session:Session) =
     let childSession = DataAccess.DatabaseContext.createChildSession session.session

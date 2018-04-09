@@ -5,7 +5,6 @@ open Zen.Cost
 open Zen.Array.Realized
 //module OptT = Zen.OptionT
 //module M = FStar.Mul
-module V = Zen.Vector
 
 type t (a:Type) (n:nat) = array a n // For qualified access
 
@@ -21,9 +20,6 @@ unfold let op_Array_Access #_ #_ arr i = item i arr
 (** create returns an array of length l in which each element is x. *)
 val create(#a:Type): l:nat -> x:a -> cost (array a l) (l+1)
 let create(#_) l x = init l (const_ x >> ret)
-
-val toVec(#a:Type)(#l:nat): array a l -> cost (V.t a l) (l+2)
-let toVec #_ #l arr = V.init l (get arr)
 
 (** sub returns the subrange of arr from i to (i+j). *)
 val sub(#a:Type)(#l:nat): arr:array a l -> i:nat{i<l} -> j:nat{j+i <= l}

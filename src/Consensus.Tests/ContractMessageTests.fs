@@ -51,7 +51,6 @@ let setup = fun () ->
     clean()
     let contract2Code = """
     open Zen.Types
-    open Zen.Vector
     open Zen.Base
     open Zen.Cost
 
@@ -83,7 +82,6 @@ let setup = fun () ->
         |> System.Convert.ToBase64String
         |> sprintf """
             open Zen.Types
-            open Zen.Vector
             open Zen.Util
             open Zen.Base
             open Zen.Cost

@@ -290,11 +290,17 @@ module private Serialization =
             }
 
         module PublicKey =
-            let write ops publicKey = ops.writeBytes publicKey Crypto.SerializedPublicKeyLength
+            module PK = Consensus.Crypto.PublicKey
+
+            let write ops publicKey =
+                let bytes = PK.serialize (PublicKey publicKey)
+                ops.writeBytes bytes Crypto.SerializedPublicKeyLength
             let read = reader {
                 let! bytes = readBytes Crypto.SerializedPublicKeyLength
 
-                return bytes
+                match PK.deserialize bytes with
+                | Some (PublicKey pk) -> return pk
+                | None -> yield! fail
             }
 
         let rec write ops = function
@@ -429,9 +435,9 @@ module private Serialization =
         let private SerializedContractWitness = 2uy
 
         let write ops = function
-            | PKWitness (bytes, Signature signature) ->
+            | PKWitness (publicKey, Signature signature) ->
                 ops.writeByte SerializedPKWitness
-                >> ops.writeBytes bytes Crypto.SerializedPublicKeyLength
+                >> ops.writeBytes (PublicKey.serialize publicKey) Crypto.SerializedPublicKeyLength
                 >> ops.writeBytes signature Crypto.SerializedSignatureLength
             | ContractWitness cw ->
                 ops.writeByte SerializedContractWitness
@@ -449,7 +455,10 @@ module private Serialization =
             | SerializedPKWitness ->
                 let! publicKey = readBytes Crypto.SerializedPublicKeyLength
                 let! signature = readBytes Crypto.SerializedSignatureLength
-                return PKWitness (publicKey, Signature signature)
+
+                match PublicKey.deserialize publicKey with
+                | Some publicKey -> return PKWitness (publicKey, Signature signature)
+                | None -> yield! fail
             | SerializedContractWitness ->
                 let! cHash = Hash.read
                 let! command = readString

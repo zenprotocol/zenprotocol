@@ -65,7 +65,7 @@ let activateContract code account session state =
     )
 
 let dataPath = ".data"
-let databaseContext = DatabaseContext.createEmpty dataPath
+let databaseContext = DatabaseContext.createTemporary dataPath
 let session = DatabaseContext.createSession databaseContext
 
 let mutable cHash = Hash.zero
@@ -78,7 +78,6 @@ let setUp = fun () ->
     clean()
     activateContract """
     open Zen.Types
-    open Zen.Vector
     open Zen.Base
     open Zen.Cost
     open Zen.Asset

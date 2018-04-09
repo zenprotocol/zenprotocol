@@ -13,7 +13,6 @@ open Zen.Types.Realized
 open Zen.TxSkeleton
 open Zen.Types.Main
 open FStar.Pervasives
-open Zen.Vector
 open MBrace.FsPickler.Combinators
 
 module Cost = Zen.Cost.Realized
@@ -124,16 +123,6 @@ let private fsToFstPointedOutput ((outpoint, output):PointedOutput) : pointedOut
 let private fsToFstOutpointOutputTuple (outpoint:Types.Outpoint, output) : (outpoint * output) =
     { txHash = Hash.bytes outpoint.txHash; index = outpoint.index }, fsToFstOutput output
 
-let private vectorToList (z:Zen.Vector.t<'Aa, _>) : List<'Aa> =
-     // 0I's are eraseable
-     Zen.Vector.foldl 0L 0L (fun acc e -> Cost.ret (e::acc)) [] z
-     |> unCost
-
-let private listToVector (ls:List<'Aa>) : Zen.Vector.t<'Aa, _> =
-    let len = List.length ls
-    let lsIndexed = List.mapi (fun i elem -> int64 (len - i - 1), elem) ls // vectors are reverse-zero-indexed
-    List.fold (fun acc (i,x) -> Zen.Vector.VCons (i, x, acc)) Zen.Vector.VNil lsIndexed
-
 let private fstToFsTx : txSkeleton -> _ = function
     | {inputs=_,inputMap; outputs=_,outputMap} ->
         let inputs =
@@ -184,10 +173,5 @@ let fsToFstTxSkeleton (txSkeleton:TxSkeleton.T) : txSkeleton =
         List.fold insertInput emptyTxSkeleton inputs
 
     List.fold insertOutput txSkeletonWithInputsOnly outputs
-
-let vectorLength v =
-    match v with
-    | VCons (l,_,_) -> l + 1L
-    | VNil -> 0L
 
 let listLength : Prims.list<'a> -> Prims.nat = Prims.length
