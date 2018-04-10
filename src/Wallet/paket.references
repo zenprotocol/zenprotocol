@@ -7,3 +7,4 @@ FsPickler
 Base58Check
 NBitcoin
 BouncyCastle
+Logary
