@@ -107,8 +107,7 @@ let getImportSeed json =
         for item in json.Words do
             words <- item :: words
 
-        let key = Encoding.ASCII.GetBytes json.Key
-        Ok (List.rev words, key)
+        Ok (List.rev words, json.Password)
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
 
@@ -116,7 +115,6 @@ let getUnlock json =
     try
         let json = UnlockAccountJson.Parse json
 
-        Encoding.ASCII.GetBytes json.Key
-        |> Ok
+        Ok json.Password
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)

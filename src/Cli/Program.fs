@@ -169,9 +169,9 @@ let main argv =
             | code -> printfn "Failed %d" code
         | Some (Import args) ->
             let words = args.GetResult <@ Import_Arguments @>
-            printfn "enter key (16 ASCII characters):"
-            let key = Console.ReadLine()
-            let send = new ImportSeedJson.Root(key, List.toArray words)
+            printfn "enter password:"
+            let password = Console.ReadLine()
+            let send = new ImportSeedJson.Root(password, List.toArray words)
             Http.requrest send.JsonValue (getUri "wallet/import") "POST"  //send.JsonValue.Request (getUri "wallet/import")
             |> printfn "%A"
         | Some (Activate args) ->
@@ -192,8 +192,9 @@ let main argv =
                         | code,_ -> printfn "Failed %d with binary response" code
         | Some (Execute args) ->
             let address,command,data,asset,assetType,amount = args.GetResult <@ ExecuteContract_Arguments @>
-            let execute = new ContractExecuteRequestJson.Root(address,command,data,
-                new ContractExecuteRequestJson.Options(true, "") , [| new ContractExecuteRequestJson.Spend(asset, assetType, amount) |])
+            let execute =
+                new ContractExecuteRequestJson.Root(address,command,data,
+                    new ContractExecuteRequestJson.Options(true, "") , [| new ContractExecuteRequestJson.Spend(asset, assetType, amount) |])
 
             let response = execute.JsonValue.Request (getUri "wallet/contract/execute")
 

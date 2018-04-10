@@ -154,13 +154,13 @@ module Wallet =
         | GetAddress
         | GetTransactions
         | GetBalance
-        | ImportSeed of string list * byte[]
+        | ImportSeed of string list * string
         | Spend of Hash * Spend
         | ActivateContract of string*uint32
         | ExecuteContract of Hash * string * data option * provideReturnAddress:bool * sign:string option * Map<Asset, uint64>
         | AccountExists
         | AccountLocked
-        | Unlock of byte[]
+        | Unlock of string
         | GetPublicKey of string
 
     let serviceName = "wallet"
@@ -186,8 +186,8 @@ module Wallet =
     let executeContract client address command data provideReturnAddress sign spends  =
         send<Transaction> client serviceName (ExecuteContract (address,command,data,provideReturnAddress,sign,spends))
 
-    let importSeed client words key =
-        send<unit> client serviceName (ImportSeed (words, key))
+    let importSeed client words password =
+        send<unit> client serviceName (ImportSeed (words, password))
 
     let getTransactions client =
         send<TransactionsResponse> client serviceName GetTransactions
@@ -201,8 +201,8 @@ module Wallet =
     let lock client =
         Command.send client serviceName Lock
 
-    let unlock client key =
-        send<unit> client serviceName (Unlock key)
+    let unlock client password =
+        send<unit> client serviceName (Unlock password)
 
     let resyncAccount client =
         Command.send client serviceName Resync

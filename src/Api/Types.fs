@@ -90,7 +90,7 @@ type BlockChainInfoJson = JsonProvider<"""
 
 type ImportSeedJson = JsonProvider<"""
 {
-    "key": "secret",
+    "password": "secret",
     "words" : [ "word" ]
 }
 """>
@@ -112,7 +112,7 @@ type TransactionsResponseJson = JsonProvider<"""
 
 type UnlockAccountJson = JsonProvider<"""
 {
-    "key": "secret"
+    "password": "secret"
 }
 """>
 
