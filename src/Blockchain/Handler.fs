@@ -11,6 +11,7 @@ open Blockchain.EffectsWriter
 open Consensus.Types
 open State
 open DatabaseContext
+open Logary.Message
 
 let handleCommand chainParams command session timestamp (state:State) =
     let contractPath = session.context.contractPath
@@ -41,7 +42,8 @@ let handleCommand chainParams command session timestamp (state:State) =
     | HandleMemPool (peerId,txHashes) ->
         let handleTxHash txHash =
             effectsWriter {
-                Log.info "Handling mempool message"
+                eventX "Handling mempool message"
+                |> Log.info
 
                 if not (MemPool.containsTransaction txHash state.memoryState.mempool) then
                     do! getTransaction peerId txHash

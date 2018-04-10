@@ -7,6 +7,7 @@ open Infrastructure
 open Consensus.Types
 open Consensus.Difficulty
 open System
+open Logary.Message
 
 type Command =
     | NewBlockTemplate of Block
@@ -41,7 +42,8 @@ let minerTask chain busName (collection:Queue) =
 
         match Block.validateHeader chain header with
         | Result.Ok _ ->
-            Log.info "new block mined"
+            eventX "New block mined"
+            |> Log.info
 
             // We found a block
             Messaging.Services.Blockchain.validateMinedBlock client block
@@ -61,7 +63,10 @@ let minerTask chain busName (collection:Queue) =
             | NewBlockTemplate block ->
                 let target = Difficulty.uncompress block.header.difficulty
 
-                Log.info "New block to mine #%d with difficulty %x" block.header.blockNumber block.header.difficulty
+                eventX "New block to mine #{blockNumber} with difficulty 0x{difficulty}"
+                >> setField "blockNumber" block.header.blockNumber
+                >> setField "difficulty" block.header.difficulty
+                |> Log.info
 
                 findNonce target block
             | Stop -> () // do nothing, we will block on next take call and wait for new block
@@ -78,7 +83,10 @@ let handleEvent client (collection:Queue) event =
             |> NewBlockTemplate
             |> collection.Add
         | _ -> ())
-    |> Result.mapError (Log.info "Miner could not get address due to %A")
+    |> Result.mapError (fun error ->
+        eventX "Miner could not get address due to {error}"
+        >> setField "error" error
+        |> Log.info)
     |> ignore
     
 let main busName chain =
@@ -86,14 +94,18 @@ let main busName chain =
         let client = ServiceBus.Client.create busName
         let collection = new Queue()
 
-        Log.info "Miner running"
+        eventX "Miner running"
+        |> Log.info
 
         Wallet.getAddressPKHash client
         |> Result.map (fun pkHash ->
             Blockchain.getBlockTemplate client pkHash
             |> NewBlockTemplate
             |> collection.Add)
-        |> Result.mapError (Log.info "Miner could not get address due to %A")
+        |> Result.mapError (fun error ->
+            eventX "Miner could not get address due to {error}"
+            >> setField "error" error
+            |> Log.info)
         |> ignore
         
         Async.Start (minerTask chain busName collection)

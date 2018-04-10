@@ -7,6 +7,7 @@ open Infrastructure
 open Blockchain.EffectsWriter
 open Messaging.Events
 open State
+open Logary.Message
 
 let getUTXO = UtxoSetRepository.get
 let getOutput = TransactionRepository.getOutput
@@ -79,7 +80,11 @@ let private connectChain chainParams contractPath timestamp session (origin:Exte
             | Error error ->
                 BlockRepository.saveHeader session (ExtendedBlockHeader.invalid tip)
 
-                Log.info "Failed connecting block %A due to %A" tip.hash error
+                eventX "Failed connecting block {tip} due to {error}"
+                >> setField "tip" (Hash.toString tip.hash)
+                >> setField "error" error
+                |> Log.info                
+                
                 validTip,(utxoSet,acs,ema, mempool)
             | Ok (block,utxoSet,acs,ema) ->
 
@@ -221,8 +226,9 @@ let rollForwardChain chainParams contractPath timestamp state session block pers
         let currentChainWork = ExtendedBlockHeader.chainWork persistentBlock
         let chains = findLongerChains session persistentBlock currentChainWork
 
-        Log.info "BlockHandler: Connecting to longest chain"
-
+        eventX "BlockHandler: Connecting to longest chain"
+        |> Log.info
+        
         let chain' =
             connectLongestChain chainParams contractPath timestamp session persistentBlock
                 (UtxoSet.asDatabase,acs,ema, mempool) chains currentChainWork
@@ -241,14 +247,20 @@ let rollForwardChain chainParams contractPath timestamp state session block pers
 
             do! addBlocks session persistentBlock tip
 
-            Log.info "BlockHandler: New tip #%A %A" tipState.tip.header.blockNumber tipState.tip.hash
+            eventX "BlockHandler: New tip #{blockNumber} {tip}"
+            >> setField "blockNumber" tipState.tip.header.blockNumber
+            >> setField "tip" (Hash.toString tipState.tip.hash)
+            |> Log.info
 
             return {state with tipState=tipState;memoryState=memoryState}
         | None ->
             let tipState = {activeContractSet=acs;ema=ema;tip=persistentBlock}
             let! memoryState = getMemoryState chainParams session contractPath persistentBlock.header.blockNumber mempool state.memoryState.orphanPool acs
 
-            Log.info "BlockHandler: New tip #%A %A" tipState.tip.header.blockNumber tipState.tip.hash
+            eventX "BlockHandler: New tip #{blockNumber} {tip}"
+            >> setField "blockNumber" tipState.tip.header.blockNumber
+            >> setField "tip" (Hash.toString tipState.tip.hash)
+            |> Log.info
 
             return {state with tipState=tipState;memoryState=memoryState}
     }
@@ -258,10 +270,14 @@ let private handleGenesisBlock chainParams contractPath session timestamp (state
         match Block.connect chainParams (getUTXO session) contractPath Block.genesisParent timestamp UtxoSet.asDatabase
                 ActiveContractSet.empty (EMA.create chainParams) block with
         | Error error ->
-            Log.info "Failed connecting genesis block %A due to %A" (Block.hash block.header) error
+            eventX "Failed connecting genesis block {hash} due to {error}"
+            >> setField "hash" (block.header |> Block.hash |> Hash.toString)
+            >> setField "error" error
+            |> Log.info
             return state
         | Ok (block,utxoSet,acs,ema) ->
-            Log.info "BlockHandler: Genesis block received"
+            eventX "BlockHandler: Genesis block received"
+            |> Log.info
 
             let extendedHeader = ExtendedBlockHeader.createGenesis blockHash block
             BlockRepository.saveHeader session extendedHeader
@@ -285,10 +301,19 @@ let private handleMainChain chain contractPath session timestamp (state:State) (
         match Block.connect chain (getUTXO session) contractPath parent.header timestamp UtxoSet.asDatabase
                 state.tipState.activeContractSet state.tipState.ema block with
         | Error error ->
-            Log.info "Failed connecting block %A due to %A" (Block.hash block.header) error
+            eventX "Failed connecting block {hash} due to {error}"
+            >> setField "hash" (block.header |> Block.hash |> Hash.toString)
+            >> setField "error" error
+            |> Log.info
             return state
         | Ok (block,utxoSet,acs,ema) ->
-            Log.info "BlockHandler: New block #%d %s with %d txs 0x%x %A" block.header.blockNumber (Timestamp.toString timestamp) (List.length block.transactions) block.header.difficulty blockHash
+            eventX "BlockHandler: New block #{blockNumber} {timestamp} with {txs} txs 0x{difficulty} {blockHash}"
+            >> setField "blockNumber" block.header.blockNumber
+            >> setField "timestamp" (Timestamp.toString timestamp)
+            >> setField "txs" (List.length block.transactions)
+            >> setField "difficulty" block.header.difficulty
+            >> setField "blockHash" (Hash.toString blockHash)
+            |> Log.info
 
             let extendedHeader = ExtendedBlockHeader.createMain parent blockHash block
 
@@ -338,7 +363,10 @@ let private handleForkChain chain contractPath session timestamp (state:State) p
                 // No connectable chain is not longer than current chain
                 return state
             | Some (tip,(utxoSet,acs,ema,mempool)) ->
-                Log.info "Reorg to #%d %A" tip.header.blockNumber tip.hash
+                eventX "Reorg to #{blockNumber} {hash}"
+                >> setField "blockNumber" tip.header.blockNumber
+                >> setField "hash" (Hash.toString tip.hash)
+                |> Log.info
 
                 let tip = ExtendedBlockHeader.markAsMain tip
 
@@ -367,8 +395,10 @@ let requestOrphanChainRoot session (tip:ExtendedBlockHeader.T) (state:State) =
     effectsWriter {
         if not <| Map.containsKey root.header.parent state.blockRequests then
 
-            Log.info "Request root of orphan chain from network block %d %A"
-                        (root.header.blockNumber - 1ul) root.header.parent
+            eventX "Request root of orphan chain from network block {blockNumber} {parent}"
+            >> setField "blockNumber" (root.header.blockNumber - 1ul)
+            >> setField "hash" (Hash.toString root.header.parent)
+            |> Log.info
 
             // asking network for the parent block
             let blockRequests = Map.add root.header.parent ParentBlock state.blockRequests
@@ -389,17 +419,26 @@ let validateBlock chainParams contractPath session timestamp block mined (state:
         let blockRequests = Map.remove blockHash state.blockRequests
         let state = {state with blockRequests = blockRequests}
 
-        Log.info "Validating new block #%d with %d txs %A" block.header.blockNumber (List.length block.transactions) blockHash
+        eventX "Validating new block #{blockNumber} with {txs} txs {hash}"
+        >> setField "blockNumber" block.header.blockNumber
+        >> setField "txs" (List.length block.transactions)
+        >> setField "hash" (Hash.toString blockHash)
+        |> Log.info
 
         // checking if block already exist
         if BlockRepository.contains session blockHash then return state else
         match Block.validate chainParams block with
         | Error error ->
-            Log.info "Block %A failed validation due to %A" blockHash error
+            eventX "Block {hash} failed validation due to {error}"
+            >> setField "hash" (Hash.toString blockHash)
+            >> setField "error" error
+            |> Log.info
             return state
         | Ok block ->
             if blockRequest = Some NewBlock || mined then
-                Log.info "Publishing new block %A" blockHash
+                eventX "Publishing new block {hash}"
+                >> setField "hash" (Hash.toString blockHash)
+                |> Log.info
                 do! publishBlock block.header
 
             if Block.isGenesis chainParams block then
@@ -413,7 +452,10 @@ let validateBlock chainParams contractPath session timestamp block mined (state:
                 // try to find parent block
                 match BlockRepository.tryGetHeader session block.header.parent with
                 | None ->
-                    Log.info "Adding block as orphan #%d %A" block.header.blockNumber blockHash
+                    eventX "Adding block as orphan #{blockNumber} {blockHash}"
+                    >> setField "blockNumber" block.header.blockNumber
+                    >> setField "blockHash" (Hash.toString blockHash)
+                    |> Log.info
 
                     let extendedHeader = ExtendedBlockHeader.createOrphan blockHash block
                     BlockRepository.saveHeader session extendedHeader
@@ -478,8 +520,11 @@ let private handleHeader chain session get reason header state findRootOrphan =
             | None ->
                 match Block.validateHeader chain header with
                 | Ok header ->
-
-                    Log.info "Request block #%d %A from peers due to %A" header.blockNumber blockHash reason
+                    eventX "Request block #{blockNumber} {blockHash} from peers due to {reason}"
+                    >> setField "blockNumber" header.blockNumber
+                    >> setField "blockHash" (Hash.toString blockHash)
+                    >> setField "reason" (reason.ToString())
+                    |> Log.info
 
                     let blockRequests = Map.add blockHash reason state.blockRequests
 
@@ -534,7 +579,9 @@ let handleHeaders chain session peerId headers (state:State) =
         | head :: headers ->
             do! requestParentHeaders session peerId head state
 
-            Log.info "Handling #%A headers, can take a while..." (List.length headers)
+            eventX "Handling #{headers} headers, can take a while..."
+            >> setField "headers" (List.length headers)
+            |> Log.info
 
             let! state' = handleHeader chain session getBlock ParentBlock head state true
             let state = ref state'
@@ -544,7 +591,8 @@ let handleHeaders chain session peerId headers (state:State) =
 
                 state := state'
 
-            Log.info "Done handling headers"
+            eventX "Done handling headers"
+            |> Log.info
 
             return !state
     }

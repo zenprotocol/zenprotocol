@@ -9,6 +9,7 @@ open Consensus.Transaction
 open Consensus.TransactionValidation
 open Consensus.Types
 open State
+open Logary.Message
 
 let getUTXO = UtxoSetRepository.get
 
@@ -22,8 +23,10 @@ let private validateOrphanTransaction chainParams session contractPath blockNumb
                 let mempool = MemPool.add txHash tx state.mempool
 
                 do! publish (TransactionAddedToMemPool (txHash, tx))
-                Log.info "Orphan transaction %s added to mempool" (Hash.toString txHash)
 
+                eventX "Orphan transaction {hash} added to mempool"
+                >> setField "hash" (Hash.toString txHash)
+                |> Log.info
 
                 let orphanPool = OrphanPool.remove txHash state.orphanPool
                 return {state with
@@ -36,12 +39,17 @@ let private validateOrphanTransaction chainParams session contractPath blockNumb
                 // transaction is still orphan, nothing to do
                 return state
             | Error BadContract ->
-                 Log.info "Previously orphaned transaction %s failed to activate its contract" (Hash.toString txHash)
+                eventX "Previously orphaned transaction {hash} failed to activate its contract"
+                >> setField "hash" (Hash.toString txHash)
+                |> Log.info
 
-                 let orphanPool = OrphanPool.remove txHash state.orphanPool
-                 return {state with orphanPool = orphanPool}
+                let orphanPool = OrphanPool.remove txHash state.orphanPool
+                return {state with orphanPool = orphanPool}
             | Error error ->
-                Log.info "Orphan transaction %s failed validation: %A" (Hash.toString txHash) error
+                eventX "Orphan transaction {hash} failed validation: {error}"
+                >> setField "hash" (Hash.toString txHash)
+                >> setField "error" (error.ToString())
+                |> Log.info
 
                 let orphanPool = OrphanPool.remove txHash state.orphanPool
                 return {state with orphanPool = orphanPool}
@@ -66,23 +74,32 @@ let validateInputs chainParams session contractPath blockNumber txHash tx (state
             | Error Orphan ->
                 let orphanPool = OrphanPool.add txHash tx state.orphanPool
 
-                Log.info "Transaction %s is an orphan. Adding to orphan pool." (Hash.toString txHash)
-
+                eventX "Transaction {hash} is an orphan. Adding to orphan pool."
+                >> setField "hash" (Hash.toString txHash)
+                |> Log.info
+                
                 return {state with orphanPool = orphanPool}
             | Error ContractNotActive ->
                 let orphanPool = OrphanPool.add txHash tx state.orphanPool
 
-                Log.info "Transaction %s tried to run an inactive contract. Adding to orphan pool." (Hash.toString txHash)
+                eventX "Transaction {hash} tried to run an inactive contract. Adding to orphan pool."
+                >> setField "hash" (Hash.toString txHash)
+                |> Log.info
 
                 return {state with orphanPool = orphanPool}
             | Error BadContract ->
-                 Log.info "Transaction %s failed to activate its contract" (Hash.toString txHash)
+                eventX "Transaction {hash} failed to activate its contract"
+                >> setField "hash" (Hash.toString txHash)
+                |> Log.info
 
-                 return state
+                return state
             | Error error ->
-                 Log.info "Transaction %s failed inputs validation: %A" (Hash.toString txHash) error
+                eventX "Transaction {hash} failed inputs validation:"
+                >> setField "hash" (Hash.toString txHash)
+                >> setField "error" (error.ToString())
+                |> Log.info
 
-                 return state
+                return state
             | Ok (tx, acs) ->
                 let utxoSet = UtxoSet.handleTransaction (getUTXO session) txHash tx state.utxoSet
                 let mempool = MemPool.add txHash tx state.mempool
@@ -90,7 +107,9 @@ let validateInputs chainParams session contractPath blockNumber txHash tx (state
                 if shouldPublishEvents then
                     do! publish (TransactionAddedToMemPool (txHash,tx))
 
-                Log.info "Transaction %s added to mempool" (Hash.toString txHash)
+                eventX "Transaction {hash} added to mempool"
+                >> setField "hash" (Hash.toString txHash)
+                |> Log.info
 
                 let state = {state with
                                 activeContractSet=acs;
@@ -113,7 +132,10 @@ let validateTransaction chainParams session contractPath blockNumber tx (state:M
         else
             match TransactionValidation.validateBasic tx with
             | Error error ->
-                Log.info "Transaction %s failed basic validation: %A" (Hash.toString txHash) error
+                eventX "Transaction {hash} failed basic validation: {error}"
+                >> setField "hash" (Hash.toString txHash)
+                >> setField "error" (error.ToString())
+                |> Log.info
 
                 return state
             | Ok tx ->
@@ -167,8 +189,10 @@ let executeContract session txSkeleton cHash command sender data state =
 
     run cHash command sender data txSkeleton [] 0L
     |> Result.map (fun (finalTxSkeleton, witnesses, totalCost) ->
-        Log.info "Running contract chain with cost: %A" totalCost
-
+        eventX "Running contract chain with cost: {totalCost}"
+        >> setField "totalCost" totalCost
+        |> Log.info
+        
         let tx =
             Transaction.fromTxSkeleton finalTxSkeleton
             |> Transaction.addWitnesses witnesses

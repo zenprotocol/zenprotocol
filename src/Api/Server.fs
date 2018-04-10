@@ -14,6 +14,7 @@ open Messaging.Services.Wallet
 open Result
 open Zen.Crypto
 open Consensus.Crypto
+open Logary.Message
 
 type T =
     {
@@ -234,7 +235,9 @@ let handleRequest chain client (request,reply) =
 let create chain poller busName bind =
     let httpAgent = Http.Server.create poller bind
 
-    Log.info "Api running on %s" bind
+    eventX "Api running on {bind}"
+    >> setField "bind" bind
+    |> Log.info
 
     let client = Client.create busName
 

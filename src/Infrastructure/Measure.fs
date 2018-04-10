@@ -1,14 +1,21 @@
 module Measure
 
 open Infrastructure
+open Logary.Message
 
-let measure<'T> text (f:Lazy<'T>) : 'T =
+let measure<'T> (text:string) (f:Lazy<'T>) : 'T =
     let sw = System.Diagnostics.Stopwatch.StartNew()
 
-    Log.info "Begin %s" text
+    eventX "Begin {text}"
+    >> setField "text" text
+    |> Log.info
+    
     let result = f.Force ()
     sw.Stop ()
 
-    Log.info "End %s. Took %Ams" text sw.ElapsedMilliseconds
+    eventX "End {text}. Duration: {duration}ms"
+    >> setField "text" text
+    >> setField "duration" sw.ElapsedMilliseconds
+    |> Log.info
 
     result
