@@ -185,5 +185,5 @@ let ``Contract activation with invalid queries should fail``() =
     let expected:TxResult = General "Total queries mismatch" |> Error
 
     validateInContext 1ul ActiveContractSet.empty utxoSet (Transaction.hash tx) tx
-    |> printfn "%A" //  should equal expected
-    ()
+    |> should equal expected
+    
