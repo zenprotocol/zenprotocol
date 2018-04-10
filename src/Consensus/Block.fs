@@ -88,9 +88,7 @@ let createGenesis (chain:Chain.ChainParameters) transactions nonce =
 let getBlockSacrificeAmount chain acs =
 
     let computeContractSacrifice (contract:Contract.T) =
-        (contract.code
-         |> String.length 
-         |> uint64) * chain.contractSacrificePerBytePerBlock
+        (contract.size |> uint64) * chain.contractSacrificePerBytePerBlock
 
     Seq.sumBy computeContractSacrifice (ActiveContractSet.getContracts acs)
 
