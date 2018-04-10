@@ -57,8 +57,6 @@ let setup = fun () ->
     module RT = Zen.ResultT
     module Tx = Zen.TxSkeleton
 
-    val main: txSkeleton -> hash -> string -> sender -> option data -> wallet
-        -> result (txSkeleton ** option message) `cost` (64 + (64 + 64 + 0) + 21)
     let main txSkeleton contractHash command sender data wallet =
         if command = "contract2_test" then
         begin
@@ -89,8 +87,6 @@ let setup = fun () ->
             module RT = Zen.ResultT
             module Tx = Zen.TxSkeleton
 
-            val main: txSkeleton -> hash -> string -> sender -> option data -> wallet
-                -> result (txSkeleton ** option message) `cost` (64 + (64 + 64 + 0) + 26)
             let main txSkeleton contractHash command sender data wallet =
                 if command = "contract1_test" then
                 begin

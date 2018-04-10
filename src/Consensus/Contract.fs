@@ -13,6 +13,7 @@ open Zen.Cost.Realized
 open Zen.Types.Realized
 open Zen.Types.Data
 open Zen.Types.Main
+open Zen.Types.Main
 
 type ContractWallet = PointedOutput list
 type ContractFn = Hash -> string -> sender -> data option -> ContractWallet -> TxSkeleton.T -> Result<(TxSkeleton.T * Message Option),string>
@@ -26,66 +27,36 @@ type T = {
     code:string
 }
 
-let private findMethods assembly =
+let private findMethods (assembly:Assembly) =
     try
-        let getMethod name =
-            (assembly:Assembly)
-                .GetModules().[0]
-                .GetTypes().[0].GetMethod(name)
-        Ok (getMethod "main", getMethod "cf")
+        let t = assembly.GetModules().[0].GetTypes().[0]
+
+        let (MainFunc ((CostFunc (_,cost)), main)) = downcast (t.GetProperty("mainFunction").GetValue null)
+
+        Ok (main, cost)
     with _ as ex ->
         Exception.toError "get contract methods" ex
 
-
-let private invokeMainFn
-                methodInfo
-                (cHash : byte[])
-                (command : byte[])
-                (sender: sender)
-                (data : Native.option<Zen.Types.Data.data>)
-                (contractWallet : Prims.list<pointedOutput>)
-                (input : txSkeleton)
-                : obj =
-    (methodInfo:MethodInfo).Invoke (null, [| input; cHash; command; sender; data; contractWallet |])
-
-let private invokeCostFn
-                methodInfo
-                (command : byte[])
-                (sender: sender)
-                (data : Native.option<Zen.Types.Data.data>)
-                (contractWallet : Prims.list<pointedOutput>)
-                (input : txSkeleton)
-                : obj =
-    (methodInfo:MethodInfo).Invoke (null, [| input; command; sender; data; contractWallet |])
-
-let private castMainFnOutput output =
-    (output:System.Object) :?> cost<result<(txSkeleton * message Native.option)>, unit>
-
-let private castCostFnOutput output =
-    (output:System.Object) :?> cost<int64, unit>
-
-let private wrap (mainMethodInfo, costMethodInfo) =
+let private wrap (main, cost) =
     (
-    fun (Hash.Hash cHash) command sender data contractWallet txSkeleton ->
+    fun (Hash.Hash cHash) command (sender:sender) data contractWallet txSkeleton ->
         let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
         let contractWallet' = ZFStar.convertWallet contractWallet
         let command' = ZFStar.fsToFstString command
         let data' = ZFStar.fsToFstOption id data
 
-        invokeMainFn mainMethodInfo cHash command' sender data' contractWallet' txSkeleton'
-        |> castMainFnOutput
+        main txSkeleton' cHash command' sender data' contractWallet'
         |> ZFStar.unCost
         |> ZFStar.toResult
         |> Result.bind ZFStar.convertResult
     ,
-    fun command sender data contractWallet txSkeleton ->
+    fun command (sender:sender) data contractWallet txSkeleton ->
         let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
         let contractWallet' = ZFStar.convertWallet contractWallet
         let command' = ZFStar.fsToFstString command
         let data' = ZFStar.fsToFstOption id data
 
-        invokeCostFn costMethodInfo command' sender data' contractWallet' txSkeleton'
-        |> castCostFnOutput
+        cost txSkeleton' command' sender data' contractWallet'
         |> ZFStar.unCost
     )
 
