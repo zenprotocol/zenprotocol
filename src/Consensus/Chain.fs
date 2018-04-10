@@ -44,9 +44,9 @@ let testParameters =
         smoothingFactor=0.035;
         maxBlockWeight=1000_000_000I;
         sacrificePerByteBlock=1UL;
-        genesisHash= get <| Hash.fromString "4d9ab23909ce747917bc1c4b70dd8ae7e8bee358f448fb65d35a482ff396c451";
+        genesisHash= get <| Hash.fromString "fa9f657a8216fbcadfab5bad334024cedefa455dfe509e01acf9af0c565b0da1";
         genesisTime=1517828985040UL
-        networkId=2002ul
+        networkId=2003ul
         contractSacrificePerBytePerBlock=ContractSacrificePerBytePerBlock
     }
 
@@ -54,7 +54,7 @@ let localParameters = {
     testParameters with
         name="local"
         genesisHash =
-            get <| Hash.fromString "7ffa8c6b1525b8b98ba7847a524a0383659d111d793d5249f4b39b0c84d06b4c";
+            get <| Hash.fromString "07473faf36113a546b319f935abecec99ee5d4de305d2ef429db40bee18b0e81";
         genesisTime=1515594186383UL
         networkId=1002ul
 }

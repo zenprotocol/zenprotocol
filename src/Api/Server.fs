@@ -1,5 +1,6 @@
 module Api.Server
 
+open System.Security.Cryptography.X509Certificates
 open System.Windows.Input
 open FSharp.Data
 open Consensus
@@ -11,6 +12,8 @@ open Parsing
 open Messaging.Services
 open Messaging.Services.Wallet
 open Result
+open Zen.Crypto
+open Consensus.Crypto
 
 type T =
     {
@@ -99,6 +102,21 @@ let handleRequest chain client (request,reply) =
             | FSharp.Core.Error _ ->
                 TextContent (sprintf "invalid address %A" query)
                 |> reply StatusCode.BadRequest
+    | Get ("/wallet/publickey", query) ->
+        match Map.tryFind "path" query with
+        | None ->
+            TextContent (sprintf "path is missing")
+            |> reply StatusCode.BadRequest
+        | Some path ->
+            match Wallet.getPublicKey client path with
+            | Ok key ->
+                let serialized = PublicKey.toString key
+
+                TextContent serialized
+                |> reply StatusCode.OK
+            | Error error ->
+                 TextContent error
+                 |> reply StatusCode.BadRequest
 
     | Get ("/wallet/balance", _) ->
         match Wallet.getBalance client with
@@ -188,8 +206,9 @@ let handleRequest chain client (request,reply) =
     | Post ("/wallet/contract/execute", Some body) ->
         match getContractExecute chain body with
         | Error error -> replyError error
-        | Ok (cHash, command, data, returnAddress, spends) ->
-            Wallet.executeContract client cHash command data returnAddress spends
+        | Ok (cHash, command, data, returnAddress, sign, spends) ->
+
+            Wallet.executeContract client cHash command data returnAddress sign spends
             |> validateTx
     | Post ("/wallet/resync", _) ->
         Wallet.resyncAccount client

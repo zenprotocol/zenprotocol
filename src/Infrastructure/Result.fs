@@ -59,3 +59,7 @@ let traverseResultA f xs : Result<'res list, 'err list> =
 let (|ResultOf|) err = function | Some x -> Ok x | None -> Error err
 
 let get = function | Ok x -> x | Error err -> failwithf "%A" err
+
+let ofOption error = function
+    | Some value -> Ok value
+    | None -> Error error

@@ -90,7 +90,7 @@ let initOutputDir moduleName =
     Directory.CreateDirectory oDir |> ignore
     oDir, oDir / moduleName
 
-let private extract code hints limits rlimit moduleName = 
+let private extract code hints limits rlimit moduleName =
     let oDir, file = initOutputDir moduleName
     let originalFile = changeExtention ".orig.fst" file
     let hintsFile = changeExtention ".fst.hints" file
@@ -167,6 +167,7 @@ let recordHints code moduleName =
         elaborate originalFile elaboratedFile
         |> Result.bind (fun _ ->
             fstar oDir elaboratedFile [
+                 "--z3rlimit";(2723280u * 2u).ToString()
                  "--use_cached_modules"
                  "--record_hints"
                  "--no_default_includes"; elaboratedFile ]
@@ -176,9 +177,9 @@ let recordHints code moduleName =
         printfn "record hints output directory: %A" oDir
 #else
         Directory.Delete (oDir, true)
-#endif 
-   
-let compile path code hints rlimit moduleName = 
+#endif
+
+let compile path code hints rlimit moduleName =
     calculateMetrics hints
     |> Result.bind (fun limits -> extract code hints limits rlimit moduleName)
     |> Result.bind (compile' path moduleName)
@@ -190,7 +191,7 @@ let load path moduleName =
         |> Ok
     with _ as ex ->
         Error ex.Message
-        
+
 let totalQueries hints =
     let oDir, file = initOutputDir "" //as for now, using the filesystem as temporary solution
     let hintsFile = changeExtention ".fst.hints" file
@@ -200,7 +201,7 @@ let totalQueries hints =
     try (
         try
             Hints.read_hints hintsFile
-            |> function 
+            |> function
             | Some hints -> Ok hints
             | None -> Error "total queries: could not read hints"
         with _ ->
@@ -210,6 +211,6 @@ let totalQueries hints =
     finally
 #if DEBUG
         printfn "total queries output directory: %A" oDir
-#else 
+#else
         Directory.Delete (oDir, true)
-#endif 
+#endif

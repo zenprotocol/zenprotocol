@@ -17,7 +17,7 @@ let create secret key =
         cipher = cipher
         iv = iv
     }
-    
+
 let decrypt key secured =
     openBox secured.cipher key secured.iv
-    <@> SecretKey
+    >>= ExtendedKey.create

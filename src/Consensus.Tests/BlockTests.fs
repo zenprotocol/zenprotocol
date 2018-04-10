@@ -135,6 +135,7 @@ let ``connecting block should fail when transaction inputs are invalid``(parent:
     match Block.connect chain getUTXO contractsPath parent (timestamp + 1UL) utxoSet acs ema block with
     | Error error
                 when error.StartsWith "transactions failed inputs validation due to"
+                  || error = "Output lookup error"
                   || error.Contains "Orphan"
                   || error.Contains "witnesses" -> true     //too many/few wts
     | Error _ as res ->
@@ -149,13 +150,13 @@ let ``block timestamp too early``() =
     }
 
     let rootAccount = createTestAccount()
-    let account1, _ = create() 
+    let account1, _ = create()
     let tx =
         Account.createTransaction (publicKeyHash account1) {asset=Constants.Zen;amount=1UL} rootAccount
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
 
     let acs = ActiveContractSet.empty
-    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO Transaction.rootTxHash Transaction.rootTx
+    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO rootTxHash rootTx
 
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate chain parent timestamp ema acs [tx] Hash.zero
@@ -178,7 +179,7 @@ let ``block timestamp in the future``() =
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
 
     let acs = ActiveContractSet.empty
-    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO Transaction.rootTxHash Transaction.rootTx
+    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO rootTxHash rootTx
 
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate chain parent (timestamp + Block.MaxTimeInFuture + 1UL) ema acs [tx] Hash.zero
@@ -197,7 +198,7 @@ let ``block with mismatch commitments fail connecting``() =
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
 
     let acs = ActiveContractSet.empty
-    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO Transaction.rootTxHash Transaction.rootTx
+    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO rootTxHash rootTx
     let ema = EMA.create chain
 
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0x20fffffful;nonce=0UL,0UL}
@@ -218,7 +219,7 @@ let ``can connect valid block``() =
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
 
     let acs = ActiveContractSet.empty
-    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO Transaction.rootTxHash Transaction.rootTx
+    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO rootTxHash rootTx
     let ema = EMA.create chain
 
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
@@ -233,7 +234,7 @@ let ``can connect block with coinbase only``() =
     let account1, _ = create()
 
     let acs = ActiveContractSet.empty
-    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO Transaction.rootTxHash Transaction.rootTx
+    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO rootTxHash rootTx
     let ema = EMA.create chain
 
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
@@ -253,15 +254,15 @@ let ``can connect block with a contract``() =
     let contract : Contract.T =
         {
             hash=Contract.computeHash SampleContract.sampleContractCode
-            fn= fun _ _ _ _ tx -> Ok (tx,None)
-            costFn = fun _ _ _ _ -> 0L
+            fn= fun _ _ _ _ _ tx -> Ok (tx,None)
+            costFn = fun _ _ _ _ _ -> 0L
             expiry=1001ul
             size=String.length SampleContract.sampleContractCode |> uint32
             code=""
         }
 
     let acs = ActiveContractSet.empty |> ActiveContractSet.add contract.hash contract
-    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO Transaction.rootTxHash Transaction.rootTx
+    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO rootTxHash rootTx
     let ema = EMA.create chain
 
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
@@ -281,20 +282,20 @@ let ``block with invalid contract failed connecting``() =
 
     let tx =
         {contract = Some { code="ada";hints=goodHints;rlimit=0u;queries=goodTotalQueries }; inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
-        |> Transaction.sign [ keyPair rootAccount ]
+        |> Transaction.sign [ rootKeyPair ]
 
     let contract : Contract.T =
         {
             hash=Contract.computeHash "ada"
-            fn= fun _ _ _ _ tx -> Ok (tx,None)
-            costFn = fun _ _ _ _ -> 0L
+            fn= fun _ _ _ _ _ tx -> Ok (tx,None)
+            costFn = fun _ _ _ _ _ -> 0L
             expiry=1000ul
             size=100ul
             code=""
         }
 
     let acs = ActiveContractSet.empty |> ActiveContractSet.add contract.hash contract
-    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO Transaction.rootTxHash Transaction.rootTx
+    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO rootTxHash rootTx
     let ema = EMA.create chain
 
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
@@ -581,7 +582,7 @@ let ``coinbase reward split over multiple outputs``() =
 
 [<Test>]
 let ``block spending mature transaction is valid``() =
-    
+
     let rootAccount =
         {fst rootAccountData with blockNumber=100ul}
     let account1, _ = create()
@@ -598,7 +599,7 @@ let ``block spending mature transaction is valid``() =
     let rootAccount = Account.addTransaction originHash origin rootAccount
 
     let tx =
-        Account.createTransaction (publicKeyHash account1) { asset = Constants.Zen; amount = 1UL } (rootAccount, rootSecretKey)
+        Account.createTransaction (publicKeyHash account1) { asset = Constants.Zen; amount = 1UL } (rootAccount, rootExtendedKey)
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
 
 
@@ -631,7 +632,7 @@ let ``block spending unmature transaction is invalid``() =
     let rootAccount = Account.addTransaction originHash origin rootAccount
 
     let tx =
-        Account.createTransaction (publicKeyHash account1) { asset = Constants.Zen; amount = 1UL } (rootAccount, rootSecretKey)
+        Account.createTransaction (publicKeyHash account1) { asset = Constants.Zen; amount = 1UL } (rootAccount, rootExtendedKey)
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
 
 
@@ -653,15 +654,15 @@ let ``contract get removed when expiring arrive``() =
     let contract : Contract.T =
         {
             hash=Contract.computeHash SampleContract.sampleContractCode
-            fn= fun _ _ _ _ tx -> Ok (tx,None)
-            costFn = fun _ _ _ _ -> 0L
+            fn= fun _ _ _ _ _ tx -> Ok (tx,None)
+            costFn = fun _ _ _ _ _ -> 0L
             expiry=1ul
             size=100ul
             code=""
         }
 
     let acs = ActiveContractSet.empty |> ActiveContractSet.add contract.hash contract
-    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO Transaction.rootTxHash Transaction.rootTx
+    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO rootTxHash rootTx
     let ema = EMA.create chain
 
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
@@ -682,18 +683,19 @@ let ``Overweight block should be rejected``() =
         beginOutputs = 0u;
         inputsLength = 1u;
         outputsLength = 0u;
+        signature = None
         cost = System.UInt32.MaxValue       // Weight >>> max block weight
         }
     let tx1 =
         Account.createTransactionFromLock cLock { asset = Constants.Zen; amount = 1UL } rootAccount
         |> (function | Ok x -> x | _ -> failwith "failed transaction generation")
-        
+
     // find the exact output
     let i, _ =
         tx1.outputs
         |> List.mapi (fun i t -> i, t)
         |> List.find (fun (_, t) -> match t.lock with | Contract _ -> true | _ -> false)
-        
+
     let tx1Hash = Transaction.hash tx1
     let tx2 = {
         inputs = [Outpoint {txHash=tx1Hash;index=uint32 i}];
@@ -703,7 +705,7 @@ let ``Overweight block should be rejected``() =
     }
 
     let acs = ActiveContractSet.empty
-    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO Transaction.rootTxHash Transaction.rootTx
+    let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO rootTxHash rootTx
     let ema = EMA.create chain
 
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}

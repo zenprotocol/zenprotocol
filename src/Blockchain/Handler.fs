@@ -107,8 +107,8 @@ let handleCommand chainParams command session timestamp (state:State) =
 
 let handleRequest chain (requestId:RequestId) request session timestamp state =
     match request with
-    | ExecuteContract (cHash, command, data, txSkeleton) ->
-        TransactionHandler.executeContract session txSkeleton cHash command data state.memoryState
+    | ExecuteContract (cHash, command,sender ,data, txSkeleton) ->
+        TransactionHandler.executeContract session txSkeleton cHash command sender data state.memoryState
         |> requestId.reply
     | GetBlockTemplate pkHash ->
         let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList chain session state

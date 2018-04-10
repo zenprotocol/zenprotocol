@@ -7,11 +7,12 @@ open Crypto
 open Types
 open Infrastructure
 open Result
-open ExtendedKey
 open Messaging.Services
 open Result
+open Zen.Hash
 
 module ZData = Zen.Types.Data
+module Cost = Zen.Cost.Realized
 
 let result = new ResultBuilder<string>()
 
@@ -42,27 +43,18 @@ type T = {
     publicKey: PublicKey
 }
 
-let private zenCoinType = Hardened 258
-let private purpose = Hardened 44
+let private zenCoinType = ExtendedKey.Hardened 258
+let private purpose = ExtendedKey.Hardened 44
 
-let private getPrivateKey seed =
-    create seed
-    >>= derive purpose
-    >>= derive zenCoinType
-    >>= derive (Hardened 0)
-    >>= derive 0
-    >>= derive 0
-    >>= getPrivateKey
+let deriveZenKey = ExtendedKey.derivePath "m/44'/258'/0'/0/0"
 
-let private create key privateKey = result {
-    let (SecretKey bytes) = privateKey
+let private create password seed = result {
+    let! extendedPrivateKey = ExtendedKey.create seed
 
-    let publicKey =
-        match SecretKey.getPublicKey privateKey with
-        | Some publicKey -> publicKey
-        | None -> failwith "unexpected invalid private key"
+    let! zenPrivateKey = deriveZenKey extendedPrivateKey
+    let! publicKey =ExtendedKey.getPublicKey zenPrivateKey
 
-    let! secured = Secured.create bytes key
+    let! secured = Secured.create seed password
 
     return {
         deltas = List.empty
@@ -81,10 +73,9 @@ let private deriveSeed words =
      with _ as ex ->
          Error ex.Message
 
-let import words key=
+let import words password =
     deriveSeed words
-    >>= getPrivateKey
-    >>= create key
+    >>= create password
 
 let private isKeyMatch account address =
     PublicKey.hash account.publicKey = address
@@ -331,7 +322,10 @@ let private addChange spend amount account output =
             }]
         )
 
-let createTransactionFromLock lk spend (account, secretKey) = result {
+let createTransactionFromLock lk spend (account, extendedKey) = result {
+    let! zenKey = deriveZenKey extendedKey
+    let! secretKey = ExtendedKey.getPrivateKey zenKey
+
     let! (inputs, keys, amount) = collectInputs account spend secretKey
     let inputPoints = List.map (fst >> Outpoint) inputs
     let outputs = addChange spend amount account { spend = spend; lock = lk }
@@ -345,13 +339,16 @@ let createTransactionFromLock lk spend (account, secretKey) = result {
 let createTransaction pkHash spend accoundData =
     createTransactionFromLock (PK pkHash) spend accoundData
 
-let createActivateContractTransaction chain code (numberOfBlocks:uint32) (account, secretKey) =
+let createActivateContractTransaction chain code (numberOfBlocks:uint32) (account, extendedKey) =
     let codeLength = String.length code |> uint64
 
     let activationSacrifice = chain.sacrificePerByteBlock * codeLength * (uint64 numberOfBlocks)
     let spend = { amount = activationSacrifice; asset = Constants.Zen }
 
     result {
+        let! zenKey = deriveZenKey extendedKey
+        let! secretKey = ExtendedKey.getPrivateKey zenKey
+
         let! (inputs,keys,amount) = collectInputs account spend secretKey
         let inputPoints = List.map (fst >> Outpoint) inputs
 
@@ -376,10 +373,56 @@ let createActivateContractTransaction chain code (numberOfBlocks:uint32) (accoun
             }
     }
 
-let createExecuteContractTransaction executeContract cHash command data provideReturnAddress spends (account, secretKey) = result {
+let addReturnAddressToData publicKey data =
+    let addReturnAddressToData' dict =
+        let returnAddress = PK (PublicKey.hash publicKey)
+
+        Zen.Dictionary.add "returnAddress"B (ZData.Lock (ZFStar.fsToFstLock returnAddress)) dict
+        |> Cost.__force
+        |> ZData.DataDict
+        |> ZData.Dict
+        |> Some
+        |> Ok
+
+    match data with
+    | Some (ZData.Dict (ZData.DataDict dict)) -> addReturnAddressToData' dict
+    | None -> addReturnAddressToData' Zen.Dictionary.empty
+    | _ -> Error "data can only be empty or dict in order to add return address"
+
+let signFirstWitness signKey tx = result {
+    match signKey with
+    | Some signKey ->
+        let! witnessIndex =
+            List.tryFindIndex (fun witness ->
+                match witness with
+                | ContractWitness _ -> true
+                | _ -> false) tx.witnesses
+            |> ofOption "missing contact witness"
+        let! wintess =
+            match tx.witnesses.[witnessIndex] with
+            | ContractWitness cw -> Ok cw
+            | _ -> Error "missing contact witness"
+
+        let txHash = Transaction.hash tx
+
+        let! signature = ExtendedKey.sign txHash signKey
+        let! publicKey = ExtendedKey.getPublicKey signKey
+
+        let witness = {wintess with signature=Some (publicKey,signature)}
+        let witnesses = List.update witnessIndex (ContractWitness witness) tx.witnesses
+
+        return {tx with witnesses = witnesses}
+    | None -> return tx
+}
+
+let createExecuteContractTransaction executeContract cHash command data provideReturnAddress sign spends (account, extendedKey) = result {
     let mutable txSkeleton = TxSkeleton.empty
     let mutable keys = List.empty
+
+    let! zenKey = deriveZenKey extendedKey
+    let! secretKey = ExtendedKey.getPrivateKey zenKey
     let pkHash = PublicKey.hash account.publicKey
+
     for (asset, amount) in Map.toSeq spends do
         let! inputs, keys', collectedAmount =
             collectInputs account { asset = asset; amount = amount } secretKey
@@ -389,34 +432,29 @@ let createExecuteContractTransaction executeContract cHash command data provideR
             |> TxSkeleton.addChange asset collectedAmount amount pkHash
         keys <- List.append keys keys'
 
-    let isDataEmptyOrDict =
-        match data with
-        | Some (ZData.Dict _) -> true
-        | None -> true
-        | _ -> false
-
-    if not isDataEmptyOrDict && provideReturnAddress then
-        return! (Error "cannot provide returnAddress while data is not a dictionary")
-
-    let data =
+    let! data =
         if provideReturnAddress then
-            let dict =
-                match data with
-                | Some (ZData.Dict (ZData.DataDict dict)) -> dict
-                | None -> Zen.Dictionary.empty
-                | _ -> failwith "data can only be empty or dict"
-
-            let returnAddress = PK (PublicKey.hash account.publicKey)
-
-            Zen.Dictionary.add "returnAddress"B (ZData.Lock (ZFStar.fsToFstLock returnAddress)) dict
-            |> Zen.Cost.Realized.__force
-            |> ZData.DataDict
-            |> ZData.Dict
-            |> Some
-
+            addReturnAddressToData account.publicKey data
         else
-            data
+            Ok data
 
-    let! unsignedTx = executeContract cHash command data txSkeleton
-    return Transaction.sign keys unsignedTx
+    let! signKey =
+        match sign with
+        | Some keyPath ->
+            ExtendedKey.derivePath keyPath extendedKey
+            <@> Some
+        | None -> Ok None
+
+    let! sender =
+        match signKey with
+        | Some signKey ->
+            ExtendedKey.getPublicKey signKey
+            <@> Some
+        | None -> Ok None
+
+    let! unsignedTx = executeContract cHash command sender data txSkeleton
+
+    let sign tx = signFirstWitness signKey tx <@> Transaction.sign keys
+
+    return! sign unsignedTx
 }

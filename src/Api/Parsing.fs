@@ -1,5 +1,6 @@
 module Api.Parsing
 
+open Api
 open FSharp.Data
 open Api.Types
 open Consensus
@@ -61,7 +62,14 @@ let getContractExecute chain json =
                             | Some data -> Some data
                             | None -> failwith "Invalid Data"
                         | None -> failwith "Invalid Data"
-                Ok (cHash, json.Command, data, json.Options.ReturnAddress, spends)
+
+                let sign =
+                    if System.String.IsNullOrEmpty json.Options.Sign then
+                        None
+                    else
+                        Some json.Options.Sign
+
+                Ok (cHash, json.Command, data, json.Options.ReturnAddress, sign, spends)
             else
                 errors
                 |> String.concat " "

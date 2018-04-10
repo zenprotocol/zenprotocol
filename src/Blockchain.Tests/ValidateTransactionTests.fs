@@ -44,8 +44,8 @@ let txHash = Transaction.hash tx
 let txOutpoints = getTxOutpoints txHash tx
 
 // Default initial state of mempool and utxoset
-let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction (fun _ -> UtxoSet.NoOutput) Transaction.rootTxHash Transaction.rootTx
-let mempool = MemPool.empty |> MemPool.add Transaction.rootTxHash Transaction.rootTx
+let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction (fun _ -> UtxoSet.NoOutput) rootTxHash rootTx
+let mempool = MemPool.empty |> MemPool.add rootTxHash rootTx
 let orphanPool = OrphanPool.create()
 let acs = ActiveContractSet.empty
 
@@ -116,7 +116,7 @@ let ``tx already in mempool nothing happen`` () =
     use databaseContext = DatabaseContext.createTemporary "test"
 
     use session = DatabaseContext.createSession databaseContext
-    let result = Handler.handleCommand chain (ValidateTransaction Transaction.rootTx) session 1UL state
+    let result = Handler.handleCommand chain (ValidateTransaction rootTx) session 1UL state
 
     let events, state' = Writer.unwrap result
 
@@ -199,7 +199,7 @@ let ``orphan transaction is eventually invalid``() =
     use session = DatabaseContext.createSession databaseContext
     let rootAccount = createTestAccount()
     let account1, account1key = create()
-    let account2, _ = create() 
+    let account2, _ = create()
 
     let tx1 = createTransaction (publicKeyHash account1) 2UL rootAccount
     let tx1Hash = Transaction.hash tx1
@@ -213,7 +213,7 @@ let ``orphan transaction is eventually invalid``() =
         let output' = {output with spend = {amount = output.spend.amount - 1UL; asset = output.spend.asset}}
         let outputs = output' :: List.tail tx.outputs
         let tx' = { tx with outputs = outputs}
-        Transaction.sign [keyPair account1] tx'
+        Transaction.sign [getSecretKey account1key,account1.publicKey] tx'
     let tx2Hash = Transaction.hash tx2
 
     // Sending orphan transaction first, which should be added to orphan list
@@ -350,7 +350,7 @@ let ``Invalid contract should not be added to ActiveContractSet or mempool``() =
         let input, output = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head
         let output' = {output with lock=PK (publicKeyHash rootAccount)}
         { inputs=[ Outpoint input ]; outputs=[ output' ]; witnesses=[]; contract = Some { code = contractCode; hints = ""; rlimit = 0u; queries = 0u } }
-        |> (Transaction.sign [ keyPair rootAccount ])
+        |> (Transaction.sign [ rootKeyPair ])
 
     let txHash = Transaction.hash tx
 
@@ -394,7 +394,7 @@ let ``contract activation arrived, running orphan transaction``() =
         |> Writer.unwrap
 
     let tx =
-        TransactionHandler.executeContract session sampleInputTx sampleContractHash "" None stateWithContract.memoryState
+        TransactionHandler.executeContract session sampleInputTx sampleContractHash "" None None stateWithContract.memoryState
         |> getResult
     let txHash = Transaction.hash tx
 

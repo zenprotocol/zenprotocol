@@ -51,9 +51,9 @@ let fstToFsOption mapper value =
 
 let fsToFstLock (outputLock:Types.Lock) : lock =
     match outputLock with
-    | PK (Hash.Hash pkHash) ->
+    | Consensus.Types.PK (Hash.Hash pkHash) ->
         PKLock pkHash
-    | Contract (Hash.Hash pkHash) ->
+    | Consensus.Types.Contract (Hash.Hash pkHash) ->
         ContractLock pkHash
     | Destroy ->
         DestroyLock
@@ -64,13 +64,18 @@ let fsToFstLock (outputLock:Types.Lock) : lock =
     | Coinbase (blockNumber, (Hash.Hash pkHash)) ->
         CoinbaseLock (blockNumber,pkHash)
 
+let fsToFstOutpoint (o:Outpoint) : outpoint = {txHash = Hash.bytes o.txHash;index = o.index}
+
+let fsToFstPublicKey (Crypto.PublicKey pk) : publicKey = pk
+
+let fsToFstSignature (Crypto.Signature signature) : signature = signature
 
 let fstToFsLock (outputLock:lock) : Types.Lock =
     match outputLock with
     | PKLock pkHash ->
-        PK (Hash.Hash pkHash)
+        Consensus.Types.PK (Hash.Hash pkHash)
     | ContractLock pkHash ->
-        Contract (Hash.Hash pkHash)
+        Consensus.Types.Contract (Hash.Hash pkHash)
     | DestroyLock -> Destroy
     | FeeLock -> Fee
     | ActivationSacrificeLock -> ActivationSacrifice

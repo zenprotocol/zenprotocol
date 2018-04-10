@@ -14,6 +14,11 @@ type message =
       command: string;
       data: option data }
 
+type sender =
+    | PK of publicKey
+    | Contract of contractHash
+    | Anonymous
+
 (*
 type contractArgs = {
     cHash: hash;
@@ -29,6 +34,7 @@ noeq type costFunction =
         #n:nat{n<=maxCost}
         -> f:(txSkeleton
               -> command:string
+              -> sender
               -> data:option data
               -> wallet
               -> nat `cost` n)
@@ -40,8 +46,9 @@ noeq type mainFunction =
         -> mf:( txSkel:txSkeleton
                 -> contractHash
                 -> command:string
+                -> sender:sender
                 -> data:option data
                 -> wallet:wallet
-                -> contractResult `cost` force ((CostFunc?.f cf) txSkel command data wallet)
+                -> contractResult `cost` force ((CostFunc?.f cf) txSkel command sender data wallet)
               )
         -> mainFunction
