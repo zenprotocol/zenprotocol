@@ -91,8 +91,6 @@ let setUp = fun () ->
     module RT = Zen.ResultT
     module Tx = Zen.TxSkeleton
 
-    val main: txSkeleton -> hash -> string -> sender -> option data -> wallet:wallet
-        -> result (txSkeleton ** option message) `cost` ((64 + (W.size wallet * 128 + 192) + 0 + 21) <: nat)
     let main txSkeleton contractHash command sender data wallet =
         let! result =
             Tx.lockToPubKey zenAsset 10UL (hashFromBase64 "DYggLLPq6eXj1YxjiPQ5dSvb/YVqAVNf8Mjnpc9P9BI=") txSkeleton

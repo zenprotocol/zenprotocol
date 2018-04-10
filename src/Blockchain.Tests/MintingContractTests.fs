@@ -113,8 +113,6 @@ let setUp = fun () ->
 
       RT.of_option "contract doesn't have enough zens to pay you" result
 
-    val main: txSkeleton -> hash -> string -> sender -> option data -> wallet:wallet
-        -> result (txSkeleton ** option message) `cost` (3 + 66 + (64 + (64 + (64 + 64 + (Zen.Wallet.size wallet * 128 + 192) + 0)) + 31) + 28)
     let main txSkeleton contractHash command sender data wallet =
       let! returnAddress = data >!> tryDict >?> tryFindLock "returnAddress" in
 

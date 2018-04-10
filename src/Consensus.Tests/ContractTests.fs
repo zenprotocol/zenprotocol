@@ -113,8 +113,6 @@ let ``Contract should not be able to create tokens other than its own``() =
          module RT = Zen.ResultT
          module Tx = Zen.TxSkeleton
 
-         val main: txSkeleton -> hash -> string -> sender -> option data -> wallet
-            -> result (txSkeleton ** option message) `cost` (64 + (64 + 64 + 0) + 21)
          let main txSkeleton contractHash command sender data wallet =
            let! asset = Zen.Asset.getDefault Zen.Asset.zeroHash in
            let lock = ContractLock contractHash in
@@ -148,8 +146,6 @@ let ``Contract should be able to destroy its own tokens locked to it``() =
     module RT = Zen.ResultT
     module Tx = Zen.TxSkeleton
 
-    val main: txSkeleton -> hash -> string -> sender -> option data -> wallet
-        -> result (txSkeleton ** option message) `cost` (64 + (64 + 0) + 11)
     let main txSkeleton contractHash command sender data wallet =
         let! asset = Zen.Asset.getDefault contractHash in
         let! txSkeleton1 = Tx.destroy 1000UL asset txSkeleton in
@@ -222,8 +218,6 @@ let ``Contract should not be able to destroy tokens other than its own - single 
     module RT = Zen.ResultT
     module Tx = Zen.TxSkeleton
 
-    val main: txSkeleton -> hash -> string -> sender -> option data -> wallet
-        -> result (txSkeleton ** option message) `cost` (64 + 8)
     let main txSkeleton contractHash command sender data wallet =
         let! txSkeleton1 = Tx.destroy 1000UL zenAsset txSkeleton in // should be impossible
         RT.ok (txSkeleton1, None)
@@ -273,8 +267,6 @@ let ``Contract should not be able to destroy tokens other than its own - multipl
     module RT = Zen.ResultT
     module Tx = Zen.TxSkeleton
 
-    val main: txSkeleton -> hash -> string -> sender -> option data -> wallet
-        -> result (txSkeleton ** option message) `cost` (64 + (64 + 64 + 0) + 15)
     let main txSkeleton contractHash command sender data wallet =
         let! asset = Zen.Asset.getDefault contractHash in
         let txSkeleton1 = Tx.destroy 1000UL zenAsset txSkeleton in // should be impossible

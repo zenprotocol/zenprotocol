@@ -31,8 +31,8 @@ let code = sprintf
             module RT = Zen.ResultT
             module Tx = Zen.TxSkeleton
             module Crypto = Zen.Crypto
+            module CR = Zen.ContractResult.NoMessage
 
-            val main: txSkeleton -> hash -> string -> sender -> option data -> wallet -> result (txSkeleton ** option message) `cost` (340)
             let main txSkeleton contractHash command sender data wallet =
                 let! pk = Crypto.parsePublicKey "%s" in
 
@@ -46,13 +46,14 @@ let code = sprintf
                             Tx.mint 1UL contractAsset txSkeleton
                             >>=Tx.lockToContract contractAsset 1UL contractHash in
 
-                        RT.ok (txSkeleton, None)
+
+                        CR.ret txSkeleton
                     end
                     else RT.autoFailw "expected different pk"
                 | _ -> RT.autoFailw "expected pk"
 
-            val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 1
-            let cf _ _ _ _ _ = ret (340)
+            //val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 1
+            let cf _ _ _ _ _ = ret (338 <: nat)
             """ serializePK
 
 let cHash = Contract.computeHash code
@@ -97,13 +98,11 @@ let ``contract witness with valid signature``() =
                                               inputsLength=1ul;
                                               outputsLength=1ul;
                                               signature=Some (publicKey,signature)
-                                              cost = 340ul
+                                              cost = 338ul
                                           }
     let tx = {tx with witnesses= [contractWintess]}
 
     let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2ul acs UtxoSet.asDatabase txHash tx
-
-    printfn "%A" result
 
     result |> should be ok
 
@@ -132,7 +131,7 @@ let ``contract witness with invalid publickey``() =
                                               inputsLength=1ul;
                                               outputsLength=1ul;
                                               signature=Some (publicKey,signature)
-                                              cost = 340ul
+                                              cost = 338u
                                           }
     let tx = {tx with witnesses= [contractWintess]}
 
@@ -165,7 +164,7 @@ let ``contract witness with no signature``() =
                                               inputsLength=1ul;
                                               outputsLength=1ul;
                                               signature=None
-                                              cost = 340ul
+                                              cost = 338ul
                                           }
     let tx = {tx with witnesses= [contractWintess]}
 
@@ -203,7 +202,7 @@ let ``contract witness with unexpcected public key``() =
                                               inputsLength=1ul;
                                               outputsLength=1ul;
                                               signature=Some (publicKey,signature)
-                                              cost = 340ul
+                                              cost = 338ul
                                           }
     let tx = {tx with witnesses= [contractWintess]}
 

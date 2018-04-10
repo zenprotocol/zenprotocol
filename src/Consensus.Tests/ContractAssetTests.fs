@@ -63,8 +63,6 @@ let ``Should generate assets from a string and from an int``() =
         module Tx = Zen.TxSkeleton
         module S = FStar.String
 
-        val main: txSkeleton -> hash -> string -> sender -> option data -> wallet
-            -> result (txSkeleton ** option message) `cost` (64 + (64 + (64 + 64 + 0)) + 26)
         let main txSkeleton contractHash command sender data wallet =
             let str = "Test" in
 

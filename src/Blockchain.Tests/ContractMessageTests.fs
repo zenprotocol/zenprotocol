@@ -96,8 +96,6 @@ open Zen.Asset
 module RT = Zen.ResultT
 module Tx = Zen.TxSkeleton
 
-val main: txSkeleton -> hash -> string -> sender -> option data -> wallet
-    -> result (txSkeleton ** option message) `cost` (64 + 64 + 0 + 25)
 let main txSkeleton contractHash command sender data wallet =
     let isFromContract =
         match sender with
@@ -137,8 +135,6 @@ open Zen.Data
 module RT = Zen.ResultT
 module Tx = Zen.TxSkeleton
 
-val main: txSkeleton -> hash -> string -> sender-> option data -> wallet
-    -> result (txSkeleton ** option message) `cost` (3 + 66 + (64 + (64 + (64 + 64 + 0))) + 34)
 let main txSkeleton contractHash command sender data wallet =
     let! returnAddress = data >!> tryDict >?> tryFindLock "returnAddress" in
 
