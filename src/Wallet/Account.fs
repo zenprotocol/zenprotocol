@@ -54,7 +54,7 @@ let private create password seed = result {
     let! zenPrivateKey = deriveZenKey extendedPrivateKey
     let! publicKey =ExtendedKey.getPublicKey zenPrivateKey
 
-    let! secured = Secured.create seed password
+    let secured = Secured.create password seed
 
     return {
         deltas = List.empty

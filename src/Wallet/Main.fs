@@ -126,8 +126,8 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
         <@> Account.getHistory
         |> reply<TransactionsResponse> requestId
         wallet, extendedKey
-    | ImportSeed (words, key) ->
-        Account.import words key
+    | ImportSeed (words, password) ->
+        Account.import words password
         <@> fun (account, secured) ->
                 DataAccess.Account.put dataAccess session account
                 DataAccess.Secured.put dataAccess session secured
@@ -181,11 +181,11 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
         with
         | x -> printfn "%A" x
         wallet,extendedKey
-    | Unlock key ->
+    | Unlock password ->
         wallet,
         match DataAccess.Secured.tryGet dataAccess session with
         | Some secured ->
-            match Secured.decrypt key secured with
+            match Secured.decrypt password secured with
             | Ok extendedKey ->
                 eventX "Account unlocked"
                 |> Log.info

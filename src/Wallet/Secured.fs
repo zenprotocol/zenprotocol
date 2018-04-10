@@ -2,22 +2,10 @@ module Wallet.Secured
 
 open Consensus.Crypto
 open Infrastructure.Result
-open Infrastructure.Crypto.SecretBox
+open Infrastructure.Security
 
-type T = {
-    cipher: byte[]
-    iv: byte[]
-}
+type T = byte[]
 
-let create secret key =
-    let iv = generateIV
-    create secret key iv
-    <@> fun cipher ->
-    {
-        cipher = cipher
-        iv = iv
-    }
+let create password secret = AuthenticatedEncryption.encrypt password secret
 
-let decrypt key secured =
-    openBox secured.cipher key secured.iv
-    >>= ExtendedKey.create
+let decrypt password secured = AuthenticatedEncryption.decrypt password secured >>= ExtendedKey.create
