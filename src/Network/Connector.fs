@@ -4,6 +4,7 @@ open Network
 open Network.Transport
 open System
 open Infrastructure
+open Logary.Message
 
 type ConnectionStatus =
     | Connected
@@ -38,11 +39,13 @@ let disconnected connector address =
             if List.contains address connector.seeds then
                 Map.remove address connector.connections
             elif attempts = MaxAttemps then
-                Log.info "address %s was suspended due to too many failed attempts" address
+                eventX "Address {address} was suspended due to too many failed attempts"
+                >> setField "address" address
+                |> Log.info
                 Map.add address (Suspended DateTime.UtcNow) connector.connections
             else
                 Map.add address (Failed attempts) connector.connections
-        | _ -> failwith "expecting connected of connecting address"
+        | _ -> failwith "Expecting connected of connecting address"
 
     {connector with connections = connections;}
 

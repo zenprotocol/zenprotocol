@@ -5,6 +5,7 @@ open System.IO
 open Microsoft.FSharp.Compiler.SourceCodeServices
 open Exception
 open Infrastructure.Result
+open Logary.Message
 
 let private fsChecker = FSharpChecker.Create()
 let private changeExtention extention path = Path.ChangeExtension (path, extention)
@@ -63,7 +64,9 @@ let private elaborate input_filepath output_target =
         ASTUtils.write_ast_to_file elab'd_ast output_target
         Ok ()
     with _ as ex ->
-        Log.info "elaboration error: %A" ex
+        eventX "elaboration error: {ex}"
+        >> setField "ex" ex
+        |> Log.info
         Error "elaborate"
 
 let private fstar outDir inputFile args =
@@ -117,7 +120,9 @@ let private extract code hints limits rlimit moduleName =
             |> wrapFStar "extract" extractedFile)
     finally
 #if DEBUG
-        printfn "extract output directory: %A" oDir
+        eventX "extract output directory: {dir}"
+        >> setField "dir" oDir
+        |> Log.debug
 #else
         Directory.Delete (oDir, true)
 #endif
@@ -150,7 +155,9 @@ let calculateMetrics hints =
             Exception.toError "limits" ex
     finally
 #if DEBUG
-        printfn "calculate metrics output directory: %A" oDir
+        eventX "calculate metrics output directory: {dir}"
+        >> setField "dir" oDir
+        |> Log.debug
 #else
         Directory.Delete (oDir, true)
 #endif
@@ -174,7 +181,9 @@ let recordHints code moduleName =
             |> wrapFStar "record hints" hintsFile)
     finally
 #if DEBUG
-        printfn "record hints output directory: %A" oDir
+        eventX "record hints output directory: {dir}"
+        >> setField "dir" oDir
+        |> Log.debug
 #else
         Directory.Delete (oDir, true)
 #endif
@@ -210,7 +219,9 @@ let totalQueries hints =
               >> uint32 )
     finally
 #if DEBUG
-        printfn "total queries output directory: %A" oDir
+        eventX "total queries output directory: {dir}"
+        >> setField "dir" oDir
+        |> Log.debug
 #else
         Directory.Delete (oDir, true)
 #endif

@@ -304,8 +304,7 @@ let ``block with invalid contract failed connecting``() =
     let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "transactions failed inputs validation due to BadContract"
 
     Block.connect chain getUTXO contractsPath parent timestamp utxoSet (ActiveContractSet.empty) ema block
-    |> printfn "%A"; ()
-//    |> should equal expected
+    |> should equal expected
 
 [<Test>]
 let ``block with coinbase lock within a regular transaction should fail``() =

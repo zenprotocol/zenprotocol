@@ -3,6 +3,7 @@ module Network.Transport.Peer
 open FsNetMQ
 open Network
 open Infrastructure
+open Logary.Message
 
 module RoutingId =
     let toBytes (FsNetMQ.RoutingId.RoutingId bytes) = bytes
@@ -86,7 +87,9 @@ let private disconnect socket peer =
         peer
 
 let private closePeer socket reason peer =
-    Log.info "Closing peer because of %A" reason
+    eventX "Closing peer because of {reason}"
+    >> setField "reason" (reason.ToString())
+    |> Log.info
 
     disconnect socket peer |> ignore
     withState peer (Dead reason)
@@ -105,7 +108,9 @@ let private create mode routingId networkId state =
 let connect socket networkId address =
     let routingId = Peer.connect socket (sprintf "tcp://%s" address)
 
-    Log.info "Connecting to %s" address
+    eventX "Connecting to {address}"
+    >> setField "address" address
+    |> Log.info
 
     let peer = create (Connector address) routingId networkId (Connecting (getNow ()))
 
@@ -128,7 +133,8 @@ let newPeer socket networkId next routingId msg =
                 send socket peer (Message.IncorrectNetwork)
                 |> disconnect socket
             else
-                Log.info "Peer accepted"
+                eventX "Peer accepted"
+                |> Log.info
 
                 let peer = createPeer Active
 
@@ -143,7 +149,8 @@ let newPeer socket networkId next routingId msg =
 let handleConnectingState socket next peer msg =
     match msg with
     | None ->
-        Log.warning "Received malformed message from peer"
+        eventX "Received malformed message from peer"
+        |> Log.warning
 
         send socket peer (Message.UnknownMessage 0uy)
         |> closePeer socket UnknownMessage
@@ -155,7 +162,8 @@ let handleConnectingState socket next peer msg =
             else
                 // TODO: save version
 
-                Log.info "Connected to peer"
+                eventX "Connected to peer"
+                |> Log.info
 
                 match peer.mode with
                 | Connector address ->
@@ -170,14 +178,16 @@ let handleConnectingState socket next peer msg =
 let handleActiveState socket next peer msg =
     match msg with
     | None ->
-        Log.warning "Received malformed message from peer"
+        eventX "Received malformed message from peer"
+        |> Log.info
 
         send socket peer (Message.UnknownMessage 0uy)
         |> closePeer socket UnknownMessage
     | Some msg ->
         match msg with
         | Message.UnknownPeer _ ->
-            Log.info "Reconnecting to peer"
+            eventX "Reconnecting to peer"
+            |> Log.info
 
             // NetMQ reconnection, just sending Hello again
             let peer = withState peer (Connecting (getNow ()))

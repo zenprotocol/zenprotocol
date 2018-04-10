@@ -2,7 +2,7 @@ module Infrastructure.Actor
 
 open FSharp.Control.Reactive
 open Infrastructure
-
+open Logary.Message
 open FsNetMQ
 
 type ActorFunction<'command,'request,'event,'result> = 
@@ -24,7 +24,11 @@ let create<'command,'request,'event,'result> busName serviceName (f:ActorFunctio
         let observable = snd actor
     
         let onError error = 
-            Log.error "Unhandled exception %s %A" serviceName error
+            eventX "Unhandled exception {serviceName} {error}"
+            >> setField "serviceName" serviceName
+            >> setField "error" error
+            |> Log.error
+
             System.Environment.FailFast(sprintf "Unhandled exception %s" serviceName, error)
     
         use observer = Observable.subscribeWithError ignore onError observable

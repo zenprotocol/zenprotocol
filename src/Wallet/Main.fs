@@ -11,6 +11,7 @@ open Consensus.Crypto
 open Messaging.Services.Wallet
 open Result
 open System
+open Logary.Message
 
 type AccountData = Account.T Option * ExtendedKey.T Option
 
@@ -36,7 +37,12 @@ let eventHandler event _ _ (account, extendedKey) =
     |> function
     | Ok account -> Some account
     | Error error ->
-        if error <> "" then Log.info "Could not handle event %A due to %A " (event.GetType().Name) error
+        if error <> "" then
+            eventX "Could not handle event {event} due to {error}"
+            >> setField "event" (event.GetType().Name)
+            >> setField "error" error
+            |> Log.info
+
         account), extendedKey
 
 let private sync chainParams client account =
@@ -47,7 +53,11 @@ let private sync chainParams client account =
             (Blockchain.getBlockHeader client >> Option.get)
             (Blockchain.getBlock client >> Option.get)
         |> fun account ->
-            Log.info "Account synced to block #%d %A" header.blockNumber blockHash
+            eventX "Account synced to block #{blockNumber} {blockHash}"
+            >> setField "blockNumber" header.blockNumber
+            >> setField "blockHash" (Hash.toString blockHash)
+            |> Log.info
+
             account
     | _ -> account
 
@@ -68,12 +78,19 @@ let commandHandler chain client command _ _ (account, extendedKey) =
         <@> (resetAccount >> sync chainParams client)
         <@> fun account -> Some account, extendedKey
     | Lock->
-        Log.info "Account locked"
+        eventX "Account locked"
+        |> Log.info
+
         Ok (account, None)
     |> function
     | Ok ret -> ret
     | Error error ->
-        if error <> "" then Log.info "Could not handle event %A due to %A " (command.GetType().Name) error
+        if error <> "" then
+            eventX "Could not handle command {command} due to {error}"
+            >> setField "command" (command.GetType().Name)
+            >> setField "error" error
+            |> Log.info
+
         account, extendedKey)
 
 let private reply<'a> (requestId:RequestId) (value : Result<'a,string>) =
@@ -114,7 +131,8 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
         <@> fun (account, secured) ->
                 DataAccess.Account.put dataAccess session account
                 DataAccess.Secured.put dataAccess session secured
-                Log.info "Account imported and secured"
+                eventX "Account imported and secured"
+                |> Log.info
                 account
         |> function
         | Ok account ->
@@ -169,7 +187,8 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
         | Some secured ->
             match Secured.decrypt key secured with
             | Ok extendedKey ->
-                Log.info "Account unlocked"
+                eventX "Account unlocked"
+                |> Log.info
                 reply<unit> requestId (Ok ())
                 Some extendedKey
             | Error error ->
@@ -191,7 +210,8 @@ let main dataPath busName chain =
 
             DataAccess.Account.tryGet dataAccess session
             |> Option.map (fun account ->
-                Log.info "Account found. syncing"
+                eventX "Account found. syncing"
+                |> Log.info
                 sync chainParams client account)
 
         let sbObservable =

@@ -7,6 +7,7 @@ open Messaging.Services.Blockchain
 open Messaging.Events
 open Consensus
 open State
+open Logary.Message
 
 let main dataPath chainParams busName =
     Actor.create<Command,Request,Event,State> busName serviceName (fun poller sbObservable ebObservable  ->
@@ -31,11 +32,15 @@ let main dataPath chainParams busName =
             use session = DatabaseContext.createSession databaseContext
             match BlockRepository.tryGetTip session with
             | Some (tip,acs,ema) ->
-                Log.info "Loading tip from db #%d %A" tip.header.blockNumber tip.hash
+                eventX "Loading tip from db #{blockNumber} {blockHash}"
+                >> setField "blockNumber" tip.header.blockNumber
+                >> setField "blockHash" (Hash.toString tip.hash)
+                |> Log.info
 
                 tip,acs,ema
             | None ->
-                Log.info "No tip in db"
+                eventX "No tip in db"
+                |> Log.info
                 ExtendedBlockHeader.empty,ActiveContractSet.empty,EMA.create chainParams
 
         let tipState =

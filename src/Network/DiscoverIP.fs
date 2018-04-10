@@ -4,6 +4,7 @@ open System.Net
 open FsNetMQ
 open Infrastructure
 open FSharp.Data
+open Logary.Message
 
 type T = 
     {
@@ -30,7 +31,9 @@ let create () : T =
                     let valid,_ = IPAddress.TryParse ip
                     
                     if valid then
-                        Log.info "External IP address %s found" ip
+                        eventX "External IP address {ip} found"
+                        >> setField "ip" ip
+                        |> Log.info
                         System.Text.Encoding.ASCII.GetBytes(ip) 
                         |> Frame.send inproc 
                 with 

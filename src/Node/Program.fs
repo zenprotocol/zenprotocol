@@ -1,10 +1,11 @@
-﻿open FsNetMQ
+﻿open System
+open FsNetMQ
 open FSharp.Configuration
 open Argu
 open Infrastructure
-open Consensus.Chain
 open Consensus
-open System
+open Chain
+open Logary.Message
 
 module Actor = FsNetMQ.Actor
 
@@ -33,9 +34,9 @@ type Argument =
                 | Wipe -> "wipe database"
                 | Miner -> "enable miner"
                 | Threads _ -> "number of threads to use for miner"
-                | Localhost -> "specify if the node should local chain host"
-                | Local1 -> "run node with local1 settings, use for tests"
-                | Local2 -> "run node with local1 settings, use for tests"
+                | Localhost -> "specify if the node should ast as localhost"
+                | Local1 -> "run node with local1 settings, used for tests"
+                | Local2 -> "run node with local2 settings, used for tests"
                 | Seed -> "run node as a seed"
                 | Data_Path _ -> "path to data folder"
 
@@ -61,10 +62,10 @@ let getChain (config:Config) =
     | "main" -> Main
     | "test" -> Test
     | _ -> Local
-
+    
 [<EntryPoint>]
 let main argv =
-    let errorHandler = ProcessExiter(colorizer = function ErrorCode.HelpText -> None | _ -> Some System.ConsoleColor.Red)
+    let errorHandler = ProcessExiter(colorizer = function ErrorCode.HelpText -> None | _ -> Some ConsoleColor.Red)
 
     let config = new Config()
     config.Load("config.yaml")
@@ -72,8 +73,12 @@ let main argv =
     let parser = ArgumentParser.Create<Argument>(programName = "zen-node.exe", errorHandler = errorHandler)
     let results = parser.Parse argv
 
-    let mutable threads = 1
     let mutable wipe = false
+
+    use logary = Log.create
+
+    eventX "Node running... press CTRL+C to exit"
+    |> Log.info
 
     List.iter (fun arg ->
         match arg with
@@ -130,9 +135,10 @@ let main argv =
     let dataPath = Platform.combine config.dataPath config.chain
 
     if wipe then
-        Log.info "wiping database"
-        if System.IO.Directory.Exists dataPath then
-                System.IO.Directory.Delete (dataPath,true)
+        eventX "Wiping database"
+        |> Log.info
+        if IO.Directory.Exists dataPath then
+                IO.Directory.Delete (dataPath,true)
 
     use brokerActor = createBroker ()
     use blockchainActor = Blockchain.Main.main dataPath chainParams busName
@@ -159,8 +165,6 @@ let main argv =
         else
             Disposables.empty
 
-    printfn "running..."
-
     if chain = Chain.Local then
         let (>>=) m f = Option.bind f m
 
@@ -182,18 +186,15 @@ let main argv =
 
         Messaging.Services.Blockchain.validateBlock client block
 
-    printfn "Press CTRL+C to exit"
+    use event = new Threading.ManualResetEvent(false)
 
-    use event = new System.Threading.ManualResetEvent(false)
-
-    System.Console.CancelKeyPress.Add (fun e ->
+    Console.CancelKeyPress.Add (fun e ->
         e.Cancel <- true
-        printfn "Close requested"
+        eventX "Closing..."
+        |> Log.info
         event.Set() |> ignore
     )
 
     event.WaitOne() |> ignore
 
-    printfn "Closing..."
-
-    0 // return an integer exit code
+    0

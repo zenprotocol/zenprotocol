@@ -6,6 +6,7 @@ open Network
 open Infrastructure
 open Network.Transport
 open Network.Transport.Peer
+open Logary.Message
 
 // Random number for sending addresses
 let random = (new System.Random()).Next()
@@ -165,7 +166,9 @@ let private handleInprocMessage socket inproc networkId msg (peers:Peers) =
         | msg -> failwithf "unexpected inproc msg %A" msg
 
 let private onError error =
-    Log.error "Unhandled exception from peer actor %A" error
+    eventX "Unhandled exception from peer actor {error}"
+    >> setField "error" error
+    |> Log.info
     System.Environment.FailFast(sprintf "Unhandled exception peer actor" , error)
 
 let connect transport address  =
@@ -250,7 +253,9 @@ let create listen bind networkId =
 
         use socket = Socket.peer ()
         if listen then
-            Log.info "Listening on %s" bind
+            eventX "Listening on {bind}"
+            >> setField "bind" bind
+            |> Log.info
 
             let address = sprintf "tcp://%s" bind
             Socket.bind socket address
