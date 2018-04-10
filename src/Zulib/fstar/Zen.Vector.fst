@@ -30,8 +30,17 @@ let tl #_ #_ (VCons _ tl) = 2 `incRet` tl
 (** [nth v i] returns the [i]th element of v, starting at 0. *)
 val nth(#a:Type)(#l:nat): vector a l -> i:nat{i<l} -> cost a (4*(i+1))
 let rec nth #_ #_ (VCons hd tl) = function
-  | 0 -> 4 `incRet` hd
+  | 0 -> hd |> incRet 4
   | i -> nth tl (i-1) |> inc 4
+
+val rev_append(#a:Type)(#l1 #l2:nat): vector a l1 -> vector a l2
+    -> Tot (vector a (l1+l2) `cost` (l1 * 4 + 4))
+           (decreases l1)
+let rec rev_append #_ #_ #_ v1 v2 = match v1 with
+    | VNil -> v2 |> incRet 4
+    | VCons hd tl ->
+        rev_append tl (VCons hd v2)
+        |> inc 4
 
 (** [append v1 v2] appends the elements of [v2] to the end of [v1]. *)
 val append(#a:Type)(#l1 #l2:nat):
@@ -44,24 +53,9 @@ let rec append #a #l1 #l2 v1 v2 =
   end
   |> inc 4
 
-unfold val (@@) (#a:Type)(#l1 #l2:nat):
+unfold val (++) (#a:Type)(#l1 #l2:nat):
   vector a l1 -> vector a l2 -> cost (vector a (l1+l2)) (4*l1+4)
-unfold let (@@) #_ #_ #_ v1 v2 = append v1 v2
-
-(*
-(** [flatten v], where [v] is a vector of vectors of constant length,
-    returns the vector of elements of vectors in [v], preserving their order. *)
-val flatten(#a:Type)(#l1 #l2:nat):
-  vector (vector a l2) l1 -> cost (vector a (l1*l2)) (4*l1*(l2+2)+4)
-let rec flatten #a #l1 #l2 v =
-  4 +!
-  begin match v with
-  | VCons hd tl ->
-    admit();
-    append hd =<< flatten tl
-  | VNil -> ret (VNil <: vector a (l1*l2))
-  end
-*)
+unfold let (++) #_ #_ #_ v1 v2 = append v1 v2
 
 (** [init l f] returns a vector of length l, for which the [i]th element is [f i]. *)
 val init(#a:Type)(#n:nat): l:nat -> (i:nat{i<l} -> cost a n)
@@ -129,14 +123,6 @@ val sumZ(#l:nat):
 let sumZ #_ =
     sumBy ret
 
-(*
-val sumN(#l:nat):
-    vector nat l
-    -> nat `cost` (2*l+2)
-let sumN #_ =
-    sumBy ret
-*)
-
 val zip(#a #b:Type)(#l:nat):
   vector a l -> vector b l -> cost (vector (a**b) l) (3*l+3)
 let rec zip #_ #_ #_ v1 v2 =
@@ -153,206 +139,3 @@ let of2 #_ (x,y) = incRet 3 (VCons x (VCons y VNil))
 
 val of3(#a:Type): a**a**a -> cost (vector a 3) 4
 let of3 #_ (x,y,z) = incRet 4 (VCons x (VCons y (VCons z VNil)))
-(*)
-val vcons_length_pos(#a:Type)(#l:nat): v:(vector a l){VCons? v}
-  -> Lemma (l >= 1 /\ l-1 >=0)
-let vcons_length_pos #_ #_ _ = ()
-
-// length of a vector
-val vlen(#a:Type)(#l:nat): vector a l -> nat
-let vlen #_ #l _ = l
-
-val for_all(#a:Type)(#l #n:nat):
-  (a -> cost bool n) -> vector a l -> cost bool (l*(n+2)+2)
-let rec for_all #_ #l #n f = function
-  | VNil -> incRet 2 true
-  | VCons hd tl -> 2 +! f hd >>= (fun x ->
-      if x then for_all f tl else autoRet false)
-
-val mem: #a:eqtype -> #l:nat -> a -> vector a l -> cost bool ((l+1)*2)
-let rec mem #a #l x = function
-  | VNil -> incRet 2 false
-  | VCons hd tl -> if hd = x then incRet ((l+1)*2) true else 2 +! mem x tl
-
-val count: #a:eqtype -> #l:nat -> a -> vector a l -> cost nat ((l+1)*2)
-let rec count #a #l x = function
-  | VNil -> incRet 2 0
-  | VCons hd tl -> if hd = x then (fun (x:nat) -> incRet 2 (x + 1) <: cost nat 2) =<< count x tl
-                   else 2 +! count x tl
-
-assume val foldl(#a #b:Type)(#n #l:nat):
-  (a -> b -> cost a n) -> a -> vector b l -> cost a ((n+2)*l+2)
-
-(*)
-private val is_sorted: #a:Type -> #l:nat -> #n:nat -> (a -> cost int n) -> vector a l
-  -> cost bool ((l*2)*(n+1)+2)
-private let rec is_sorted #a #l #n f = function
-  | VNil -> incRet 2 true
-  | VCons _ VNil -> incRet (2*n+4) true
-  | VCons x (VCons y tl) ->
-    let head_sorted = (<=) <$> f x <*> f y in
-    2 +! ((&&) <$> head_sorted <*> is_sorted f (VCons y tl))
-
-val is_sorted_tail: #a:Type -> #l:nat -> #n:nat ->
-  f:(a -> cost int n) -> v:vector a l{VCons? v}
-  -> Lemma (forceT (is_sorted f v) ==> forceT (is_sorted f (VCons?.tl v)))
-let rec is_sorted_tail #_ #_ #_ f = function
-  | VNil | VCons _ VNil -> ()
-  | VCons x (VCons y tl) ->
-    let head_sorted = (<=) <$> f x <*> f y in
-    force_liftM (&&) head_sorted;
-    is_sorted_tail f (VCons y tl);
-    force_ap ((&&) <$> head_sorted) (is_sorted f (VCons y tl));
-    force_inc 2 ((&&) <$> head_sorted <*> is_sorted f (VCons y tl))
-
-type sorted (#a:Type)(#l:nat)(#n:nat)
-  (f:a -> cost int n)(v:vector a l) = force (is_sorted f v) = true
-type sortedVector (#n:nat)
-  (a:Type)(l:nat)(f:a ->cost int n) = v:vector a l {sorted f v}
-
-val sorted_tail: #a:Type -> #l:nat -> #n:nat ->
-  f:(a -> cost int n) -> v:vector a l{VCons? v}
-  -> Lemma (sorted f v ==> sorted f (VCons?.tl v))
-let sorted_tail #_ #_ #_ f v = is_sorted_tail f v
-
-type permutation (#a:eqtype)(#l:nat)(v1:vector a l)(v2:vector a l) =
-  forall (x:a). mem x v1 = mem x v2 /\ count x v1 = count x v2
-
-assume val mergesort': #a:Type -> #l:nat -> #n:nat
-  -> f:(a-> cost int n) -> vector a l
-  -> cost (sortedVector a l f) (l*n*2 * Math.log_2 (l + 1))
-assume val mergesort: #a:eqtype -> #l:nat -> #n:nat
-  -> f:(a-> cost int n) -> v:vector a l
-  -> cost (res:sortedVector a l f{permutation res v}) (l*n*2 * Math.log_2 (l + 1))
-
-val is_unique: #a:eqtype -> #l:nat -> #n:nat -> #f:(a -> cost int n)
-  -> sortedVector a l f -> cost bool ((l+1)*2)
-let rec is_unique #a #l #n #f v = match v with
-  | VNil -> incRet 2 true
-  | VCons _ VNil  -> incRet 4 true
-  | VCons x (VCons y tl) ->
-    sorted_tail f v;
-    let tail_unique = is_unique #a #(l-1) #n #f (VCons y tl) in
-    2 +! ((&&) (x<>y) <$> tail_unique)
-
-type unique (#a:eqtype)(#l:nat)(#n:nat)(#f:a -> cost int n)
-  (v:sortedVector a l f) = force (is_unique v) = true
-
-
-val is_unique_tail: #a:eqtype -> #l:nat -> #n:nat -> #f:(a -> cost int n)
-  -> v:sortedVector a l f{VCons? v}
-  -> Lemma (forceT (is_unique v) ==> forceT (is_unique #a #(l-1) #n #f (sorted_tail f v; VCons?.tl v)))
-let rec is_unique_tail #a #l #n #f v = match v with
-  | VNil | VCons _ VNil -> ()
-  | VCons x (VCons y tl) ->
-    sorted_tail f v;
-    let tail_unique = is_unique #a #(l-1) #n #f (VCons y tl) in
-    force_liftM ((&&) (x <> y)) tail_unique;
-    is_unique_tail #a #(l-1) #n #f (VCons y tl);
-    force_inc 2 ((&&) (x<>y) <$> tail_unique)
-(*)
-val unique: #a:eqtype -> #l:nat -> #n:nat -> #f:(a -> cost int n)
-  -> sortedVector a l f -> cost (l2:nat & sortedVector a l2 f) ((l+1)*2)
-let rec unique #a #l #n #f v = match v with
-  | VNil -> incRet 2 (| 0, v |)
-  | VCons _ VNil  -> incRet 4 (|1, v|)
-  | VCons x (VCons y tl) ->
-    sorted_tail f v;
-    let tail = 2 +! unique #a #(l-1) #n #f (VCons y tl) in
-    tail <&> (function
-    | (|l2, tail|) -> if x <> y then (|l2+1, VCons x tail|)
-    else (|l2, tail|))
-
-(*)
-// helps with vrev
-private val vrev_help: #a:Type
-  -> #l1:nat
-  -> vector a l1
-  -> #l2:nat
-  -> vector a l2
-  -> Tot (cost (vector a (l1+l2)) ((3 * l1) + 2)) (decreases l1)
-private let rec vrev_help #a #l1 v1 #l2 v2 =
-  match v1 with
-  | VNil -> ret v2 `inc` 2
-  | VCons hd tl ->
-    (ret (VCons hd v2) `inc` 3)
-    >>= (fun v2' -> vrev_help tl #(l2+1) v2')
-
-// reverse a vector
-val vrev: #a:Type -> #l:nat -> vector a l -> cost (vector a l) (3*l + 3)
-let vrev #a #l v = vrev_help v VNil `inc` 1
-
-
-val take: #a:Type -> #l:nat -> n:nat{n<=l} -> vector a l -> cost (vector a n) (n+1)
-let rec take #a #l n v = match n with
-  | 0 -> incRet 1 VNil
-  | n -> match v with | VCons hd tl ->
-      let n':nat = n-1 in
-      1 +! (VCons hd <$> (take n' tl))
-
-val split: #a:Type -> #l:nat -> i:pos{i<=l} -> vector a l
-  -> cost (vector a i * vector a (l-i)) i
-let rec split #a #l i (VCons hd tl) = match i with
-  | 1 -> incRet 1 (VCons hd VNil, tl)
-  | _ -> let i':pos = i-1 in
-    1 +! ((fun (fst,snd : vector a i' * vector a (l-i)) -> VCons hd fst, snd) <$> split i' tl)
-
-
-assume val chunkBy: #a:Type -> #n:nat -> chunkSize:pos -> vector a n
-  -> cost (vector (vector a chunkSize) (n/chunkSize)) n
-(*
-let rec chunkBy #a #n size v =
-  if n < size then incRet n VNil
-  else
-  split size v >>= (fun (fst, snd : vector a size * vector a (n-size)) ->
-  FStar.Math.Lemmas.division_sub_lemma n size 1;
-  let n':nat = n-size in
-  if n' < size then incRet n' (VCons fst VNil) <: cost (vector (vector a size) (n/size)) (n-size)
-  else admit()
-    //VCons fst <$> (chunkBy size snd)
-    )
-*)
-
-// maps f onto v, but also reverses it.
-private val tail_map_help: #a:Type
-  -> #b:Type
-  -> #n: nat
-  -> (a-> cost b n)
-  -> #l1:nat
-  -> vector a l1
-  -> #l2:nat
-  -> vector b l2
-  -> Tot (cost (vector b (l1+l2)) ((n+3)*l1 + 2)) (decreases l1)
-private let rec tail_map_help #a #b #n f #l1 v1 #l2 v2 =
-  match v1 with
-  | VNil -> ret v2 `inc` 2
-  | VCons #_ #l_tl hd tl -> (f hd) >>=
-      (fun f_hd -> ret (VCons f_hd v2) `inc` 3) >>=
-      (fun v2'-> tail_map_help f #l_tl tl v2')
-
-// maps f onto v
-val vmap: #a:Type
-  -> #b:Type
-  -> #n: nat
-  -> (f:a->cost b n)
-  -> #l:nat
-  -> vector a l
-  -> cost (vector b l) ((n+6) * l + 5)
-let vmap #a #b #n f #l v =
-  (tail_map_help f v VNil)
-  >>= vrev
-
-val vfoldl: #a:Type
-  -> #b:Type
-  -> #n:nat
-  -> (a -> b -> cost a n)
-  -> a
-  -> #l:nat
-  -> vector b l
-  -> Tot (cost a ((n+2)*l + 2)) (decreases l)
-let rec vfoldl #a #b #n f acc #l v =
-  match v with
-  | VNil -> ret acc `inc` 2
-  | VCons hd tl ->
-    (f acc hd `inc` 2)
-    >>= (fun acc' -> vfoldl f acc' tl)

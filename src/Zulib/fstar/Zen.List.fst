@@ -264,23 +264,3 @@ let rec tryNth #_ ls n =
     if n < length ls
     then nth ls n >>= OT.some |> inc 5
     else OT.incNone (2 * n + 7)
-
-(*)
-
-val mapi_aux(#a #b:Type): nat
-    -> (nat -> a -> b)
-    -> ls:list a
-    -> Tot (result : cost (list b) (2 * length ls + 2)
-                     { length (force result) == length ls })
-           (decreases (length ls))
-let rec mapi_aux #_ #_ n f = function
-    | [] -> 2 +~! []
-    | hd::tl ->
-        let! tl = mapi_aux (n+1) f tl in
-        2 +~! ((f n hd)::tl)
-
-val mapi(#a #b:Type): (nat -> a -> b)
-    -> ls:list a
-    -> result : cost (list b) (2 * length ls + 2)
-       { length (force result) == length ls }
-let mapi #_ #_ f ls = mapi_aux 0 f ls

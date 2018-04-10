@@ -148,7 +148,7 @@ let ``Should produce execute contracts with message passed between them``() =
 
         let stringData = Zen.Types.Data.data.String "Some string data"B |> Some
 
-        let! (tx, message) = Contract.run contract1 "contract1_test" stringData List.empty TxSkeleton.empty
+        let! (tx, message) = Contract.run contract1 TxSkeleton.empty "contract1_test" stringData List.empty
 
         let command =
             match message with
@@ -160,7 +160,7 @@ let ``Should produce execute contracts with message passed between them``() =
             | _ ->
                 failwithf "should be some message"
 
-        let! (tx, message) = Contract.run contract2 command None List.empty tx
+        let! (tx, message) = Contract.run contract2 tx command None List.empty
 
         match message with
         | Some _ ->

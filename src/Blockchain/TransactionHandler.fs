@@ -127,7 +127,7 @@ let executeContract session txSkeleton cHash command data state =
             | TxSkeleton.Mint _ -> false
             | TxSkeleton.PointedOutput (outpoint',_) -> outpoint' = outpoint) txSkeleton.pInputs
 
-    let rec run cHash command data (txSkeleton:TxSkeleton.T) witnesses totalCost =
+    let rec run (txSkeleton:TxSkeleton.T) cHash command data witnesses totalCost =
         match ActiveContractSet.tryFind cHash state.activeContractSet with
         | None -> Error "Contract not active"
         | Some contract ->
@@ -135,7 +135,7 @@ let executeContract session txSkeleton cHash command data state =
                 ContractUtxoRepository.getContractUtxo session cHash state.utxoSet
                 |> List.reject (isInTxSkeleton txSkeleton)
 
-            Contract.run contract command data contractWallet txSkeleton
+            Contract.run contract txSkeleton command data contractWallet
             |> Result.bind (fun (tx, message) ->
 
                 TxSkeleton.checkPrefix txSkeleton tx
@@ -144,7 +144,7 @@ let executeContract session txSkeleton cHash command data state =
 
                     // To commit to the cost we need the real contract wallet
                     let contractWallet = TransactionValidation.getContractWallet tx witness
-                    let cost = Contract.getCost contract command data contractWallet txSkeleton
+                    let cost = Contract.getCost contract txSkeleton command data contractWallet
                     let totalCost = cost + totalCost
 
                     // We can now commit to the cost, so lets alter it with the real cost
@@ -154,13 +154,13 @@ let executeContract session txSkeleton cHash command data state =
 
                     match message with
                     | Some {cHash=cHash; command=command; data=data} ->
-                        run cHash command data finalTxSkeleton witnesses totalCost
+                        run finalTxSkeleton cHash command data witnesses totalCost
                     | None ->
                         Ok (finalTxSkeleton, witnesses, totalCost)
                 )
             )
 
-    run cHash command data txSkeleton [] 0L
+    run txSkeleton cHash command data [] 0L
     |> Result.map (fun (finalTxSkeleton, witnesses, totalCost) ->
         Log.info "Running contract chain with cost: %A" totalCost
 

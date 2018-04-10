@@ -41,7 +41,7 @@ let tearDown = fun () ->
 let compileAndRun code =
     compile code
     |> Result.bind (fun contract ->
-        Contract.run contract "" None List.empty TxSkeleton.empty
+        Contract.run contract TxSkeleton.empty "" None List.empty
         |> Result.map (fun (tx, _) -> tx)
     )
 
