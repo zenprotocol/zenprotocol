@@ -47,13 +47,15 @@ type ContractCostFn = TxSkeleton.T
                           -> ContractWallet 
                           -> int64
 
-type T = {
+type Contract = {
     hash: Hash
     mainFn: ContractMainFn
     costFn: ContractCostFn
     expiry: uint32
     code:string
 }
+type T = Contract
+
 
 let private getMainFunction assembly =
     try
@@ -88,9 +90,9 @@ let private wrapCostFn (costFn: zfstarCostFn) : ContractCostFn =
         costFn txSkeleton' command' sender data' contractWallet'
         |> ZFStar.unCost
 
-let hash contract = contract.hash
+let getHash contract : Hash = contract.hash
 
-let private getModuleName =
+let private getModuleName : Hash -> string =
     Hash.bytes
     >> Base16.encode
     >> (+) "Z"
@@ -112,7 +114,10 @@ let load contractsPath expiry code hash =
     |> Result.bind getMainFunction
     |> Result.map mkContract
 
-let compile contractsPath (contract:Consensus.Types.Contract) expiry =
+let compile (contractsPath:string) 
+            (contract:Consensus.Types.Contract) 
+            (expiry:uint32) 
+            : Result<Contract, string> =
     let hash = computeHash contract.code
 
     hash
@@ -120,7 +125,7 @@ let compile contractsPath (contract:Consensus.Types.Contract) expiry =
     |> ZFStar.compile contractsPath contract.code contract.hints contract.rlimit
     |> Result.bind (fun _ -> load contractsPath expiry contract.code hash)
 
-let recordHints code =
+let recordHints (code:string) : Result<string, string> =
     code
     |> computeHash
     |> getModuleName

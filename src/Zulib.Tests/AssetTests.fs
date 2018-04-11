@@ -11,6 +11,7 @@ module Cost = Zen.Cost.Realized
 
 let unCost (Cost.C inj:Zen.Cost.Realized.cost<'Aa, 'An>) : 'Aa = inj.Force()
 
+(*
 [<Test>]
 let ``Should create asset from string``() =
     let bytes = 
@@ -29,3 +30,4 @@ let ``Should create asset from string``() =
 [<Test>]
 let ``Should create asset from bigint``() =
     Zen.Asset.fromInt Zen.Asset.zeroHash 63456u
+*)
