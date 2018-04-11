@@ -277,7 +277,7 @@ let main busName chainParams externalIp listen bind seeds =
             if not (System.String.IsNullOrEmpty externalIp) && listen then
                 let port = Endpoint.getPort bind
 
-                eventX "Public IP: {ip}"
+                eventX "External IP is {ip}"
                 >> setField "ip" externalIp
                 |> Log.info
                 Some (sprintf "%s:%d" externalIp port)

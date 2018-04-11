@@ -9,7 +9,7 @@ open FsBech32
 open System.Text
 open Newtonsoft.Json
 
-let private getSpend' asset assetType amount =
+let private getSpend asset assetType amount =
     match Hash.fromString asset, Hash.fromString assetType with
     | Ok asset, Ok assetType ->
         Ok { asset = asset, assetType; amount = uint64 amount }
@@ -20,75 +20,84 @@ let private getSpend' asset assetType amount =
     | Error msg1, Error msg2->
         Error <| sprintf "Asset: %s, AssetType %s" msg1 msg2
 
-let getSpend chain json =
+let parseSendJson chain json =
     try
-        let json = SpendRequestJson.Parse json
+        let json = SendRequestJson.Parse json
 
-        Address.decodePK chain json.Address
-        |> function
-        | Error err ->
-            Error ("Address is invalid: " + err)
-        | Ok pkHash ->
-            let s = json.Spend
-            getSpend' s.Asset s.AssetType s.Amount
-            |> Result.map (fun spend -> (pkHash, spend))
+        if String.length json.Password = 0 then
+            Error "Password is empty"
+        else
+            Address.decodePK chain json.Address
+            |> function
+            | Error err ->
+                Error ("Address is invalid: " + err)
+            | Ok pkHash ->
+                let s = json.Spend
+                getSpend s.Asset s.AssetType s.Amount
+                |> Result.map (fun spend -> (pkHash, spend, json.Password))
     with _ as ex ->
         Error ("Json invalid: " + ex.Message)
 
-let getContractExecute chain json =
+let parseContractExecuteJson chain json =
     try
         let json = ContractExecuteRequestJson.Parse json
-        match Address.decodeContract chain json.Address with
-        | Error err -> Error ("Address is invalid: " + err)
-        | Ok cHash ->
-            let mutable spends = Map.empty
-            let mutable errors = List.empty
-
-            for item in json.Spends do
-                getSpend' item.Asset item.AssetType item.Amount
-                |> function
-                | Ok spend -> spends <- Map.add spend.asset spend.amount spends
-                | Error err -> errors <- err :: errors
-                |> ignore
-
-            if List.isEmpty errors then
-                let data =
-                    if System.String.IsNullOrEmpty json.Data then
-                        None
-                    else
-                        match Base16.decode json.Data with
-                        | Some data ->
-                            match Serialization.Data.deserialize data with
-                            | Some data -> Some data
+        
+        if String.length json.Password = 0 then
+            Error "Password is empty"
+        else
+            match Address.decodeContract chain json.Address with
+            | Error err -> Error ("Address is invalid: " + err)
+            | Ok cHash ->
+                let mutable spends = Map.empty
+                let mutable errors = List.empty
+    
+                for item in json.Spends do
+                    getSpend item.Asset item.AssetType item.Amount
+                    |> function
+                    | Ok spend -> spends <- Map.add spend.asset spend.amount spends
+                    | Error err -> errors <- err :: errors
+                    |> ignore
+    
+                if List.isEmpty errors then
+                    let data =
+                        if System.String.IsNullOrEmpty json.Data then
+                            None
+                        else
+                            match Base16.decode json.Data with
+                            | Some data ->
+                                match Serialization.Data.deserialize data with
+                                | Some data -> Some data
+                                | None -> failwith "Invalid Data"
                             | None -> failwith "Invalid Data"
-                        | None -> failwith "Invalid Data"
-
-                let sign =
-                    if System.String.IsNullOrEmpty json.Options.Sign then
-                        None
-                    else
-                        Some json.Options.Sign
-
-                Ok (cHash, json.Command, data, json.Options.ReturnAddress, sign, spends)
-            else
-                errors
-                |> String.concat " "
-                |> Error
+    
+                    let sign =
+                        if System.String.IsNullOrEmpty json.Options.Sign then
+                            None
+                        else
+                            Some json.Options.Sign
+    
+                    Ok (cHash, json.Command, data, json.Options.ReturnAddress, sign, spends, json.Password)
+                else
+                    errors
+                    |> String.concat " "
+                    |> Error
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
 
-let getContractActivate json =
+let parseContractActivateJson json =
     try
         let json = ContractActivateRequestJson.Parse json
 
         if String.length json.Code = 0 then
             Error "Contract code is empty"
+        else if String.length json.Password = 0 then
+            Error "Password is empty"
         else
-            Ok (json.Code, uint32 json.NumberOfBlocks)
+            Ok (json.Code, uint32 json.NumberOfBlocks, json.Password)
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
 
-let getPublishBlock json =
+let parsePublishBlockJson json =
     try
         let json = PublishBlockJson.Parse json
 
@@ -98,7 +107,7 @@ let getPublishBlock json =
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
 
-let getImportSeed json =
+let parseImportSeedJson json =
     try
         let json = ImportSeedJson.Parse json
 
@@ -107,14 +116,33 @@ let getImportSeed json =
         for item in json.Words do
             words <- item :: words
 
-        Ok (List.rev words, json.Password)
+        if String.length json.Password = 0 then
+            Error "Password is empty"
+        else
+            Ok (List.rev words, json.Password)
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
 
-let getUnlock json =
+let parseGetPublicKeyJson json =
     try
-        let json = UnlockAccountJson.Parse json
+        let json = GetPublicKeyJson.Parse json
 
-        Ok json.Password
+        if String.length json.Path = 0 then
+            Error "Path is empty"
+        else if String.length json.Password = 0 then
+            Error "Password is empty"
+        else
+            Ok (json.Path, json.Password)
+    with _ as ex ->
+        Error ("Json is invalid: " + ex.Message)
+
+let parseCheckPasswordJson json =
+    try
+        let json = CheckPasswordJson.Parse json
+
+        if String.length json.Password = 0 then
+            Error "Password is empty"
+        else
+            Ok json.Password
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)

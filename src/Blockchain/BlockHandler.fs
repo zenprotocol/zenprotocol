@@ -397,7 +397,7 @@ let requestOrphanChainRoot session (tip:ExtendedBlockHeader.T) (state:State) =
 
             eventX "Request root of orphan chain from network block {blockNumber} {parent}"
             >> setField "blockNumber" (root.header.blockNumber - 1ul)
-            >> setField "hash" (Hash.toString root.header.parent)
+            >> setField "parent" (Hash.toString root.header.parent)
             |> Log.info
 
             // asking network for the parent block
