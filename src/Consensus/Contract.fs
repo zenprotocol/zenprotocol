@@ -27,13 +27,14 @@ type T = {
     code:string
 }
 
-let private getMainFunc assembly =
+let private getMainFunction assembly =
     try
-        let getMethod name =
+        let getProperty name = 
             (assembly:Assembly)
                 .GetModules().[0]
-                .GetTypes().[0].GetMethod(name)
-        (getMethod "mainFunc").Invoke(null, [||])
+                .GetTypes().[0]
+                .GetProperty(name)
+        (getProperty "mainFunction").GetValue null
         :?> mainFunction
         |> Ok
     with _ as ex ->
@@ -89,7 +90,7 @@ let computeHash : string -> Hash = Hash.compute << Encoding.UTF8.GetBytes
 let load contractsPath expiry size code hash =
     let mainFunc = getModuleName hash
                    |> ZFStar.load contractsPath
-                   |> Result.bind getMainFunc
+                   |> Result.bind getMainFunction
     let mainFn = mainFunc 
                  |> Result.map getMainFn
                  |> Result.map wrapMainFn
