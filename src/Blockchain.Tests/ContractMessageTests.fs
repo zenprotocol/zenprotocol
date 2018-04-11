@@ -22,8 +22,8 @@ module Result = Core.Result
 
 let chain = Chain.getChainParameters Chain.Local
 
-let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction (fun _ -> UtxoSet.NoOutput) Transaction.rootTxHash Transaction.rootTx
-let mempool = MemPool.empty |> MemPool.add Transaction.rootTxHash Transaction.rootTx
+let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction (fun _ -> UtxoSet.NoOutput) rootTxHash rootTx
+let mempool = MemPool.empty |> MemPool.add rootTxHash rootTx
 let orphanPool = OrphanPool.create()
 let acs = ActiveContractSet.empty
 
@@ -96,10 +96,13 @@ open Zen.Asset
 module RT = Zen.ResultT
 module Tx = Zen.TxSkeleton
 
-val main: txSkeleton -> hash -> string -> option data -> wallet
-    -> result (txSkeleton ** option message) `cost` (64 + 64 + 0 + 18)
-let main txSkeleton contractHash command data wallet =
-    if command = "contract2_test" then
+let main txSkeleton contractHash command sender data wallet =
+    let isFromContract =
+        match sender with
+        | Contract contractHash' -> contractHash' <> contractHash
+        | _ -> false in
+
+    if isFromContract && command = "contract2_test" then
     begin
         let! tokens = Tx.getAvailableTokens zenAsset txSkeleton in
 
@@ -110,8 +113,8 @@ let main txSkeleton contractHash command data wallet =
     else
         RT.autoFailw "unsupported command"
 
-val cf: txSkeleton -> string -> option data -> wallet -> cost nat 7
-let cf _ _ _ _ = ret (64 + 64 + 0 + 18)
+val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 7
+let cf _ _ _ _ _ = ret (64 + 64 + 0 + 25)
 """
 let contract2Hash = Contract.computeHash contract2Code
 
@@ -132,9 +135,7 @@ open Zen.Data
 module RT = Zen.ResultT
 module Tx = Zen.TxSkeleton
 
-val main: txSkeleton -> hash -> string -> option data -> wallet
-    -> result (txSkeleton ** option message) `cost` (3 + 66 + (64 + (64 + (64 + 64 + 0))) + 34)
-let main txSkeleton contractHash command data wallet =
+let main txSkeleton contractHash command sender data wallet =
     let! returnAddress = data >!> tryDict >?> tryFindLock "returnAddress" in
 
     match returnAddress with
@@ -155,8 +156,8 @@ let main txSkeleton contractHash command data wallet =
     | None ->
         RT.autoFailw "returnAddress is required"
 
-val cf: txSkeleton -> string -> option data -> wallet -> cost nat 15
-let cf _ _ _ _ = ret (3 + 66 + (64 + (64 + (64 + 64 + 0))) + 34)
+val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 15
+let cf _ _ _ _ _ = ret (3 + 66 + (64 + (64 + (64 + 64 + 0))) + 34)
 """
 
 [<Test>]
@@ -208,7 +209,7 @@ let ``Should execute contract chain and get a valid transaction``() =
             |> Types.Data.Dict
             |> Some
 
-        let! tx = TransactionHandler.executeContract session inputTx cHash1 "" data state.memoryState
+        let! tx = TransactionHandler.executeContract session inputTx cHash1 "" None data state.memoryState
 
         let tx = Transaction.sign [ sampleKeyPair ] tx
         let txHash = Transaction.hash tx

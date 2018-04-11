@@ -49,7 +49,8 @@ type ContractExecuteRequestJson = JsonProvider<"""
     "command": "command",
     "data": "data",
     "options": {
-        "returnAddress": true
+        "returnAddress": true,
+        "sign": "m/0/9'"
     },
     "spends": [
         {
@@ -89,7 +90,7 @@ type BlockChainInfoJson = JsonProvider<"""
 
 type ImportSeedJson = JsonProvider<"""
 {
-    "key": "secret",
+    "password": "secret",
     "words" : [ "word" ]
 }
 """>
@@ -111,7 +112,7 @@ type TransactionsResponseJson = JsonProvider<"""
 
 type UnlockAccountJson = JsonProvider<"""
 {
-    "key": "secret"
+    "password": "secret"
 }
 """>
 

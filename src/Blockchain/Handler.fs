@@ -11,6 +11,7 @@ open Blockchain.EffectsWriter
 open Consensus.Types
 open State
 open DatabaseContext
+open Logary.Message
 
 let handleCommand chainParams command session timestamp (state:State) =
     let contractPath = session.context.contractPath
@@ -41,7 +42,8 @@ let handleCommand chainParams command session timestamp (state:State) =
     | HandleMemPool (peerId,txHashes) ->
         let handleTxHash txHash =
             effectsWriter {
-                Log.info "Handling mempool message"
+                eventX "Handling mempool message"
+                |> Log.info
 
                 if not (MemPool.containsTransaction txHash state.memoryState.mempool) then
                     do! getTransaction peerId txHash
@@ -107,8 +109,8 @@ let handleCommand chainParams command session timestamp (state:State) =
 
 let handleRequest chain (requestId:RequestId) request session timestamp state =
     match request with
-    | ExecuteContract (cHash, command, data, txSkeleton) ->
-        TransactionHandler.executeContract session txSkeleton cHash command data state.memoryState
+    | ExecuteContract (cHash, command,sender ,data, txSkeleton) ->
+        TransactionHandler.executeContract session txSkeleton cHash command sender data state.memoryState
         |> requestId.reply
     | GetBlockTemplate pkHash ->
         let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList chain session state

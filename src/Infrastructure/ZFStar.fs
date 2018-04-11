@@ -5,6 +5,7 @@ open System.IO
 open Microsoft.FSharp.Compiler.SourceCodeServices
 open Exception
 open Infrastructure.Result
+open Logary.Message
 
 let private fsChecker = FSharpChecker.Create()
 let private changeExtention extention path = Path.ChangeExtension (path, extention)
@@ -63,7 +64,9 @@ let private elaborate input_filepath output_target =
         ASTUtils.write_ast_to_file elab'd_ast output_target
         Ok ()
     with _ as ex ->
-        Log.info "elaboration error: %A" ex
+        eventX "elaboration error: {ex}"
+        >> setField "ex" ex
+        |> Log.info
         Error "elaborate"
 
 let private fstar outDir inputFile args =
@@ -90,7 +93,7 @@ let initOutputDir moduleName =
     Directory.CreateDirectory oDir |> ignore
     oDir, oDir / moduleName
 
-let private extract code hints limits rlimit moduleName = 
+let private extract code hints limits rlimit moduleName =
     let oDir, file = initOutputDir moduleName
     let originalFile = changeExtention ".orig.fst" file
     let hintsFile = changeExtention ".fst.hints" file
@@ -117,7 +120,9 @@ let private extract code hints limits rlimit moduleName =
             |> wrapFStar "extract" extractedFile)
     finally
 #if DEBUG
-        printfn "extract output directory: %A" oDir
+        eventX "extract output directory: {dir}"
+        >> setField "dir" oDir
+        |> Log.debug
 #else
         Directory.Delete (oDir, true)
 #endif
@@ -150,7 +155,9 @@ let calculateMetrics hints =
             Exception.toError "limits" ex
     finally
 #if DEBUG
-        printfn "calculate metrics output directory: %A" oDir
+        eventX "calculate metrics output directory: {dir}"
+        >> setField "dir" oDir
+        |> Log.debug
 #else
         Directory.Delete (oDir, true)
 #endif
@@ -167,18 +174,21 @@ let recordHints code moduleName =
         elaborate originalFile elaboratedFile
         |> Result.bind (fun _ ->
             fstar oDir elaboratedFile [
+                 "--z3rlimit";(2723280u * 2u).ToString()
                  "--use_cached_modules"
                  "--record_hints"
                  "--no_default_includes"; elaboratedFile ]
             |> wrapFStar "record hints" hintsFile)
     finally
 #if DEBUG
-        printfn "record hints output directory: %A" oDir
+        eventX "record hints output directory: {dir}"
+        >> setField "dir" oDir
+        |> Log.debug
 #else
         Directory.Delete (oDir, true)
-#endif 
-   
-let compile path code hints rlimit moduleName = 
+#endif
+
+let compile path code hints rlimit moduleName =
     calculateMetrics hints
     |> Result.bind (fun limits -> extract code hints limits rlimit moduleName)
     |> Result.bind (compile' path moduleName)
@@ -190,7 +200,7 @@ let load path moduleName =
         |> Ok
     with _ as ex ->
         Error ex.Message
-        
+
 let totalQueries hints =
     let oDir, file = initOutputDir "" //as for now, using the filesystem as temporary solution
     let hintsFile = changeExtention ".fst.hints" file
@@ -200,7 +210,7 @@ let totalQueries hints =
     try (
         try
             Hints.read_hints hintsFile
-            |> function 
+            |> function
             | Some hints -> Ok hints
             | None -> Error "total queries: could not read hints"
         with _ ->
@@ -209,7 +219,9 @@ let totalQueries hints =
               >> uint32 )
     finally
 #if DEBUG
-        printfn "total queries output directory: %A" oDir
-#else 
+        eventX "total queries output directory: {dir}"
+        >> setField "dir" oDir
+        |> Log.debug
+#else
         Directory.Delete (oDir, true)
-#endif 
+#endif

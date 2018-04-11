@@ -13,3 +13,4 @@ System.Reflection.Metadata
 FSharp.Compatibility.OCaml
 BouncyCastle
 FsBech32
+Logary

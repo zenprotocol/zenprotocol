@@ -16,6 +16,7 @@ open Network.Message
 open Network.Transport
 open Serialization
 open Consensus.Chain
+open Logary.Message
 
 type State = Connector.T * AddressBook.T * string option
 
@@ -77,11 +78,15 @@ let transportHandler transport seeds client msg (connector,addressBook,ownAddres
     | InProcMessage.Address address ->
         match Endpoint.isValid address with
         | false ->
-            Log.warning "Received invalid address from peer %s" address
+            eventX "Received invalid address from peer {address}"
+            >> setField "address" address
+            |> Log.warning
             connector, addressBook,ownAddress // TODO: we should punish the sending node
         | true ->
             let handleAddress () =
-                Log.info "Received new address %s" address
+                eventX "Received new address {address}"
+                >> setField "address" address
+                |> Log.warning
 
                 if not (AddressBook.contains addressBook address) && not (Seq.contains address seeds) then
                     let addressBook = AddressBook.add addressBook address
@@ -102,7 +107,9 @@ let transportHandler transport seeds client msg (connector,addressBook,ownAddres
     | InProcMessage.Addresses addresses ->
         match List.forall Endpoint.isValid addresses with
         | false ->
-            Log.warning "Received invalid addresses from peer"
+            eventX "Received invalid addresses from peer"
+            |> Log.warning
+        
             connector, addressBook,ownAddress // TODO: we should punish the sending node
         | true ->
             // Filter own address
@@ -270,7 +277,9 @@ let main busName chainParams externalIp listen bind seeds =
             if not (System.String.IsNullOrEmpty externalIp) && listen then
                 let port = Endpoint.getPort bind
 
-                Log.info "Public IP: %s" externalIp
+                eventX "Public IP: {ip}"
+                >> setField "ip" externalIp
+                |> Log.info
                 Some (sprintf "%s:%d" externalIp port)
             else None
 

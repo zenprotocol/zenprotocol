@@ -1,10 +1,11 @@
-﻿open FsNetMQ
+﻿open System
+open FsNetMQ
 open FSharp.Configuration
 open Argu
 open Infrastructure
-open Consensus.Chain
 open Consensus
-open System
+open Chain
+open Logary.Message
 
 module Actor = FsNetMQ.Actor
 
@@ -33,9 +34,9 @@ type Argument =
                 | Wipe -> "wipe database"
                 | Miner -> "enable miner"
                 | Threads _ -> "number of threads to use for miner"
-                | Localhost -> "specify if the node should local chain host"
-                | Local1 -> "run node with local1 settings, use for tests"
-                | Local2 -> "run node with local1 settings, use for tests"
+                | Localhost -> "specify if the node should ast as localhost"
+                | Local1 -> "run node with local1 settings, used for tests"
+                | Local2 -> "run node with local2 settings, used for tests"
                 | Seed -> "run node as a seed"
                 | Data_Path _ -> "path to data folder"
 
@@ -61,10 +62,10 @@ let getChain (config:Config) =
     | "main" -> Main
     | "test" -> Test
     | _ -> Local
-
+    
 [<EntryPoint>]
 let main argv =
-    let errorHandler = ProcessExiter(colorizer = function ErrorCode.HelpText -> None | _ -> Some System.ConsoleColor.Red)
+    let errorHandler = ProcessExiter(colorizer = function ErrorCode.HelpText -> None | _ -> Some ConsoleColor.Red)
 
     let config = new Config()
     config.Load("config.yaml")
@@ -72,8 +73,12 @@ let main argv =
     let parser = ArgumentParser.Create<Argument>(programName = "zen-node.exe", errorHandler = errorHandler)
     let results = parser.Parse argv
 
-    let mutable threads = 1
     let mutable wipe = false
+
+    use logary = Log.create
+
+    eventX "Node running... press CTRL+C to exit"
+    |> Log.info
 
     List.iter (fun arg ->
         match arg with
@@ -130,9 +135,10 @@ let main argv =
     let dataPath = Platform.combine config.dataPath config.chain
 
     if wipe then
-        Log.info "wiping database"
-        if System.IO.Directory.Exists dataPath then
-                System.IO.Directory.Delete (dataPath,true)
+        eventX "Wiping database"
+        |> Log.info
+        if IO.Directory.Exists dataPath then
+                IO.Directory.Delete (dataPath,true)
 
     use brokerActor = createBroker ()
     use blockchainActor = Blockchain.Main.main dataPath chainParams busName
@@ -159,27 +165,36 @@ let main argv =
         else
             Disposables.empty
 
-    printfn "running..."
-
     if chain = Chain.Local then
-        let block = Block.createGenesis chainParams [Transaction.rootTx] (0UL,0UL)
+        let (>>=) m f = Option.bind f m
+
+        let block =
+            "0000000000000000000000000000000000000000000000000000000000000000000000000000000" +
+            "10ee6ef1eb8bcf752290c0765c52e83a0cf72963773c3aa6f18524f97b4b55ee100000160e073fe" +
+            "8f20ffffff000000000000000000000000000000000000000327568a196fd2af61b99bd5578e80f" +
+            "44bb4b685973fd87f334623a503b5b67c65f54f0947eb311b6fdd36ccd5ab7b8fada7b55502abba" +
+            "816e8d65d83a26092ed9be653064be80f760b9d471dc9afbac2b24236c9f2eb0f08b7427942852d" +
+            "c780200000001000000000000000101eca101ba1e938c6a8cd10e031f2ac363f4176dcf4450e244" +
+            "2ebedb825fd33b1e000000000000000000000000000000000000000000000000000000000000000" +
+            "000000000000000000000000000000000000000000000000000000000000000000000000005f5e1" +
+            "000000000000"
+            |> FsBech32.Base16.decode
+            >>= Serialization.Block.deserialize
+            |> Option.get
 
         use client = ServiceBus.Client.create busName
 
         Messaging.Services.Blockchain.validateBlock client block
 
-    printfn "Press CTRL+C to exit"
+    use event = new Threading.ManualResetEvent(false)
 
-    use event = new System.Threading.ManualResetEvent(false)
-
-    System.Console.CancelKeyPress.Add (fun e ->
+    Console.CancelKeyPress.Add (fun e ->
         e.Cancel <- true
-        printfn "Close requested"
+        eventX "Closing..."
+        |> Log.info
         event.Set() |> ignore
     )
 
-    event.WaitOne() |> ignore    
+    event.WaitOne() |> ignore
 
-    printfn "Closing..."
-
-    0 // return an integer exit code
+    0

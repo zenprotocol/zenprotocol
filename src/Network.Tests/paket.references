@@ -5,3 +5,4 @@ FsNetMQ
 FSharp.Control.Reactive
 System.Reactive.Linq
 FSharp.Compiler.Tools
+Logary

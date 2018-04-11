@@ -13,22 +13,22 @@ let chain = Chain.Local
 let localParams = Chain.getChainParameters chain
 let getUTXO _ = UtxoSet.NoOutput
 let contractPath = "./test"
-let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO Transaction.rootTxHash Transaction.rootTx
+let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO rootTxHash rootTx
 
 let validateInContext = validateInContext localParams getUTXO contractPath
 
 type TxResult = Result<Transaction*ActiveContractSet.T,ValidationError>
 
-let unwrap = 
+let unwrap =
     function
     | Ok value -> value
     | Error error -> failwith error
-    
-let recordHints = 
+
+let recordHints =
     Consensus.Contract.recordHints
     >> unwrap
 
-let totalQueries = 
+let totalQueries =
     Infrastructure.ZFStar.totalQueries
     >> unwrap
 
@@ -44,10 +44,10 @@ let ``Contract activation without contract sacrifice should fail``() =
 
     let hints = recordHints code
     let totalQueries = totalQueries hints
-    
+
     let tx =
         {contract = Some { code=code;hints=hints;rlimit=0u;queries=totalQueries }; inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
-        |> Transaction.sign [keyPair rootAccount]
+        |> Transaction.sign [rootKeyPair]
     let txHash = Transaction.hash tx
 
     let expected:TxResult = General "Contract activation must include activation sacrifice" |> Error
@@ -76,7 +76,7 @@ let ``Contract activation with too low contract sacrifice``() =
 
     let tx =
         {contract = Some { code=code;hints=hints;rlimit=0u;queries=totalQueries }; inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
-        |> Transaction.sign [keyPair rootAccount]
+        |> Transaction.sign [rootKeyPair]
     let txHash = Transaction.hash tx
 
     let expected:TxResult = General "Contract must be activated for at least one block" |> Error
@@ -93,7 +93,7 @@ let ``Contract activation with asset other than zen should fail``() =
 
     let originTx = {
         inputs=[];
-        outputs=[{lock=PK Transaction.rootPKHash;spend={amount=1UL;asset=asset}}]
+        outputs=[{lock=PK rootPKHash;spend={amount=1UL;asset=asset}}]
         witnesses=[]
         contract=None
     }
@@ -109,7 +109,7 @@ let ``Contract activation with asset other than zen should fail``() =
 
     let tx =
         {contract = Some { code=code;hints=hints;rlimit=0u;queries=totalQueries }; inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
-        |> Transaction.sign [keyPair (fst rootAccountData)]
+        |> Transaction.sign [rootKeyPair]
     let txHash = Transaction.hash tx
 
     let expected:TxResult = General "Sacrifice must be paid in Zen" |> Error
@@ -150,7 +150,7 @@ let ``Contract activation without hints should fail``() =
 
     let tx =
         {contract = Some { code=code;hints="";rlimit=0u;queries=0u }; inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
-        |> Transaction.sign [keyPair rootAccount]
+        |> Transaction.sign [rootKeyPair]
 
 
     let expected:TxResult = General "total queries: invalid hints" |> Error
@@ -179,11 +179,11 @@ let ``Contract activation with invalid queries should fail``() =
 
     let tx =
         {contract = Some { code=code;hints=hints;rlimit=0u;queries=(totalQueries - 1u) }; inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
-        |> Transaction.sign [keyPair rootAccount]
+        |> Transaction.sign [rootKeyPair]
 
 
     let expected:TxResult = General "Total queries mismatch" |> Error
 
     validateInContext 1ul ActiveContractSet.empty utxoSet (Transaction.hash tx) tx
-    |> printfn "%A" //  should equal expected
-    ()
+    |> should equal expected
+    

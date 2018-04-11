@@ -60,7 +60,7 @@ let saveBlockState session blockHash (acs:ActiveContractSet.T) ema =
             ema = ema
             activeContractSet =
                 ActiveContractSet.getContracts acs
-                |> Seq.map (fun contract -> contract.hash,contract.expiry,contract.size,contract.code)
+                |> Seq.map (fun contract -> contract.hash,contract.expiry,contract.code)
                 |> List.ofSeq
         }
 
@@ -76,7 +76,7 @@ let getBlockState session blockHash =
 
     let acs =
         blockState.activeContractSet
-        |> List.map (fun (cHash,expiry,size,code) -> cHash,Contract.load session.context.contractPath expiry size code cHash)
+        |> List.map (fun (cHash,expiry,code) -> cHash, Contract.load session.context.contractPath expiry code cHash)
         |> List.map getOk
         |> List.toArray
         |> SparseMerkleTree.addMultiple ActiveContractSet.empty

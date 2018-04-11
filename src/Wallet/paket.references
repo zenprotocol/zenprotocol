@@ -6,3 +6,5 @@ FSharp.Compiler.Tools
 FsPickler
 Base58Check
 NBitcoin
+BouncyCastle
+Logary

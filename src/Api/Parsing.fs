@@ -1,5 +1,6 @@
 module Api.Parsing
 
+open Api
 open FSharp.Data
 open Api.Types
 open Consensus
@@ -61,7 +62,14 @@ let getContractExecute chain json =
                             | Some data -> Some data
                             | None -> failwith "Invalid Data"
                         | None -> failwith "Invalid Data"
-                Ok (cHash, json.Command, data, json.Options.ReturnAddress, spends)
+
+                let sign =
+                    if System.String.IsNullOrEmpty json.Options.Sign then
+                        None
+                    else
+                        Some json.Options.Sign
+
+                Ok (cHash, json.Command, data, json.Options.ReturnAddress, sign, spends)
             else
                 errors
                 |> String.concat " "
@@ -99,8 +107,7 @@ let getImportSeed json =
         for item in json.Words do
             words <- item :: words
 
-        let key = Encoding.ASCII.GetBytes json.Key
-        Ok (List.rev words, key)
+        Ok (List.rev words, json.Password)
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
 
@@ -108,7 +115,6 @@ let getUnlock json =
     try
         let json = UnlockAccountJson.Parse json
 
-        Encoding.ASCII.GetBytes json.Key
-        |> Ok
+        Ok json.Password
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)

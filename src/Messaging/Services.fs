@@ -38,7 +38,7 @@ module Blockchain =
         | HandleHeaders of peerId:byte[] * BlockHeader list
 
     type Request =
-        | ExecuteContract of Hash * string * data option * TxSkeleton.T
+        | ExecuteContract of Hash * string * Crypto.PublicKey option * data option * TxSkeleton.T
         | GetBlockTemplate of pkHash:Hash
         | GetTip
         | GetBlock of Hash
@@ -61,8 +61,8 @@ module Blockchain =
     let handleMemPool client peerId txHashes =
         Command.send client serviceName (HandleMemPool (peerId,txHashes))
 
-    let executeContract client cHash command data txSkeleton =
-        ExecuteContract (cHash,command, data, txSkeleton)
+    let executeContract client cHash command sender data txSkeleton =
+        ExecuteContract (cHash,command, sender, data, txSkeleton)
         |> Request.send<Request, Result<Transaction,string>> client serviceName
 
     let validateBlock client block =
@@ -154,13 +154,14 @@ module Wallet =
         | GetAddress
         | GetTransactions
         | GetBalance
-        | ImportSeed of string list * byte[]
+        | ImportSeed of string list * string
         | Spend of Hash * Spend
         | ActivateContract of string*uint32
-        | ExecuteContract of Hash * string * data option * provideReturnAddress:bool * Map<Asset, uint64>
+        | ExecuteContract of Hash * string * data option * provideReturnAddress:bool * sign:string option * Map<Asset, uint64>
         | AccountExists
         | AccountLocked
-        | Unlock of byte[]
+        | Unlock of string
+        | GetPublicKey of string
 
     let serviceName = "wallet"
 
@@ -182,11 +183,11 @@ module Wallet =
     let activateContract client code numberOfBlocks =
         send<ActivateContractResponse> client serviceName (ActivateContract (code,numberOfBlocks))
 
-    let executeContract client address command data provideReturnAddress spends  =
-        send<Transaction> client serviceName (ExecuteContract (address,command,data,provideReturnAddress, spends))
+    let executeContract client address command data provideReturnAddress sign spends  =
+        send<Transaction> client serviceName (ExecuteContract (address,command,data,provideReturnAddress,sign,spends))
 
-    let importSeed client words key =
-        send<unit> client serviceName (ImportSeed (words, key))
+    let importSeed client words password =
+        send<unit> client serviceName (ImportSeed (words, password))
 
     let getTransactions client =
         send<TransactionsResponse> client serviceName GetTransactions
@@ -200,8 +201,11 @@ module Wallet =
     let lock client =
         Command.send client serviceName Lock
 
-    let unlock client key =
-        send<unit> client serviceName (Unlock key)
+    let unlock client password =
+        send<unit> client serviceName (Unlock password)
 
     let resyncAccount client =
         Command.send client serviceName Resync
+
+    let getPublicKey client path =
+        Request.send<Request, Result<Crypto.PublicKey,string>> client serviceName (GetPublicKey path)

@@ -10,3 +10,4 @@ FSharp.Compiler.Tools
 ZFStar
 FSharp.Compatibility.OCaml
 System.Reflection.Metadata
+Logary

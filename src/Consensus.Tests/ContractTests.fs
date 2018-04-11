@@ -33,7 +33,7 @@ let compile code = result {
         rlimit = rlimit
         queries = queries
     }
-    
+
     return! Contract.compile contractPath contract 1000ul
 }
 
@@ -70,9 +70,9 @@ let validateInputs (contract:Contract.T) utxos tx  =
 let compileRunAndValidate inputTx utxoSet code =
     compileAndCheck code
     |> Result.bind (fun contract ->
-        Contract.run contract inputTx "" None List.empty
+        Contract.run contract inputTx "" Anonymous None List.empty
         |> Result.bind (fun (tx, _) ->
-            let cost = Contract.getCost contract inputTx "" None List.empty
+            let cost = Contract.getCost contract inputTx "" Anonymous None List.empty
             tx
             |> TxSkeleton.checkPrefix inputTx
             |> Result.map (fun finalTxSkeleton ->
@@ -97,7 +97,7 @@ let ``Contract generated transaction should be valid``() =
 let ``Should get expected contract cost``() =
     (compile sampleContractCode
      |> Result.map (fun contract ->
-        Contract.getCost contract sampleInputTx "" None List.empty)
+        Contract.getCost contract sampleInputTx "" Anonymous None List.empty)
     , (Ok 215L : Result<int64, string>))
     |> shouldEqual
 
@@ -113,9 +113,7 @@ let ``Contract should not be able to create tokens other than its own``() =
          module RT = Zen.ResultT
          module Tx = Zen.TxSkeleton
 
-         val main: txSkeleton -> hash -> string -> option data -> wallet
-            -> result (txSkeleton ** option message) `cost` (64 + (64 + 64 + 0) + 21)
-         let main txSkeleton contractHash command data wallet =
+         let main txSkeleton contractHash command sender data wallet =
            let! asset = Zen.Asset.getDefault Zen.Asset.zeroHash in
            let lock = ContractLock contractHash in
            let spend = {
@@ -131,8 +129,8 @@ let ``Contract should not be able to create tokens other than its own``() =
 
            RT.ok (txSkeleton, None)
 
-           val cf: txSkeleton -> string -> option data -> wallet -> cost nat 9
-                    let cf _ _ _ _ = ret (64 + (64 + 64 + 0) + 21)
+           val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 9
+                    let cf _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 21)
            """
     , (Error "illegal creation of tokens" : Result<Transaction, string>))
     |> shouldEqual
@@ -148,15 +146,13 @@ let ``Contract should be able to destroy its own tokens locked to it``() =
     module RT = Zen.ResultT
     module Tx = Zen.TxSkeleton
 
-    val main: txSkeleton -> hash -> string -> option data -> wallet
-        -> result (txSkeleton ** option message) `cost` (64 + (64 + 0) + 11)
-    let main txSkeleton contractHash command data wallet =
+    let main txSkeleton contractHash command sender data wallet =
         let! asset = Zen.Asset.getDefault contractHash in
         let! txSkeleton1 = Tx.destroy 1000UL asset txSkeleton in
         RT.ok (txSkeleton1, None)
 
-    val cf: txSkeleton -> string -> option data -> wallet -> cost nat 7
-        let cf _ _ _ _ = ret (64 + (64 + 0) + 11)
+    val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 7
+        let cf _ _ _ _ _ = ret (64 + (64 + 0) + 11)
 
     """
 
@@ -222,14 +218,12 @@ let ``Contract should not be able to destroy tokens other than its own - single 
     module RT = Zen.ResultT
     module Tx = Zen.TxSkeleton
 
-    val main: txSkeleton -> hash -> string -> option data -> wallet
-        -> result (txSkeleton ** option message) `cost` (64 + 8)
-    let main txSkeleton contractHash command data wallet =
+    let main txSkeleton contractHash command sender data wallet =
         let! txSkeleton1 = Tx.destroy 1000UL zenAsset txSkeleton in // should be impossible
         RT.ok (txSkeleton1, None)
 
-    val cf: txSkeleton -> string -> option data -> wallet -> cost nat 3
-        let cf _ _ _ _ = ret (64 + 8)
+    val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 3
+        let cf _ _ _ _ _ = ret (64 + 8)
     """
 
     let contractHash =
@@ -273,16 +267,14 @@ let ``Contract should not be able to destroy tokens other than its own - multipl
     module RT = Zen.ResultT
     module Tx = Zen.TxSkeleton
 
-    val main: txSkeleton -> hash -> string -> option data -> wallet
-        -> result (txSkeleton ** option message) `cost` (64 + (64 + 64 + 0) + 15)
-    let main txSkeleton contractHash command data wallet =
+    let main txSkeleton contractHash command sender data wallet =
         let! asset = Zen.Asset.getDefault contractHash in
         let txSkeleton1 = Tx.destroy 1000UL zenAsset txSkeleton in // should be impossible
         let! txSkeleton2 = txSkeleton1 >>= Tx.destroy 1000UL asset in // should be possible
         RT.ok (txSkeleton2, None)
 
-    val cf: txSkeleton -> string -> option data -> wallet -> cost nat 9
-        let cf _ _ _ _ = ret (64 + (64 + 64 + 0) + 15)
+    val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 9
+        let cf _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 15)
     """
 
     let contractHash =

@@ -13,23 +13,23 @@ open Zen.Cost.Realized
 open Zen.Types.Realized
 open Zen.Types.Data
 open Zen.Types.Main
+open Zen.Types.Main
 
 type ContractWallet = PointedOutput list
-type ContractMainFn = TxSkeleton.T -> Hash -> string -> data option -> ContractWallet -> Result<(TxSkeleton.T * Message Option),string>
-type ContractCostFn = TxSkeleton.T -> string -> data option -> ContractWallet -> int64
+type ContractMainFn = TxSkeleton.T -> Hash -> string -> sender -> data option -> ContractWallet -> Result<(TxSkeleton.T * Message Option),string>
+type ContractCostFn = TxSkeleton.T -> string -> sender -> data option -> ContractWallet -> int64
 
 type T = {
     hash: Hash
     mainFn: ContractMainFn
     costFn: ContractCostFn
     expiry: uint32
-    size: uint32
     code:string
 }
 
 let private getMainFunction assembly =
     try
-        let getProperty name = 
+        let getProperty name =
             (assembly:Assembly)
                 .GetModules().[0]
                 .GetTypes().[0]
@@ -42,40 +42,42 @@ let private getMainFunction assembly =
 
 let private getCostFn (MainFunc(CostFunc(_, cf), _)) = cf
 let private getMainFn (MainFunc (_, mf)) = mf
-    
+
 let private wrapMainFn
-                (mainFn: 
-                    txSkeleton 
-                    -> contractHash 
-                    -> Prims.string 
-                    -> Native.option<data> 
+                (mainFn:
+                    txSkeleton
+                    -> contractHash
+                    -> Prims.string
+                    -> sender
+                    -> Native.option<data>
                     -> wallet
                     -> cost<contractResult, Prims.unit>)
                 : ContractMainFn =
-    fun txSkeleton (Hash.Hash cHash) command data contractWallet ->
+    fun txSkeleton (Hash.Hash cHash) command sender data contractWallet ->
         let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
         let command' = ZFStar.fsToFstString command
         let data' = ZFStar.fsToFstOption id data
         let contractWallet' = ZFStar.convertWallet contractWallet
-        mainFn txSkeleton' cHash command' data' contractWallet'
+        mainFn txSkeleton' cHash command' sender data' contractWallet'
         |> ZFStar.unCost
         |> ZFStar.toResult
         |> Result.bind ZFStar.convertResult
 
 let private wrapCostFn
-                (costFn: 
-                    txSkeleton 
-                    -> Prims.string 
-                    -> Native.option<data> 
+                (costFn:
+                    txSkeleton
+                    -> Prims.string
+                    -> sender
+                    -> Native.option<data>
                     -> wallet
                     -> cost<Prims.nat, Prims.unit>)
                 : ContractCostFn =
-    fun txSkeleton command data contractWallet ->
+    fun txSkeleton command sender data contractWallet ->
         let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
         let command' = ZFStar.fsToFstString command
         let data' = ZFStar.fsToFstOption id data
         let contractWallet' = ZFStar.convertWallet contractWallet
-        costFn txSkeleton' command' data' contractWallet'
+        costFn txSkeleton' command' sender data' contractWallet'
         |> ZFStar.unCost
 
 let hash contract = contract.hash
@@ -87,17 +89,17 @@ let private getModuleName =
 
 let computeHash : string -> Hash = Hash.compute << Encoding.UTF8.GetBytes
 
-let load contractsPath expiry size code hash =
+let load contractsPath expiry code hash =
     let mainFunc = getModuleName hash
                    |> ZFStar.load contractsPath
                    |> Result.bind getMainFunction
-    let mainFn = mainFunc 
+    let mainFn = mainFunc
                  |> Result.map getMainFn
                  |> Result.map wrapMainFn
-    let costFn = mainFunc 
+    let costFn = mainFunc
                  |> Result.map getCostFn
                  |> Result.map wrapCostFn
-    
+
     mainFn |> Result.bind (fun mainFn ->
     costFn |> Result.map (fun costFn ->
         {
@@ -105,7 +107,6 @@ let load contractsPath expiry size code hash =
             mainFn = mainFn
             costFn = costFn
             expiry = expiry
-            size = size //TODO: remove, use: String.length code |> uint32
             code = code
         }))
 
@@ -115,7 +116,7 @@ let compile contractsPath (contract:Consensus.Types.Contract) expiry =
     hash
     |> getModuleName
     |> ZFStar.compile contractsPath contract.code contract.hints contract.rlimit
-    |> Result.bind (fun _ -> load contractsPath expiry (String.length contract.code |> uint32) contract.code hash) //TODO: remove size
+    |> Result.bind (fun _ -> load contractsPath expiry contract.code hash)
 
 let recordHints code =
     code

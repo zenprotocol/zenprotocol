@@ -6,6 +6,7 @@ open System.Text
 open System.Diagnostics
 open System.Runtime.InteropServices
 open Exception
+open Logary.Message
 
 [<DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true )>]
 extern uint16 GetShortPathName(
@@ -103,10 +104,14 @@ let run exe args =
             else
                 let error = error.ToString()
                 if error.Length > 0 then
-                    Log.info "%A" error
+                    eventX "{error}"
+                    >> setField "error" error
+                    |> Log.info
                 let output = output.ToString()
                 if output.Length > 0 then
-                    Log.info "%A" output
+                    eventX "{ourput}"
+                    >> setField "output" error
+                    |> Log.verbose
                 Error error
         else
             Error "failed to start process"

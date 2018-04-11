@@ -21,7 +21,7 @@ type ChainKeyArgs = {
 type Key =
     | ExtendedPrivateKey of Crypto.SecretKey
     | ExtendedPublicKey of Crypto.PublicKey
-    
+
 type T = {
     key: Key
     depth: byte
@@ -30,21 +30,21 @@ type T = {
     index: int32
 }
 
-let private getPublicKey extendedKey = 
+let getPublicKey extendedKey =
     match extendedKey.key with
-    | ExtendedPrivateKey (SecretKey prvBytes) -> 
+    | ExtendedPrivateKey (SecretKey prvBytes) ->
         match SecretKey.getPublicKey (SecretKey prvBytes) with
         | Some pulicKey -> Ok pulicKey
-        | None -> Error "private key invalid"        
+        | None -> Error "private key invalid"
     | ExtendedPublicKey publicKey -> Ok publicKey
 
-let getPrivateKey extendedKey = 
+let getPrivateKey extendedKey =
     match extendedKey.key with
     | ExtendedPrivateKey privateKey-> Ok privateKey
     | _ -> Error "underlying key mismatch"
-    
+
 let private getIdentifier extendedKey = result {
-    let! publicKey = getPublicKey extendedKey 
+    let! publicKey = getPublicKey extendedKey
     let sha256 = new SHA256Managed()
     let hash = sha256.ComputeHash(PublicKey.serialize publicKey)
     let ripemd160 = new RIPEMD160Managed()
@@ -72,7 +72,7 @@ let private (++) a b = Array.append a b
 
 let create seed =
     let il, ir = computeHash (Encoding.ASCII.GetBytes preSeed) seed
-    
+
     if il = Array.zeroCreate 32 || il >= secp256k1.n then
         Error "invalid seed"
     else
@@ -86,8 +86,8 @@ let create seed =
 
 let derive i parent = result {
     let! data = result {
-        match parent.key with 
-        | ExtendedPrivateKey privateKey -> 
+        match parent.key with
+        | ExtendedPrivateKey privateKey ->
             if isHardened i then
                 return [| 0uy |] ++ (SecretKey.serialize privateKey)
             else
@@ -103,16 +103,16 @@ let derive i parent = result {
     if il >= secp256k1.n then yield! Error "cannot derive"
 
     let! key = result {
-        match parent.key with 
-        | ExtendedPrivateKey (SecretKey prvBytes) -> 
+        match parent.key with
+        | ExtendedPrivateKey (SecretKey prvBytes) ->
             let key = ((parse256 il) + parse256 prvBytes) % (parse256 secp256k1.n)
             if key = 0I then yield! Error "cannot derive"
             return
                 key
                 |> ser256
-                |> SecretKey 
-                |> ExtendedPrivateKey 
-        | ExtendedPublicKey _ -> 
+                |> SecretKey
+                |> ExtendedPrivateKey
+        | ExtendedPublicKey _ ->
             yield! Error "not supported"
     }
 
@@ -132,14 +132,14 @@ let neuter parent = result {
 }
 
 let encode chainKeyArgs extendedKey = result {
-    let data, chain = 
+    let data, chain =
         match extendedKey.key with
-        | ExtendedPublicKey publicKey -> 
+        | ExtendedPublicKey publicKey ->
             PublicKey.serialize publicKey, chainKeyArgs.Public
-        | ExtendedPrivateKey privateKey-> 
+        | ExtendedPrivateKey privateKey->
             [| 0uy |] ++ (SecretKey.serialize privateKey), chainKeyArgs.Private
     return
-        chain    
+        chain
         ++ [| extendedKey.depth |]
         ++ extendedKey.parentFingetprint
         ++
@@ -147,4 +147,16 @@ let encode chainKeyArgs extendedKey = result {
         ++ extendedKey.chainCode
         ++ data
         |> Base58Check.Base58CheckEncoding.Encode
+}
+
+let derivePath path extendedKey = result {
+    let! indexes = KeyPathParser.parse path
+
+    return! List.fold (fun extendedKey index -> extendedKey >>= derive index) (Ok extendedKey) indexes
+}
+
+let sign msg extendedKey = result {
+    let! secretKey = getPrivateKey extendedKey
+
+    return Crypto.sign secretKey msg
 }

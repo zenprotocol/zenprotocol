@@ -20,8 +20,8 @@ module Result = Core.Result
 
 let chain = Chain.getChainParameters Chain.Local
 
-let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction (fun _ -> UtxoSet.NoOutput) Transaction.rootTxHash Transaction.rootTx
-let mempool = MemPool.empty |> MemPool.add Transaction.rootTxHash Transaction.rootTx
+let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction (fun _ -> UtxoSet.NoOutput) rootTxHash rootTx
+let mempool = MemPool.empty |> MemPool.add rootTxHash rootTx
 let orphanPool = OrphanPool.create()
 let acs = ActiveContractSet.empty
 
@@ -113,9 +113,7 @@ let setUp = fun () ->
 
       RT.of_option "contract doesn't have enough zens to pay you" result
 
-    val main: txSkeleton -> hash -> string -> option data -> wallet:wallet
-        -> result (txSkeleton ** option message) `cost` (3 + 66 + (64 + (64 + (64 + 64 + (Zen.Wallet.size wallet * 128 + 192) + 0)) + 31) + 28)
-    let main txSkeleton contractHash command data wallet =
+    let main txSkeleton contractHash command sender data wallet =
       let! returnAddress = data >!> tryDict >?> tryFindLock "returnAddress" in
 
       match returnAddress with
@@ -130,8 +128,8 @@ let setUp = fun () ->
       | None ->
         RT.autoFailw "returnAddress is required"
 
-    val cf: txSkeleton -> string -> option data -> wallet -> cost nat 24
-        let cf _ _ _ wallet = ret (3 + 66 + (64 + (64 + (64 + 64 + (Zen.Wallet.size wallet * 128 + 192) + 0)) + 31) + 28)
+    val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 24
+        let cf _ _ _ _ wallet = ret (3 + 66 + (64 + (64 + (64 + 64 + (Zen.Wallet.size wallet * 128 + 192) + 0)) + 31) + 28)
     """ account session state
     |> function
     | Ok (state', cHash') ->
@@ -173,7 +171,7 @@ let ``Contract should detect unsupported command``() =
         |> Types.Data.Dict
         |> Some
 
-    TransactionHandler.executeContract session inputTx cHash "x" data state.memoryState
+    TransactionHandler.executeContract session inputTx cHash "x" None data state.memoryState
     |> shouldBeErrorMessage "unsupported command"
 
 [<Test>]
@@ -211,7 +209,7 @@ let ``Should buy``() =
         |> Types.Data.Dict
         |> Some
 
-    TransactionHandler.executeContract session inputTx cHash "buy" data { state.memoryState with utxoSet = utxoSet }
+    TransactionHandler.executeContract session inputTx cHash "buy" None data { state.memoryState with utxoSet = utxoSet }
     |> function
     | Ok tx ->
         tx.inputs |> should haveLength 2
@@ -234,6 +232,7 @@ let ``Should buy``() =
              beginOutputs = 0u
              inputsLength = 1u
              outputsLength = 2u
+             signature = None
              cost = cost
         }
         wit |> should equal cw
@@ -287,7 +286,7 @@ let ``Should redeem``() =
         |> Types.Data.Dict
         |> Some
 
-    TransactionHandler.executeContract session inputTx cHash "redeem" data { state.memoryState with utxoSet = utxoSet }
+    TransactionHandler.executeContract session inputTx cHash "redeem" None data { state.memoryState with utxoSet = utxoSet }
     |> function
     | Ok tx ->
         tx.inputs |> should haveLength 2
@@ -311,6 +310,7 @@ let ``Should redeem``() =
              beginOutputs = 0u
              inputsLength = 1u
              outputsLength = 2u
+             signature = None
              cost = cost
         }
         wit |> should equal cw

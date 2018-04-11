@@ -42,7 +42,14 @@ let getOutputs = UtxoSet.tryGetOutputs
 let pkWitnessWeight : bigint * int * int = 100_000I, 1, 0
 
 let contractWitnessWeight (cWit:ContractWitness) =
-    100I * bigint (cWit.cost), int cWit.inputsLength, int cWit.outputsLength
+    let signatureWeight =
+        match cWit.signature with
+        | Some _ -> 80_000I
+        | None -> 0I
+
+    let costWeight = 100I * bigint (cWit.cost)
+
+    signatureWeight + costWeight, int cWit.inputsLength, int cWit.outputsLength
 
 let activationWeight contract =
     contract.queries * contract.rlimit |> bigint

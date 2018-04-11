@@ -181,6 +181,8 @@ module PublicKey =
             | Native.Result.Ok -> Some (PublicKey publicKey)
             | _ -> None
 
+    let toString = serialize >> FsBech32.Base16.encode
+
     let hash = serialize >> Hash.compute
 
 module Signature =
@@ -221,7 +223,7 @@ let sign (SecretKey secretKey) (Hash hash) =
     | Native.Result.Ok -> Signature.Signature signature
     | x -> failwithf "failed to sign %A" x
 
-let verify (PublicKey publicKey) (Signature signature) msg =
+let verify (PublicKey publicKey) (Signature signature) (Hash msg) =
     match Native.secp256k1_ecdsa_verify (context, signature, msg, publicKey) with
     | Native.Result.Ok -> Valid
     | _ -> Invalid

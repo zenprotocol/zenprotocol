@@ -14,7 +14,7 @@ open Serialization
 type BlockState =
     {
         ema:EMA.T
-        activeContractSet:(Hash.Hash*uint32*uint32*string) list
+        activeContractSet:(Hash.Hash*uint32*string) list
     }
 
 type T =

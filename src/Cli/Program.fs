@@ -1,5 +1,6 @@
 ﻿open Argu
 open System
+open System.IO
 open FSharp.Data
 open Api.Types
 open FSharp.Data
@@ -111,141 +112,154 @@ let main argv =
     let getUri =
         sprintf "http://127.0.0.1:%d/%s" port
 
-    match results.TryGetSubCommand() with
-    | Some (Spend args) ->
-        let asset,assetType,amount,address = args.GetResult <@ Spend_Arguments @>
-        let send = new SpendRequestJson.Root(address, new SpendRequestJson.Spend(asset, assetType, amount))
-        Http.requrest send.JsonValue (getUri "wallet/spend") "POST"
-        |> printfn "%A"
-    | Some (Balance _) ->
-        try
-            let balance =
-                BalanceResponseJson.Load(getUri "wallet/balance")
+    try
 
-            printfn "Asset\t\t| Balance"
-            printfn "============================"
+        match results.TryGetSubCommand() with
+        | Some (Spend args) ->
+            let asset,assetType,amount,address = args.GetResult <@ Spend_Arguments @>
+            let send = new SpendRequestJson.Root(address, new SpendRequestJson.Spend(asset, assetType, amount))
+            Http.requrest send.JsonValue (getUri "wallet/spend") "POST"
+            |> printfn "%A"
+        | Some (Balance _) ->
+            try
+                let balance =
+                    BalanceResponseJson.Load(getUri "wallet/balance")
 
-            Array.iter (fun (assertBalance:BalanceResponseJson.Root) ->
-                printfn " %s %s\t| %d" assertBalance.Asset assertBalance.AssetType assertBalance.Balance) balance
-        with
-            | :? Net.WebException as ex ->
-                printfn "%s" ex.Message
-    | Some (History _) ->
-        try
-            let transactions =
-                TransactionsResponseJson.Load(getUri "wallet/transactions")
+                printfn "Asset\t\t| Balance"
+                printfn "============================"
 
-            printfn "TxHash\t| Asset\t| Amount"
-            printfn "=========================================="
+                Array.iter (fun (assertBalance:BalanceResponseJson.Root) ->
+                    printfn " %s %s\t| %d" assertBalance.Asset assertBalance.AssetType assertBalance.Balance) balance
+            with
+                | :? Net.WebException as ex ->
+                    printfn "%s" ex.Message
+        | Some (History _) ->
+            try
+                let transactions =
+                    TransactionsResponseJson.Load(getUri "wallet/transactions")
 
-            Array.iter (fun (transaction:TransactionsResponseJson.Root) ->
-                printfn "\n%s" transaction.TxHash
+                printfn "TxHash\t| Asset\t| Amount"
+                printfn "=========================================="
 
-                Array.iter (fun (amount:TransactionsResponseJson.Delta) ->
-                    printfn "\t| %s %s\t| %d" amount.Asset amount.AssetType amount.Amount
-                ) transaction.Deltas
+                Array.iter (fun (transaction:TransactionsResponseJson.Root) ->
+                    printfn "\n%s" transaction.TxHash
 
-            ) transactions
-        with
-            | :? Net.WebException as ex ->
-                printfn "%s" ex.Message
-    | Some (Address _) ->
-        try
-            let address =
-                AddressJson.Load (getUri "wallet/address")
+                    Array.iter (fun (amount:TransactionsResponseJson.Delta) ->
+                        printfn "\t| %s %s\t| %d" amount.Asset amount.AssetType amount.Amount
+                    ) transaction.Deltas
 
-            printfn "%s" address.Address
-        with
-            | :? Net.WebException as ex ->
-                printfn "%s" ex.Message
-    | Some (Resync _) ->
-        let response = FSharp.Data.Http.Request (getUri "wallet/resync", httpMethod="POST",body=TextRequest "")
+                ) transactions
+            with
+                | :? Net.WebException as ex ->
+                    printfn "%s" ex.Message
+        | Some (Address _) ->
+            try
+                let address =
+                    AddressJson.Load (getUri "wallet/address")
 
-        match response.StatusCode with
-        | 200 -> printfn "Success"
-        | code -> printfn "Failed %d" code
-    | Some (Import args) ->
-        let words = args.GetResult <@ Import_Arguments @>
-        printfn "enter key (16 ASCII characters):"
-        let key = Console.ReadLine()
-        let send = new ImportSeedJson.Root(key, List.toArray words)
-        Http.requrest send.JsonValue (getUri "wallet/import") "POST"  //send.JsonValue.Request (getUri "wallet/import")
-        |> printfn "%A"
-    | Some (Activate args) ->
-        let file,numberOfBlocks = args.GetResult <@ ActivateContract_Arguments @>
+                printfn "%s" address.Address
+            with
+                | :? Net.WebException as ex ->
+                    printfn "%s" ex.Message
+        | Some (Resync _) ->
+            let response = FSharp.Data.Http.Request (getUri "wallet/resync", httpMethod="POST",body=TextRequest "")
 
-        match System.IO.File.Exists file with
-            | false ->
-                printfn "File not found: %s" file
-            | true ->
-                let code = System.IO.File.ReadAllText file
-                let activate = new ContractActivateRequestJson.Root(code,numberOfBlocks)
+            match response.StatusCode with
+            | 200 -> printfn "Success"
+            | code -> printfn "Failed %d" code
+        | Some (Import args) ->
+            let words = args.GetResult <@ Import_Arguments @>
+            printfn "enter password:"
+            let password = Console.ReadLine()
+            let send = new ImportSeedJson.Root(password, List.toArray words)
+            Http.requrest send.JsonValue (getUri "wallet/import") "POST"  //send.JsonValue.Request (getUri "wallet/import")
+            |> printfn "%A"
+        | Some (Activate args) ->
+            let file,numberOfBlocks = args.GetResult <@ ActivateContract_Arguments @>
 
-                let response = activate.JsonValue.Request (getUri "wallet/contract/activate")
+            match System.IO.File.Exists file with
+                | false ->
+                    printfn "File not found: %s" file
+                | true ->
+                    let code = System.IO.File.ReadAllText file
+                    let activate = new ContractActivateRequestJson.Root(code,numberOfBlocks)
 
-                match response.StatusCode, response.Body with
-                    | 200,_ -> printfn "Success %A" response.Body
-                    | code, HttpResponseBody.Text text -> printfn "Failed %d %s" code text
-                    | code,_ -> printfn "Failed %d with binary response" code
-    | Some (Execute args) ->
-        let address,command,data,asset,assetType,amount = args.GetResult <@ ExecuteContract_Arguments @>
-        let execute = new ContractExecuteRequestJson.Root(address,command,data,
-            new ContractExecuteRequestJson.Options(true) , [| new ContractExecuteRequestJson.Spend(asset, assetType, amount) |])
+                    let response = activate.JsonValue.Request (getUri "wallet/contract/activate")
 
-        let response = execute.JsonValue.Request (getUri "wallet/contract/execute")
+                    match response.StatusCode, response.Body with
+                        | 200,_ -> printfn "Success %A" response.Body
+                        | code, HttpResponseBody.Text text -> printfn "Failed %d %s" code text
+                        | code,_ -> printfn "Failed %d with binary response" code
+        | Some (Execute args) ->
+            let address,command,data,asset,assetType,amount = args.GetResult <@ ExecuteContract_Arguments @>
+            let execute =
+                new ContractExecuteRequestJson.Root(address,command,data,
+                    new ContractExecuteRequestJson.Options(true, "") , [| new ContractExecuteRequestJson.Spend(asset, assetType, amount) |])
 
-        match response.StatusCode, response.Body with
+            let response = execute.JsonValue.Request (getUri "wallet/contract/execute")
+
+            match response.StatusCode, response.Body with
+                | 200,_ -> printfn "Success"
+                | code, HttpResponseBody.Text text -> printfn "Failed %d %s" code text
+                | code,_ -> printfn "Failed %d with binary response" code
+        | Some (PublishBlock args) ->
+            let block = args.GetResult <@ PublishBlock_Arguments @>
+            let publishBlock = new PublishBlockJson.Root(block)
+            let response = publishBlock.JsonValue.Request (getUri "block/publish")
+
+            match response.StatusCode, response.Body with
             | 200,_ -> printfn "Success"
             | code, HttpResponseBody.Text text -> printfn "Failed %d %s" code text
             | code,_ -> printfn "Failed %d with binary response" code
-    | Some (PublishBlock args) ->
-        let block = args.GetResult <@ PublishBlock_Arguments @>
-        let publishBlock = new PublishBlockJson.Root(block)
-        let response = publishBlock.JsonValue.Request (getUri "block/publish")
+        | Some (AccountExists _) ->
+            try
+                let result =
+                    AccountExistsResponseJson.Load(getUri "wallet/exists")
 
-        match response.StatusCode, response.Body with
-        | 200,_ -> printfn "Success"
-        | code, HttpResponseBody.Text text -> printfn "Failed %d %s" code text
-        | code,_ -> printfn "Failed %d with binary response" code
-    | Some (AccountExists _) ->
-        try
-            let result =
-                AccountExistsResponseJson.Load(getUri "wallet/exists")
+                if result.AccountExists then
+                    printfn "Account is initialized"
+                else
+                    printfn "Account is not initialized"
+            with
+                | :? Net.WebException as ex ->
+                    printfn "%s" ex.Message
+        | Some (AccountLocked _) ->
+            try
+                let result =
+                    AccountLockedResponseJson.Load(getUri "wallet/locked")
 
-            if result.AccountExists then
-                printfn "Account is initialized"
-            else
-                printfn "Account is not initialized"
-        with
-            | :? Net.WebException as ex ->
-                printfn "%s" ex.Message
-    | Some (AccountLocked _) ->
-        try
-            let result =
-                AccountLockedResponseJson.Load(getUri "wallet/locked")
+                if result.AccountLocked then
+                    printfn "Account is locked"
+                else
+                    printfn "Account is unlocked"
+            with
+                | :? Net.WebException as ex ->
+                    printfn "%s" ex.Message
+        | Some (Lock _) ->
+            let response = FSharp.Data.Http.Request (getUri "wallet/lock", httpMethod="GET")
 
-            if result.AccountLocked then
-                printfn "Account is locked"
-            else
-                printfn "Account is unlocked"
-        with
-            | :? Net.WebException as ex ->
-                printfn "%s" ex.Message
-    | Some (Lock _) ->
-        let response = FSharp.Data.Http.Request (getUri "wallet/lock", httpMethod="GET")
+            match response.StatusCode with
+            | 200 -> printfn "Success"
+            | code -> printfn "Failed %d" code
+        | Some (Unlock args) ->
+            let key = args.GetResult <@ Unlock_Arguments @>
+            let response = (new UnlockAccountJson.Root(key)).JsonValue.Request (getUri "wallet/unlock")
 
-        match response.StatusCode with
-        | 200 -> printfn "Success"
-        | code -> printfn "Failed %d" code
-    | Some (Unlock args) ->
-        let key = args.GetResult <@ Unlock_Arguments @>
-        let response = (new UnlockAccountJson.Root(key)).JsonValue.Request (getUri "wallet/unlock")
+            match response.StatusCode, response.Body with
+            | 200,_ -> printfn "Success"
+            | code, HttpResponseBody.Text text -> printfn "Failed %d %s" code text
+            | code,_ -> printfn "Failed %d with binary response" code
+        | _ -> ()
+    with
+    | :? System.Net.WebException as ex ->
+        use reader = new StreamReader(ex.Response.GetResponseStream())
 
-        match response.StatusCode, response.Body with
-        | 200,_ -> printfn "Success"
-        | code, HttpResponseBody.Text text -> printfn "Failed %d %s" code text
-        | code,_ -> printfn "Failed %d with binary response" code
-    | _ -> ()
+        printfn "Operation failed - %s" (reader.ReadToEnd())
+    | :? System.AggregateException as ex ->
+            printfn "Operation failed - %s" <| ex.Flatten().InnerException.Message
+
+    | ex ->
+        printfn "Operation failed - %s" ex.Message
 
     printfn ""
 

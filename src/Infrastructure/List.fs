@@ -6,7 +6,10 @@ let remove item = List.filter (fun x -> x <> item)
 
 let reject fn = List.filter (fn >> not)
 
-let add item list = List.append list [item] 
+let add item list = List.append list [item]
+
+let update index newValue =
+    List.mapi (fun i value -> if i = index then newValue else value)
 
 // Fisher-Yates shuffle
 let shuffle list : 'a list =
