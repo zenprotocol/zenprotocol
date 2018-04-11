@@ -15,9 +15,37 @@ open Zen.Types.Data
 open Zen.Types.Main
 open Zen.Types.Main
 
+type zfstarMainFn = txSkeleton
+                        -> contractHash
+                        -> Prims.string
+                        -> sender
+                        -> Native.option<data>
+                        -> wallet
+                        -> cost<contractResult, Prims.unit>
+
+type zfstarCostFn = txSkeleton
+                        -> Prims.string
+                        -> sender
+                        -> Native.option<data>
+                        -> wallet
+                        -> cost<Prims.nat, Prims.unit>
+
 type ContractWallet = PointedOutput list
-type ContractMainFn = TxSkeleton.T -> Hash -> string -> sender -> data option -> ContractWallet -> Result<(TxSkeleton.T * Message Option),string>
-type ContractCostFn = TxSkeleton.T -> string -> sender -> data option -> ContractWallet -> int64
+
+type ContractMainFn = TxSkeleton.T 
+                          -> Hash 
+                          -> string 
+                          -> sender 
+                          -> data option 
+                          -> ContractWallet 
+                          -> Result<(TxSkeleton.T * Message Option),string>
+
+type ContractCostFn = TxSkeleton.T 
+                          -> string 
+                          -> sender 
+                          -> data option 
+                          -> ContractWallet 
+                          -> int64
 
 type T = {
     hash: Hash
@@ -40,19 +68,7 @@ let private getMainFunction assembly =
     with _ as ex ->
         Exception.toError "get contract mainFunc" ex
 
-let private getCostFn (MainFunc(CostFunc(_, cf), _)) = cf
-let private getMainFn (MainFunc (_, mf)) = mf
-
-let private wrapMainFn
-                (mainFn:
-                    txSkeleton
-                    -> contractHash
-                    -> Prims.string
-                    -> sender
-                    -> Native.option<data>
-                    -> wallet
-                    -> cost<contractResult, Prims.unit>)
-                : ContractMainFn =
+let private wrapMainFn (mainFn : zfstarMainFn) : ContractMainFn =
     fun txSkeleton (Hash.Hash cHash) command sender data contractWallet ->
         let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
         let command' = ZFStar.fsToFstString command
@@ -63,15 +79,7 @@ let private wrapMainFn
         |> ZFStar.toResult
         |> Result.bind ZFStar.convertResult
 
-let private wrapCostFn
-                (costFn:
-                    txSkeleton
-                    -> Prims.string
-                    -> sender
-                    -> Native.option<data>
-                    -> wallet
-                    -> cost<Prims.nat, Prims.unit>)
-                : ContractCostFn =
+let private wrapCostFn (costFn: zfstarCostFn) : ContractCostFn =
     fun txSkeleton command sender data contractWallet ->
         let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
         let command' = ZFStar.fsToFstString command
