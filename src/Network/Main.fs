@@ -20,7 +20,7 @@ open Logary.Message
 
 type State = Connector.T * AddressBook.T * string option
 
-let maxConnections = 3
+let maxConnections = 50
 
 let eventHandler transport event (connector,addressBook, ownAddress) =
     match event with
