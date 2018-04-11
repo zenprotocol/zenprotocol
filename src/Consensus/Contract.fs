@@ -90,25 +90,19 @@ let private getModuleName =
 let computeHash : string -> Hash = Hash.compute << Encoding.UTF8.GetBytes
 
 let load contractsPath expiry code hash =
-    let mainFunc = getModuleName hash
-                   |> ZFStar.load contractsPath
-                   |> Result.bind getMainFunction
-    let mainFn = mainFunc
-                 |> Result.map getMainFn
-                 |> Result.map wrapMainFn
-    let costFn = mainFunc
-                 |> Result.map getCostFn
-                 |> Result.map wrapCostFn
-
-    mainFn |> Result.bind (fun mainFn ->
-    costFn |> Result.map (fun costFn ->
+    let mkContract (MainFunc (CostFunc (_, costFn), mainFn) : mainFunction) : T =
         {
             hash = hash
-            mainFn = mainFn
-            costFn = costFn
+            mainFn = wrapMainFn mainFn
+            costFn = wrapCostFn costFn
             expiry = expiry
             code = code
-        }))
+        }
+    
+    getModuleName hash
+    |> ZFStar.load contractsPath
+    |> Result.bind getMainFunction
+    |> Result.map mkContract
 
 let compile contractsPath (contract:Consensus.Types.Contract) expiry =
     let hash = computeHash contract.code
@@ -126,4 +120,5 @@ let recordHints code =
 
 let getCost contract = contract.costFn
 
-let run contract = fun txSkeleton -> contract.mainFn txSkeleton contract.hash
+let run contract txSkeleton command sender data wallet = 
+    contract.mainFn txSkeleton contract.hash command sender data wallet 
