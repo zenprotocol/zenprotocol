@@ -201,11 +201,11 @@ let private checkWitnesses blockNumber acs (txHash, tx, inputs) =
 
                 // Validate true cost (not weight!) of running contract against
                 // the witness commitment
-                let cost = Contract.getCost contract cw.command sender cw.data contractWallet inputTx
+                let cost = Contract.getCost contract inputTx cw.command sender cw.data contractWallet
                 if uint32 cost <> cw.cost then
                     GeneralError <| sprintf "Contract witness committed to cost %d, but cost of execution is %d" (uint32 cost) cw.cost
                 else
-                    Contract.run contract cw.command sender cw.data contractWallet inputTx
+                    Contract.run contract inputTx cw.command sender cw.data contractWallet
                     |> Result.mapError General
                     |> Result.bind checkMessage
                     |> Result.bind checkIssuedAndDestroyed

@@ -77,7 +77,7 @@ let validateInputs chainParams session contractPath blockNumber txHash tx (state
                 eventX "Transaction {hash} is an orphan. Adding to orphan pool."
                 >> setField "hash" (Hash.toString txHash)
                 |> Log.info
-                
+
                 return {state with orphanPool = orphanPool}
             | Error ContractNotActive ->
                 let orphanPool = OrphanPool.add txHash tx state.orphanPool
@@ -149,7 +149,7 @@ let executeContract session txSkeleton cHash command sender data state =
             | TxSkeleton.Mint _ -> false
             | TxSkeleton.PointedOutput (outpoint',_) -> outpoint' = outpoint) txSkeleton.pInputs
 
-    let rec run cHash command sender data (txSkeleton:TxSkeleton.T) witnesses totalCost =
+    let rec run (txSkeleton:TxSkeleton.T) cHash command sender data witnesses totalCost =
         match ActiveContractSet.tryFind cHash state.activeContractSet with
         | None -> Error "Contract not active"
         | Some contract ->
@@ -157,7 +157,7 @@ let executeContract session txSkeleton cHash command sender data state =
                 ContractUtxoRepository.getContractUtxo session cHash state.utxoSet
                 |> List.reject (isInTxSkeleton txSkeleton)
 
-            Contract.run contract command sender data contractWallet txSkeleton
+            Contract.run contract txSkeleton command sender data contractWallet
             |> Result.bind (fun (tx, message) ->
 
                 TxSkeleton.checkPrefix txSkeleton tx
@@ -166,7 +166,7 @@ let executeContract session txSkeleton cHash command sender data state =
 
                     // To commit to the cost we need the real contract wallet
                     let contractWallet = TransactionValidation.getContractWallet tx witness
-                    let cost = Contract.getCost contract command sender data contractWallet txSkeleton
+                    let cost = Contract.getCost contract txSkeleton command sender data contractWallet
                     let totalCost = cost + totalCost
 
                     // We can now commit to the cost, so lets alter it with the real cost
@@ -176,7 +176,7 @@ let executeContract session txSkeleton cHash command sender data state =
 
                     match message with
                     | Some {cHash=cHash; command=command; data=data} ->
-                        run cHash command (ContractSender contract.hash) data finalTxSkeleton witnesses totalCost
+                        run finalTxSkeleton cHash command (ContractSender contract.hash) data witnesses totalCost
                     | None ->
                         Ok (finalTxSkeleton, witnesses, totalCost)
                 )
@@ -187,16 +187,15 @@ let executeContract session txSkeleton cHash command sender data state =
         | Some publicKey -> PKSender publicKey
         | None -> Anonymous
 
-    run cHash command sender data txSkeleton [] 0L
+    run txSkeleton cHash command sender data [] 0L
     |> Result.map (fun (finalTxSkeleton, witnesses, totalCost) ->
         eventX "Running contract chain with cost: {totalCost}"
         >> setField "totalCost" totalCost
         |> Log.info
-        
+
         let tx =
             Transaction.fromTxSkeleton finalTxSkeleton
             |> Transaction.addWitnesses witnesses
 
         tx
     )
-

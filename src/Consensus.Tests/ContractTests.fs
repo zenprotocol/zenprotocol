@@ -70,9 +70,9 @@ let validateInputs (contract:Contract.T) utxos tx  =
 let compileRunAndValidate inputTx utxoSet code =
     compileAndCheck code
     |> Result.bind (fun contract ->
-        Contract.run contract "" Anonymous None List.empty inputTx
+        Contract.run contract inputTx "" Anonymous None List.empty
         |> Result.bind (fun (tx, _) ->
-            let cost = Contract.getCost contract "" Anonymous None List.empty inputTx
+            let cost = Contract.getCost contract inputTx "" Anonymous None List.empty
             tx
             |> TxSkeleton.checkPrefix inputTx
             |> Result.map (fun finalTxSkeleton ->
@@ -97,7 +97,7 @@ let ``Contract generated transaction should be valid``() =
 let ``Should get expected contract cost``() =
     (compile sampleContractCode
      |> Result.map (fun contract ->
-        Contract.getCost contract "" Anonymous None List.empty sampleInputTx)
+        Contract.getCost contract sampleInputTx "" Anonymous None List.empty)
     , (Ok 215L : Result<int64, string>))
     |> shouldEqual
 

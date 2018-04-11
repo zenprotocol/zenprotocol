@@ -38,7 +38,7 @@ let concat #_ #l1 #l2 a1 a2 =
   let fetch (i:nat{ i < (l1+l2)}) = if i < l1 then a1.(i) else a2.(i-l1) in
   init (l1+l2) fetch
 
-(** [concat3 a1 a2] returns an array containing the elements of a1 followed by the elements of a2 followed by the elements of a3. *)
+(** [concat3 a1 a2 a3] returns an array containing the elements of a1 followed by the elements of a2 followed by the elements of a3. *)
 val concat3(#a:Type)(#l1 #l2 #l3:nat): array a l1 -> array a l2 -> array a l3
   -> cost (array a (l1+l2+l3)) ((l1+l2+l3+1)*2)
 let concat3 #_ #l1 #l2 #l3 a1 a2 a3 =
