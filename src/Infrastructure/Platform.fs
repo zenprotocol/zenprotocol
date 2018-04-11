@@ -50,9 +50,10 @@ let combine a b = Path.Combine (a,b)
 
 let getFrameworkPath =
     match platform with
-    | PlatformID.Unix -> "/usr/lib/mono/4.6.2-api/"
-    | PlatformID.MacOSX -> "/Library/Frameworks/Mono.framework/Versions/Current/lib/mono/4.6.2-api/"
-    | _ -> @"C:\Windows\Microsoft.NET\Framework\v4.0.30319\"
+    | PlatformID.Unix -> "/usr/lib/mono/4.7-api/"
+    | PlatformID.MacOSX -> "/Library/Frameworks/Mono.framework/Versions/Current/lib/mono/4.7-api/"
+    | _ -> "C:\\Program Files (x86)\\Reference Assemblies\\Microsoft\\Framework\\.NETFramework\\v4.7\\"
+
 
 let private monoM =
     if isUnix then
