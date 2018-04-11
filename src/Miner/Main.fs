@@ -84,7 +84,7 @@ let handleEvent client (collection:Queue) event =
             |> collection.Add
         | _ -> ())
     |> Result.mapError (fun error ->
-        eventX "Miner could not get address due to {error}"
+        eventX "Miner could not get address: {error}"
         >> setField "error" error
         |> Log.info)
     |> ignore
@@ -103,7 +103,7 @@ let main busName chain =
             |> NewBlockTemplate
             |> collection.Add)
         |> Result.mapError (fun error ->
-            eventX "Miner could not get address due to {error}"
+            eventX "Miner could not get address: {error}"
             >> setField "error" error
             |> Log.info)
         |> ignore

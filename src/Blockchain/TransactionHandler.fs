@@ -94,7 +94,7 @@ let validateInputs chainParams session contractPath blockNumber txHash tx (state
 
                 return state
             | Error error ->
-                eventX "Transaction {hash} failed inputs validation:"
+                eventX "Transaction {hash} failed inputs validation: {error}"
                 >> setField "hash" (Hash.toString txHash)
                 >> setField "error" (error.ToString())
                 |> Log.info
