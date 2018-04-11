@@ -192,28 +192,21 @@ let sync tipBlockHash (getHeader:Hash -> BlockHeader) (getBlock:Hash -> Block) a
     // Find the fork block of the account and the blockchain, logging actions
     // to perform. Undo each block in the account's chain but not the blockchain,
     // and add each block in the blockchain but not the account's chain.
-    let rec locate ((x,i),(y,j)) =
-        writer {
-            if x = y && i = j then return ()
-            elif i > j
-            then
-                do! log (Add (getBlock x, x))
-                return! locate (((getHeader x).parent, i-1ul), (y,j))
-            elif i < j
-            then
-                do! log (Undo (getBlock y))
-                return! locate ((x,i), ((getHeader y).parent, j-1ul))
-            else
-                do! log (Add (getBlock x, x))
-                do! log (Undo (getBlock y))
-                return! locate (((getHeader x).parent, i-1ul), ((getHeader y).parent, j-1ul))
-        }
+    let rec locate ((x,i),(y,j)) acc =
 
-    let (actions, _) =
-        Writer.unwrap
-        <| locate ((tipBlockHash, blockNumber tipBlockHash), (account.tip, blockNumber account.tip))
-    let toUndo, toAddR = List.partition (function | Undo _ -> true | _ -> false) actions
-    let toAdd = List.rev toAddR     // Blocks to be added were found backwards.
+        if x = y && i = j then acc
+        elif i > j
+        then
+            locate (((getHeader x).parent, i-1ul), (y,j)) (Add (getBlock x, x) :: acc)
+        elif i < j
+        then
+            locate ((x,i), ((getHeader y).parent, j-1ul)) (Undo (getBlock y) :: acc)
+        else
+            locate (((getHeader x).parent, i-1ul), ((getHeader y).parent, j-1ul)) (Add (getBlock x, x) :: Undo (getBlock y) :: acc)
+
+    let actions = locate ((tipBlockHash, blockNumber tipBlockHash), (account.tip, blockNumber account.tip)) []
+    let toUndo, toAdd = List.partition (function | Undo _ -> true | _ -> false) actions
+    let toUndo = List.rev toUndo     // Blocks to be undo were found backwards.
     let sortedActions = toUndo @ toAdd
 
     List.fold

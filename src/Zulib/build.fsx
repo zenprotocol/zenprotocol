@@ -164,9 +164,9 @@ Target "Build" (fun _ ->
   let checker = FSharpChecker.Create()
 
   let frameworkDirectory =
-    if EnvironmentHelper.isLinux then ("/usr/lib/mono/4.6.2-api/")
-    elif EnvironmentHelper.isMacOS then ("/Library/Frameworks/Mono.framework/Versions/Current/lib/mono/4.6.2-api/")
-    else ("C:\\Program Files (x86)\\Reference Assemblies\\Microsoft\\Framework\\.NETFramework\\v4.6.2\\")
+    if EnvironmentHelper.isLinux then ("/usr/lib/mono/4.7-api/")
+    elif EnvironmentHelper.isMacOS then ("/Library/Frameworks/Mono.framework/Versions/Current/lib/mono/4.7-api/")
+    else ("C:\\Program Files (x86)\\Reference Assemblies\\Microsoft\\Framework\\.NETFramework\\v4.7\\")
 
   let fw = sprintf "%s%s" frameworkDirectory
 

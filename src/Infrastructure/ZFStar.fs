@@ -42,7 +42,7 @@ let private compile' path moduleName code =
                     "-r"; (+/) "System.Core.dll";
                     "-r"; (+/) "System.dll";
                     "-r"; (+/) "System.Numerics.dll";
-                    "-r"; "zulib" / "Zulib.dll";
+                    "-r"; "Zulib.dll";
                     //"-r"; "FsPickler.dll";
                     "-r"; "FSharp.Compatibility.OCaml.dll"|])
             if exitCode = 0 then
