@@ -46,7 +46,7 @@ let testParameters =
         sacrificePerByteBlock=1UL;
         genesisHash= get <| Hash.fromString "fa9f657a8216fbcadfab5bad334024cedefa455dfe509e01acf9af0c565b0da1";
         genesisTime=1517828985040UL
-        networkId=2003ul
+        networkId=2005ul
         contractSacrificePerBytePerBlock=ContractSacrificePerBytePerBlock
     }
 

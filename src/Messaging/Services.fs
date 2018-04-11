@@ -32,9 +32,9 @@ module Blockchain =
         | HandleMemPool of peerId:byte[] * Hash list
         | HandleTip of peerId:byte[] * Types.BlockHeader
         | ValidateNewBlockHeader of peerId:byte[] * Types.BlockHeader
-        | ValidateBlock of Types.Block
+        | ValidateBlock of peerId:byte[] * Types.Block
         | ValidateMinedBlock of Types.Block
-        | RequestHeaders of peerId:byte[] * blockHash:Hash * numberOfHeaders:uint16
+        | RequestHeaders of peerId:byte[] * startBlockHashes:Hash list * endBlockHash :Hash
         | HandleHeaders of peerId:byte[] * BlockHeader list
 
     type Request =
@@ -66,8 +66,8 @@ module Blockchain =
         ExecuteContract (cHash,command, sender, data, txSkeleton)
         |> Request.send<Request, Result<Transaction,string>> client serviceName
 
-    let validateBlock client block =
-        ValidateBlock block
+    let validateBlock client peerId block =
+        ValidateBlock (peerId, block)
         |> Command.send client serviceName
 
     let validateMinedBlock client block =
@@ -109,8 +109,8 @@ module Blockchain =
     let getBlockChainInfo client =
         Request.send<Request,BlochChainInfo> client serviceName GetBlockChainInfo
 
-    let requestHeaders client peerId blockHash numberOfHeaders=
-        RequestHeaders (peerId,blockHash,numberOfHeaders) |> Command.send client serviceName
+    let requestHeaders client peerId startBlockHash endBlockHash=
+        RequestHeaders (peerId,startBlockHash,endBlockHash) |> Command.send client serviceName
 
     let handleHeaders client peerId headers =
         HandleHeaders (peerId,headers) |> Command.send client serviceName
@@ -129,10 +129,12 @@ module Network =
         | SendBlock of peerId:byte[] * Block
         | GetTransaction of peerId:byte[] * Hash
         | GetBlock of Hash
-        | GetNewBlock of peerId:byte[] * Hash
+        | GetBlockFrom of peerId:byte[] * Hash
         | PublishBlock of BlockHeader
-        | GetHeaders of peerId:byte[] * blockHash:Hash * numberOfBlocks:uint16
+        | GetHeaders of peerId:byte[] * from:Hash list * toHash:Hash
         | SendHeaders of peerId:byte[] * BlockHeader list
+        | DisconnectPeer of peerId:byte[]
+        | GetTipFromAllPeers
 
     type Request =
         GetConnectionCount

@@ -79,7 +79,7 @@ let state = {
            activeContractSet=acs
            ema=ema
         }
-    blockRequests= Map.empty
+    initialBlockDownload = InitialBlockDownload.Inactive
     headers=0ul
 }
 
@@ -113,13 +113,13 @@ let createChainFromGenesis length nonce =
     createChain length nonce genesisBlock ema rootAccount
 
 let getGenesisState session =
-    BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state
+    BlockHandler.validateBlock chain session.context.contractPath session timestamp None genesisBlock false state
     |> Writer.unwrap
     |> snd
 
 let validateChain session blocks state =
     List.fold (fun (_,state) block ->
-        BlockHandler.validateBlock chain session.context.contractPath session block.header.timestamp block false state
+        BlockHandler.validateBlock chain session.context.contractPath session block.header.timestamp None block false state
         |> Writer.unwrap) ([], state) blocks
 
 [<Test>]
@@ -131,10 +131,10 @@ let ``genesis block accepted``() =
     let blockHash = Block.hash block.header
 
     let events, state' =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp None block false state
         |> Writer.unwrap
 
-    events |> should haveLength 2
+    events |> should haveLength 3
     events |> should contain (EffectsWriter.EventEffect (BlockAdded (blockHash,block)))
 
     BlockRepository.tryGetTip session
@@ -155,7 +155,7 @@ let ``wrong genesis block should be rejected``() =
     use session = DatabaseContext.createSession databaseContext
     let block = Block.createGenesis chain [rootTx] (0UL,1UL)
     let events, state' =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp None block false state
         |> Writer.unwrap
 
     events |> should haveLength 0
@@ -170,7 +170,7 @@ let ``validate new valid block which extended main chain``() =
     use session = DatabaseContext.createSession databaseContext
 
     let _, state =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp None genesisBlock false state
         |> Writer.unwrap
 
     let tx = createTransaction rootAccount
@@ -180,11 +180,11 @@ let ``validate new valid block which extended main chain``() =
 
     // Mark the block as new so we will also have network command
     let _, state =
-        BlockHandler.handleNewBlockHeader chain session (Array.empty) block.header state
+        BlockHandler.handleNewBlockHeader chain session timestamp (Array.empty) block.header state
         |> Writer.unwrap
 
     let events, state' =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp None block false state
         |> Writer.unwrap
 
     events |> should haveLength 3
@@ -209,7 +209,7 @@ let ``validate new invalid block which try to extended main chain``() =
     use session = DatabaseContext.createSession databaseContext
 
     let _, state =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp None genesisBlock false state
         |> Writer.unwrap
 
     let tx = createTransaction (fst rootAccountData)
@@ -218,11 +218,11 @@ let ``validate new invalid block which try to extended main chain``() =
 
     // Mark the block as new so we will also have network command
     let _, state =
-        BlockHandler.handleNewBlockHeader chain session (Array.empty) block.header state
+        BlockHandler.handleNewBlockHeader chain session timestamp (Array.empty) block.header state
         |> Writer.unwrap
 
     let events, state' =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp None block false state
         |> Writer.unwrap
 
     events |> should haveLength 0
@@ -243,7 +243,7 @@ let ``validating orphan block yield a request for block from network``() =
     let block = Block.createTemplate chain genesisBlock.header timestamp state.tipState.ema acs [tx] Hash.zero
 
     let events, state' =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp None block false state
         |> Writer.unwrap
 
     events |> should haveLength 1
@@ -269,17 +269,19 @@ let ``validate new block which connect orphan chain which extend main chain``() 
 
     // Sending orphan block first
     let _, state =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp None block false state
         |> Writer.unwrap
 
     // Now sending the genesis, which should roll forward the chain
     let events, state' =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp None genesisBlock false state
         |> Writer.unwrap
 
-    events |> should haveLength 3
+    events |> should haveLength 4
     events |> should contain (EffectsWriter.EventEffect (BlockAdded (genesisBlockHash,genesisBlock)))
     events |> should contain (EffectsWriter.EventEffect (BlockAdded (blockHash,block)))
+    events |> should contain (EffectsWriter.NetworkCommand (PublishBlock block.header))
+    events |> should contain (EffectsWriter.EventEffect (TipChanged block.header))
 
     BlockRepository.tryGetTip session
     |> should equal (Some (state'.tipState.tip,
@@ -361,12 +363,14 @@ let ``orphan chain become longer than main chain``() =
                            state.tipState.activeContractSet,
                            state.tipState.ema))
 
-    events |> should haveLength 6
+    events |> should haveLength 7
     events.[0] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock alternativeChain.[1])))
     events.[1] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock alternativeChain.[0])))
     events.[2] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock mainChain.[0])))
     events.[3] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock mainChain.[1])))
     events.[4] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock mainChain.[2])))
+    events.[5] |> should equal (EffectsWriter.NetworkCommand (PublishBlock tip.header))
+    events.[6] |> should equal (EffectsWriter.EventEffect (TipChanged tip.header))
 
     state.tipState.tip.status |> should equal ExtendedBlockHeader.MainChain
     state.tipState.tip.header |> should equal tip.header
@@ -394,12 +398,13 @@ let ``new block extend fork chain which become longest``() =
 
     let tip = List.last mainChain
 
-    events |> should haveLength 4
+    events |> should haveLength 5
 
     events.[0] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock alternativeChain.[0])))
     events.[1] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock mainChain.[0])))
     events.[2] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock mainChain.[1])))
-    events.[3] |> should equal (EffectsWriter.EventEffect (TipChanged state.tipState.tip.header))
+    events.[3] |> should equal (EffectsWriter.NetworkCommand (PublishBlock tip.header))
+    events.[4] |> should equal (EffectsWriter.EventEffect (TipChanged tip.header))
 
     state.tipState.tip.header |> should equal tip.header
     state.memoryState.utxoSet |> should equal UtxoSet.asDatabase
@@ -431,13 +436,14 @@ let ``2 orphan chains, one become longer than main chain``() =
 
     let tip = List.last sideChain2
 
-    events |> should haveLength 6
+    events |> should haveLength 7
     events.[0] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock mainChain.[1])))
     events.[1] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock mainChain.[0])))
     events.[2] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock orphanBlock)))
     events.[3] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock sideChain2.[0])))
     events.[4] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock sideChain2.[1])))
-    events.[5] |> should equal (EffectsWriter.EventEffect (TipChanged state.tipState.tip.header))
+    events.[5] |> should equal (EffectsWriter.NetworkCommand (PublishBlock state.tipState.tip.header))
+    events.[6] |> should equal (EffectsWriter.EventEffect (TipChanged state.tipState.tip.header))
 
     state.tipState.tip.header |> should equal tip.header
     state.memoryState.utxoSet |> should equal UtxoSet.asDatabase
@@ -469,14 +475,15 @@ let ``2 orphan chains, two longer than main, one is longer``() =
 
     let tip = List.last sideChain2
 
-    events |> should haveLength 7
+    events |> should haveLength 8
     events.[0] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock mainChain.[1])))
     events.[1] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock mainChain.[0])))
     events.[2] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock orphanBlock)))
     events.[3] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock sideChain2.[0])))
     events.[4] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock sideChain2.[1])))
     events.[5] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock sideChain2.[2])))
-    events.[6] |> should equal (EffectsWriter.EventEffect (TipChanged state.tipState.tip.header))
+    events.[6] |> should equal (EffectsWriter.NetworkCommand (PublishBlock tip.header))
+    events.[7] |> should equal (EffectsWriter.EventEffect (TipChanged tip.header))
 
     state.tipState.tip.header |> should equal tip.header
     state.memoryState.utxoSet |> should equal UtxoSet.asDatabase
@@ -510,13 +517,14 @@ let ``2 orphan chains, two longer than main, longest is invalid, should pick sec
 
     let tip = List.last sideChain2
 
-    events |> should haveLength 6
+    events |> should haveLength 7
     events.[0] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock mainChain.[1])))
     events.[1] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock mainChain.[0])))
     events.[2] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock orphanBlock)))
     events.[3] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock sideChain2.[0])))
     events.[4] |> should equal (EffectsWriter.EventEffect (BlockAdded (hashBlock sideChain2.[1])))
-    events.[5] |> should equal (EffectsWriter.EventEffect (TipChanged state.tipState.tip.header))
+    events.[5] |> should equal (EffectsWriter.NetworkCommand (PublishBlock state.tipState.tip.header))
+    events.[6] |> should equal (EffectsWriter.EventEffect (TipChanged state.tipState.tip.header))
 
     state.tipState.tip.header |> should equal tip.header
     state.memoryState.utxoSet |> should equal UtxoSet.asDatabase
@@ -618,10 +626,10 @@ let ``block with a contract activation is added to chain``() =
     let block = Block.createTemplate chain genesisBlock.header timestamp state.tipState.ema acs [tx] Hash.zero
 
     let events, state' =
-            BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state
+            BlockHandler.validateBlock chain session.context.contractPath session timestamp None block false state
             |> Writer.unwrap
 
-    events |> should haveLength 2
+    events |> should haveLength 3
     events |> should contain (EffectsWriter.EventEffect (BlockAdded (hashBlock block)))
 
     let tip = BlockRepository.tryGetTip session
@@ -645,32 +653,11 @@ let ``validate new block header should ask for block``() =
         |> List.head
 
     let events, _ =
-        BlockHandler.handleNewBlockHeader chain session Array.empty block.header state
+        BlockHandler.handleNewBlockHeader chain session timestamp Array.empty block.header state
         |> Writer.unwrap
 
     events |> should haveLength 1
-    events.[0] |> should equal (EffectsWriter.NetworkCommand (GetNewBlock (Array.empty,(Block.hash block.header))))
-
-[<Test>]
-let ``validate new block header which we already asked for``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
-
-    use session = DatabaseContext.createSession databaseContext
-    let state = getGenesisState session
-
-    let block =
-        createChainFromGenesis 1 0
-        |> fst
-        |> List.head
-
-    let _, state =
-        BlockHandler.handleNewBlockHeader chain session Array.empty block.header state
-        |> Writer.unwrap
-    let events, _ =
-        BlockHandler.handleNewBlockHeader chain session Array.empty block.header state
-        |> Writer.unwrap
-
-    events |> should haveLength 0
+    events.[0] |> should equal (EffectsWriter.NetworkCommand (GetBlockFrom (Array.empty,(Block.hash block.header))))
 
 [<Test>]
 let ``new block should publish to network``() =
@@ -685,10 +672,10 @@ let ``new block should publish to network``() =
         |> List.head
 
     let _, state =
-        BlockHandler.handleNewBlockHeader chain session Array.empty block.header state
+        BlockHandler.handleNewBlockHeader chain session timestamp Array.empty block.header state
         |> Writer.unwrap
     let events, _ =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp None block false state
         |> Writer.unwrap
 
     events |> should contain (EffectsWriter.NetworkCommand (PublishBlock block.header))
@@ -706,7 +693,7 @@ let ``mined block should publish to network``() =
         |> List.head
 
     let events, _ =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp block true state
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp None block true state
         |> Writer.unwrap
 
     events |> should contain (EffectsWriter.NetworkCommand (PublishBlock block.header))
@@ -724,53 +711,11 @@ let ``validate new tip should ask for block``() =
         |> List.head
 
     let events, _ =
-        BlockHandler.handleTip chain session Array.empty block.header state
+        BlockHandler.handleTip chain session timestamp Array.empty block.header state
         |> Writer.unwrap
 
     events |> should haveLength 1
-    events.[0] |> should equal (EffectsWriter.NetworkCommand (GetBlock (Block.hash block.header)))
-
-[<Test>]
-let ``validate new tip which we already asked for``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
-
-    use session = DatabaseContext.createSession databaseContext
-    let state = getGenesisState session
-
-    let block =
-        createChainFromGenesis 1 0
-        |> fst
-        |> List.head
-
-    let _, state =
-        BlockHandler.handleTip chain session Array.empty block.header state
-        |> Writer.unwrap
-    let events, _ =
-        BlockHandler.handleTip chain session Array.empty block.header state
-        |> Writer.unwrap
-
-    events |> should haveLength 0
-
-[<Test>]
-let ``tip block should not be publish to network``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
-
-    use session = DatabaseContext.createSession databaseContext
-    let state = getGenesisState session
-
-    let block =
-        createChainFromGenesis 1 0
-        |> fst
-        |> List.head
-
-    let _, state =
-        BlockHandler.handleTip chain session Array.empty block.header state
-        |> Writer.unwrap
-    let events, _ =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp block false state
-        |> Writer.unwrap
-
-    events |> should not' (contain (EffectsWriter.NetworkCommand (PublishBlock block.header)))
+    events.[0] |> should equal (EffectsWriter.NetworkCommand (GetBlockFrom (Array.empty, (Block.hash block.header))))
 
 [<Test>]
 let ``Valid template for two transactions which don't depend on each other``() =
@@ -778,7 +723,7 @@ let ``Valid template for two transactions which don't depend on each other``() =
     use session = DatabaseContext.createSession databaseContext
 
     let _, genesisState =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp None genesisBlock false state
         |> Writer.unwrap
 
     let balances = Account.getBalance rootAccount
@@ -796,7 +741,7 @@ let ``Valid template for two transactions which don't depend on each other``() =
     ema''.delayed.Length |> should equal 2
 
     let _, splitState =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp splitBlock false genesisState
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp None splitBlock false genesisState
         |> Writer.unwrap
     let splitOutputs = Account.getUnspentOutputs account |> fst
 
@@ -822,7 +767,7 @@ let ``Valid template for two transactions which don't depend on each other``() =
     let twoTxBlock = Block.createTemplate chain splitBlock.header (timestamp+100UL) splitState.tipState.ema acs [tx1;tx2] Hash.zero
     let oldHash = splitState.tipState.tip.hash
     let _, withTxsState =
-        BlockHandler.validateBlock chain session.context.contractPath session (timestamp+100UL) twoTxBlock false splitState
+        BlockHandler.validateBlock chain session.context.contractPath session (timestamp+100UL) None twoTxBlock false splitState
         |> Writer.unwrap
     withTxsState.tipState.tip.hash |> should not' (equal oldHash)
     withTxsState.tipState.tip.hash |> should equal (Block.hash twoTxBlock.header)
@@ -833,7 +778,7 @@ let ``Two transactions in the same block which depend on each other are valid``(
     use session = DatabaseContext.createSession databaseContext
 
     let _, genesisState =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp None genesisBlock false state
         |> Writer.unwrap
 
     let balances = Account.getBalance rootAccount
@@ -851,7 +796,7 @@ let ``Two transactions in the same block which depend on each other are valid``(
     let oldHash = genesisState.tipState.tip.hash
 
     let _, twoTxState =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp twoTxBlock false genesisState
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp None twoTxBlock false genesisState
         |> Writer.unwrap
     twoTxState.tipState.tip.hash |> should not' (equal oldHash)
     twoTxState.tipState.tip.hash |> should equal (Block.hash twoTxBlock.header)
@@ -862,7 +807,7 @@ let ``Two transactions in the same block which depend on each other are invalid 
     use session = DatabaseContext.createSession databaseContext
 
     let _, genesisState =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp None genesisBlock false state
         |> Writer.unwrap
 
     let balances = Account.getBalance rootAccount
@@ -880,7 +825,7 @@ let ``Two transactions in the same block which depend on each other are invalid 
     let oldHash = genesisState.tipState.tip.hash
 
     let _, twoTxState =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp twoTxBlock false genesisState
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp None twoTxBlock false genesisState
         |> Writer.unwrap
     twoTxState.tipState.tip.hash |> should not' (equal (Block.hash twoTxBlock.header))
     twoTxState.tipState.tip.hash |> should equal oldHash
@@ -891,7 +836,7 @@ let ``Template builder uses two transactions in the same block which depend on e
     use session = DatabaseContext.createSession databaseContext
 
     let _, genesisState =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp None genesisBlock false state
         |> Writer.unwrap
 
     let balances = Account.getBalance rootAccount
@@ -912,7 +857,7 @@ let ``Template builder uses two transactions in the same block which depend on e
     let twoTxBlock = Block.createTemplate chain genesisBlock.header (timestamp+1UL) ema' memState.activeContractSet validatedTransactions Hash.zero
     let oldHash = genesisState.tipState.tip.hash
     let _, twoTxState =
-        BlockHandler.validateBlock chain session.context.contractPath session (timestamp+1UL) twoTxBlock false genesisState
+        BlockHandler.validateBlock chain session.context.contractPath session (timestamp+1UL) None twoTxBlock false genesisState
         |> Writer.unwrap
     twoTxState.tipState.tip.hash |> should not' (equal oldHash)
     twoTxState.tipState.tip.hash |> should equal (Block.hash twoTxBlock.header)
@@ -924,7 +869,7 @@ let ``Out of order dependent transactions are rearranged``() =
     use session = DatabaseContext.createSession databaseContext
 
     let _, genesisState =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp genesisBlock false state
+        BlockHandler.validateBlock chain session.context.contractPath session timestamp None genesisBlock false state
         |> Writer.unwrap
 
     let balances = Account.getBalance rootAccount

@@ -13,6 +13,7 @@ let main dataPath chainParams busName =
     Actor.create<Command,Request,Event,State> busName serviceName (fun poller sbObservable ebObservable  ->
         let publisher = EventBus.Publisher.create<Event> busName
         let client = ServiceBus.Client.create busName
+        let ticker = Timer.create 1000<milliseconds>
 
         let sbObservable =
             sbObservable
@@ -25,6 +26,11 @@ let main dataPath chainParams busName =
         let ebObservable =
             ebObservable
             |> Observable.map Handler.handleEvent
+
+        let tickerObservable =
+            Poller.addTimer poller ticker
+            |> Observable.map (fun _ ->
+                Handler.tick chainParams)
 
         let databaseContext = DatabaseContext.create dataPath
 
@@ -62,12 +68,13 @@ let main dataPath chainParams busName =
             {
                 memoryState = memoryState;
                 tipState = tipState;
-                blockRequests= Map.empty;
                 headers=tip.header.blockNumber
+                initialBlockDownload = InitialBlockDownload.Inactive
             }
 
         let observable =
             Observable.merge sbObservable ebObservable
+            |> Observable.merge tickerObservable
             |> Observable.scan (fun state handler ->
                 use session = DatabaseContext.createSession databaseContext
                 let effectWriter = handler session (Timestamp.now ()) state

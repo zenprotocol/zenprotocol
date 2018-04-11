@@ -96,8 +96,8 @@ type NewBlock =
         byte[]
 
 type GetHeaders = {
-        blockHash : byte[]
-        numberOfHeaders : uint16
+        from : byte[]
+        endHash : byte[]
     }
 
 type Headers =
@@ -356,26 +356,28 @@ module NewBlock =
 
 
 module GetHeaders =
-    let blockHashSize = 32
+    let endHashSize = 32
     let getMessageSize (msg:GetHeaders) =
         0 +
+            4 + Array.length msg.from +
             32 +
-            2 +
             0
 
     let write (msg:GetHeaders) stream =
         stream
-        |> Stream.writeBytes msg.blockHash 32
-        |> Stream.writeNumber2 msg.numberOfHeaders
+        |> Stream.writeNumber4 (uint32 (Array.length msg.from))
+        |> Stream.writeBytes msg.from (Array.length msg.from)
+        |> Stream.writeBytes msg.endHash 32
 
     let read =
         reader {
-            let! blockHash = Stream.readBytes 32
-            let! numberOfHeaders = Stream.readNumber2
+            let! fromLength = Stream.readNumber4
+            let! from = Stream.readBytes (int fromLength)
+            let! endHash = Stream.readBytes 32
 
             return ({
-                        blockHash = blockHash;
-                        numberOfHeaders = numberOfHeaders;
+                        from = from;
+                        endHash = endHash;
                     }: GetHeaders)
         }
 

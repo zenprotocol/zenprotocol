@@ -45,6 +45,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="InitialBlockDownloadTests.fs" />
     <Compile Include="ValidateBlockTests.fs" />
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="ContractMessageTests.fs" />

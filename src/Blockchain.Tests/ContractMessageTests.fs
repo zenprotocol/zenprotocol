@@ -41,7 +41,7 @@ let mutable state = {
             activeContractSet = acs
             ema=EMA.create chain
         }
-    blockRequests= Map.empty
+    initialBlockDownload = InitialBlockDownload.Inactive
     headers = 0ul
 }
 
@@ -54,7 +54,7 @@ let shouldBeErrorMessage message =
 
 let activateContract code account session state =
     let (account:Account.T), secretKey = account
-    let account = { account with mempool = Map.toList state.memoryState.mempool }
+    let account = { account with mempool = MemPool.toList state.memoryState.mempool }
 
     let accountData = account, secretKey
     Account.createActivateContractTransaction chain code 1ul accountData

@@ -473,8 +473,8 @@ let ``NewBlock size fits stream ``() =
 [<Test>]
 let ``send and recv GetHeaders``() =
     let msg = GetHeaders {
-        blockHash = Array.create 32 123uy;
-        numberOfHeaders = 123us;
+        from = "Captcha Diem"B;
+        endHash = Array.create 32 123uy;
     }
 
     use server = Socket.dealer ()
@@ -492,8 +492,8 @@ let ``send and recv GetHeaders``() =
 [<Test>]
 let ``GetHeaders size fits stream ``() =
     let getheaders:GetHeaders = {
-        blockHash = Array.create 32 123uy;
-        numberOfHeaders = 123us;
+        from = "Captcha Diem"B;
+        endHash = Array.create 32 123uy;
     }
 
     let messageSize = GetHeaders.getMessageSize getheaders

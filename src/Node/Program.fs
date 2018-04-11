@@ -62,7 +62,7 @@ let getChain (config:Config) =
     | "main" -> Main
     | "test" -> Test
     | _ -> Local
-    
+
 [<EntryPoint>]
 let main argv =
     let errorHandler = ProcessExiter(colorizer = function ErrorCode.HelpText -> None | _ -> Some ConsoleColor.Red)
@@ -184,7 +184,7 @@ let main argv =
 
         use client = ServiceBus.Client.create busName
 
-        Messaging.Services.Blockchain.validateBlock client block
+        Messaging.Services.Blockchain.validateMinedBlock client block
 
     use event = new Threading.ManualResetEvent(false)
 

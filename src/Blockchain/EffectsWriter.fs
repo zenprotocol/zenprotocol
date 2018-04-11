@@ -32,8 +32,8 @@ let getBlock blockHash =
     let command = Network.GetBlock blockHash
     Writer([NetworkCommand command],())
 
-let getNewBlock peerId blockHash =
-    let command = Network.GetNewBlock (peerId, blockHash)
+let getBlockFrom peerId blockHash =
+    let command = Network.GetBlockFrom (peerId,blockHash)
     Writer([NetworkCommand command],())
 
 let sendTip peerId blockHeader =
@@ -52,8 +52,16 @@ let sendHeaders peerId headers =
     let command = Network.SendHeaders (peerId, headers)
     Writer([NetworkCommand command],())
 
-let getHeaders peerId blockHash numberOfBlocks =
-    let command = Network.GetHeaders (peerId, blockHash, numberOfBlocks)
+let getHeaders peerId startHash endHash =
+    let command = Network.GetHeaders (peerId, startHash, endHash)
+    Writer([NetworkCommand command],())
+
+let disconnectPeer peerId =
+    let command = Network.DisconnectPeer peerId
+    Writer([NetworkCommand command],())
+
+let getTipsFromAllPeers =
+    let command = Network.GetTipFromAllPeers
     Writer([NetworkCommand command],())
 
 let run (Writer (effects, x)) publisher client =
