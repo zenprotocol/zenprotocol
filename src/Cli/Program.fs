@@ -75,7 +75,7 @@ type Arguments =
             | History _ -> "list wallet transactions"
             | Address _ -> "get wallet address"
             | Resync _ -> "resync wallet"
-            | Import _ -> "import wallet seed from mnemonic sentence"
+            | Import _ -> "import wallet seed from mnemonic sentence. \n First word is the password and the rest are the mnemonic phrase"
             | Send _ -> "send asset to address"
             | Activate _ -> "activate contract"
             | Extend _ -> "extend contract activation"
@@ -108,10 +108,10 @@ let main argv =
         sprintf "http://127.0.0.1:%d/%s" port
 
     let exit error = (errorHandler :> IExiter).Exit(error, ErrorCode.AppSettings (*=1*))
-       
+
     let getResponse (response : HttpResponse) =
         let text =
-            match response.Body with 
+            match response.Body with
             | Text text -> text
             | Binary bytes -> Text.Encoding.ASCII.GetString bytes
 
@@ -173,13 +173,15 @@ let main argv =
             |> Http.Request
             |> printResponse
         | Some (Import args) ->
-            let words = args.GetResult <@ Import_Arguments @>
-            printfn "Enter password:"
-            let password = Console.ReadLine()
-            "wallet/import"
-            |> getUri
-            |> (new ImportSeedJson.Root(password, List.toArray words)).JsonValue.Request
-            |> printResponse
+            match args.GetResult <@ Import_Arguments @> with
+            | [_]
+            | [] -> printfn "Must include a password and list of words"
+            | password :: words ->
+                "wallet/import"
+                |> getUri
+                |> (new ImportSeedJson.Root(password, List.toArray words)).JsonValue.Request
+                |> printResponse
+
         | Some (Activate args) ->
             let file, numberOfBlocks, password = args.GetResult <@ ActivateContract_Arguments @>
 
@@ -195,7 +197,7 @@ let main argv =
                             .JsonValue.Request
                         |> getResponse
                         |> ContractActivateResponseJson.Parse
-                        
+
                     printfn "Contract activated.\nAddress: %s\nHash: %s" result.Address result.Hash
         | Some (Extend args) ->
             let address, numberOfBlocks, password = args.GetResult <@ ExtendContract_Arguments @>
@@ -206,7 +208,7 @@ let main argv =
                 .JsonValue.Request
             |> printResponse
         | Some (Execute args) ->
-            let address, command, data, asset, assetType, amount, password = 
+            let address, command, data, asset, assetType, amount, password =
                 args.GetResult <@ ExecuteContract_Arguments @>
             "wallet/contract/execute"
             |> getUri
@@ -256,5 +258,5 @@ let main argv =
         exit (ex.Flatten().InnerException.Message)
     | ex ->
         exit ex.Message
-    
+
     0
