@@ -159,6 +159,10 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
 
         requestId.reply headers
 
+    | GetMempool ->
+        let txs = MemPool.toList state.memoryState.mempool
+        requestId.reply txs
+
     | GetBlockChainInfo ->
         let tip = state.tipState.tip.header
 

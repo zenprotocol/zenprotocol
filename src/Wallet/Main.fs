@@ -14,7 +14,7 @@ open Result
 open System
 open Logary.Message
 
-let eventHandler event _ _ account =
+let eventHandler event dataAccess session account =
     account
     |> Option.map (
         match event with
@@ -25,6 +25,9 @@ let eventHandler event _ _ account =
         | BlockRemoved (_,block) ->
             Account.undoBlock block
         | _ -> id)
+    |> Option.map (fun account ->
+        DataAccess.Account.put dataAccess session account
+        account)
 
 let private sync client account =
     match Blockchain.getTip client with
@@ -42,7 +45,7 @@ let private sync client account =
     | _ -> account
 
 
-let commandHandler client command _ _ account =
+let commandHandler client command dataAccess session  account =
     match account with
     | None ->
         eventX "Could not handle {command} - no account"
@@ -51,11 +54,18 @@ let commandHandler client command _ _ account =
         account
     | Some account ->
         match command with
-        | Resync -> 
-            { account with deltas = List.empty; outputs=Map.empty; tip = Hash.zero; blockNumber = 0ul }
+        | Resync ->
+            { account with deltas = List.empty; outputs=Map.empty; tip = Hash.zero; blockNumber = 0ul; mempool = List.empty }
             |> sync client
+            |> fun account ->
+                let txs = Blockchain.getMempool client
+                List.fold (fun account (txHash, tx) ->
+                    Account.addTransaction txHash tx account) account txs
+            |> fun account ->
+                DataAccess.Account.put dataAccess session account
+                account
             |> Some
-            
+
 let private reply<'a> (requestId:RequestId) (value : Result<'a,string>) =
     requestId.reply value
 
@@ -101,7 +111,12 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
         |> reply<TransactionsResponse> requestId
         account
     | ImportSeed (words, password) ->
-        Account.import words password
+        let tipHash, tipBlockNumber =
+            match Blockchain.getTip client with
+            | Some (blockHash,header) -> blockHash, header.blockNumber
+            | None -> Hash.zero, 0ul
+
+        Account.import words password tipHash tipBlockNumber
         <@> fun (account, secured) ->
                 DataAccess.Account.put dataAccess session account
                 DataAccess.Secured.put dataAccess session secured
@@ -151,7 +166,7 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
     | CheckPassword password ->
         match unlockAccount password with
         | Ok _ -> Ok true
-        | Error error when error = Security.BadPassword -> Ok false 
+        | Error error when error = Security.BadPassword -> Ok false
         | Error error -> Error error
         |> reply<bool> requestId
         account

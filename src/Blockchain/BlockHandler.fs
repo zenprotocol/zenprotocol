@@ -210,7 +210,7 @@ let getMemoryState chainParams session contractPath blockNumber mempool orphanPo
 
     let memoryState = TransactionHandler.validateOrphanTransactions chainParams session contractPath blockNumber memoryState
 
-    Map.fold (fun writer txHash tx ->
+    Map.fold (fun writer txHash (_,tx) ->
         Writer.bind writer (fun memoryState ->
 
             TransactionHandler.validateInputs chainParams session contractPath blockNumber txHash tx memoryState false)) memoryState mempool

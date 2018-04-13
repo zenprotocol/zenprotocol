@@ -46,6 +46,7 @@ module Blockchain =
         | GetActiveContracts
         | GetBlockChainInfo
         | GetHeaders
+        | GetMempool
 
     type Response = unit
 
@@ -116,6 +117,9 @@ module Blockchain =
 
     let getHeaders client =
         GetHeaders |> Request.send<Request, BlockHeader list> client serviceName
+
+    let getMempool client =
+        GetMempool |> Request.send<Request, (Hash.Hash * Transaction) list> client serviceName
 
 module Network =
     type Command =

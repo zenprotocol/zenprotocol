@@ -14,15 +14,15 @@ let getUTXO = UtxoSetRepository.get
 // use of the UTXOs is to dereference all the outputs.
 let weights session state =
     let resMap =
-        Map.map
-            (fun _ tx ->
-                (tx, Weight.transactionWeight (getUTXO session) state.memoryState.utxoSet tx))
-            state.memoryState.mempool    
+        MemPool.toList state.memoryState.mempool
+        |> List.map
+            (fun (txHash,tx) ->
+                txHash,tx, Weight.transactionWeight (getUTXO session) state.memoryState.utxoSet tx)
+
     resMap
-    |> Map.toList
     |> fun sq ->
             [
-            for (txHash, (tx, wtRes)) in sq do
+            for (txHash, tx, wtRes) in sq do
                 match wtRes with
                 | Ok wt -> yield (txHash, tx, wt)
                 | _ -> ()
