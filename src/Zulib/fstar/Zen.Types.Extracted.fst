@@ -51,4 +51,4 @@ unopteq type blockHeader = {
     difficulty: U32.t;
     nonce: nonce }
 
-type wallet = list pointedOutput
+
