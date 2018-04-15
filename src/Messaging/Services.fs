@@ -147,7 +147,6 @@ module Wallet =
 
     type Command =
         | Resync
-        | Lock
 
     type Request =
         | GetAddressPKHash
@@ -155,13 +154,12 @@ module Wallet =
         | GetTransactions
         | GetBalance
         | ImportSeed of string list * string
-        | Spend of Hash * Spend
-        | ActivateContract of string*uint32
-        | ExecuteContract of Hash * string * data option * provideReturnAddress:bool * sign:string option * Map<Asset, uint64>
+        | Send of Hash * Spend * string
+        | ActivateContract of string * uint32 * string
+        | ExecuteContract of Hash * string * data option * provideReturnAddress:bool * sign:string option * Map<Asset, uint64> * string
         | AccountExists
-        | AccountLocked
-        | Unlock of string
-        | GetPublicKey of string
+        | CheckPassword of string
+        | GetPublicKey of string * string
 
     let serviceName = "wallet"
 
@@ -177,14 +175,14 @@ module Wallet =
     let getAddress client =
         send<string> client serviceName GetAddress
 
-    let createTransaction client address spend =
-        send<Transaction> client serviceName (Spend (address, spend))
+    let createTransaction client address spend password =
+        send<Transaction> client serviceName (Send (address, spend, password))
 
-    let activateContract client code numberOfBlocks =
-        send<ActivateContractResponse> client serviceName (ActivateContract (code,numberOfBlocks))
+    let activateContract client code numberOfBlocks password =
+        send<ActivateContractResponse> client serviceName (ActivateContract (code, numberOfBlocks, password))
 
-    let executeContract client address command data provideReturnAddress sign spends  =
-        send<Transaction> client serviceName (ExecuteContract (address,command,data,provideReturnAddress,sign,spends))
+    let executeContract client address command data provideReturnAddress sign spends password =
+        send<Transaction> client serviceName (ExecuteContract (address, command, data, provideReturnAddress, sign, spends, password))
 
     let importSeed client words password =
         send<unit> client serviceName (ImportSeed (words, password))
@@ -195,17 +193,11 @@ module Wallet =
     let accountExists client =
         send<bool> client serviceName AccountExists
 
-    let accountLocked client =
-        send<bool> client serviceName AccountLocked
-
-    let lock client =
-        Command.send client serviceName Lock
-
-    let unlock client password =
-        send<unit> client serviceName (Unlock password)
+    let checkPassword client password =
+        send<bool> client serviceName (CheckPassword password)
 
     let resyncAccount client =
         Command.send client serviceName Resync
 
-    let getPublicKey client path =
-        Request.send<Request, Result<Crypto.PublicKey,string>> client serviceName (GetPublicKey path)
+    let getPublicKey client path password =
+        Request.send<Request, Result<Crypto.PublicKey,string>> client serviceName (GetPublicKey (path, password))

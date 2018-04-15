@@ -13,39 +13,19 @@ open Result
 open System
 open Logary.Message
 
-type AccountData = Account.T Option * ExtendedKey.T Option
+let eventHandler event _ _ account =
+    account
+    |> Option.map (
+        match event with
+        | TransactionAddedToMemPool (txHash,tx) ->
+            Account.addTransaction txHash tx
+        | BlockAdded (blockHash,block) ->
+            Account.handleBlock blockHash block
+        | BlockRemoved (_,block) ->
+            Account.undoBlock block
+        | _ -> id)
 
-let checkWallet =
-    function
-    | Some wallet -> Ok (wallet)
-    | _ -> Error "no wallet"
-
-let eventHandler event _ _ (account, extendedKey) =
-    let checkWallet = checkWallet account
-
-    (match event with
-    | TransactionAddedToMemPool (txHash,tx) ->
-        checkWallet
-        <@> Account.addTransaction txHash tx
-    | BlockAdded (blockHash,block) ->
-        checkWallet
-        <@> Account.handleBlock blockHash block
-    | BlockRemoved (_,block) ->
-        checkWallet
-        <@> Account.undoBlock block
-    | _ -> Error ""
-    |> function
-    | Ok account -> Some account
-    | Error error ->
-        if error <> "" then
-            eventX "Could not handle event {event} due to {error}"
-            >> setField "event" (event.GetType().Name)
-            >> setField "error" error
-            |> Log.info
-
-        account), extendedKey
-
-let private sync chainParams client account =
+let private sync client account =
     match Blockchain.getTip client with
     | Some (blockHash,header) when blockHash <> account.tip ->
         account
@@ -57,150 +37,121 @@ let private sync chainParams client account =
             >> setField "blockNumber" header.blockNumber
             >> setField "blockHash" (Hash.toString blockHash)
             |> Log.info
-
             account
     | _ -> account
 
-let checkWalletSecured wallet extendedKey =
-    checkWallet wallet
-    >>= fun wallet ->
-        match extendedKey with
-        | Some extendedKey -> Ok (wallet, extendedKey)
-        | None -> Error "wallet locked"
 
-let commandHandler chain client command _ _ (account, extendedKey) =
-    let chainParams = Consensus.Chain.getChainParameters chain
-    let checkWallet = checkWallet account
-    (match command with
-    | Resync ->
-        let resetAccount account = { account with deltas = List.empty; outputs=Map.empty; tip = Hash.zero; blockNumber = 0ul }
-        checkWallet
-        <@> (resetAccount >> sync chainParams client)
-        <@> fun account -> Some account, extendedKey
-    | Lock->
-        eventX "Account locked"
+let commandHandler client command _ _ account =
+    match account with
+    | None ->
+        eventX "Could not handle {command} - no account"
+        >> setField "command" (command.ToString())
         |> Log.info
-
-        Ok (account, None)
-    |> function
-    | Ok ret -> ret
-    | Error error ->
-        if error <> "" then
-            eventX "Could not handle command {command} due to {error}"
-            >> setField "command" (command.GetType().Name)
-            >> setField "error" error
-            |> Log.info
-
-        account, extendedKey)
-
+        account
+    | Some account ->
+        match command with
+        | Resync -> 
+            { account with deltas = List.empty; outputs=Map.empty; tip = Hash.zero; blockNumber = 0ul }
+            |> sync client
+            |> Some
+            
 let private reply<'a> (requestId:RequestId) (value : Result<'a,string>) =
     requestId.reply value
 
-let requestHandler chain client (requestId:RequestId) request dataAccess session (wallet, extendedKey) =
+let requestHandler chain client (requestId:RequestId) request dataAccess session account =
     let chainParams = Consensus.Chain.getChainParameters chain
-    let checkWallet = checkWallet wallet
-    let checkWalletSecured = checkWalletSecured wallet extendedKey
+    let getAccount =
+        match account with
+        | Some account -> Ok account
+        | _ -> Error "No account"
+    let unlockAccount password =
+        getAccount
+        >>= fun account ->
+            match DataAccess.Secured.tryGet dataAccess session with
+            | Some secured ->
+                Secured.decrypt password secured
+                <@> fun extendedKey -> account, extendedKey
+            | None ->
+                Error "Could not unlock account - no data"
 
     match request with
     | GetBalance ->
-        checkWallet
+        getAccount
         <@> Account.getBalance
         |> reply<BalanceResponse> requestId
-        wallet, extendedKey
+        account
     | GetAddressPKHash ->
-        checkWallet
-        <@> fun wallet -> wallet.publicKey
+        getAccount
+        <@> fun account -> account.publicKey
                           |> PublicKey.hash
         |> reply<Hash.Hash> requestId
-        wallet, extendedKey
+        account
     | GetAddress ->
-        checkWallet
-        <@> fun wallet -> wallet.publicKey
+        getAccount
+        <@> fun account -> account.publicKey
                           |> PublicKey.hash
                           |> Address.PK
                           |> Address.encode chain
         |> reply<string> requestId
-        wallet, extendedKey
+        account
     | GetTransactions ->
-        checkWallet
+        getAccount
         <@> Account.getHistory
         |> reply<TransactionsResponse> requestId
-        wallet, extendedKey
+        account
     | ImportSeed (words, password) ->
         Account.import words password
         <@> fun (account, secured) ->
                 DataAccess.Account.put dataAccess session account
                 DataAccess.Secured.put dataAccess session secured
-                eventX "Account imported and secured"
+                eventX "Account imported"
                 |> Log.info
                 account
         |> function
         | Ok account ->
             reply<unit> requestId (Ok ())
-            Some account, extendedKey
+            Some account
         | Error error ->
             reply<unit> requestId (Error error)
-            wallet, extendedKey
-    | Spend (address, spend) ->
-        checkWalletSecured
+            account
+    | Send (address, spend, password) ->
+        unlockAccount password
         >>= Account.createTransaction address spend
         |> reply<Types.Transaction> requestId
-        wallet, extendedKey
-    | ActivateContract (code,numberOfBlocks) ->
-        checkWalletSecured
+        account
+    | ActivateContract (code, numberOfBlocks, password) ->
+        unlockAccount password
         >>= Account.createActivateContractTransaction chainParams code numberOfBlocks
         <@> fun tx -> tx, Consensus.Contract.computeHash code
         |> reply<ActivateContractResponse> requestId
-        wallet, extendedKey
-    | ExecuteContract (cHash,command,data,provideReturnAddress, sign, spends) ->
-        checkWalletSecured
+        account
+    | ExecuteContract (cHash, command, data, provideReturnAddress, sign, spends, password) ->
+        unlockAccount password
         >>= Account.createExecuteContractTransaction (Blockchain.executeContract client) cHash command data provideReturnAddress sign spends
         |> reply<Types.Transaction> requestId
-        wallet, extendedKey
+        account
     | AccountExists ->
-        wallet
+        account
         |> Option.isSome
         |> Ok
         |> reply<bool> requestId
-        wallet, extendedKey
-    | AccountLocked ->
-        extendedKey
-        |> Option.isNone
-        |> Ok
+        account
+    | GetPublicKey (path, password) ->
+        unlockAccount password
+        >>= (snd >> ExtendedKey.derivePath path)
+        >>= ExtendedKey.getPublicKey
+        |> reply<PublicKey> requestId
+        account
+    | CheckPassword password ->
+        match unlockAccount password with
+        | Ok _ -> Ok true
+        | Error error when error = Security.BadPassword -> Ok false 
+        | Error error -> Error error
         |> reply<bool> requestId
-        wallet, extendedKey
-    | GetPublicKey path ->
-        try
-            match extendedKey with
-            | None ->
-                reply<PublicKey> requestId (Error "wallet locked")
-            | Some extendedKey ->
-                ExtendedKey.derivePath path extendedKey
-                >>= ExtendedKey.getPublicKey
-                |> reply<PublicKey> requestId
-        with
-        | x -> printfn "%A" x
-        wallet,extendedKey
-    | Unlock password ->
-        wallet,
-        match DataAccess.Secured.tryGet dataAccess session with
-        | Some secured ->
-            match Secured.decrypt password secured with
-            | Ok extendedKey ->
-                eventX "Account unlocked"
-                |> Log.info
-                reply<unit> requestId (Ok ())
-                Some extendedKey
-            | Error error ->
-                reply<unit> requestId (Error <| sprintf "Could not unlock wallet: %A" error)
-                None
-        | None ->
-            reply<unit> requestId (Error "Could not unlock wallet - no data")
-            None
+        account
 
 let main dataPath busName chain =
-    let chainParams = Consensus.Chain.getChainParameters chain
-    Actor.create<Command,Request,Event, AccountData> busName serviceName (fun poller sbObservable ebObservable ->
+    Actor.create<Command,Request,Event, Option<Account.T>> busName serviceName (fun poller sbObservable ebObservable ->
         let databaseContext = DataAccess.createContext dataPath
         let dataAccess = DataAccess.init databaseContext
 
@@ -210,15 +161,15 @@ let main dataPath busName chain =
 
             DataAccess.Account.tryGet dataAccess session
             |> Option.map (fun account ->
-                eventX "Account found. syncing"
+                eventX "Account exists. syncing..."
                 |> Log.info
-                sync chainParams client account)
+                sync client account)
 
         let sbObservable =
             sbObservable
             |> Observable.map (fun message ->
                 match message with
-                | ServiceBus.Agent.Command c -> commandHandler chain client c
+                | ServiceBus.Agent.Command c -> commandHandler client c
                 | ServiceBus.Agent.Request (requestId, r) -> requestHandler chain client requestId r)
 
         let ebObservable =
@@ -227,12 +178,12 @@ let main dataPath busName chain =
 
         let observable =
             Observable.merge sbObservable ebObservable
-            |> Observable.scan (fun (wallet, key) handler ->
+            |> Observable.scan (fun account handler ->
                 use session = DatabaseContext.createSession databaseContext
-                let wallet = handler dataAccess session (wallet, key)
+                let account = handler dataAccess session account
 
                 Session.commit session
-                wallet) (account, None)
+                account) account
 
         Disposables.fromFunction (fun () ->
             DataAccess.dispose dataAccess

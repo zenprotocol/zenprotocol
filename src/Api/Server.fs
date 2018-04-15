@@ -103,22 +103,18 @@ let handleRequest chain client (request,reply) =
             | FSharp.Core.Error _ ->
                 TextContent (sprintf "invalid address %A" query)
                 |> reply StatusCode.BadRequest
-    | Get ("/wallet/publickey", query) ->
-        match Map.tryFind "path" query with
-        | None ->
-            TextContent (sprintf "path is missing")
-            |> reply StatusCode.BadRequest
-        | Some path ->
-            match Wallet.getPublicKey client path with
+    | Post ("/wallet/publickey", Some body) ->
+        match parseGetPublicKeyJson body with
+        | Error error -> replyError error
+        | Ok (path, password) ->
+            match Wallet.getPublicKey client path password with
             | Ok key ->
-                let serialized = PublicKey.toString key
-
-                TextContent serialized
+                PublicKey.toString key
+                |> TextContent
                 |> reply StatusCode.OK
             | Error error ->
-                 TextContent error
-                 |> reply StatusCode.BadRequest
-
+                TextContent error
+                |> reply StatusCode.BadRequest
     | Get ("/wallet/balance", _) ->
         match Wallet.getBalance client with
         | Ok balances ->
@@ -135,39 +131,46 @@ let handleRequest chain client (request,reply) =
     | Get ("/wallet/exists", _) ->
         match Wallet.accountExists client with
         | Ok result ->
-            (new AccountExistsResponseJson.Root(result)).JsonValue
+            result
+            |> JsonValue.Boolean
             |> JsonContent
             |> reply StatusCode.OK
         | Error error ->
             replyError error
-    | Get ("/wallet/locked", _) ->
-        match Wallet.accountLocked client with
-        | Ok result ->
-            (new AccountLockedResponseJson.Root(result)).JsonValue
-            |> JsonContent
-            |> reply StatusCode.OK
+    | Post ("/wallet/checkpassword", Some body) ->
+        match parseCheckPasswordJson body with
+        | Ok password ->
+            match Wallet.checkPassword client password with
+            | Ok result ->
+                result
+                |> JsonValue.Boolean
+                |> JsonContent
+                |> reply StatusCode.OK
+            | Error error ->
+                replyError error
         | Error error ->
             replyError error
     | Get ("/wallet/address", _) ->
         match Wallet.getAddress client with
         | Ok address ->
-            (new AddressJson.Root(address)).JsonValue
+            address
+            |> JsonValue.String
             |> JsonContent
             |> reply StatusCode.OK
         | Error error ->
             replyError error
     | Post ("/wallet/import", Some body) ->
-        match getImportSeed body with
+        match parseImportSeedJson body with
         | Ok (words, key) ->
             match Wallet.importSeed client words key with
             | Ok _ -> reply StatusCode.OK NoContent
             | Error error -> replyError error
         | Error error ->
             replyError error
-    | Post ("/wallet/spend", Some body) ->
-        match getSpend chain body with
-        | Ok (pkHash, spend) ->
-            Wallet.createTransaction client pkHash spend
+    | Post ("/wallet/send", Some body) ->
+        match parseSendJson chain body with
+        | Ok (pkHash, spend, password) ->
+            Wallet.createTransaction client pkHash spend password
             |> validateTx
         | Error error ->
             replyError error
@@ -191,10 +194,10 @@ let handleRequest chain client (request,reply) =
         | Error error ->
             replyError error
     | Post ("/wallet/contract/activate", Some body) ->
-        match getContractActivate body with
+        match parseContractActivateJson body with
         | Error error -> replyError error
-        | Ok (code,numberOfBlocks) ->
-            match Wallet.activateContract client code numberOfBlocks with
+        | Ok (code, numberOfBlocks, password) ->
+            match Wallet.activateContract client code numberOfBlocks password with
             | Ok (tx, cHash) ->
                 let address =
                     Address.Contract cHash
@@ -205,30 +208,20 @@ let handleRequest chain client (request,reply) =
             | Error error ->
                 replyError error
     | Post ("/wallet/contract/execute", Some body) ->
-        match getContractExecute chain body with
+        match parseContractExecuteJson chain body with
         | Error error -> replyError error
-        | Ok (cHash, command, data, returnAddress, sign, spends) ->
-
-            Wallet.executeContract client cHash command data returnAddress sign spends
+        | Ok (cHash, command, data, returnAddress, sign, spends, password) ->
+            Wallet.executeContract client cHash command data returnAddress sign spends password
             |> validateTx
-    | Post ("/wallet/resync", _) ->
+    | Get ("/wallet/resync", _) ->
         Wallet.resyncAccount client
         reply StatusCode.OK NoContent
     | Post ("/block/publish", Some body) ->
-        match getPublishBlock body with
+        match parsePublishBlockJson body with
         | Error error -> replyError error
         | Ok block ->
             Blockchain.validateMinedBlock client block
             reply StatusCode.OK NoContent
-    | Get ("/wallet/lock", _) ->
-        Wallet.lock client
-        reply StatusCode.OK NoContent
-    | Post ("/wallet/unlock", Some body) ->
-        getUnlock body
-        >>= Wallet.unlock client
-        |> Result.mapError replyError
-        |> Result.map (fun _ -> reply StatusCode.OK NoContent)
-        |> ignore
     | _ ->
         reply StatusCode.NotFound NoContent
 
@@ -236,7 +229,7 @@ let create chain poller busName bind =
     let httpAgent = Http.Server.create poller bind
 
     eventX "Api running on {bind}"
-    >> setField "bind" bind
+    >> setField "bind" (sprintf "http://%s" bind)
     |> Log.info
 
     let client = Client.create busName

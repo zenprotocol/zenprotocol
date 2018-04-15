@@ -1,6 +1,7 @@
 namespace Api.Types
 
 open FSharp.Data
+open System
 
 type BalanceResponseJson = JsonProvider<"""
 [
@@ -12,12 +13,6 @@ type BalanceResponseJson = JsonProvider<"""
 ]
 """>
 
-type AddressJson = JsonProvider<"""
-{
-    "address" : "address"
-}
-""">
-
 type ContractActivateResponseJson = JsonProvider<"""
 {
     "address" : "address",
@@ -25,21 +20,23 @@ type ContractActivateResponseJson = JsonProvider<"""
 }
 """>
 
-type SpendRequestJson = JsonProvider<"""
+type SendRequestJson = JsonProvider<"""
 {
     "address": "address",
     "spend": {
         "asset": "hash",
         "assetType": "hash",
         "amount": 2147483649
-    }
+    },
+    "password": "password"
 }
 """>
 
 type ContractActivateRequestJson = JsonProvider<"""
 {
     "code": "string",
-    "numberOfBlocks": 1
+    "numberOfBlocks": 1,
+    "password": "password"
 }
 """>
 
@@ -58,7 +55,8 @@ type ContractExecuteRequestJson = JsonProvider<"""
             "assetType": "hash",
             "amount": 2147483649
         }
-    ]
+    ],
+    "password": "password"
 }
 """>
 
@@ -110,25 +108,6 @@ type TransactionsResponseJson = JsonProvider<"""
 ]
 """>
 
-type UnlockAccountJson = JsonProvider<"""
-{
-    "password": "secret"
-}
-""">
-
-type AccountExistsResponseJson = JsonProvider<"""
-{
-    "accountExists" : false
-}
-""">
-
-type AccountLockedResponseJson = JsonProvider<"""
-{
-    "accountLocked" : false
-}
-""">
-
-
 type HeadersResponseJson = JsonProvider<"""
 [
     {
@@ -140,4 +119,17 @@ type HeadersResponseJson = JsonProvider<"""
         "target":"abcd1234"
     }
 ]
+""">
+
+type GetPublicKeyJson = JsonProvider<"""
+{
+    "path": "path",
+    "password": "secret"
+}
+""">
+
+type CheckPasswordJson = JsonProvider<"""
+{
+    "password": "secret"
+}
 """>

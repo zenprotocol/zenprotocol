@@ -2,7 +2,10 @@ module Infrastructure.Security
 
 open System.Security.Cryptography
 open System.IO
+open System.Web.UI.WebControls
 
+[<Literal>]
+let BadPassword = "Bad password"
 
 // Libsodium secret box port
 module AuthenticatedEncryption =
@@ -68,7 +71,7 @@ module AuthenticatedEncryption =
 
         use hmac = new HMACSHA256(authKey)
         if hash <> hmac.ComputeHash cipher then
-            Error "incorrect password or data was tampered"
+            Error BadPassword
         else
             use aes = createAes key iv
             use decryptor = aes.CreateDecryptor()

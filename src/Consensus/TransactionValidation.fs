@@ -37,6 +37,7 @@ let private foldSpends =
 let private checkSpends m =
     Map.forall (fun _ v -> Option.isSome v) m
 
+//TODO: factor out actual activation into ActiveContractSet; only keep validation login here
 let private activateContract (chainParams : Chain.ChainParameters) contractPath blockNumber acs (tx : Types.Transaction) =
     let getActivationSacrifice tx = result {
         let activationSacrifices = List.filter(fun output -> output.lock = ActivationSacrifice) tx.outputs

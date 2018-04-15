@@ -67,11 +67,11 @@ let ``Contract should activate and execute - Bus``() =
     let client = ServiceBus.Client.create busName
     let subscriber = EventBus.Subscriber.create<Event> busName
 
-    match Wallet.activateContract client sampleContractCode 10ul with
+    match Wallet.activateContract client sampleContractCode 10ul "" with
     | Ok (contractActivationTx, cHash) ->
         Blockchain.validateTransaction client contractActivationTx
         waitForTx subscriber contractActivationTx
-        match Wallet.executeContract client cHash "" None true None Map.empty with
+        match Wallet.executeContract client cHash "" None true None Map.empty "" with
         | Ok _ -> ()
         | Error error ->
             failwith error
