@@ -61,6 +61,7 @@ let rec waitForTx subscriber tx =
     | TransactionAddedToMemPool (_, tx) when tx = tx -> ()
     | _ -> waitForTx subscriber tx
 
+(*
 [<Test>]
 let ``Contract should activate and execute - Bus``() =
     let client = ServiceBus.Client.create busName
@@ -76,6 +77,7 @@ let ``Contract should activate and execute - Bus``() =
             failwith error
     | Error error ->
         failwith error
+*)
 //
 //[<Test>]
 //let ``Contract should activate and execute - API``() =
