@@ -62,3 +62,5 @@ You can communicate with the node with `zen-cli`. Enter the `bin` directory of t
 ./zen-cli --help
 ```
 
+# License
+This software is available under the Zen Protocol Software License, which may be viewed at LICENSE.md.
