@@ -1,8 +1,8 @@
 ## ZEN PROTOCOL SOFTWARE LICENSE
 
-This Zen Protocol Software License (this **"Agreement"** ​ ​) governs Your use of the
+This Zen Protocol Software License (this **"Agreement"** ) governs Your use of the
 computer software (including wallet, miner, tools, compilers, documentation, examples, source
-code and other files) as may be made available by **Zen** ​ **Protocol Ltd** ,​ a Seychelles company
+code and other files) as may be made available by **Zen** **Protocol Ltd** ,​ a Seychelles company
 (​ **“Licensor”** ​) via GitLab at ​https://gitlab.com/zenprotocol/zenprotocol or from any other
 distribution source authorized by Licensor from time to time (together with the authorized
 Community Releases defined below, the “ **Licensed** ​ **Software”** ).​ References herein to “You” or
@@ -35,8 +35,8 @@ validity and immutability of such Blockchain; provided that, after the Community
 Release Date, the Authorized Protocol shall mean such version of the Authorized
 Protocol in effect on the Community Release Date, or as applicable any amendment
 thereafter made by the required consensus of Authorized Nodes (determined in
-accordance​ ​with​ ​the​ ​Authorized​ ​Protocol​ ​in​ ​effect​ ​immediately​ ​prior​ ​to​ ​such​ ​amendment).
-(c) “ **Blockchain ​ **​” means the distributed, public, digital ledger containing
+accordance with the Authorized Protocol in effect immediately prior to such amendment).
+(c) “ **Blockchain** ” means the distributed, public, digital ledger containing
 records (blocks) evidencing transactions and contracts, structured and signed via digital
 encrypted signatures in accordance with the Authorized Protocol, which blocks are
 formed, confirmed by consensus, and extended solely by Authorized Nodes running the
