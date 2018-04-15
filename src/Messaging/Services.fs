@@ -21,6 +21,7 @@ module Blockchain =
         headers:uint32
         difficulty:float
         medianTime:uint64
+        initialBlockDownload:bool
     }
 
     type Command =

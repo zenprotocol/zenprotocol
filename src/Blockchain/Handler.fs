@@ -172,12 +172,19 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
                     shift <- shift - 1ul
 
                 diff
+
+        let syncing = InitialBlockDownload.isActive state.initialBlockDownload
+
         {
             chain = chain.name
             blocks = state.tipState.tip.header.blockNumber
-            headers = state.headers
+            headers =
+                InitialBlockDownload.getPeerHeader state.initialBlockDownload
+                |> Option.map (fun bh -> bh.blockNumber)
+                |> Option.defaultValue state.headers
             medianTime = EMA.earliest state.tipState.ema
             difficulty = difficulty
+            initialBlockDownload = syncing
         }
         |> requestId.reply
 
