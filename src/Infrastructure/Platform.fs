@@ -110,7 +110,7 @@ let run exe args =
                     |> Log.info
                 let output = output.ToString()
                 if output.Length > 0 then
-                    eventX "{ourput}"
+                    eventX "{output}"
                     >> setField "output" error
                     |> Log.verbose
                 Error error
