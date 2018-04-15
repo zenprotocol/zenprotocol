@@ -2,7 +2,6 @@ module Infrastructure.Security
 
 open System.Security.Cryptography
 open System.IO
-open System.Web.UI.WebControls
 
 [<Literal>]
 let BadPassword = "Bad password"
