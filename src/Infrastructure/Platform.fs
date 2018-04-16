@@ -52,7 +52,7 @@ let getFrameworkPath =
     match platform with
     | PlatformID.Unix -> "/usr/lib/mono/4.7-api/"
     | PlatformID.MacOSX -> "/Library/Frameworks/Mono.framework/Versions/Current/lib/mono/4.7-api/"
-    | _ -> "C:\\Program Files (x86)\\Reference Assemblies\\Microsoft\\Framework\\.NETFramework\\v4.7\\"
+    | _ -> @"C:\Windows\Microsoft.NET\Framework\v4.0.30319\"
 
 
 let private monoM =
@@ -110,7 +110,7 @@ let run exe args =
                     |> Log.info
                 let output = output.ToString()
                 if output.Length > 0 then
-                    eventX "{ourput}"
+                    eventX "{output}"
                     >> setField "output" error
                     |> Log.verbose
                 Error error

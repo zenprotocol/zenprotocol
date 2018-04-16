@@ -149,7 +149,7 @@ let private handleInprocMessage socket inproc networkId msg (peers:Peers) =
             sendToPeer socket inproc peers routingId (Message.Block block)
         | InProcMessage.GetBlock blockHash ->
             sendToNextPeer socket inproc peers (Message.GetBlock blockHash)
-        | InProcMessage.GetNewBlock {peerId=peerId; blockHash=blockHash} ->
+        | InProcMessage.GetBlockFrom {peerId=peerId; blockHash=blockHash} ->
             let routingId = RoutingId.fromBytes peerId
             sendToPeer socket inproc peers routingId (Message.GetBlock blockHash)
         | InProcMessage.SendTip {peerId=peerId; blockHeader=blockHeader} ->
@@ -159,10 +159,24 @@ let private handleInprocMessage socket inproc networkId msg (peers:Peers) =
             publishMessage socket inproc peers (Message.Address address)
         | InProcMessage.GetHeaders request ->
             let routingId = RoutingId.fromBytes request.peerId
-            sendToPeer socket inproc peers routingId (Message.GetHeaders {blockHash=request.blockHash;numberOfHeaders=request.numberOfHeaders})
+            sendToPeer socket inproc peers routingId (Message.GetHeaders {from=request.from;endHash=request.endHash})
         | InProcMessage.SendHeaders request ->
             let routingId = RoutingId.fromBytes request.peerId
             sendToPeer socket inproc peers routingId (Message.Headers request.headers)
+        | InProcMessage.DisconnectPeer peerId ->
+            let routingId = RoutingId.fromBytes peerId
+            match Map.tryFind routingId peers with
+            | Some peer ->
+                match Peer.getAddress peer with
+                | Some address ->
+                    InProcMessage.send inproc (InProcMessage.Disconnected address)
+                    Peer.closePeer socket Peer.BlockchainRequest peer |> ignore
+                | None -> ()
+
+                Map.remove routingId peers
+            | None -> peers
+        | InProcMessage.GetTipFromAllPeers ->
+            publishMessage socket inproc peers Message.GetTip
         | msg -> failwithf "unexpected inproc msg %A" msg
 
 let private onError error =
@@ -210,8 +224,8 @@ let getTip transport peerId =
 let publisNewBlock transport blockHeader =
     InProcMessage.send transport.inproc (InProcMessage.PublishBlock blockHeader)
 
-let getNewBlock transport peerId blockHash =
-    InProcMessage.send transport.inproc (InProcMessage.GetNewBlock {peerId=peerId;blockHash=blockHash})
+let getBlockFrom transport peerId blockHash =
+    InProcMessage.send transport.inproc (InProcMessage.GetBlockFrom {peerId=peerId;blockHash=blockHash})
 
 let sendTip transport peerId blockHeader =
     InProcMessage.send transport.inproc (InProcMessage.SendTip {peerId=peerId;blockHeader=blockHeader})
@@ -223,12 +237,20 @@ let publishAddressToAll transport ipAddress =
     InProcMessage.PublishAddressToAll ipAddress
     |> InProcMessage.send transport.inproc
 
-let getHeaders transport peerId blockHash numberOfHeaders =
-    InProcMessage.GetHeaders {peerId=peerId;blockHash=blockHash;numberOfHeaders=numberOfHeaders}
+let getHeaders transport peerId from endHash =
+    InProcMessage.GetHeaders {peerId=peerId;from=from;endHash=endHash}
     |> InProcMessage.send transport.inproc
 
 let sendHeaders transport peerId headers =
     InProcMessage.SendHeaders {peerId=peerId;headers=headers}
+    |> InProcMessage.send transport.inproc
+
+let disconnectPeer transport peerId =
+    InProcMessage.DisconnectPeer peerId
+    |> InProcMessage.send transport.inproc
+
+let getTipFromAllPeers transport =
+    InProcMessage.GetTipFromAllPeers
     |> InProcMessage.send transport.inproc
 
 let recv transport =

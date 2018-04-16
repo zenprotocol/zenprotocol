@@ -2,10 +2,6 @@ module Blockchain.State
 
 open Consensus
 
-type BlockRequest =
-    | ParentBlock
-    | Tip
-    | NewBlock
 
 type TipState =
     {
@@ -26,6 +22,6 @@ type State =
     {
         tipState: TipState
         memoryState: MemoryState
-        blockRequests: Map<Hash.Hash, BlockRequest>
+        initialBlockDownload:InitialBlockDownload.T
         headers: uint32
     }

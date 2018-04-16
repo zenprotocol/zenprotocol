@@ -12,3 +12,5 @@ type txSkeleton =
                 // the uint64 field in the map codomain represents cumulative asset amount totals
                 // the uint64 field in the list in the map codomain represents the insertion index of each output
                 Collections.Map<asset, uint64 * list<uint64 * output>> }
+
+type wallet = pointedOutput Prims.list

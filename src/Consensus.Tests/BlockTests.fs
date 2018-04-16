@@ -268,6 +268,7 @@ let ``can connect block with a contract``() =
     let block = Block.createTemplate chain  parent (timestamp+1UL) ema acs [tx] Hash.zero
 
     Block.connect chain getUTXO contractsPath parent timestamp utxoSet ActiveContractSet.empty ema block
+    //|> printfn "%A"
     |> should be ok
 
 [<Test>]

@@ -8,15 +8,15 @@ open FSharp.Core.Operators.Checked
 module Cost = Zen.Cost.Realized
 module U64 = FStar.UInt64
 
-type t = Zen.Types.Extracted.wallet
+type t = Zen.Types.Realized.wallet
 
-let size : Zen.Types.Extracted.wallet  ->  Prims.nat = Prims.length
+let size : t ->  Prims.nat = Prims.length
 
 let rec collect (asset:asset) (amount:U64.t) (wallet:wallet) collected (collectedAmount:U64.t) =
     match wallet with
     | Prims.Nil ->
         if collectedAmount >= amount then
-            collected, collectedAmount
+            (Zen.List.rev collected |> Cost.__force), collectedAmount
         else
             Prims.Nil, 0UL
     | Prims.Cons (head,tail) ->
