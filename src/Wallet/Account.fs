@@ -366,6 +366,40 @@ let createActivateContractTransaction chain code (numberOfBlocks:uint32) (accoun
             }
     }
 
+let createExtendContractTransaction client chainParams cHash (numberOfBlocks:uint32) (account, extendedKey) =
+    let activeContracts = Blockchain.getActiveContracts client
+
+    result {
+        let! code = 
+            activeContracts
+            |> List.tryFind (function 
+                             | { contractHash = contractHash } when contractHash = cHash -> true
+                             | _ -> false)
+            |> function
+            | Some activeContract -> Ok activeContract.code
+            | None -> Error "contract is not active"
+            
+        let codeLength = String.length code |> uint64
+        let extensionSacrifice = chainParams.sacrificePerByteBlock * codeLength * (uint64 numberOfBlocks)
+        let spend = { amount = extensionSacrifice; asset = Constants.Zen }
+
+        let! zenKey = deriveZenKey extendedKey
+        let! secretKey = ExtendedKey.getPrivateKey zenKey
+
+        let! (inputs,keys,amount) = collectInputs account spend secretKey
+        let inputPoints = List.map (fst >> Outpoint) inputs
+
+        let outputs = addChange spend amount account { spend = spend; lock = ExtensionSacrifice cHash }
+        return Transaction.sign
+            keys
+            {
+                inputs = inputPoints
+                outputs = outputs
+                witnesses = []
+                contract = None
+            }
+    }
+
 let addReturnAddressToData publicKey data =
     let addReturnAddressToData' dict =
         let returnAddress = PK (PublicKey.hash publicKey)

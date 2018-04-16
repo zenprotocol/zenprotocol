@@ -6,8 +6,9 @@ open Messaging.Services
 open Messaging.Events
 open ServiceBus.Agent
 open Consensus
+open Types
 open Account
-open Consensus.Crypto
+open Crypto
 open Messaging.Services.Wallet
 open Result
 open System
@@ -117,7 +118,7 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
     | Send (address, spend, password) ->
         unlockAccount password
         >>= Account.createTransaction address spend
-        |> reply<Types.Transaction> requestId
+        |> reply<Transaction> requestId
         account
     | ActivateContract (code, numberOfBlocks, password) ->
         unlockAccount password
@@ -125,10 +126,15 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
         <@> fun tx -> tx, Consensus.Contract.computeHash code
         |> reply<ActivateContractResponse> requestId
         account
+    | ExtendContract (cHash, numberOfBlocks, password) ->
+        unlockAccount password
+        >>= Account.createExtendContractTransaction client chainParams cHash numberOfBlocks
+        |> reply<Transaction> requestId
+        account
     | ExecuteContract (cHash, command, data, provideReturnAddress, sign, spends, password) ->
         unlockAccount password
         >>= Account.createExecuteContractTransaction (Blockchain.executeContract client) cHash command data provideReturnAddress sign spends
-        |> reply<Types.Transaction> requestId
+        |> reply<Transaction> requestId
         account
     | AccountExists ->
         account
