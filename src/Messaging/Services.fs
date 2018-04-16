@@ -153,13 +153,14 @@ module Wallet =
         | GetAddress
         | GetTransactions
         | GetBalance
-        | ImportSeed of string list * string
-        | Send of Hash * Spend * string
-        | ActivateContract of string * uint32 * string
-        | ExecuteContract of Hash * string * data option * provideReturnAddress:bool * sign:string option * Map<Asset, uint64> * string
+        | ImportSeed of string list * password:string
+        | Send of Hash * Spend * password:string
+        | ActivateContract of string * uint32 * password:string
+        | ExtendContract of Hash * uint32 * password:string
+        | ExecuteContract of Hash * string * data option * provideReturnAddress:bool * sign:string option * Map<Asset, uint64> * password:string
         | AccountExists
-        | CheckPassword of string
-        | GetPublicKey of string * string
+        | CheckPassword of password:string
+        | GetPublicKey of string * password:string
 
     let serviceName = "wallet"
 
@@ -180,6 +181,9 @@ module Wallet =
 
     let activateContract client code numberOfBlocks password =
         send<ActivateContractResponse> client serviceName (ActivateContract (code, numberOfBlocks, password))
+
+    let extendContract client address numberOfBlocks password =
+        send<Transaction> client serviceName (ExtendContract (address, numberOfBlocks, password))
 
     let executeContract client address command data provideReturnAddress sign spends password =
         send<Transaction> client serviceName (ExecuteContract (address, command, data, provideReturnAddress, sign, spends, password))

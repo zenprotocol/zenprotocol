@@ -43,4 +43,5 @@ let isOutputSpendable output =
     | Contract _ -> true
     | Fee
     | Destroy
-    | ActivationSacrifice -> false
+    | ActivationSacrifice
+    | ExtensionSacrifice _ -> false

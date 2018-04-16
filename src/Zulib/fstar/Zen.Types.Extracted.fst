@@ -29,6 +29,7 @@ type lock =
     | FeeLock
     | DestroyLock
     | ActivationSacrificeLock
+    | ExtensionSacrificeLock of hash
     | CoinbaseLock of U32.t ** hash
 
 type output =

@@ -40,6 +40,14 @@ type ContractActivateRequestJson = JsonProvider<"""
 }
 """>
 
+type ContractExtendRequestJson = JsonProvider<"""
+{
+    "address": "address",
+    "numberOfBlocks": 1,
+    "password": "password"
+}
+""">
+
 type ContractExecuteRequestJson = JsonProvider<"""
 {
     "address": "address",
@@ -66,7 +74,7 @@ type PublishBlockJson = JsonProvider<"""
 }
 """>
 
-type ActiveContractsJson = JsonProvider<"""
+type ActiveContractsResponseJson = JsonProvider<"""
 [
     {
         "contractHash": "hash",

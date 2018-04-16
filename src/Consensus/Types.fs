@@ -30,6 +30,7 @@ type Lock =
     | Coinbase of blockNumber:uint32 * pkHash:Hash
     | Fee
     | ActivationSacrifice
+    | ExtensionSacrifice of cHash:Hash
     | Destroy
 
 type Output = {

@@ -61,6 +61,8 @@ let fsToFstLock (outputLock:Types.Lock) : lock =
         FeeLock
     | ActivationSacrifice ->
         ActivationSacrificeLock
+    | ExtensionSacrifice (Hash.Hash cHash) ->
+        ExtensionSacrificeLock cHash
     | Coinbase (blockNumber, (Hash.Hash pkHash)) ->
         CoinbaseLock (blockNumber,pkHash)
 
@@ -79,6 +81,7 @@ let fstToFsLock (outputLock:lock) : Types.Lock =
     | DestroyLock -> Destroy
     | FeeLock -> Fee
     | ActivationSacrificeLock -> ActivationSacrifice
+    | ExtensionSacrificeLock cHash -> ExtensionSacrifice (Hash.Hash cHash)
     | CoinbaseLock (blockNumber,pkHash) ->
             Coinbase (blockNumber, Hash.Hash pkHash)
 

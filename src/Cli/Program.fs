@@ -19,6 +19,11 @@ type ActivateContractArgs =
     interface IArgParserTemplate with
         member arg.Usage = ""
 
+type ExtendContractArgs =
+    | [<MainCommand("COMMAND");ExactlyOnce>] ExtendContract_Arguments of address:string * numberOfBlocks:int * password:string
+    interface IArgParserTemplate with
+        member arg.Usage = ""
+
 type ExecuteContractArgs =
     | [<MainCommand("COMMAND");ExactlyOnce>] ExecuteContract_Arguments of address:string * command:string * data:string * asset:string * assetType:string * amount:int64 * password:string
     interface IArgParserTemplate with
@@ -52,7 +57,9 @@ type Arguments =
     | [<CliPrefix(CliPrefix.None)>] Import of ParseResults<ImportArgs>
     | [<CliPrefix(CliPrefix.None)>] Send of ParseResults<SendArgs>
     | [<CliPrefix(CliPrefix.None)>] Activate of ParseResults<ActivateContractArgs>
+    | [<CliPrefix(CliPrefix.None)>] Extend of ParseResults<ExtendContractArgs>
     | [<CliPrefix(CliPrefix.None)>] Execute of ParseResults<ExecuteContractArgs>
+    | [<CliPrefix(CliPrefix.None)>] Active of ParseResults<NoArgs>
     | [<CliPrefix(CliPrefix.None)>] PublishBlock of ParseResults<PublishBlockArgs>
     | [<CliPrefix(CliPrefix.None)>] AccountExists of ParseResults<NoArgs>
     | [<CliPrefix(CliPrefix.None)>] CheckPassword of ParseResults<CheckPasswordArgs>
@@ -65,13 +72,15 @@ type Arguments =
             | Local2 -> "use port of local2 testing node"
 #endif
             | Balance _ -> "get wallet balance"
-            | History _ -> "get wallet transactions"
+            | History _ -> "list wallet transactions"
             | Address _ -> "get wallet address"
             | Resync _ -> "resync wallet"
             | Import _ -> "import wallet seed from mnemonic sentence"
             | Send _ -> "send asset to address"
             | Activate _ -> "activate contract"
+            | Extend _ -> "extend contract activation"
             | Execute _ -> "execute contract"
+            | Active _ -> "list active contracts"
             | PublishBlock _ -> "publish a block to the network"
             | AccountExists _ -> "check for an existing account"
             | CheckPassword _ -> "check a password"
@@ -80,7 +89,6 @@ type Arguments =
 let main argv =
     let errorHandler = ProcessExiter(colorizer = function ErrorCode.HelpText -> None | _ -> Some ConsoleColor.Red)
     let parser = ArgumentParser.Create<Arguments>(programName = "zen-ctl", errorHandler = errorHandler)
-
 
     let results = parser.ParseCommandLine argv
 
@@ -101,17 +109,6 @@ let main argv =
 
     let exit error = (errorHandler :> IExiter).Exit(error, ErrorCode.AppSettings (*=1*))
        
-    let printResponse (response : HttpResponse) =
-        let text =
-            match response.Body with 
-            | Text text -> text
-            | Binary bytes -> Text.Encoding.ASCII.GetString bytes
-
-        if response.StatusCode <> 200 then
-            exit text
-        else
-            printfn "%s" text
-
     let getResponse (response : HttpResponse) =
         let text =
             match response.Body with 
@@ -122,6 +119,8 @@ let main argv =
             exit text
         else
             text
+
+    let printResponse = getResponse >> printfn "%s"
 
     try
         match results.TryGetSubCommand() with
@@ -198,6 +197,14 @@ let main argv =
                         |> ContractActivateResponseJson.Parse
                         
                     printfn "Contract activated.\nAddress: %s\nHash: %s" result.Address result.Hash
+        | Some (Extend args) ->
+            let address, numberOfBlocks, password = args.GetResult <@ ExtendContract_Arguments @>
+            "wallet/contract/extend"
+            |> getUri
+            |> (new ContractExtendRequestJson.Root(
+                    address, numberOfBlocks, password))
+                .JsonValue.Request
+            |> printResponse
         | Some (Execute args) ->
             let address, command, data, asset, assetType, amount, password = 
                 args.GetResult <@ ExecuteContract_Arguments @>
@@ -210,6 +217,17 @@ let main argv =
                         password))
                 .JsonValue.Request
             |> printResponse
+        | Some (Active _) ->
+            let activeContracts =
+                "contract/active"
+                |> getUri
+                |> ActiveContractsResponseJson.Load
+
+            printfn "Address\t\t| Hash\t\t | Expire"
+            printfn "========================================="
+
+            Array.iter (fun (activeContract:ActiveContractsResponseJson.Root) ->
+                printfn " %s %s\t| %d" activeContract.Address activeContract.ContractHash activeContract.Expire) activeContracts
         | Some (PublishBlock args) ->
             let block = args.GetResult <@ PublishBlock_Arguments @>
             "block/publish"
