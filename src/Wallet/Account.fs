@@ -48,7 +48,7 @@ let private purpose = ExtendedKey.Hardened 44
 
 let deriveZenKey = ExtendedKey.derivePath "m/44'/258'/0'/0/0"
 
-let private create password seed = result {
+let private create password tipHash tipBlockNumber seed = result {
     let! extendedPrivateKey = ExtendedKey.create seed
 
     let! zenPrivateKey = deriveZenKey extendedPrivateKey
@@ -60,8 +60,8 @@ let private create password seed = result {
         deltas = List.empty
         outputs = Map.empty
         mempool = List.empty
-        tip = Hash.zero
-        blockNumber = 0ul
+        tip = tipHash
+        blockNumber = tipBlockNumber
         publicKey = publicKey
     }, secured
 }
@@ -73,9 +73,9 @@ let private deriveSeed words =
      with _ as ex ->
          Error ex.Message
 
-let import words password =
+let import words password tipHash tipBlockNumber =
     deriveSeed words
-    >>= create password
+    >>= create password tipHash tipBlockNumber
 
 let private isKeyMatch account address =
     PublicKey.hash account.publicKey = address
@@ -187,7 +187,7 @@ let sync tipBlockHash (getHeader:Hash -> BlockHeader) (getBlock:Hash -> Block) a
         else
             0ul
 
-    let log action = Writer.Writer([action],())
+
 
     // Find the fork block of the account and the blockchain, logging actions
     // to perform. Undo each block in the account's chain but not the blockchain,
@@ -205,17 +205,22 @@ let sync tipBlockHash (getHeader:Hash -> BlockHeader) (getBlock:Hash -> Block) a
             locate (((getHeader x).parent, i-1ul), ((getHeader y).parent, j-1ul)) (Add (getBlock x, x) :: Undo (getBlock y) :: acc)
 
     let actions = locate ((tipBlockHash, blockNumber tipBlockHash), (account.tip, blockNumber account.tip)) []
+
+
     let toUndo, toAdd = List.partition (function | Undo _ -> true | _ -> false) actions
     let toUndo = List.rev toUndo     // Blocks to be undo were found backwards.
     let sortedActions = toUndo @ toAdd
 
-    List.fold
-        <|  fun accnt ->
-                function
-                | Undo blk -> undoBlock blk accnt
-                | Add (blk,hash) -> handleBlock hash blk accnt
-        <| account
-        <| sortedActions
+    let account =
+        List.fold
+            <|  fun accnt ->
+                    function
+                    | Undo blk -> undoBlock blk accnt
+                    | Add (blk,hash) -> handleBlock hash blk accnt
+            <| account
+            <| sortedActions
+
+    account
 
 let getUnspentOutputs account =
     // we first update the account according to the mempool transactions
@@ -363,6 +368,40 @@ let createActivateContractTransaction chain code (numberOfBlocks:uint32) (accoun
                                   hints = hints
                                   rlimit = rlimit
                                   queries = queries }
+            }
+    }
+
+let createExtendContractTransaction client chainParams cHash (numberOfBlocks:uint32) (account, extendedKey) =
+    let activeContracts = Blockchain.getActiveContracts client
+
+    result {
+        let! code = 
+            activeContracts
+            |> List.tryFind (function 
+                             | { contractHash = contractHash } when contractHash = cHash -> true
+                             | _ -> false)
+            |> function
+            | Some activeContract -> Ok activeContract.code
+            | None -> Error "contract is not active"
+            
+        let codeLength = String.length code |> uint64
+        let extensionSacrifice = chainParams.sacrificePerByteBlock * codeLength * (uint64 numberOfBlocks)
+        let spend = { amount = extensionSacrifice; asset = Constants.Zen }
+
+        let! zenKey = deriveZenKey extendedKey
+        let! secretKey = ExtendedKey.getPrivateKey zenKey
+
+        let! (inputs,keys,amount) = collectInputs account spend secretKey
+        let inputPoints = List.map (fst >> Outpoint) inputs
+
+        let outputs = addChange spend amount account { spend = spend; lock = ExtensionSacrifice cHash }
+        return Transaction.sign
+            keys
+            {
+                inputs = inputPoints
+                outputs = outputs
+                witnesses = []
+                contract = None
             }
     }
 

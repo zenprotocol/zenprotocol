@@ -9,4 +9,3 @@ module U64 = FStar.UInt64
 type t = wallet
 
 val size : wallet -> nat
-let size = length

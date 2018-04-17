@@ -21,6 +21,7 @@ module Blockchain =
         headers:uint32
         difficulty:float
         medianTime:uint64
+        initialBlockDownload:bool
     }
 
     type Command =
@@ -32,9 +33,9 @@ module Blockchain =
         | HandleMemPool of peerId:byte[] * Hash list
         | HandleTip of peerId:byte[] * Types.BlockHeader
         | ValidateNewBlockHeader of peerId:byte[] * Types.BlockHeader
-        | ValidateBlock of Types.Block
+        | ValidateBlock of peerId:byte[] * Types.Block
         | ValidateMinedBlock of Types.Block
-        | RequestHeaders of peerId:byte[] * blockHash:Hash * numberOfHeaders:uint16
+        | RequestHeaders of peerId:byte[] * startBlockHashes:Hash list * endBlockHash :Hash
         | HandleHeaders of peerId:byte[] * BlockHeader list
 
     type Request =
@@ -46,6 +47,7 @@ module Blockchain =
         | GetActiveContracts
         | GetBlockChainInfo
         | GetHeaders
+        | GetMempool
 
     type Response = unit
 
@@ -65,8 +67,8 @@ module Blockchain =
         ExecuteContract (cHash,command, sender, data, txSkeleton)
         |> Request.send<Request, Result<Transaction,string>> client serviceName
 
-    let validateBlock client block =
-        ValidateBlock block
+    let validateBlock client peerId block =
+        ValidateBlock (peerId, block)
         |> Command.send client serviceName
 
     let validateMinedBlock client block =
@@ -108,14 +110,17 @@ module Blockchain =
     let getBlockChainInfo client =
         Request.send<Request,BlochChainInfo> client serviceName GetBlockChainInfo
 
-    let requestHeaders client peerId blockHash numberOfHeaders=
-        RequestHeaders (peerId,blockHash,numberOfHeaders) |> Command.send client serviceName
+    let requestHeaders client peerId startBlockHash endBlockHash=
+        RequestHeaders (peerId,startBlockHash,endBlockHash) |> Command.send client serviceName
 
     let handleHeaders client peerId headers =
         HandleHeaders (peerId,headers) |> Command.send client serviceName
 
     let getHeaders client =
         GetHeaders |> Request.send<Request, BlockHeader list> client serviceName
+
+    let getMempool client =
+        GetMempool |> Request.send<Request, (Hash.Hash * Transaction) list> client serviceName
 
 module Network =
     type Command =
@@ -125,10 +130,12 @@ module Network =
         | SendBlock of peerId:byte[] * Block
         | GetTransaction of peerId:byte[] * Hash
         | GetBlock of Hash
-        | GetNewBlock of peerId:byte[] * Hash
+        | GetBlockFrom of peerId:byte[] * Hash
         | PublishBlock of BlockHeader
-        | GetHeaders of peerId:byte[] * blockHash:Hash * numberOfBlocks:uint16
+        | GetHeaders of peerId:byte[] * from:Hash list * toHash:Hash
         | SendHeaders of peerId:byte[] * BlockHeader list
+        | DisconnectPeer of peerId:byte[]
+        | GetTipFromAllPeers
 
     type Request =
         GetConnectionCount
@@ -153,13 +160,14 @@ module Wallet =
         | GetAddress
         | GetTransactions
         | GetBalance
-        | ImportSeed of string list * string
-        | Send of Hash * Spend * string
-        | ActivateContract of string * uint32 * string
-        | ExecuteContract of Hash * string * data option * provideReturnAddress:bool * sign:string option * Map<Asset, uint64> * string
+        | ImportSeed of string list * password:string
+        | Send of Hash * Spend * password:string
+        | ActivateContract of string * uint32 * password:string
+        | ExtendContract of Hash * uint32 * password:string
+        | ExecuteContract of Hash * string * data option * provideReturnAddress:bool * sign:string option * Map<Asset, uint64> * password:string
         | AccountExists
-        | CheckPassword of string
-        | GetPublicKey of string * string
+        | CheckPassword of password:string
+        | GetPublicKey of string * password:string
 
     let serviceName = "wallet"
 
@@ -180,6 +188,9 @@ module Wallet =
 
     let activateContract client code numberOfBlocks password =
         send<ActivateContractResponse> client serviceName (ActivateContract (code, numberOfBlocks, password))
+
+    let extendContract client address numberOfBlocks password =
+        send<Transaction> client serviceName (ExtendContract (address, numberOfBlocks, password))
 
     let executeContract client address command data provideReturnAddress sign spends password =
         send<Transaction> client serviceName (ExecuteContract (address, command, data, provideReturnAddress, sign, spends, password))

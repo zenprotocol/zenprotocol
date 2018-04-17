@@ -50,7 +50,7 @@ let setUp = fun () ->
     // initialize genesis block
     let block = Block.createGenesis chainParams [Consensus.Tests.Helper.rootTx] (0UL,0UL)
     let client = ServiceBus.Client.create busName
-    Blockchain.validateBlock client block
+    Blockchain.validateMinedBlock client block
 
 [<TearDown>]
 let tearDown = fun () ->

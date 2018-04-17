@@ -29,6 +29,7 @@ type lock =
     | FeeLock
     | DestroyLock
     | ActivationSacrificeLock
+    | ExtensionSacrificeLock of hash
     | CoinbaseLock of U32.t ** hash
 
 type output =
@@ -50,4 +51,4 @@ unopteq type blockHeader = {
     difficulty: U32.t;
     nonce: nonce }
 
-type wallet = list pointedOutput
+

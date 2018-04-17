@@ -196,7 +196,9 @@ module private Serialization =
         [<Literal>]
         let private SerializedActivationSacrifice = 5uy
         [<Literal>]
-        let private SerializedDestroy = 6uy
+        let private SerializedExtensionSacrifice = 6uy
+        [<Literal>]
+        let private SerializedDestroy = 7uy
 
         let write ops = function
             | PK hash ->
@@ -213,6 +215,9 @@ module private Serialization =
                 ops.writeByte SerializedFee
             | ActivationSacrifice ->
                 ops.writeByte SerializedActivationSacrifice
+            | ExtensionSacrifice cHash ->
+                ops.writeByte SerializedExtensionSacrifice
+                >> ops.writeHash cHash
             | Destroy ->
                 ops.writeByte SerializedDestroy
         let read = reader {
@@ -232,6 +237,9 @@ module private Serialization =
                 return Lock.Fee
             | SerializedActivationSacrifice ->
                 return Lock.ActivationSacrifice
+            | SerializedExtensionSacrifice ->
+                let! cHash = Hash.read
+                return Lock.ExtensionSacrifice (Hash.Hash cHash)
             | SerializedDestroy ->
                 return Lock.Destroy
             | _ ->

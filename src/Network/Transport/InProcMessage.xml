@@ -71,6 +71,7 @@
     </message>
 
     <message name="Block" id="20">
+        <field name="peerId" type="octets" size="4">Peer Id</field>sl
         <field name="block" type="chunk">Block</field>
     </message>
 
@@ -92,7 +93,7 @@
         <field name="blockHash" type="octets" size="32">BlockHash</field>
     </message>
 
-    <message name="Get New Block" id="25">
+    <message name="Get Block From" id="25">
         <field name="peerId" type="octets" size="4">Peer Id</field>
         <field name="blockHash" type="octets" size="32">BlockHash</field>
     </message>
@@ -122,14 +123,14 @@
 
     <message name="Get Headers" id="31">
         <field name="peerId" type="octets" size="4">Peer Id</field>
-        <field name="blockHash" type="octets" size="32">BlockHash</field>
-        <field name="numberOfHeaders" type="number" size="2">Number of Blocks</field>
+        <field name="from" type="chunk">From</field>
+        <field name="endHash" type="octets" size="32">End Hash</field>
     </message>
 
     <message name="Headers Request" id="32">
         <field name="peerId" type="octets" size="4">Peer Id</field>
-        <field name="blockHash" type="octets" size="32">BlockHash</field>
-        <field name="numberOfHeaders" type="number" size="2">Number of Blocks</field>
+        <field name="from" type="chunk">From</field>
+        <field name="endHash" type="octets" size="32">End Hash</field>
     </message>
 
     <message name="Send Headers" id="33">
@@ -140,5 +141,13 @@
     <message name="Headers" id="34">
         <field name="peerId" type="octets" size="4">Peer Id</field>
         <field name="headers" type="chunk">headers</field>
+    </message>
+
+    <message name="Disconnect Peer" id="35">
+        <field name="peerId" type="octets" size="4">Peer Id</field>
+    </message>
+
+    <message name="Get Tip From All Peers" id="36">
+
     </message>
 </class>

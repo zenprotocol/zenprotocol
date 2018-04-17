@@ -38,7 +38,7 @@ let mutable state = {
             activeContractSet = acs
             ema=EMA.create chain
         }
-    blockRequests= Map.empty
+    initialBlockDownload = InitialBlockDownload.Inactive
     headers=0ul
 }
 

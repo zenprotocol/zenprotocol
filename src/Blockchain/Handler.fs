@@ -7,11 +7,13 @@ open Messaging.Services
 open Messaging.Events
 open Consensus
 open Blockchain
+open Blockchain
 open Blockchain.EffectsWriter
 open Consensus.Types
 open State
 open DatabaseContext
 open Logary.Message
+
 
 let handleCommand chainParams command session timestamp (state:State) =
     let contractPath = session.context.contractPath
@@ -56,14 +58,14 @@ let handleCommand chainParams command session timestamp (state:State) =
             |> List.fold (fun state writer -> Writer.bind state (fun () -> writer)) (Writer.ret ())
 
         Writer.bind writer (fun () -> Writer.ret state)
-    | ValidateBlock block ->
-        BlockHandler.validateBlock chainParams contractPath session timestamp block false state
+    | ValidateBlock (peerId,block) ->
+        BlockHandler.validateBlock chainParams contractPath session timestamp (Some peerId) block false state
     | ValidateMinedBlock block ->
-        BlockHandler.validateBlock chainParams contractPath session timestamp block true state
+        BlockHandler.validateBlock chainParams contractPath session timestamp None block true state
     | HandleTip (peerId,header) ->
-        BlockHandler.handleTip chainParams session peerId header state
+        BlockHandler.handleTip chainParams session timestamp peerId header state
     | ValidateNewBlockHeader (peerId, header) ->
-        BlockHandler.handleNewBlockHeader chainParams session peerId header state
+        BlockHandler.handleNewBlockHeader chainParams session timestamp peerId header state
     | RequestTip peerId ->
         effectsWriter {
             if state.tipState.tip <> ExtendedBlockHeader.empty then
@@ -81,31 +83,18 @@ let handleCommand chainParams command session timestamp (state:State) =
 
                 return state
         }
-    | RequestHeaders (peerId, blockHash, numberOfHeaders) ->
-        let rec getHeaders blockHash headers left =
-            if left = 0us then
-                headers
-            else
-                match BlockRepository.tryGetHeader session blockHash with
-                | None -> headers
-                | Some exHeader ->
-                    if blockHash <> chainParams.genesisHash then
-                        getHeaders exHeader.header.parent (exHeader.header :: headers) (left - 1us)
-                    else
-                        (exHeader.header :: headers)
-
+    | RequestHeaders (peerId, from, endHash) ->
         effectsWriter {
-
-            let numberOfHeaders = if numberOfHeaders > 500us then 500us else numberOfHeaders
-
-            let headers = getHeaders blockHash [] numberOfHeaders
-
-            do! sendHeaders peerId headers
+            if state.tipState.tip.hash <> Hash.zero then
+                do! InitialBlockDownload.getHeaders chainParams session peerId from endHash
 
             return state
         }
     | HandleHeaders (peerId,headers) ->
-       BlockHandler.handleHeaders chainParams session peerId headers state
+       effectsWriter {
+           let! initialBlockDownload = InitialBlockDownload.processHeaders chainParams session timestamp peerId headers state.initialBlockDownload
+           return {state with initialBlockDownload = initialBlockDownload}
+       }
 
 let handleRequest chain (requestId:RequestId) request session timestamp state =
     match request with
@@ -159,6 +148,10 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
 
         requestId.reply headers
 
+    | GetMempool ->
+        let txs = MemPool.toList state.memoryState.mempool
+        requestId.reply txs
+
     | GetBlockChainInfo ->
         let tip = state.tipState.tip.header
 
@@ -179,12 +172,19 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
                     shift <- shift - 1ul
 
                 diff
+
+        let syncing = InitialBlockDownload.isActive state.initialBlockDownload
+
         {
             chain = chain.name
             blocks = state.tipState.tip.header.blockNumber
-            headers = state.headers
+            headers =
+                InitialBlockDownload.getPeerHeader state.initialBlockDownload
+                |> Option.map (fun bh -> bh.blockNumber)
+                |> Option.defaultValue state.headers
             medianTime = EMA.earliest state.tipState.ema
             difficulty = difficulty
+            initialBlockDownload = syncing
         }
         |> requestId.reply
 
@@ -192,3 +192,9 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
 
 let handleEvent event session timestamp state =
     ret state
+
+let tick chain session timestamp state = effectsWriter {
+    let! ibd = InitialBlockDownload.tick timestamp state.initialBlockDownload
+
+    return {state with initialBlockDownload = ibd}
+}

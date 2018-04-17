@@ -92,8 +92,25 @@ let parseContractActivateJson json =
             Error "Contract code is empty"
         else if String.length json.Password = 0 then
             Error "Password is empty"
+        else if json.NumberOfBlocks = 0 then
+            Error "Number of blocks is zero"
         else
             Ok (json.Code, uint32 json.NumberOfBlocks, json.Password)
+    with _ as ex ->
+        Error ("Json is invalid: " + ex.Message)
+
+let parseContractExtendJson chain json =
+    try
+        let json = ContractExtendRequestJson.Parse json
+
+        if String.length json.Password = 0 then
+            Error "Password is empty"
+        else if json.NumberOfBlocks = 0 then
+            Error "Number of blocks is zero"
+        else
+            match Address.decodeContract chain json.Address with
+            | Error err -> Error ("Address is invalid: " + err)
+            | Ok cHash -> Ok (cHash, uint32 json.NumberOfBlocks, json.Password)
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
 

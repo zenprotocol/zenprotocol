@@ -27,6 +27,7 @@ type CloseReason =
     | ExpectingHelloAck
     | NoPong
     | IncorrectNetwork
+    | BlockchainRequest
 
 type State =
     | Connecting of sent:System.DateTime
@@ -86,7 +87,7 @@ let private disconnect socket peer =
         Socket.disconnect socket (sprintf "tcp://%s" address)
         peer
 
-let private closePeer socket reason peer =
+let closePeer socket reason peer =
     eventX "Closing peer because of {reason}"
     >> setField "reason" (reason.ToString())
     |> Log.info
@@ -227,7 +228,7 @@ let handleActiveState socket next peer msg =
             next (InProcMessage.BlockRequest {peerId=(RoutingId.toBytes peer.routingId); blockHash=blockHash})
             peer
         | Message.Block block ->
-            next (InProcMessage.Block block)
+            next (InProcMessage.Block {peerId=(RoutingId.toBytes peer.routingId); block=block})
             peer
         | Message.Tip blockHeader ->
             next (InProcMessage.Tip {peerId=RoutingId.toBytes peer.routingId;blockHeader=blockHeader})
@@ -241,8 +242,8 @@ let handleActiveState socket next peer msg =
         | Message.GetHeaders request ->
             next (InProcMessage.HeadersRequest {
                 peerId=(RoutingId.toBytes peer.routingId);
-                blockHash=request.blockHash;
-                numberOfHeaders=request.numberOfHeaders;
+                from=request.from;
+                endHash= request.endHash;
             })
             peer
         | Message.Headers headers ->

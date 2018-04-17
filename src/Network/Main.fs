@@ -20,7 +20,7 @@ open Logary.Message
 
 type State = Connector.T * AddressBook.T * string option
 
-let maxConnections = 3
+let maxConnections = 10
 
 let eventHandler transport event (connector,addressBook, ownAddress) =
     match event with
@@ -109,7 +109,7 @@ let transportHandler transport seeds client msg (connector,addressBook,ownAddres
         | false ->
             eventX "Received invalid addresses from peer"
             |> Log.warning
-        
+
             connector, addressBook,ownAddress // TODO: we should punish the sending node
         | true ->
             // Filter own address
@@ -159,10 +159,10 @@ let transportHandler transport seeds client msg (connector,addressBook,ownAddres
     | InProcMessage.GetTip peerId ->
         Blockchain.requestTip client peerId
         connector, addressBook,ownAddress
-    | InProcMessage.Block block ->
+    | InProcMessage.Block {peerId=peerId;block=block} ->
         match Block.deserialize block with
         | Some block ->
-            Blockchain.validateBlock client block
+            Blockchain.validateBlock client peerId block
             connector,addressBook,ownAddress
         | None ->
             //TODO: log non-deserializable block
@@ -183,10 +183,15 @@ let transportHandler transport seeds client msg (connector,addressBook,ownAddres
         | None ->
             //TODO: log non-deserializable blockheader
             connector,addressBook,ownAddress
-    | InProcMessage.HeadersRequest {peerId=peerId;blockHash=blockHash;numberOfHeaders=numberOfHeaders} ->
-        match Hash.fromBytes blockHash with
-        | Some blockHash -> Blockchain.requestHeaders client peerId blockHash numberOfHeaders
-        | None -> ()
+    | InProcMessage.HeadersRequest {peerId=peerId;from=from;endHash=endHash} ->
+        let from =
+            Array.chunkBySize Hash.Length from
+            |> Seq.choose Hash.fromBytes
+            |> List.ofSeq
+
+        match List.isEmpty from, Hash.fromBytes endHash with
+        | false, Some endHash -> Blockchain.requestHeaders client peerId from endHash
+        | _ -> ()
 
         connector,addressBook,ownAddress
     | InProcMessage.Headers {peerId=peerId;headers=headers} ->
@@ -228,15 +233,19 @@ let commandHandler transport command (state:State) =
     | Command.GetBlock blockHash ->
         Transport.getBlock transport (Hash.bytes blockHash)
         state
+    | Command.GetBlockFrom (peerId,blockHash) ->
+        Transport.getBlockFrom transport peerId (Hash.bytes blockHash)
+        state
     | Command.PublishBlock blockHeader ->
         let bytes = Header.serialize blockHeader
         Transport.publisNewBlock transport bytes
         state
-    | Command.GetNewBlock (peerId,blockHash) ->
-        Transport.getNewBlock transport peerId (Hash.bytes blockHash)
-        state
-    | Command.GetHeaders (peerId,blockHash,numberOfBlocks) ->
-        Transport.getHeaders transport peerId (Hash.bytes blockHash) numberOfBlocks
+    | Command.GetHeaders (peerId,from,endHash) ->
+        let from =
+            List.map Hash.bytes from
+            |> Array.concat
+
+        Transport.getHeaders transport peerId from (Hash.bytes endHash)
         state
     | Command.SendHeaders (peerId, headers) ->
         let headers =
@@ -245,6 +254,12 @@ let commandHandler transport command (state:State) =
             |> Array.concat
 
         Transport.sendHeaders transport peerId headers
+        state
+    | Command.DisconnectPeer peerId ->
+        Transport.disconnectPeer transport peerId
+        state
+    | Command.GetTipFromAllPeers ->
+        Transport.getTipFromAllPeers transport
         state
 
 let handleIpAddressFound bind transport ipAddress (connector,addressBook,ownAddress) =

@@ -260,12 +260,10 @@ let connect chain getUTXO contractsPath parent timestamp utxoSet acs ema =
         else
             Ok (block,nextEma)
 
-//name is misleading, e.i. UtxoSet.handleTransaction does something else but checking
-//where is transaction unorphaning from the mempool?
     let checkTxInputs (block,ema) =
         if isGenesis chain block then
             let set = List.fold (fun set tx ->
-                let txHash = (Transaction.hash tx) // hashing is repeated thoughout the code, is not expenssive?
+                let txHash = (Transaction.hash tx)
                 UtxoSet.handleTransaction getUTXO txHash tx set) utxoSet block.transactions
             Ok (block,set,acs,ema)
         else

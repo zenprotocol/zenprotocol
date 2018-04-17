@@ -74,8 +74,8 @@
     </message>
 
     <message name="Get Headers" id="17">
-        <field name="blockHash" type="octets" size="32">BlockHash</field>
-        <field name="numberOfHeaders" type="number" size="2">Number of Blocks</field>
+        <field name="from" type="chunk">From</field>
+        <field name="endHash" type="octets" size="32">End Hash</field>
     </message>
 
     <message name="Headers" id="18">

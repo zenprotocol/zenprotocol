@@ -84,7 +84,7 @@ let handleRequest chain client (request,reply) =
             activeContracts
             |> List.map (fun contract ->
                 let address = Address.encode chain (Address.Contract contract.contractHash)
-                new ActiveContractsJson.Root(Hash.toString contract.contractHash,address, contract.expiry |> int,contract.code))
+                new ActiveContractsResponseJson.Root(Hash.toString contract.contractHash,address, contract.expiry |> int,contract.code))
             |> List.map (fun json -> json.JsonValue)
             |> List.toArray
             |> JsonValue.Array
@@ -205,6 +205,16 @@ let handleRequest chain client (request,reply) =
                 Blockchain.validateTransaction client tx
                 let json = new ContractActivateResponseJson.Root (address, Hash.toString cHash)
                 reply StatusCode.OK (JsonContent json.JsonValue)
+            | Error error ->
+                replyError error
+    | Post ("/wallet/contract/extend", Some body) ->
+        match parseContractExtendJson chain body with
+        | Error error -> replyError error
+        | Ok (cHash, numberOfBlocks, password) ->
+            match Wallet.extendContract client cHash numberOfBlocks password with
+            | Ok tx ->
+                Blockchain.validateTransaction client tx
+                reply StatusCode.OK NoContent
             | Error error ->
                 replyError error
     | Post ("/wallet/contract/execute", Some body) ->
