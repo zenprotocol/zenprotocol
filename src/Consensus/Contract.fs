@@ -15,37 +15,41 @@ open Zen.Types.Data
 open Zen.Types.Main
 open Zen.Types.Main
 
-type zfstarMainFn = txSkeleton
-                        -> contractHash
-                        -> Prims.string
-                        -> sender
-                        -> Native.option<data>
-                        -> wallet
-                        -> cost<contractResult, Prims.unit>
+type private zfstarMainFn =
+    txSkeleton
+        -> contractHash
+        -> Prims.string
+        -> sender
+        -> Native.option<data>
+        -> wallet
+        -> cost<contractResult, Prims.unit>
 
-type zfstarCostFn = txSkeleton
-                        -> Prims.string
-                        -> sender
-                        -> Native.option<data>
-                        -> wallet
-                        -> cost<Prims.nat, Prims.unit>
+type private zfstarCostFn =
+    txSkeleton
+        -> Prims.string
+        -> sender
+        -> Native.option<data>
+        -> wallet
+        -> cost<Prims.nat, Prims.unit>
 
 type ContractWallet = PointedOutput list
 
-type ContractMainFn = TxSkeleton.T 
-                          -> Hash 
-                          -> string 
-                          -> sender 
-                          -> data option 
-                          -> ContractWallet 
-                          -> Result<(TxSkeleton.T * Message Option),string>
+type ContractMainFn =
+    TxSkeleton.T
+        -> Hash
+        -> string
+        -> sender
+        -> data option
+        -> ContractWallet
+        -> Result<(TxSkeleton.T * Message Option),string>
 
-type ContractCostFn = TxSkeleton.T 
-                          -> string 
-                          -> sender 
-                          -> data option 
-                          -> ContractWallet 
-                          -> int64
+type ContractCostFn =
+    TxSkeleton.T
+        -> string
+        -> sender
+        -> data option
+        -> ContractWallet
+        -> int64
 
 type Contract = {
     hash: Hash
@@ -100,30 +104,26 @@ let private getModuleName : Hash -> string =
 let computeHash : string -> Hash = Hash.compute << Encoding.UTF8.GetBytes
 
 let load contractsPath expiry code hash =
-    let mkContract (MainFunc (CostFunc (_, costFn), mainFn) : mainFunction) : T =
+    getModuleName hash
+    |> ZFStar.load contractsPath
+    |> Result.bind getMainFunction
+    |> Result.map (fun (MainFunc (CostFunc (_, costFn), mainFn) : mainFunction) ->
         {
             hash = hash
             mainFn = wrapMainFn mainFn
             costFn = wrapCostFn costFn
             expiry = expiry
             code = code
-        }
-    
-    getModuleName hash
-    |> ZFStar.load contractsPath
-    |> Result.bind getMainFunction
-    |> Result.map mkContract
+        })
 
-let compile (contractsPath:string) 
-            (contract:Consensus.Types.Contract) 
-            (expiry:uint32) 
-            : Result<Contract, string> =
+let compile (contractsPath:string)
+            (contract:Consensus.Types.Contract) =
     let hash = computeHash contract.code
 
     hash
     |> getModuleName
     |> ZFStar.compile contractsPath contract.code contract.hints contract.rlimit
-    |> Result.bind (fun _ -> load contractsPath expiry contract.code hash)
+    |> Result.map (fun _ -> hash)
 
 let recordHints (code:string) : Result<string, string> =
     code
@@ -133,5 +133,5 @@ let recordHints (code:string) : Result<string, string> =
 
 let getCost contract = contract.costFn
 
-let run contract txSkeleton command sender data wallet = 
-    contract.mainFn txSkeleton contract.hash command sender data wallet 
+let run contract txSkeleton command sender data wallet =
+    contract.mainFn txSkeleton contract.hash command sender data wallet

@@ -34,7 +34,7 @@ let main dataPath chainParams busName =
 
         let databaseContext = DatabaseContext.create dataPath
 
-        let tip,acs,ema =
+        let tip, acs, ema, contractCache =
             use session = DatabaseContext.createSession databaseContext
             match BlockRepository.tryGetTip session with
             | Some (tip,acs,ema) ->
@@ -43,11 +43,21 @@ let main dataPath chainParams busName =
                 >> setField "blockHash" (Hash.toString tip.hash)
                 |> Log.info
 
-                tip,acs,ema
+                tip,
+                acs,
+                ema,
+                Seq.fold (fun contractCache contract -> 
+                    ContractCache.add contract contractCache) 
+                    ContractCache.empty (ActiveContractSet.getContracts acs)
+
             | None ->
                 eventX "No tip in db"
                 |> Log.info
-                ExtendedBlockHeader.empty,ActiveContractSet.empty,EMA.create chainParams
+                
+                ExtendedBlockHeader.empty,
+                ActiveContractSet.empty,
+                EMA.create chainParams,
+                ContractCache.empty
 
         let tipState =
             {
@@ -62,6 +72,7 @@ let main dataPath chainParams busName =
                 utxoSet=UtxoSet.asDatabase
                 mempool=MemPool.empty
                 orphanPool=OrphanPool.create ()
+                contractCache=contractCache
             }
 
         let state =

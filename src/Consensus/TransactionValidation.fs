@@ -46,7 +46,7 @@ let private getSacrificeBlocks (chainParams : Chain.ChainParameters) code sacrif
     else
         Ok numberOfBlocks
 
-let private activateContract (chainParams : Chain.ChainParameters) contractPath blockNumber acs (tx : Types.Transaction) =
+let private activateContract (chainParams : Chain.ChainParameters) contractPath blockNumber acs contractCache (tx : Types.Transaction) =
     let getActivationSacrifice tx = result {
         let activationSacrifices = List.filter(fun output -> output.lock = ActivationSacrifice) tx.outputs
 
@@ -81,14 +81,33 @@ let private activateContract (chainParams : Chain.ChainParameters) contractPath 
             match ActiveContractSet.tryFind cHash acs with
             | Some contract ->
                 let contract = {contract with expiry = contract.expiry + numberOfBlocks}
-                return ActiveContractSet.add cHash contract acs
+                return ActiveContractSet.add cHash contract acs, contractCache
             | None ->
-                let! contract =
-                    Measure.measure (sprintf "compiling contract %A" cHash)
-                        (lazy(Contract.compile contractPath contract (blockNumber + numberOfBlocks) |> Result.mapError (fun _ -> BadContract)))
-                return ActiveContractSet.add contract.hash contract acs
+                let! contract, contractCache = result {
+                    match ContractCache.tryFind cHash contractCache with
+                    | Some (mainFn, costFn) ->
+                        return (
+                            {
+                                hash = cHash
+                                mainFn = mainFn
+                                costFn = costFn
+                                expiry = numberOfBlocks
+                                code = contract.code
+                            } : Contract.T), contractCache
+                    | None ->
+                        let compile contract = 
+                            Contract.compile contractPath contract
+                            |> Result.bind (fun _ -> Contract.load contractPath (blockNumber + numberOfBlocks) contract.code cHash)
+                            |> Result.mapError (fun _ -> BadContract)
+                            
+                        let! contract = Measure.measure (sprintf "compiling contract %A" cHash) (lazy (compile contract))
+                        let contractCache = ContractCache.add contract contractCache
+                        
+                        return contract, contractCache
+                }
+                return ActiveContractSet.add contract.hash contract acs, contractCache
         | None ->
-            return acs
+            return acs, contractCache
     }
     
 let private extendContracts chainParams acs tx = result {
@@ -435,11 +454,11 @@ let validateCoinbase blockNumber =
     >=> checkNoContractInCoinbase
     >=> checkOutputsOverflow
 
-let validateInContext chainParams getUTXO contractPath blockNumber acs set txHash tx = result {
+let validateInContext chainParams getUTXO contractPath blockNumber acs contractCache set txHash tx = result {
     let! outputs = tryGetUtxos getUTXO set tx
     let! txSkel = checkWitnesses blockNumber acs (txHash, tx, outputs)
     do! checkAmounts txSkel
-    let! acs = activateContract chainParams contractPath blockNumber acs tx
+    let! acs, contractCache = activateContract chainParams contractPath blockNumber acs contractCache tx
     let! acs = extendContracts chainParams acs tx
-    return tx, acs
+    return tx, acs, contractCache
 }
