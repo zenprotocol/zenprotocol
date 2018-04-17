@@ -61,6 +61,7 @@
     <Compile Include="UtxoSet.fs" />
     <Compile Include="Weight.fs" />
     <Compile Include="Contract.fs" />
+    <Compile Include="ContractCache.fs" />
     <Compile Include="ActiveContractSet.fs" />
     <Compile Include="TransactionValidation.fs" />
     <Compile Include="Block.fs" />
