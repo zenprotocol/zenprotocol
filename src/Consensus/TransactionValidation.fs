@@ -40,7 +40,7 @@ let private getSacrificeBlocks (chainParams : Chain.ChainParameters) code sacrif
     let codeLength = String.length code |> uint64
     let activationSacrificePerBlock = chainParams.sacrificePerByteBlock * codeLength
     let numberOfBlocks = sacrifice / activationSacrificePerBlock |> uint32
-            
+
     if numberOfBlocks = 0ul then
         GeneralError "Contract must be activated for at least one block"
     else
@@ -109,7 +109,7 @@ let private activateContract (chainParams : Chain.ChainParameters) contractPath 
         | None ->
             return acs, contractCache
     }
-    
+
 let private extendContracts chainParams acs tx = result {
     let extensionSacrifices = List.filter(function | { lock = ExtensionSacrifice _ } -> true | _ -> false) tx.outputs
     if List.exists (fun output -> output.spend.asset <> Constants.Zen) extensionSacrifices then

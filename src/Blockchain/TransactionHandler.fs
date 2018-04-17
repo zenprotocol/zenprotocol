@@ -17,8 +17,8 @@ let private validateOrphanTransaction chainParams session contractPath blockNumb
     effectsWriter
         {
             match TransactionValidation.validateInContext chainParams (getUTXO session) contractPath (blockNumber + 1ul)
-                    state.activeContractSet state.utxoSet txHash tx with
-            | Ok (tx, acs) ->
+                    state.activeContractSet state.contractCache state.utxoSet txHash tx with
+            | Ok (tx, acs, contractCache) ->
                 let utxoSet = UtxoSet.handleTransaction (getUTXO session) txHash tx state.utxoSet
                 let mempool = MemPool.add txHash tx state.mempool
 
@@ -29,11 +29,14 @@ let private validateOrphanTransaction chainParams session contractPath blockNumb
                 |> Log.info
 
                 let orphanPool = OrphanPool.remove txHash state.orphanPool
-                return {state with
-                            activeContractSet=acs;
-                            mempool=mempool;
-                            utxoSet=utxoSet;
-                            orphanPool=orphanPool}
+                return {
+                    state with
+                        activeContractSet = acs
+                        mempool = mempool
+                        utxoSet = utxoSet
+                        orphanPool = orphanPool
+                        contractCache = contractCache
+                    }
             | Error Orphan
             | Error ContractNotActive ->
                 // transaction is still orphan, nothing to do
@@ -70,7 +73,7 @@ let validateInputs chainParams session contractPath blockNumber txHash tx (state
     effectsWriter
         {
             match TransactionValidation.validateInContext chainParams (getUTXO session) contractPath (blockNumber + 1ul)
-                    state.activeContractSet state.utxoSet txHash tx with
+                    state.activeContractSet state.contractCache state.utxoSet txHash tx with
             | Error Orphan ->
                 let orphanPool = OrphanPool.add txHash tx state.orphanPool
 
@@ -100,7 +103,7 @@ let validateInputs chainParams session contractPath blockNumber txHash tx (state
                 |> Log.info
 
                 return state
-            | Ok (tx, acs) ->
+            | Ok (tx, acs, contractCache) ->
                 let utxoSet = UtxoSet.handleTransaction (getUTXO session) txHash tx state.utxoSet
                 let mempool = MemPool.add txHash tx state.mempool
 
@@ -111,11 +114,13 @@ let validateInputs chainParams session contractPath blockNumber txHash tx (state
                 >> setField "hash" (Hash.toString txHash)
                 |> Log.info
 
-                let state = {state with
-                                activeContractSet=acs;
-                                mempool=mempool;
-                                utxoSet=utxoSet;
-                             }
+                let state = {
+                    state with
+                        activeContractSet = acs
+                        mempool = mempool
+                        utxoSet = utxoSet
+                        contractCache = contractCache
+                    }
 
                 return! validateOrphanTransactions chainParams session contractPath blockNumber state
         }

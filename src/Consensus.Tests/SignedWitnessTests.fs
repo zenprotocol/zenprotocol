@@ -21,6 +21,8 @@ let publicKey = ExtendedKey.getPublicKey (snd account) |> Result.get
 
 let serializePK = PublicKey.toString publicKey
 
+type TxResult = Result<Transaction*ActiveContractSet.T*ContractCache.T,ValidationError>
+
 let code = sprintf
             """
             open Zen.Types
@@ -70,7 +72,10 @@ let setup () =
             rlimit = Account.rlimit;
             queries = ZFStar.totalQueries hints |> Result.get
         }
-    let contract = Contract.compile contractPath contractActivation 100ul |> Result.get
+    let contract =
+        Contract.compile contractPath contractActivation 
+        |> Result.bind (Contract.load contractPath 100ul code)
+        |> Result.get
 
     acs <- ActiveContractSet.add cHash contract ActiveContractSet.empty
 
@@ -102,7 +107,7 @@ let ``contract witness with valid signature``() =
                                           }
     let tx = {tx with witnesses= [contractWintess]}
 
-    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2ul acs UtxoSet.asDatabase txHash tx
+    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2ul acs UtxoSet.asDatabase ContractCache.empty txHash tx
 
     result |> should be ok
 
@@ -135,9 +140,9 @@ let ``contract witness with invalid publickey``() =
                                           }
     let tx = {tx with witnesses= [contractWintess]}
 
-    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2ul acs UtxoSet.asDatabase txHash tx
+    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2ul acs UtxoSet.asDatabase ContractCache.empty txHash tx
 
-    let expected:Result<Transaction*ActiveContractSet.T,ValidationError> = Error (General "invalid contract witness signature")
+    let expected:TxResult = Error (General "invalid contract witness signature")
 
     result |> should equal expected
 
@@ -168,9 +173,9 @@ let ``contract witness with no signature``() =
                                           }
     let tx = {tx with witnesses= [contractWintess]}
 
-    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2ul acs UtxoSet.asDatabase txHash tx
+    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2ul acs UtxoSet.asDatabase ContractCache.empty txHash tx
 
-    let expected:Result<Transaction*ActiveContractSet.T,ValidationError> = Error (General "expected pk")
+    let expected:TxResult = Error (General "expected pk")
 
     result |> should equal expected
 
@@ -206,8 +211,8 @@ let ``contract witness with unexpcected public key``() =
                                           }
     let tx = {tx with witnesses= [contractWintess]}
 
-    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2ul acs UtxoSet.asDatabase txHash tx
+    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2ul acs UtxoSet.asDatabase ContractCache.empty txHash tx
 
-    let expected:Result<Transaction*ActiveContractSet.T,ValidationError> = Error (General "expected different pk")
+    let expected:TxResult = Error (General "expected different pk")
 
     result |> should equal expected
