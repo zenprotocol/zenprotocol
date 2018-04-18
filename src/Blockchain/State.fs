@@ -16,6 +16,7 @@ type MemoryState =
         activeContractSet: ActiveContractSet.T
         orphanPool: OrphanPool.T
         mempool: MemPool.T
+        contractCache: ContractCache.T
     }
 
 type State =

@@ -72,6 +72,7 @@ let state = {
             mempool=mempool
             orphanPool=orphanPool
             activeContractSet=acs
+            contractCache=ContractCache.empty
         }
     tipState =
         {

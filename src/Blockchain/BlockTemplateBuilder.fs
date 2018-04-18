@@ -36,16 +36,16 @@ let selectOrderedTransactions (chain:Chain.ChainParameters) (session:DatabaseCon
         let newWeight = weight+wt
         if newWeight > maxWeight then (state, added, notAdded, false, weight) else
         validateInContext chain (getUTXO session) contractPath (blockNumber + 1ul)
-            state.activeContractSet state.utxoSet txHash tx
+            state.activeContractSet state.contractCache state.utxoSet txHash tx
         |> function
             | Error (Orphan | ContractNotActive) ->
                 (state, added, (txHash,tx,wt)::notAdded, altered, weight)
             | Error _ ->
                 (state, added, notAdded, altered, weight)
-            | Ok (tx, acs) ->
+            | Ok (tx, acs, contractCache) ->
                 let utxoSet = UtxoSet.handleTransaction (getUTXO session) txHash tx state.utxoSet
                 let mempool = MemPool.add txHash tx state.mempool
-                ({state with activeContractSet=acs;mempool=mempool;utxoSet=utxoSet}, tx::added, notAdded, true, newWeight)
+                ({state with activeContractSet=acs;mempool=mempool;utxoSet=utxoSet;contractCache=contractCache}, tx::added, notAdded, true, newWeight)
 
     let foldOverTransactions foldState txs =
         List.fold tryAddTransaction foldState txs
@@ -63,7 +63,8 @@ let selectOrderedTransactions (chain:Chain.ChainParameters) (session:DatabaseCon
         activeContractSet = acs;
         orphanPool = OrphanPool.create();
         mempool = MemPool.empty
-        }
+        contractCache = ContractCache.empty
+    }
 
     foldUntilUnchanged initialState transactions
 
