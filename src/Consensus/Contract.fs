@@ -88,18 +88,18 @@ let private wrapMainFn (mainFn : zfstarMainFn) : ContractMainFn =
     fun txSkeleton (ContractId (version, Hash.Hash cHash)) command sender data contractWallet ->
         let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
         let command' = ZFStar.fsToFstString command
-        let data' = ZFStar.fsToFstOption id data
+        let data' = ZFStar.fsToFstOption data
         let contractWallet' = ZFStar.convertWallet contractWallet
         mainFn txSkeleton' (version,cHash) command' sender data' contractWallet'
         |> ZFStar.unCost
         |> ZFStar.toResult
-        |> Result.bind ZFStar.convertResult
+        |> Result.map ZFStar.convertResult
 
 let private wrapCostFn (costFn: zfstarCostFn) : ContractCostFn =
     fun txSkeleton command sender data contractWallet ->
         let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
         let command' = ZFStar.fsToFstString command
-        let data' = ZFStar.fsToFstOption id data
+        let data' = ZFStar.fsToFstOption data
         let contractWallet' = ZFStar.convertWallet contractWallet
         costFn txSkeleton' command' sender data' contractWallet'
         |> ZFStar.unCost
