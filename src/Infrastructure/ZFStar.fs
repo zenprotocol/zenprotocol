@@ -6,6 +6,7 @@ open Microsoft.FSharp.Compiler.SourceCodeServices
 open Exception
 open Infrastructure.Result
 open Logary.Message
+open FSharpx.Functional.Prelude
 
 let private fsChecker = FSharpChecker.Create()
 let private changeExtention extention path = Path.ChangeExtension (path, extention)
@@ -58,10 +59,11 @@ let private compile' path moduleName code =
 
 let private elaborate input_filepath output_target =
     try
-        let ast = FStar.Parser.Driver.parse_file input_filepath
-        let elab'd_ast = ASTUtils.elab_ast ast
-                         |> ASTUtils.add_main_to_ast
-        ASTUtils.write_ast_to_file elab'd_ast output_target
+        ASTUtils.parse_file input_filepath
+        |>! ASTUtils.check_ast
+        |>  ASTUtils.elab_ast
+        |>  ASTUtils.add_main_to_ast
+        |>  ASTUtils.write_ast_to_file output_target
         Ok ()
     with _ as ex ->
         eventX "elaboration error: {ex}"
