@@ -191,6 +191,11 @@ type Wipe =
 let main dataPath busName chain (wipe:Wipe) =
     let dataPath = Platform.combine dataPath "walletdb"
 
+    if wipe = Full then
+        eventX "Wiping wallet database"
+        |> Log.info
+        if System.IO.Directory.Exists dataPath then
+                System.IO.Directory.Delete (dataPath,true)
 
     Actor.create<Command,Request,Event, Option<Account.T>> busName serviceName (fun poller sbObservable ebObservable ->
         let databaseContext = DataAccess.createContext dataPath
@@ -204,14 +209,6 @@ let main dataPath busName chain (wipe:Wipe) =
 
             let account =
                 match wipe, account with
-                | Full, Some _ ->
-                    eventX "Wiping account"
-                    |> Log.info
-
-                    DataAccess.Account.delete dataAccess session
-                    DataAccess.Secured.delete dataAccess session
-
-                    None
                 | Reset, Some account  ->
                     eventX "Resetting account"
                     |> Log.info

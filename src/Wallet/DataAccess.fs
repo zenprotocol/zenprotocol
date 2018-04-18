@@ -15,11 +15,15 @@ let private MainAccount = "MAIN"
 [<Literal>]
 let private Secured = "SECURED"
 
+[<Literal>]
+let DbVersion = 0
+
 type Collection<'a> = Collection<string, 'a>
 
 type T = {
     accountCollection: Collection<Account.T>
     securedCollection: Collection<Secured.T>
+    dbVersion: SingleValue<int>
 }
 
 let private createCollection<'a> session name =
@@ -37,9 +41,22 @@ let init databaseContext =
     let accountCollection = createCollection<Account.T> session "accounts"
     let securedCollection = createCollection<Secured.T> session "secured"
 
+    let dbVersion =
+        SingleValue.create databaseContext "dbVersion"
+            binarySerializer.Pickle<int>
+            binarySerializer.UnPickle<int>
+
+    match SingleValue.tryGet dbVersion session with
+    | Some version when version <> DbVersion ->
+        failwithf "Wallet: wrong db version, expected %d but got %d" DbVersion version
+    | None ->
+        SingleValue.put dbVersion session DbVersion
+    | _ -> () // TODO: in the future we should have here db upgrade script
+
     let t = {
         accountCollection = accountCollection
         securedCollection = securedCollection
+        dbVersion =dbVersion
     }
 
     Session.commit session
@@ -58,9 +75,6 @@ module Account =
     let tryGet t session =
         tryGet t.accountCollection session MainAccount
 
-    let delete t session =
-        delete t.accountCollection session MainAccount
-
 module Secured =
     open Collection
 
@@ -69,6 +83,3 @@ module Secured =
 
     let tryGet t session =
         tryGet t.securedCollection session Secured
-
-    let delete t session =
-        delete t.securedCollection session Secured
