@@ -16,7 +16,8 @@ let private contractPath = "./test"
 let private inputsValidation blockNumber acs utxos signedTx txHash =
     let getUTXO _ = UtxoSet.NoOutput
 
-    validateInContext Chain.localParameters getUTXO contractPath blockNumber acs utxos txHash signedTx |> Result.map fst
+    validateInContext Chain.localParameters getUTXO contractPath blockNumber acs Map.empty utxos txHash signedTx 
+    |> Result.map (fun (tx, _, _) -> tx)
 
 let inputsValidationMsg msg blockNumber acs utxos tx keys =
     let signedTx, txHash = getSignedTx tx keys

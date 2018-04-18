@@ -65,18 +65,18 @@ let private connectChain chainParams contractPath timestamp session (origin:Exte
 
     let headers = getHeaders tip []
 
-    List.fold (fun ((validTip:ExtendedBlockHeader.T),(utxoSet, acs, ema, mempool)) tip ->
+    List.fold (fun ((validTip:ExtendedBlockHeader.T),(utxoSet, acs, ema, mempool, contractCache)) tip ->
         if not (ExtendedBlockHeader.isValid tip) then
-            validTip,(utxoSet,acs,ema, mempool)
+            validTip,(utxoSet,acs,ema,mempool,contractCache)
         elif validTip.hash <> tip.header.parent then
             // parent block is invalid, so are we
             BlockRepository.saveHeader session (ExtendedBlockHeader.invalid tip)
 
-            validTip,(utxoSet,acs,ema, mempool)
+            validTip,(utxoSet,acs,ema,mempool,contractCache)
         else
             let block = BlockRepository.getFullBlock session tip
 
-            match Block.connect chainParams (getUTXO session) contractPath validTip.header timestamp utxoSet acs ema block with
+            match Block.connect chainParams (getUTXO session) contractPath validTip.header timestamp utxoSet acs contractCache ema block with
             | Error error ->
                 BlockRepository.saveHeader session (ExtendedBlockHeader.invalid tip)
 
@@ -85,14 +85,14 @@ let private connectChain chainParams contractPath timestamp session (origin:Exte
                 >> setField "error" error
                 |> Log.info
 
-                validTip,(utxoSet,acs,ema, mempool)
-            | Ok (block,utxoSet,acs,ema) ->
+                validTip,(utxoSet,acs,ema,mempool,contractCache)
+            | Ok (block,utxoSet,acs,contractCache,ema) ->
 
                 BlockRepository.saveBlockState session tip.hash acs ema
 
                 let mempool = MemPool.handleBlock block mempool
 
-                tip,(utxoSet,acs,ema, mempool)) (origin, originState) headers
+                tip,(utxoSet,acs,ema,mempool,contractCache)) (origin, originState) headers
 
 let private connectLongestChain chainParams contractPath timestamp session origin originState chains minChainWork =
     let connectChain tip (best,state) =
@@ -178,11 +178,11 @@ let rec private addBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:Extende
     }
 
 // Undo blocks from current state in order to get the state of the forkblock
-let rec private undoBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:ExtendedBlockHeader.T) utxoSet mempool =
+let rec private undoBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:ExtendedBlockHeader.T) utxoSet mempool contractCache =
     if tip.header = forkBlock.header then
         let acs,ema = BlockRepository.getBlockState session tip.hash
 
-        (utxoSet,acs,ema,mempool)
+        (utxoSet,acs,ema,mempool,contractCache)
     else
         let parent = BlockRepository.getHeader session tip.header.parent
         let fullBlock = BlockRepository.getFullBlock session tip
@@ -194,18 +194,23 @@ let rec private undoBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:Extend
                 (getUTXO session)
                 fullBlock utxoSet
 
-        undoBlocks session forkBlock parent utxoSet mempool
+        undoBlocks session forkBlock parent utxoSet mempool contractCache
 
 // After applying block or blocks we must readd mempool transactions to the ACS and UTXO
-let getMemoryState chainParams session contractPath blockNumber mempool orphanPool acs =
+let getMemoryState chainParams session contractPath blockNumber mempool orphanPool acs contractCache =
 
     // We start with an empty mempool and current orphan pool
     // We first validate all orphan transactions according to the new state
     // We loop through existing mempool and adding it as we go to a new mempool
     // We don't publish AddedMemPool event for mempool transaction as they are already in mempool
     // We only publish add to mem pool transactions to orphan transactions
-    let memoryState = {utxoSet=UtxoSet.asDatabase;
-                        activeContractSet=acs;mempool=MemPool.empty;orphanPool=orphanPool}
+    let memoryState = {
+        utxoSet = UtxoSet.asDatabase
+        activeContractSet = acs
+        mempool = MemPool.empty
+        orphanPool = orphanPool
+        contractCache = contractCache
+    }
 
 
     let memoryState = TransactionHandler.validateOrphanTransactions chainParams session contractPath blockNumber memoryState
@@ -215,7 +220,7 @@ let getMemoryState chainParams session contractPath blockNumber mempool orphanPo
 
             TransactionHandler.validateInputs chainParams session contractPath blockNumber txHash tx memoryState false)) memoryState mempool
 
-let rollForwardChain chainParams contractPath timestamp state session block persistentBlock acs ema =
+let rollForwardChain chainParams contractPath timestamp state session block persistentBlock acs contractCache ema =
     effectsWriter {
         // unorphan any orphan chain starting with current block
         unorphanChain session persistentBlock
@@ -231,9 +236,9 @@ let rollForwardChain chainParams contractPath timestamp state session block pers
 
         let chain' =
             connectLongestChain chainParams contractPath timestamp session persistentBlock
-                (UtxoSet.asDatabase,acs,ema, mempool) chains currentChainWork
+                (UtxoSet.asDatabase,acs,ema,mempool,contractCache) chains currentChainWork
         match chain' with
-        | Some (tip,(utxoSet,acs,ema,mempool)) ->
+        | Some (tip,(utxoSet,acs,ema,mempool,contractCache)) ->
 
             let tip = ExtendedBlockHeader.markAsMain tip
 
@@ -243,7 +248,7 @@ let rollForwardChain chainParams contractPath timestamp state session block pers
             UtxoSetRepository.save session utxoSet
 
             let tipState = {activeContractSet=acs;ema=ema;tip=tip}
-            let! memoryState = getMemoryState chainParams session contractPath tip.header.blockNumber mempool state.memoryState.orphanPool acs
+            let! memoryState = getMemoryState chainParams session contractPath tip.header.blockNumber mempool state.memoryState.orphanPool acs contractCache
 
             do! addBlocks session persistentBlock tip
 
@@ -259,7 +264,7 @@ let rollForwardChain chainParams contractPath timestamp state session block pers
             return {state with tipState=tipState;memoryState=memoryState}
         | None ->
             let tipState = {activeContractSet=acs;ema=ema;tip=persistentBlock}
-            let! memoryState = getMemoryState chainParams session contractPath persistentBlock.header.blockNumber mempool state.memoryState.orphanPool acs
+            let! memoryState = getMemoryState chainParams session contractPath persistentBlock.header.blockNumber mempool state.memoryState.orphanPool acs contractCache
 
             eventX "BlockHandler: New tip #{blockNumber} {tip}"
             >> setField "blockNumber" tipState.tip.header.blockNumber
@@ -276,7 +281,7 @@ let rollForwardChain chainParams contractPath timestamp state session block pers
 let private handleGenesisBlock chainParams contractPath session timestamp (state:State) blockHash block =
     effectsWriter {
         match Block.connect chainParams (getUTXO session) contractPath Block.genesisParent timestamp UtxoSet.asDatabase
-                ActiveContractSet.empty (EMA.create chainParams) block with
+                ActiveContractSet.empty state.memoryState.contractCache (EMA.create chainParams) block with
         | Error error ->
             eventX "Failed connecting genesis block {hash} due to {error}"
             >> setField "hash" (block.header |> Block.hash |> Hash.toString)
@@ -286,7 +291,7 @@ let private handleGenesisBlock chainParams contractPath session timestamp (state
             let! ibd = InitialBlockDownload.invalid timestamp blockHash state.initialBlockDownload
 
             return {state with initialBlockDownload = ibd}
-        | Ok (block,utxoSet,acs,ema) ->
+        | Ok (block,utxoSet,acs,contractCache,ema) ->
             eventX "BlockHandler: Genesis block received"
             |> Log.info
 
@@ -304,7 +309,7 @@ let private handleGenesisBlock chainParams contractPath session timestamp (state
 
             let state = {state with initialBlockDownload = ibd}
 
-            return! rollForwardChain chainParams contractPath timestamp state session block extendedHeader acs ema
+            return! rollForwardChain chainParams contractPath timestamp state session block extendedHeader acs state.memoryState.contractCache ema
     }
 
 // Handle new block that is extending the main chain
@@ -313,7 +318,7 @@ let private handleGenesisBlock chainParams contractPath session timestamp (state
 let private handleMainChain chain contractPath session timestamp (state:State) (parent:ExtendedBlockHeader.T) blockHash block =
     effectsWriter {
         match Block.connect chain (getUTXO session) contractPath parent.header timestamp UtxoSet.asDatabase
-                state.tipState.activeContractSet state.tipState.ema block with
+                state.tipState.activeContractSet state.memoryState.contractCache state.tipState.ema block with
         | Error error ->
             eventX "Failed connecting block {hash} due to {error}"
             >> setField "hash" (block.header |> Block.hash |> Hash.toString)
@@ -324,7 +329,7 @@ let private handleMainChain chain contractPath session timestamp (state:State) (
             let state = { state with initialBlockDownload = initialBlockDownload }
 
             return state
-        | Ok (block,utxoSet,acs,ema) ->
+        | Ok (block,utxoSet,acs,contractCache,ema) ->
             eventX "BlockHandler: New block #{blockNumber} {timestamp} with {txs} txs 0x{difficulty} {blockHash}"
             >> setField "blockNumber" block.header.blockNumber
             >> setField "timestamp" (Timestamp.toString timestamp)
@@ -348,7 +353,7 @@ let private handleMainChain chain contractPath session timestamp (state:State) (
             // Pulishing event of the new block
             do! publish (BlockAdded (blockHash, block))
 
-            return! rollForwardChain chain contractPath timestamp state session block extendedHeader acs ema
+            return! rollForwardChain chain contractPath timestamp state session block extendedHeader acs state.memoryState.contractCache ema
     }
 
 // New block that is extending one of the fork chains
@@ -385,7 +390,7 @@ let private handleForkChain chain contractPath session timestamp (state:State) p
 
             // undo blocks from mainnet to get fork block state
             let forkState = undoBlocks session forkBlock currentTip
-                                UtxoSet.asDatabase state.memoryState.mempool
+                                UtxoSet.asDatabase state.memoryState.mempool state.memoryState.contractCache
 
             match connectLongestChain chain contractPath timestamp session  forkBlock forkState chains currentChainWork with
             | None ->
@@ -396,7 +401,7 @@ let private handleForkChain chain contractPath session timestamp (state:State) p
 
                 // No connectable chain is not longer than current chain
                 return state
-            | Some (tip,(utxoSet,acs,ema,mempool)) ->
+            | Some (tip,(utxoSet,acs,ema,mempool,contractCache)) ->
                 eventX "Reorg to #{blockNumber} {hash}"
                 >> setField "blockNumber" tip.header.blockNumber
                 >> setField "hash" (Hash.toString tip.hash)
@@ -412,7 +417,7 @@ let private handleForkChain chain contractPath session timestamp (state:State) p
                 do! addBlocks session forkBlock tip
 
                 let tipState = {activeContractSet=acs;ema=ema;tip=tip}
-                let! memoryState = getMemoryState chain session contractPath tip.header.blockNumber mempool state.memoryState.orphanPool acs
+                let! memoryState = getMemoryState chain session contractPath tip.header.blockNumber mempool state.memoryState.orphanPool acs contractCache
 
                 // Not publishing new blocks during the initial download phase
                 if not <| InitialBlockDownload.isActive state.initialBlockDownload then

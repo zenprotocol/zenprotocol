@@ -34,7 +34,9 @@ let compile code = result {
         queries = queries
     }
 
-    return! Contract.compile contractPath contract 1000ul
+    return! 
+        Contract.compile contractPath contract
+        |> Result.bind (Contract.load contractPath 100ul code)
 }
 
 let compileAndCheck code =
@@ -62,7 +64,7 @@ let ``Should get 'elaborate' error for invalid code``() =
 
 let validateInputs (contract:Contract.T) utxos tx  =
     let acs = ActiveContractSet.add contract.hash contract ActiveContractSet.empty
-    TransactionValidation.validateInContext Chain.localParameters getUTXO contractPath 1ul acs utxos (Transaction.hash tx) tx
+    TransactionValidation.validateInContext Chain.localParameters getUTXO contractPath 1ul acs Map.empty utxos (Transaction.hash tx) tx
     |> Result.mapError (function
         | TransactionValidation.ValidationError.General error -> error
         | other -> other.ToString())
@@ -81,7 +83,7 @@ let compileRunAndValidate inputTx utxoSet code =
                 |> Transaction.addWitnesses [ ContractWitness cw ])
             |> Result.map (Transaction.sign [ sampleKeyPair ])
             |> Result.bind (validateInputs contract utxoSet))
-            |> Result.map (fun (tx, _) -> tx)
+            |> Result.map (fun (tx, _, _) -> tx)
     )
 let utxoSet =
     getSampleUtxoset (UtxoSet.asDatabase)

@@ -38,7 +38,9 @@ let compile code = result {
         queries = queries
     }
 
-    return! Contract.compile contractPath contract 1000ul
+    return! 
+        Contract.compile contractPath contract
+        |> Result.bind (Contract.load contractPath 100ul code)
 }
 
 // Message passing 'artificial' test:

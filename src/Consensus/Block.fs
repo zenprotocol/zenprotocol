@@ -241,7 +241,7 @@ let validate chain =
     >=> checkCommitments
 
 /// Apply block to UTXO and ACS, operation can fail
-let connect chain getUTXO contractsPath parent timestamp utxoSet acs ema =
+let connect chain getUTXO contractsPath parent timestamp utxoSet acs contractCache ema =
     let checkBlockNumber (block:Block) =
         if parent.blockNumber + 1ul <> block.header.blockNumber then
             Error "blockNumber mismatch"
@@ -249,6 +249,7 @@ let connect chain getUTXO contractsPath parent timestamp utxoSet acs ema =
 
     let checkDifficulty (block:Block) =
         let nextEma = EMA.add chain block.header.timestamp ema
+    
         if block.header.difficulty <> ema.difficulty then
             Error "incorrect proof of work"
         elif isGenesis chain block then
@@ -265,30 +266,29 @@ let connect chain getUTXO contractsPath parent timestamp utxoSet acs ema =
             let set = List.fold (fun set tx ->
                 let txHash = (Transaction.hash tx)
                 UtxoSet.handleTransaction getUTXO txHash tx set) utxoSet block.transactions
-            Ok (block,set,acs,ema)
+            Ok (block,set,acs,ema,contractCache)
         else
             let coinbase = List.head block.transactions
             let withoutCoinbase = List.tail block.transactions
 
             let set = UtxoSet.handleTransaction getUTXO (Transaction.hash coinbase) coinbase utxoSet
 
-            List.fold (fun state tx->
-                match state with
-                | Error e -> Error e
-                | Ok (block,set,acs,ema) ->
-                    let txHash = (Transaction.hash tx)
+            List.fold (fun state tx -> result {
+                let! block,set,acs,ema,contractCache = state
 
-                    match TransactionValidation.validateInContext chain getUTXO contractsPath (block.header.blockNumber) acs set txHash tx with
-                    | Error err -> Error (sprintf "transactions failed inputs validation due to %A" err)
-                    | Ok (_,acs) ->
-                        let set = UtxoSet.handleTransaction getUTXO txHash tx set
+                let txHash = (Transaction.hash tx)
 
-                        Ok (block,set,acs,ema)
-                    ) (Ok (block,set,acs,ema)) withoutCoinbase
+                let! _,acs,contractCache = 
+                    TransactionValidation.validateInContext chain getUTXO contractsPath block.header.blockNumber acs contractCache set txHash tx
+                    |> Result.mapError (sprintf "transactions failed inputs validation due to %A")
 
-    let checkCoinbase (block,set,acs,ema) =
+                let set = UtxoSet.handleTransaction getUTXO txHash tx set
+                return block,set,acs,ema,contractCache
+            }) (Ok (block,set,acs,ema,contractCache)) withoutCoinbase
+
+    let checkCoinbase (block,set,acs,ema,contractCache) =
         if isGenesis chain block then
-            Ok (block,set,acs,ema)
+            Ok (block,set,acs,ema,contractCache)
         else
             let coinbase = List.head block.transactions
             let transactions = List.tail block.transactions
@@ -319,9 +319,9 @@ let connect chain getUTXO contractsPath parent timestamp utxoSet acs ema =
             if coinbaseTotals <> blockRewardAndFees then
                 Error "block reward is incorrect"
             else
-                Ok (block,set,acs,ema)
+                Ok (block,set,acs,ema,contractCache)
 
-    let checkCommitments (block,set,acs,ema) =
+    let checkCommitments (block,set,acs,ema,contractCache) =
         let acs = ActiveContractSet.expireContracts block.header.blockNumber acs
         let acsMerkleRoot = SparseMerkleTree.root acs
 
@@ -333,7 +333,7 @@ let connect chain getUTXO contractsPath parent timestamp utxoSet acs ema =
         // We ignore the known commitments in the block as we already calculated them
         // Only check that the final commitment is correct
         if commitments = block.header.commitments then
-            Ok (block,set,acs,ema)
+            Ok (block,set,acs,contractCache,ema)
         else
             Error "commitments mismatch"
 
@@ -349,13 +349,9 @@ let connect chain getUTXO contractsPath parent timestamp utxoSet acs ema =
             return! Error err
     }
 
-
     checkBlockNumber
     >=> checkDifficulty
     >=> checkWeight
     >=> checkTxInputs
     >=> checkCoinbase
     >=> checkCommitments
-
-
-

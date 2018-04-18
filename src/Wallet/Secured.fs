@@ -6,6 +6,6 @@ open Infrastructure.Security
 
 type T = byte[]
 
-let create password secret = AuthenticatedEncryption.encrypt password secret
+let create password (secret:string) = AuthenticatedEncryption.encrypt password (System.Text.Encoding.ASCII.GetBytes secret)
 
-let decrypt password secured = AuthenticatedEncryption.decrypt password secured >>= ExtendedKey.create
+let decrypt password secured = AuthenticatedEncryption.decrypt password secured <@> System.Text.Encoding.ASCII.GetString

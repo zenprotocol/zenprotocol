@@ -32,6 +32,8 @@ let goodTotalQueries = match Infrastructure.ZFStar.totalQueries goodHints with
 let getUTXO _ = UtxoSet.NoOutput
 let getWallet _ = Map.empty
 
+type BkResult = Result<(Block*UtxoSet.T*ActiveContractSet.T*ContractCache.T*EMA.T) , string>
+
 let coinbase blockNumber transactions =
     Block.getBlockCoinbase chain ActiveContractSet.empty blockNumber transactions Hash.zero
 
@@ -99,7 +101,11 @@ let ``connecting block failed when block number is not successive``(parent:Block
     let ema = EMA.create chain
 
     parent.blockNumber + 1ul <> block.header.blockNumber
-    ==> (Block.connect chain getUTXO contractsPath parent 1UL utxoSet acs ema block = Error "blockNumber mismatch")
+    ==>
+    (match Block.connect chain getUTXO contractsPath parent 1UL utxoSet acs ContractCache.empty ema block with
+    | Ok _ -> Ok ()
+    | Error error -> Error error
+    = Error "blockNumber mismatch")
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``connecting block should fail when commitments are wrong``(parent:BlockHeader) =
@@ -122,7 +128,10 @@ let ``connecting block should fail when commitments are wrong``(parent:BlockHead
 
     let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero;}
 
-    Block.connect chain getUTXO contractsPath parent (timestamp + 1UL) utxoSet acs ema block = Error "commitments mismatch"
+    match Block.connect chain getUTXO contractsPath parent (timestamp + 1UL) utxoSet acs ContractCache.empty ema block with
+    | Ok _ -> Ok ()
+    | Error error -> Error error
+    = Error "commitments mismatch"
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``connecting block should fail when transaction inputs are invalid``(parent:BlockHeader) (NonEmptyTransactions transactions) =
@@ -132,7 +141,7 @@ let ``connecting block should fail when transaction inputs are invalid``(parent:
 
     let block = Block.createTemplate chain parent timestamp ema acs transactions Hash.zero
 
-    match Block.connect chain getUTXO contractsPath parent (timestamp + 1UL) utxoSet acs ema block with
+    match Block.connect chain getUTXO contractsPath parent (timestamp + 1UL) utxoSet acs ContractCache.empty ema block with
     | Error error
                 when error.StartsWith "transactions failed inputs validation due to"
                   || error = "Output lookup error"
@@ -161,9 +170,9 @@ let ``block timestamp too early``() =
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate chain parent timestamp ema acs [tx] Hash.zero
 
-    let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "block's timestamp is too early"
+    let expected : BkResult = Error "block's timestamp is too early"
 
-    Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ema block
+    Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ContractCache.empty ema block
     |> should equal expected
 
 [<Test>]
@@ -184,9 +193,9 @@ let ``block timestamp in the future``() =
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate chain parent (timestamp + Block.MaxTimeInFuture + 1UL) ema acs [tx] Hash.zero
 
-    let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "block timestamp too far in the future"
+    let expected : BkResult = Error "block timestamp too far in the future"
 
-    Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ema block
+    Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ContractCache.empty ema block
     |> should equal expected
 
 [<Test>]
@@ -205,9 +214,9 @@ let ``block with mismatch commitments fail connecting``() =
     let block = Block.createTemplate chain parent (timestamp + 1UL) ema acs [tx] Hash.zero
     let block = {block with commitments=[Hash.zero]}
 
-    let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "commitments mismatch"
+    let expected : BkResult = Error "commitments mismatch"
 
-    Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ema block
+    Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ContractCache.empty ema block
     |> should equal expected
 
 [<Test>]
@@ -225,7 +234,7 @@ let ``can connect valid block``() =
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate chain parent (timestamp+1UL) ema acs [tx] Hash.zero
 
-    Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ema block
+    Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ContractCache.empty ema block
     |> should be ok
 
 [<Test>]
@@ -240,7 +249,7 @@ let ``can connect block with coinbase only``() =
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate chain parent (timestamp+1UL) ema acs [] Hash.zero
 
-    Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ema block
+    Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ContractCache.empty ema block
     |> should be ok
 
 [<Test>]
@@ -267,8 +276,7 @@ let ``can connect block with a contract``() =
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate chain  parent (timestamp+1UL) ema acs [tx] Hash.zero
 
-    Block.connect chain getUTXO contractsPath parent timestamp utxoSet ActiveContractSet.empty ema block
-    //|> printfn "%A"
+    Block.connect chain getUTXO contractsPath parent timestamp utxoSet ActiveContractSet.empty ContractCache.empty ema block
     |> should be ok
 
 [<Test>]
@@ -300,9 +308,9 @@ let ``block with invalid contract failed connecting``() =
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate chain parent (timestamp+1UL) ema acs [tx] Hash.zero
 
-    let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "transactions failed inputs validation due to BadContract"
+    let expected : BkResult = Error "transactions failed inputs validation due to BadContract"
 
-    Block.connect chain getUTXO contractsPath parent timestamp utxoSet (ActiveContractSet.empty) ema block
+    Block.connect chain getUTXO contractsPath parent timestamp utxoSet (ActiveContractSet.empty) ContractCache.empty ema block
     |> should equal expected
 
 [<Test>]
@@ -388,9 +396,9 @@ let ``block with wrong coinbase reward``() =
 
     let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot; witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot;}
 
-    let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> = Error "block reward is incorrect"
+    let expected : BkResult = Error "block reward is incorrect"
 
-    Block.connect chain getUTXO contractsPath parent timestamp (UtxoSet.asDatabase) (ActiveContractSet.empty) ema block
+    Block.connect chain getUTXO contractsPath parent timestamp (UtxoSet.asDatabase) (ActiveContractSet.empty) ContractCache.empty ema block
     |> should equal expected
 
 [<Test>]
@@ -523,10 +531,10 @@ let ``block with coinbase with multiple asset as reward should fail``() =
 
     let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot; witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot;}
 
-    let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> =
+    let expected : BkResult =
         Error "block reward is incorrect"
 
-    Block.connect chain getUTXO contractsPath parent timestamp (UtxoSet.asDatabase) (ActiveContractSet.empty) ema block
+    Block.connect chain getUTXO contractsPath parent timestamp (UtxoSet.asDatabase) (ActiveContractSet.empty) ContractCache.empty ema block
     |> should equal expected
 
 [<Test>]
@@ -575,7 +583,7 @@ let ``coinbase reward split over multiple outputs``() =
 
     let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot; witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot;}
 
-    Block.connect chain getUTXO contractsPath parent timestamp (UtxoSet.asDatabase) (ActiveContractSet.empty) ema block
+    Block.connect chain getUTXO contractsPath parent timestamp (UtxoSet.asDatabase) (ActiveContractSet.empty) ContractCache.empty ema block
     |> should be ok
 
 [<Test>]
@@ -608,7 +616,7 @@ let ``block spending mature transaction is valid``() =
     let parent = {version=0ul; parent=Hash.zero; blockNumber=100ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate chain parent (timestamp+1UL) ema acs [tx] Hash.zero
 
-    Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ema block
+    Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ContractCache.empty ema block
     |>  should be ok
 
 
@@ -641,10 +649,10 @@ let ``block spending unmature transaction is invalid``() =
     let parent = {version=0ul; parent=Hash.zero; blockNumber=99ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate chain parent (timestamp+1UL) ema acs [tx] Hash.zero
 
-    let expected : Result<(Block*UtxoSet.T*ActiveContractSet.T*EMA.T) , string> =
+    let expected : BkResult =
         Error "transactions failed inputs validation due to General \"Coinbase not mature enough\""
 
-    Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ema block
+    Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ContractCache.empty ema block
     |> should equal expected
 
 [<Test>]
@@ -665,7 +673,7 @@ let ``contract get removed when expiring arrive``() =
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate chain parent (timestamp+1UL) ema acs [] Hash.zero
 
-    Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ema block
+    Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ContractCache.empty ema block
     |> should be ok
 
 [<Test>]
@@ -708,7 +716,7 @@ let ``Overweight block should be rejected``() =
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate chain parent (timestamp+1UL) ema acs [tx1;tx2] Hash.zero
 
-    let res = Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ema block
+    let res = Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ContractCache.empty ema block
     res |> should not' (be ok)
     let errStr =
         match res with | Error err -> err | _ -> assert false; ""

@@ -9,6 +9,9 @@ open Infrastructure
 open MBrace.FsPickler
 open Serialization
 
+[<Literal>]
+let DbVersion = 0
+
 // TODO:Move to own file
 // TODO:Implement serialize and deserialize for persistence
 type BlockState =
@@ -30,6 +33,7 @@ type T =
         transactions:Collection<Hash.Hash, Transaction>
         transactionBlocks:MultiCollection<Hash.Hash, Hash.Hash>
         contractPath:string
+        dbVersion:SingleValue<int>
     }
     interface System.IDisposable with
         member x.Dispose () =
@@ -111,6 +115,18 @@ let create dataPath =
             binarySerializer.Pickle<PointedOutput>
             binarySerializer.UnPickle<PointedOutput>
 
+    let dbVersion =
+        SingleValue.create databaseContext "dbVersion"
+            binarySerializer.Pickle<int>
+            binarySerializer.UnPickle<int>
+
+    match SingleValue.tryGet dbVersion session with
+    | Some version when version <> DbVersion ->
+        failwithf "Blockchain: wrong db version, expected %d but got %d" DbVersion version
+    | None ->
+        SingleValue.put dbVersion session DbVersion
+    | _ -> () // TODO: in the future we should have here db upgrade script
+
     Session.commit session
 
     {
@@ -125,6 +141,7 @@ let create dataPath =
         transactions=transactions
         transactionBlocks = transactionBlocks
         contractPath=(Platform.combine dataPath "contracts")
+        dbVersion = dbVersion
     }
 
 let createEmpty pathToFolder =
