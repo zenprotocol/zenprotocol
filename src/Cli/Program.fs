@@ -34,8 +34,8 @@ type PublishBlockArgs =
     interface IArgParserTemplate with
         member arg.Usage = ""
 
-type CheckPasswordArgs =
-    | [<MainCommand("COMMAND");ExactlyOnce>] CheckPassword_Arguments of password:string
+type PasswordArgs =
+    | [<MainCommand("COMMAND");ExactlyOnce>] Password_Arguments of password:string
     interface IArgParserTemplate with
         member arg.Usage = ""
 
@@ -62,7 +62,8 @@ type Arguments =
     | [<CliPrefix(CliPrefix.None)>] Active of ParseResults<NoArgs>
     | [<CliPrefix(CliPrefix.None)>] PublishBlock of ParseResults<PublishBlockArgs>
     | [<CliPrefix(CliPrefix.None)>] AccountExists of ParseResults<NoArgs>
-    | [<CliPrefix(CliPrefix.None)>] CheckPassword of ParseResults<CheckPasswordArgs>
+    | [<CliPrefix(CliPrefix.None)>] CheckPassword of ParseResults<PasswordArgs>
+    | [<CliPrefix(CliPrefix.None)>] MnemonicPhrase of ParseResults<PasswordArgs>
     interface IArgParserTemplate with
         member arg.Usage =
             match arg with
@@ -84,6 +85,7 @@ type Arguments =
             | PublishBlock _ -> "publish a block to the network"
             | AccountExists _ -> "check for an existing account"
             | CheckPassword _ -> "check a password"
+            | MnemonicPhrase _ -> "get the mnemonic phrase"
 
 [<EntryPoint>]
 let main argv =
@@ -243,8 +245,15 @@ let main argv =
             |> Http.Request
             |> printResponse
         | Some (CheckPassword args) ->
-            let password = args.GetResult <@ CheckPassword_Arguments @>
+            let password = args.GetResult <@ Password_Arguments @>
             "wallet/checkpassword"
+            |> getUri
+            |> (new CheckPasswordJson.Root(password))
+                .JsonValue.Request
+            |> printResponse
+        | Some (MnemonicPhrase args) ->
+            let password = args.GetResult <@ Password_Arguments @>
+            "wallet/mnemonicphrase"
             |> getUri
             |> (new CheckPasswordJson.Root(password))
                 .JsonValue.Request

@@ -84,6 +84,15 @@ let create seed =
             index = 0
         }
 
+let fromMnemonicPhrase (mnemonicPhrase:string) =
+    try
+         let mnemonicSentence = new NBitcoin.Mnemonic(mnemonicPhrase, NBitcoin.Wordlist.English)
+
+         mnemonicSentence.DeriveSeed mnemonicPhrase
+         |> create
+    with _ as ex ->
+        Error ex.Message
+
 let derive i parent = result {
     let! data = result {
         match parent.key with

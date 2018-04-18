@@ -48,13 +48,13 @@ let private purpose = ExtendedKey.Hardened 44
 
 let deriveZenKey = ExtendedKey.derivePath "m/44'/258'/0'/0/0"
 
-let private create password tipHash tipBlockNumber seed = result {
-    let! extendedPrivateKey = ExtendedKey.create seed
+let private create mnemonicPhrase password tipHash tipBlockNumber = result {
+    let! extendedPrivateKey = ExtendedKey.fromMnemonicPhrase mnemonicPhrase
 
     let! zenPrivateKey = deriveZenKey extendedPrivateKey
     let! publicKey =ExtendedKey.getPublicKey zenPrivateKey
 
-    let secured = Secured.create password seed
+    let secured = Secured.create password mnemonicPhrase
 
     return {
         deltas = List.empty
@@ -66,16 +66,10 @@ let private create password tipHash tipBlockNumber seed = result {
     }, secured
 }
 
-let private deriveSeed words =
-    try
-         let mnemonicSentence = new NBitcoin.Mnemonic(String.concat " " words, NBitcoin.Wordlist.English)
-         Ok <| mnemonicSentence.DeriveSeed passphrase
-     with _ as ex ->
-         Error ex.Message
+let import mnemonicPhrase =
+    let mnemonicPhrase = String.concat " " mnemonicPhrase
 
-let import words password tipHash tipBlockNumber =
-    deriveSeed words
-    >>= create password tipHash tipBlockNumber
+    create mnemonicPhrase
 
 let private isKeyMatch account address =
     PublicKey.hash account.publicKey = address
@@ -375,15 +369,15 @@ let createExtendContractTransaction client chainParams cHash (numberOfBlocks:uin
     let activeContracts = Blockchain.getActiveContracts client
 
     result {
-        let! code = 
+        let! code =
             activeContracts
-            |> List.tryFind (function 
+            |> List.tryFind (function
                              | { contractHash = contractHash } when contractHash = cHash -> true
                              | _ -> false)
             |> function
             | Some activeContract -> Ok activeContract.code
             | None -> Error "contract is not active"
-            
+
         let codeLength = String.length code |> uint64
         let extensionSacrifice = chainParams.sacrificePerByteBlock * codeLength * (uint64 numberOfBlocks)
         let spend = { amount = extensionSacrifice; asset = Constants.Zen }

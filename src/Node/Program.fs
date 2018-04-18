@@ -9,13 +9,16 @@ open Logary.Message
 
 module Actor = FsNetMQ.Actor
 
+type Wipe =
+    | Full
+
 [<NoAppSettings>]
 type Argument =
     | Chain of string
     | Api of string
     | Bind of string
     | Ip of string
-    | Wipe
+    | Wipe of full:Wipe option
     | Miner
     | [<AltCommandLine("-t")>] Threads of int
     | [<AltCommandLine("-lr")>] Localhost
@@ -31,7 +34,7 @@ type Argument =
                 | Bind _ -> "Set the address the node should listen on"
                 | Chain _ -> "specify chain (local,test or main)."
                 | Ip _ -> "specify the IP the node should relay to other peers"
-                | Wipe -> "wipe database"
+                | Wipe _ -> "wipe database, specify full if you want to remove wallet well"
                 | Miner -> "enable miner"
                 | Threads _ -> "number of threads to use for miner"
                 | Localhost -> "specify if the node should ast as localhost"
@@ -74,6 +77,7 @@ let main argv =
     let results = parser.Parse argv
 
     let mutable wipe = false
+    let mutable wipeFull = false
 
     use logary = Log.create
 
@@ -117,7 +121,9 @@ let main argv =
             config.listen <- true
         | Ip ip ->
             config.externalIp <- ip
-        | Wipe -> wipe <- true
+        | Wipe full ->
+            wipe <- true
+            wipeFull <- Option.isSome full
         | Miner ->
             config.miner <- true
         | Threads n ->
@@ -134,19 +140,15 @@ let main argv =
     let chainParams = getChainParameters chain
     let dataPath = Platform.combine config.dataPath config.chain
 
-    if wipe then
-        eventX "Wiping database"
-        |> Log.info
-        if IO.Directory.Exists dataPath then
-                IO.Directory.Delete (dataPath,true)
-
     use brokerActor = createBroker ()
-    use blockchainActor = Blockchain.Main.main dataPath chainParams busName
+    use blockchainActor = Blockchain.Main.main dataPath chainParams busName wipe
 
     use networkActor =
         Network.Main.main busName chainParams config.externalIp config.listen config.bind config.seeds
 
-    use walletActor = Wallet.Main.main dataPath busName chain
+    use walletActor =
+        if wipeFull then Wallet.Main.Full elif wipe then Wallet.Main.Reset else Wallet.Main.NoWipe
+        |> Wallet.Main.main dataPath busName chain
 
     use minerActors =
         if config.miner then

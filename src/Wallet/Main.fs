@@ -81,6 +81,7 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             match DataAccess.Secured.tryGet dataAccess session with
             | Some secured ->
                 Secured.decrypt password secured
+                >>= ExtendedKey.fromMnemonicPhrase
                 <@> fun extendedKey -> account, extendedKey
             | None ->
                 Error "Could not unlock account - no data"
@@ -170,8 +171,32 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
         | Error error -> Error error
         |> reply<bool> requestId
         account
+    | GetMnemonicPhrase password ->
+       match DataAccess.Secured.tryGet dataAccess session with
+       | Some secured ->
+           match Secured.decrypt password secured with
+           | Ok mnemonicPhrase -> Ok mnemonicPhrase
+           | Error error -> Error error
+       | None ->
+           Error "Could not unlock account - no data"
+       |> reply<string> requestId
 
-let main dataPath busName chain =
+       account
+
+type Wipe =
+    | Full
+    | Reset
+    | NoWipe
+
+let main dataPath busName chain (wipe:Wipe) =
+    let dataPath = Platform.combine dataPath "walletdb"
+
+    if wipe = Full then
+        eventX "Wiping wallet database"
+        |> Log.info
+        if System.IO.Directory.Exists dataPath then
+                System.IO.Directory.Delete (dataPath,true)
+
     Actor.create<Command,Request,Event, Option<Account.T>> busName serviceName (fun poller sbObservable ebObservable ->
         let databaseContext = DataAccess.createContext dataPath
         let dataAccess = DataAccess.init databaseContext
@@ -180,11 +205,31 @@ let main dataPath busName chain =
         let account =
             use session = DatabaseContext.createSession databaseContext
 
-            DataAccess.Account.tryGet dataAccess session
-            |> Option.map (fun account ->
-                eventX "Account exists. syncing..."
-                |> Log.info
-                sync client account)
+            let account = DataAccess.Account.tryGet dataAccess session
+
+            let account =
+                match wipe, account with
+                | Reset, Some account  ->
+                    eventX "Resetting account"
+                    |> Log.info
+
+                    let account = { account with deltas = List.empty; outputs=Map.empty; tip = Hash.zero; blockNumber = 0ul; mempool = List.empty }
+                    DataAccess.Account.put dataAccess session account
+
+                    Some account
+                | NoWipe, Some account ->
+                    eventX "Syncing account..."
+                    |> Log.info
+
+                    let account = sync client account
+                    DataAccess.Account.put dataAccess session account
+
+                    Some account
+                | _, account -> account
+
+            Session.commit session
+
+            account
 
         let sbObservable =
             sbObservable

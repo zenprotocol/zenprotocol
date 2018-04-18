@@ -167,6 +167,20 @@ let handleRequest chain client (request,reply) =
             | Error error -> replyError error
         | Error error ->
             replyError error
+    | Post ("/wallet/mnemonicphrase", Some body) ->
+        // TODO: should be a get with Authorization header
+        match parseCheckPasswordJson body with
+        | Ok password ->
+            match Wallet.getMnemonicPhrase client password with
+            | Ok mnemonicPhrase ->
+                mnemonicPhrase
+                |> JsonValue.String
+                |> JsonContent
+                |> reply StatusCode.OK
+            | Error error ->
+                replyError error
+        | Error error ->
+            replyError error
     | Post ("/wallet/send", Some body) ->
         match parseSendJson chain body with
         | Ok (pkHash, spend, password) ->

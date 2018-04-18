@@ -4,7 +4,6 @@ open NUnit.Framework
 open FsUnit
 open Blockchain
 open Blockchain.InitialBlockDownload
-open Blockchain.EffectsWriter
 open Consensus
 open Consensus.Chain
 open Consensus.Types
@@ -14,6 +13,8 @@ open Messaging.Services
 let chain = localParameters
 let peerId = Array.empty
 let difficulty = Difficulty.compress localParameters.proofOfWorkLimit
+
+let NetworkCommand = EffectsWriter.NetworkCommand
 
 let peerHeader = {
     version=0ul;
@@ -29,16 +30,22 @@ let peerBlockHash = Block.hash peerHeader
 
 let createHeaders from _to =
     [from.._to]
-    |> List.map (fun blockNumber ->
+    |> List.fold (fun headers blockNumber ->
+        let parent =
+            match headers with
+            | [] -> Hash.zero
+            | parent :: _ -> parent |> Block.hash
+
         {
             version=0ul;
-            parent=Hash.zero;
+            parent=parent;
             blockNumber=blockNumber;
             commitments=Hash.zero;
             timestamp=0UL;
             difficulty=difficulty;
             nonce=1UL,1UL;
-        })
+        } :: headers) []
+    |> List.rev
 
 [<Test>]
 let ``from genesis``() =
@@ -232,4 +239,236 @@ let ``block invalid``() =
     effects |> should equal [
         NetworkCommand <| Network.DisconnectPeer peerId
         NetworkCommand <| Network.GetTipFromAllPeers
+    ]
+
+[<Test>]
+let ``timeout on get headers request``() =
+    let idb = Inactive
+
+    let _, ibd =
+        start 0UL Hash.zero Block.genesisParent peerId peerHeader
+        |> Writer.unwrap
+
+    let effects, ibd =
+        tick 1000UL ibd
+        |> Writer.unwrap
+
+    isActive ibd |> should equal true
+    effects |> should equal []
+
+    let effects, ibd =
+        tick 3001UL ibd
+        |> Writer.unwrap
+
+    effects |> should equal [
+        NetworkCommand <| Network.DisconnectPeer peerId
+        NetworkCommand <| Network.GetTipFromAllPeers
+    ]
+
+    isActive ibd |> should equal false
+
+[<Test>]
+let ``timeout on downloading``() =
+    use databaseContext = DatabaseContext.createEmpty "test"
+    use session = DatabaseContext.createSession databaseContext
+
+    let ibd = GettingHeaders ({peerId=peerId;peerTipHeader=peerHeader;peerTipHash=peerBlockHash},0UL,0UL)
+
+    let headers = createHeaders 1ul 2000ul
+
+    let _,ibd =
+        processHeaders chain session 1000UL peerId headers ibd
+        |> Writer.unwrap
+
+    let effects,ibd =
+        InitialBlockDownload.received 2000UL (Block.hash headers.[0]) ibd
+        |> Writer.unwrap
+
+    let effects, ibd =
+        tick 3000UL ibd
+        |> Writer.unwrap
+
+    isActive ibd |> should equal true
+    effects |> should equal []
+
+    let effects, ibd =
+        tick 5001UL ibd
+        |> Writer.unwrap
+
+    effects |> should equal [
+        NetworkCommand <| Network.DisconnectPeer peerId
+        NetworkCommand <| Network.GetTipFromAllPeers
+    ]
+
+    isActive ibd |> should equal false
+
+[<Test>]
+let ``getting headers from genesis``() =
+    use databaseContext = DatabaseContext.createEmpty "test"
+    use session = DatabaseContext.createSession databaseContext
+
+    let headers = createHeaders 1ul 2000ul
+    let chain = {chain with genesisHash = List.head headers |> Block.hash}
+
+    List.iter (fun header ->
+        {
+            header=header;
+            txMerkleRoot = Hash.zero;
+            witnessMerkleRoot=Hash.zero;
+            activeContractSetMerkleRoot=Hash.zero;
+            commitments=[]
+            transactions=[]
+        }
+        |> ExtendedBlockHeader.createOrphan (Block.hash header)
+        |> fun header -> {header with status = ExtendedBlockHeader.MainChain}
+        |> BlockRepository.saveHeader session) headers
+
+    let effect, _  =
+        getHeaders chain session peerId [Hash.zero] (List.last headers |> Block.hash)
+        |> Writer.unwrap
+
+    effect |> should equal [
+        NetworkCommand <| Network.SendHeaders (peerId,headers)
+    ]
+
+[<Test>]
+let ``getting headers from unknown hash``() =
+    use databaseContext = DatabaseContext.createEmpty "test"
+    use session = DatabaseContext.createSession databaseContext
+
+    let headers = createHeaders 1ul 2000ul
+    let chain = {chain with genesisHash = List.head headers |> Block.hash}
+
+    List.iter (fun header ->
+        {
+            header=header;
+            txMerkleRoot = Hash.zero;
+            witnessMerkleRoot=Hash.zero;
+            activeContractSetMerkleRoot=Hash.zero;
+            commitments=[]
+            transactions=[]
+        }
+        |> ExtendedBlockHeader.createOrphan (Block.hash header)
+        |> fun header -> {header with status = ExtendedBlockHeader.MainChain}
+        |> BlockRepository.saveHeader session) headers
+
+    let effect, _  =
+        getHeaders chain session peerId [Hash.compute "HELLO"B] (List.last headers |> Block.hash)
+        |> Writer.unwrap
+
+    effect |> should equal [
+        NetworkCommand <| Network.SendHeaders (peerId,headers)
+    ]
+
+[<Test>]
+let ``getting headers from none main chain hash``() =
+    use databaseContext = DatabaseContext.createEmpty "test"
+    use session = DatabaseContext.createSession databaseContext
+
+    let headers = createHeaders 1ul 2000ul
+    let chain = {chain with genesisHash = List.head headers |> Block.hash}
+
+    List.iter (fun header ->
+        {
+            header=header;
+            txMerkleRoot = Hash.zero;
+            witnessMerkleRoot=Hash.zero;
+            activeContractSetMerkleRoot=Hash.zero;
+            commitments=[]
+            transactions=[]
+        }
+        |> ExtendedBlockHeader.createOrphan (Block.hash header)
+        |> fun header -> {header with status = ExtendedBlockHeader.MainChain}
+        |> BlockRepository.saveHeader session) headers
+
+    let sideBlock = {
+        header={peerHeader with blockNumber = 5ul;nonce=5UL,5UL}
+        txMerkleRoot = Hash.zero;
+        witnessMerkleRoot=Hash.zero;
+        activeContractSetMerkleRoot=Hash.zero;
+        commitments=[]
+        transactions=[]
+    }
+
+    sideBlock
+    |> ExtendedBlockHeader.createOrphan (Block.hash sideBlock.header)
+    |> BlockRepository.saveHeader session
+
+    let effect, _  =
+        getHeaders chain session peerId [Block.hash sideBlock.header] (List.last headers |> Block.hash)
+        |> Writer.unwrap
+
+    effect |> should equal [
+        NetworkCommand <| Network.SendHeaders (peerId,headers)
+    ]
+
+[<Test>]
+let ``getting headers from middle``() =
+    use databaseContext = DatabaseContext.createEmpty "test"
+    use session = DatabaseContext.createSession databaseContext
+
+    let headers = createHeaders 1ul 2000ul
+    let chain = {chain with genesisHash = List.head headers |> Block.hash}
+
+    List.iter (fun header ->
+        {
+            header=header;
+            txMerkleRoot = Hash.zero;
+            witnessMerkleRoot=Hash.zero;
+            activeContractSetMerkleRoot=Hash.zero;
+            commitments=[]
+            transactions=[]
+        }
+        |> ExtendedBlockHeader.createOrphan (Block.hash header)
+        |> fun header -> {header with status = ExtendedBlockHeader.MainChain}
+        |> BlockRepository.saveHeader session) headers
+
+    let effect, _  =
+        getHeaders chain session peerId [headers.[1000] |> Block.hash] (List.last headers |> Block.hash)
+        |> Writer.unwrap
+
+    effect |> should equal [
+        NetworkCommand <| Network.SendHeaders (peerId,headers.[1001..1999])
+    ]
+
+[<Test>]
+let ``getting headers from multiple hashes``() =
+    use databaseContext = DatabaseContext.createEmpty "test"
+    use session = DatabaseContext.createSession databaseContext
+
+    let headers = createHeaders 1ul 2000ul
+    let chain = {chain with genesisHash = List.head headers |> Block.hash}
+
+    List.iter (fun header ->
+        {
+            header=header;
+            txMerkleRoot = Hash.zero;
+            witnessMerkleRoot=Hash.zero;
+            activeContractSetMerkleRoot=Hash.zero;
+            commitments=[]
+            transactions=[]
+        }
+        |> ExtendedBlockHeader.createOrphan (Block.hash header)
+        |> fun header -> {header with status = ExtendedBlockHeader.MainChain}
+        |> BlockRepository.saveHeader session) headers
+
+    let sideBlock = {
+        header={peerHeader with blockNumber = 5ul;nonce=5UL,5UL}
+        txMerkleRoot = Hash.zero;
+        witnessMerkleRoot=Hash.zero;
+        activeContractSetMerkleRoot=Hash.zero;
+        commitments=[]
+        transactions=[]
+    }
+
+    sideBlock
+    |> ExtendedBlockHeader.createOrphan (Block.hash sideBlock.header)
+    |> BlockRepository.saveHeader session
+
+    let effect, _  =
+        getHeaders chain session peerId [Block.hash sideBlock.header;Block.hash headers.[3]; Block.hash headers.[2]] (List.last headers |> Block.hash)
+        |> Writer.unwrap
+
+    effect |> should equal [
+        NetworkCommand <| Network.SendHeaders (peerId,headers.[4..1999])
     ]

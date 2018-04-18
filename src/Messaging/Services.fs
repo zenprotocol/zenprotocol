@@ -168,6 +168,7 @@ module Wallet =
         | AccountExists
         | CheckPassword of password:string
         | GetPublicKey of string * password:string
+        | GetMnemonicPhrase of password:string
 
     let serviceName = "wallet"
 
@@ -212,3 +213,6 @@ module Wallet =
 
     let getPublicKey client path password =
         Request.send<Request, Result<Crypto.PublicKey,string>> client serviceName (GetPublicKey (path, password))
+
+    let getMnemonicPhrase client password =
+        Request.send<Request, Result<string, string>> client serviceName (GetMnemonicPhrase password)

@@ -9,7 +9,15 @@ open Consensus
 open State
 open Logary.Message
 
-let main dataPath chainParams busName =
+let main dataPath chainParams busName wipe =
+    let dataPath = Platform.combine dataPath "blockchaindb"
+
+    if wipe then
+        eventX "Wiping blockchain database"
+        |> Log.info
+        if System.IO.Directory.Exists dataPath then
+                System.IO.Directory.Delete (dataPath,true)
+
     Actor.create<Command,Request,Event,State> busName serviceName (fun poller sbObservable ebObservable  ->
         let publisher = EventBus.Publisher.create<Event> busName
         let client = ServiceBus.Client.create busName
