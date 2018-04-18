@@ -81,6 +81,7 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             match DataAccess.Secured.tryGet dataAccess session with
             | Some secured ->
                 Secured.decrypt password secured
+                >>= ExtendedKey.fromMnemonicPhrase
                 <@> fun extendedKey -> account, extendedKey
             | None ->
                 Error "Could not unlock account - no data"
@@ -170,6 +171,17 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
         | Error error -> Error error
         |> reply<bool> requestId
         account
+    | GetMnemonicPhrase password ->
+       match DataAccess.Secured.tryGet dataAccess session with
+       | Some secured ->
+           match Secured.decrypt password secured with
+           | Ok mnemonicPhrase -> Ok mnemonicPhrase
+           | Error error -> Error error
+       | None ->
+           Error "Could not unlock account - no data"
+       |> reply<string> requestId
+
+       account
 
 let main dataPath busName chain =
     Actor.create<Command,Request,Event, Option<Account.T>> busName serviceName (fun poller sbObservable ebObservable ->
