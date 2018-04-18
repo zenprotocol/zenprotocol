@@ -183,7 +183,15 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
 
        account
 
-let main dataPath busName chain =
+type Wipe =
+    | Full
+    | Reset
+    | NoWipe
+
+let main dataPath busName chain (wipe:Wipe) =
+    let dataPath = Platform.combine dataPath "walletdb"
+
+
     Actor.create<Command,Request,Event, Option<Account.T>> busName serviceName (fun poller sbObservable ebObservable ->
         let databaseContext = DataAccess.createContext dataPath
         let dataAccess = DataAccess.init databaseContext
@@ -192,11 +200,39 @@ let main dataPath busName chain =
         let account =
             use session = DatabaseContext.createSession databaseContext
 
-            DataAccess.Account.tryGet dataAccess session
-            |> Option.map (fun account ->
-                eventX "Account exists. syncing..."
-                |> Log.info
-                sync client account)
+            let account = DataAccess.Account.tryGet dataAccess session
+
+            let account =
+                match wipe, account with
+                | Full, Some _ ->
+                    eventX "Wiping account"
+                    |> Log.info
+
+                    DataAccess.Account.delete dataAccess session
+                    DataAccess.Secured.delete dataAccess session
+
+                    None
+                | Reset, Some account  ->
+                    eventX "Resetting account"
+                    |> Log.info
+
+                    let account = { account with deltas = List.empty; outputs=Map.empty; tip = Hash.zero; blockNumber = 0ul; mempool = List.empty }
+                    DataAccess.Account.put dataAccess session account
+
+                    Some account
+                | NoWipe, Some account ->
+                    eventX "Syncing account..."
+                    |> Log.info
+
+                    let account = sync client account
+                    DataAccess.Account.put dataAccess session account
+
+                    Some account
+                | _, account -> account
+
+            Session.commit session
+
+            account
 
         let sbObservable =
             sbObservable

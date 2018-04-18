@@ -20,9 +20,9 @@ type Collection<'a> = Collection<string, 'a>
 type T = {
     accountCollection: Collection<Account.T>
     securedCollection: Collection<Secured.T>
-} 
+}
 
-let private createCollection<'a> session name = 
+let private createCollection<'a> session name =
     Collection.create session name
         getBytes
         binarySerializer.Pickle<'a>
@@ -30,13 +30,13 @@ let private createCollection<'a> session name =
 
 let createContext dataPath =
     Platform.combine dataPath "wallet"
-    |> DatabaseContext.create 
+    |> DatabaseContext.create
 
-let init databaseContext = 
+let init databaseContext =
     use session = DatabaseContext.createSession databaseContext
     let accountCollection = createCollection<Account.T> session "accounts"
     let securedCollection = createCollection<Secured.T> session "secured"
-    
+
     let t = {
         accountCollection = accountCollection
         securedCollection = securedCollection
@@ -44,25 +44,31 @@ let init databaseContext =
 
     Session.commit session
     t
-    
+
 let dispose t =
     Disposables.dispose t.accountCollection
     Disposables.dispose t.securedCollection
 
-module Account = 
+module Account =
     open Collection
-    
+
     let put t session =
         put t.accountCollection session MainAccount
 
     let tryGet t session =
         tryGet t.accountCollection session MainAccount
-        
-module Secured = 
+
+    let delete t session =
+        delete t.accountCollection session MainAccount
+
+module Secured =
     open Collection
-    
+
     let put t session =
         put t.securedCollection session Secured
 
     let tryGet t session =
         tryGet t.securedCollection session Secured
+
+    let delete t session =
+        delete t.securedCollection session Secured
