@@ -7,16 +7,13 @@ open Result
 open Serialization
 open Chain
 
-[<Literal>]
-let Version = 0ul
-
 let pickler = Pickler.auto<Block>
 
 let TwoPow256 = bigint.Pow (2I, 256)
 
 let MaxTimeInFuture = 15UL * 60UL * 1000UL // 15 minutes in milliseconds
 
-let genesisParent = {version=Version;parent=Hash.zero;blockNumber=0ul;commitments=Hash.zero;timestamp=0UL;difficulty=0ul;nonce=0UL,0UL}
+let genesisParent = {version=Version0;parent=Hash.zero;blockNumber=0ul;commitments=Hash.zero;timestamp=0UL;difficulty=0ul;nonce=0UL,0UL}
 
 let result = new Result.ResultBuilder<string>()
 
@@ -74,7 +71,7 @@ let createGenesis (chain:Chain.ChainParameters) transactions nonce =
 
     let header =
         {
-            version=Version;
+            version=Version0;
             parent=Hash.zero;
             blockNumber=1ul;
             commitments=commitments;
@@ -123,10 +120,11 @@ let getBlockCoinbase chain acs blockNumber transactions coinbasePkHash =
         |> Seq.toList
 
     {
-        inputs=[]
-        outputs= coinbaseOutputs
+        version = Version0
+        inputs = []
+        outputs = coinbaseOutputs
         contract = None
-        witnesses=[]
+        witnesses = []
     }
 
 let createTemplate chain (parent:BlockHeader) timestamp (ema:EMA.T) acs transactions coinbasePkHash =
@@ -157,7 +155,7 @@ let createTemplate chain (parent:BlockHeader) timestamp (ema:EMA.T) acs transact
 
     let header =
         {
-            version=Version;
+            version=Version0;
             parent=parentHash;
             blockNumber=blockNumber;
             commitments=commitments;

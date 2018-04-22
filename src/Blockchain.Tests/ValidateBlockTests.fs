@@ -752,6 +752,7 @@ let ``Valid template for two transactions which don't depend on each other``() =
         Transaction.sign
             [ rootKeyPair ]
             {
+                version = Version0;
                 inputs = [Outpoint outpoint];
                 outputs = outputs;
                 witnesses=[];

@@ -84,6 +84,7 @@ let ``contract witness with valid signature``() =
     let spend = {asset=cHash,Hash.zero;amount=1UL}
     let tx =
         {
+            version = Version0
             inputs=[Mint spend]
             outputs=[{lock=Contract cHash;spend=spend}]
             witnesses=[]
@@ -116,6 +117,7 @@ let ``contract witness with invalid publickey``() =
     let spend = {asset=cHash,Hash.zero;amount=1UL}
     let tx =
         {
+            version = Version0
             inputs=[Mint spend]
             outputs=[{lock=Contract cHash;spend=spend}]
             witnesses=[]
@@ -151,6 +153,7 @@ let ``contract witness with no signature``() =
     let spend = {asset=cHash,Hash.zero;amount=1UL}
     let tx =
         {
+            version = Version0
             inputs=[Mint spend]
             outputs=[{lock=Contract cHash;spend=spend}]
             witnesses=[]
@@ -185,6 +188,7 @@ let ``contract witness with unexpcected public key``() =
     let spend = {asset=cHash,Hash.zero;amount=1UL}
     let tx =
         {
+            version = Version0
             inputs=[Mint spend]
             outputs=[{lock=Contract cHash;spend=spend}]
             witnesses=[]
