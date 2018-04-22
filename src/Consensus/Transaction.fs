@@ -28,6 +28,7 @@ let sign keyPairs tx =
 
 let fromTxSkeleton tx =
     {
+        version = Version0
         inputs = List.map (function
             | TxSkeleton.Input.PointedOutput (outpoint, _) -> Outpoint outpoint
             | TxSkeleton.Input.Mint spend -> Mint spend) tx.pInputs
@@ -40,7 +41,8 @@ let isOutputSpendable output =
     match output.lock with
     | PK _
     | Coinbase _
-    | Contract _ -> true
+    | Contract _
+    | HighVLock _ -> true
     | Fee
     | Destroy
     | ActivationSacrifice
