@@ -131,7 +131,6 @@ let main argv =
         | Seed ->
             config.listen <- true
             config.seeds.Clear ()
-            config.miner.enabled <- true
         | Data_Path dataPath ->
             config.dataPath <- dataPath
     ) (results.GetAllResults())
