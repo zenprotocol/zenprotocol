@@ -15,33 +15,35 @@ let PingMessageId = 3uy
 [<LiteralAttribute>]
 let PongMessageId = 4uy
 [<LiteralAttribute>]
-let TransactionMessageId = 5uy
+let NewTransactionMessageId = 5uy
 [<LiteralAttribute>]
-let AddressMessageId = 6uy
+let TransactionMessageId = 6uy
 [<LiteralAttribute>]
-let GetAddressesMessageId = 7uy
+let AddressMessageId = 7uy
 [<LiteralAttribute>]
-let AddressesMessageId = 8uy
+let GetAddressesMessageId = 8uy
 [<LiteralAttribute>]
-let GetMemPoolMessageId = 9uy
+let AddressesMessageId = 9uy
 [<LiteralAttribute>]
-let MemPoolMessageId = 10uy
+let GetMemPoolMessageId = 10uy
 [<LiteralAttribute>]
-let GetTransactionMessageId = 11uy
+let MemPoolMessageId = 11uy
 [<LiteralAttribute>]
-let GetBlockMessageId = 12uy
+let GetTransactionMessageId = 12uy
 [<LiteralAttribute>]
-let BlockMessageId = 13uy
+let GetBlockMessageId = 13uy
 [<LiteralAttribute>]
-let GetTipMessageId = 14uy
+let BlockMessageId = 14uy
 [<LiteralAttribute>]
-let TipMessageId = 15uy
+let GetTipMessageId = 15uy
 [<LiteralAttribute>]
-let NewBlockMessageId = 16uy
+let TipMessageId = 16uy
 [<LiteralAttribute>]
-let GetHeadersMessageId = 17uy
+let NewBlockMessageId = 17uy
 [<LiteralAttribute>]
-let HeadersMessageId = 18uy
+let GetHeadersMessageId = 18uy
+[<LiteralAttribute>]
+let HeadersMessageId = 19uy
 [<LiteralAttribute>]
 let UnknownPeerMessageId = 100uy
 [<LiteralAttribute>]
@@ -64,6 +66,9 @@ type Ping =
 
 type Pong =
         uint32
+
+type NewTransaction =
+        byte[]
 
 type Transaction =
         byte[]
@@ -113,6 +118,7 @@ type T =
     | HelloAck of HelloAck
     | Ping of Ping
     | Pong of Pong
+    | NewTransaction of NewTransaction
     | Transaction of Transaction
     | Address of Address
     | GetAddresses
@@ -205,6 +211,22 @@ module Pong =
     let read =
         reader {
             let! msg = Stream.readNumber4
+
+            return msg
+        }
+
+module NewTransaction =
+    let txHashSize = 32
+    let getMessageSize (msg:NewTransaction) =
+            32
+
+    let write (msg:NewTransaction) stream =
+        stream
+        |> Stream.writeBytes msg 32
+
+    let read =
+        reader {
+            let! msg = Stream.readBytes 32
 
             return msg
         }
@@ -433,6 +455,10 @@ let private decode stream =
             match Pong.read stream with
             | None,stream -> None,stream
             | Some msg, stream -> Some (Pong msg), stream
+        | NewTransactionMessageId ->
+            match NewTransaction.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (NewTransaction msg), stream
         | TransactionMessageId ->
             match Transaction.read stream with
             | None,stream -> None,stream
@@ -526,6 +552,7 @@ let send socket msg =
         | HelloAck msg -> HelloAck.write msg
         | Ping msg -> Ping.write msg
         | Pong msg -> Pong.write msg
+        | NewTransaction msg -> NewTransaction.write msg
         | Transaction msg -> Transaction.write msg
         | Address msg -> Address.write msg
         | GetAddresses -> id
@@ -550,6 +577,7 @@ let send socket msg =
         | HelloAck _ -> HelloAckMessageId
         | Ping _ -> PingMessageId
         | Pong _ -> PongMessageId
+        | NewTransaction _ -> NewTransactionMessageId
         | Transaction _ -> TransactionMessageId
         | Address _ -> AddressMessageId
         | GetAddresses _ -> GetAddressesMessageId
@@ -574,6 +602,7 @@ let send socket msg =
         | HelloAck msg -> HelloAck.getMessageSize msg
         | Ping msg -> Ping.getMessageSize msg
         | Pong msg -> Pong.getMessageSize msg
+        | NewTransaction msg -> NewTransaction.getMessageSize msg
         | Transaction msg -> Transaction.getMessageSize msg
         | Address msg -> Address.getMessageSize msg
         | GetAddresses -> 0

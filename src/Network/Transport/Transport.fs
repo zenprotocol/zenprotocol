@@ -104,8 +104,6 @@ let private handleInprocMessage socket inproc networkId msg (peers:Peers) =
             let routingId = Peer.routingId peer
 
             Map.add routingId peer peers
-        | InProcMessage.Transaction tx ->
-            publishMessage socket inproc peers (Message.Transaction tx)
         | InProcMessage.Address address ->
             // we only want to publish to 2 peers and want to pick them randomly
             let today = System.DateTime.Now.Day
@@ -177,6 +175,8 @@ let private handleInprocMessage socket inproc networkId msg (peers:Peers) =
             | None -> peers
         | InProcMessage.GetTipFromAllPeers ->
             publishMessage socket inproc peers Message.GetTip
+        | InProcMessage.PublishTransaction txHash ->
+            publishMessage socket inproc peers <| Message.NewTransaction txHash
         | msg -> failwithf "unexpected inproc msg %A" msg
 
 let private onError error =
@@ -188,8 +188,8 @@ let private onError error =
 let connect transport address  =
     InProcMessage.send transport.inproc (InProcMessage.Connect address)
 
-let publishTransaction transport tx =
-    InProcMessage.send transport.inproc (InProcMessage.Transaction tx)
+let publishTransaction transport txHash =
+    InProcMessage.send transport.inproc (InProcMessage.PublishTransaction txHash)
 
 let sendAddress transport peerId address =
     InProcMessage.send transport.inproc (InProcMessage.SendAddress {address=address;peerId=peerId})

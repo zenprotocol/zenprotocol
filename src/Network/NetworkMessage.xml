@@ -27,58 +27,62 @@
         <field name = "nonce" type = "number" size="4" >Nonce</field>
     </message>
 
-    <message name="Transaction" id="5">
+    <message name="New Transaction" id="5">
+        <field name="txHash" type="octets" size="32">Transaction Hash</field>
+    </message>
+
+    <message name="Transaction" id="6">
         <field name="tx" type="chunk">Tx</field>
     </message>
 
-    <message name="Address" id="6">
+    <message name="Address" id="7">
         <field name="address" type="longstr">Address</field>
     </message>
 
-    <message name="Get Addresses" id="7">
+    <message name="Get Addresses" id="8">
     </message>
 
-    <message name="Addresses" id="8">
+    <message name="Addresses" id="9">
         <field name="addresses" type="strings"/>
     </message>
 
-    <message name="Get Mem Pool" id="9">
+    <message name="Get Mem Pool" id="10">
 
     </message>
 
-    <message name="Mem Pool" id="10">
+    <message name="Mem Pool" id="11">
         <field name="txs" type="chunk">Transactions</field>
     </message>
 
-    <message name="Get Transaction" id="11">
+    <message name="Get Transaction" id="12">
         <field name="txHash" type="octets" size="32">TransactionHash</field>
     </message>
 
-    <message name="Get Block" id="12">
+    <message name="Get Block" id="13">
         <field name="blockHash" type="octets" size="32">BlockHash</field>
     </message>
 
-    <message name="Block" id="13">
+    <message name="Block" id="14">
         <field name="block" type="chunk">Block</field>
     </message>
 
-    <message name="Get Tip" id="14">
+    <message name="Get Tip" id="15">
     </message>
 
-    <message name="Tip" id="15">
+    <message name="Tip" id="16">
         <field name="block header" type="octets" size="100">block header</field>
     </message>
 
-    <message name="New Block" id="16">
+    <message name="New Block" id="17">
         <field name="block header" type="octets" size="100">block header</field>
     </message>
 
-    <message name="Get Headers" id="17">
+    <message name="Get Headers" id="18">
         <field name="from" type="chunk">From</field>
         <field name="endHash" type="octets" size="32">End Hash</field>
     </message>
 
-    <message name="Headers" id="18">
+    <message name="Headers" id="19">
         <field name="headers" type="chunk">headers</field>
     </message>
 

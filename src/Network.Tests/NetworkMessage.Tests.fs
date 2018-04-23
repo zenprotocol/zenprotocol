@@ -141,6 +141,37 @@ let ``Pong size fits stream ``() =
     messageSize |> should equal offset
 
 [<Test>]
+let ``send and recv NewTransaction``() =
+    let msg = NewTransaction (Array.create 32 123uy)
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://NewTransaction.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://NewTransaction.test"
+
+    Network.Message.send server msg
+
+    let msg' = Network.Message.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``NewTransaction size fits stream ``() =
+    let newtransaction:NewTransaction =
+        Array.create 32 123uy
+
+    let messageSize = NewTransaction.getMessageSize newtransaction
+
+    let stream =
+        Stream.create messageSize
+        |> NewTransaction.write newtransaction
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
 let ``send and recv Transaction``() =
     let msg = Transaction ("Captcha Diem"B)
 
