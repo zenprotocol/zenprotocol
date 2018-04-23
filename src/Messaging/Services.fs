@@ -37,6 +37,7 @@ module Blockchain =
         | ValidateMinedBlock of Types.Block
         | RequestHeaders of peerId:byte[] * startBlockHashes:Hash list * endBlockHash :Hash
         | HandleHeaders of peerId:byte[] * BlockHeader list
+        | HandleNewTransaction of peerId:byte[] * txHash:Hash
 
     type Request =
         | ExecuteContract of Hash * string * Crypto.PublicKey option * data option * TxSkeleton.T
@@ -121,6 +122,10 @@ module Blockchain =
 
     let getMempool client =
         GetMempool |> Request.send<Request, (Hash.Hash * Transaction) list> client serviceName
+
+    let handleNewTransaction client peerId txHash =
+        HandleNewTransaction (peerId,txHash)
+        |> Command.send client serviceName
 
 module Network =
     type Command =

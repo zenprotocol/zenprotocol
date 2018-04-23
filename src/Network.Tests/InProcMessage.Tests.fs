@@ -1026,6 +1026,73 @@ let ``DisconnectPeer size fits stream ``() =
     messageSize |> should equal offset
 
 [<Test>]
+let ``send and recv PublishTransaction``() =
+    let msg = PublishTransaction (Array.create 32 123uy)
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://PublishTransaction.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://PublishTransaction.test"
+
+    Network.Transport.InProcMessage.send server msg
+
+    let msg' = Network.Transport.InProcMessage.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``PublishTransaction size fits stream ``() =
+    let publishtransaction:PublishTransaction =
+        Array.create 32 123uy
+
+    let messageSize = PublishTransaction.getMessageSize publishtransaction
+
+    let stream =
+        Stream.create messageSize
+        |> PublishTransaction.write publishtransaction
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
+let ``send and recv NewTransaction``() =
+    let msg = NewTransaction {
+        peerId = Array.create 4 123uy;
+        txHash = Array.create 32 123uy;
+    }
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://NewTransaction.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://NewTransaction.test"
+
+    Network.Transport.InProcMessage.send server msg
+
+    let msg' = Network.Transport.InProcMessage.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``NewTransaction size fits stream ``() =
+    let newtransaction:NewTransaction = {
+        peerId = Array.create 4 123uy;
+        txHash = Array.create 32 123uy;
+    }
+
+    let messageSize = NewTransaction.getMessageSize newtransaction
+
+    let stream =
+        Stream.create messageSize
+        |> NewTransaction.write newtransaction
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
+
+[<Test>]
 let ``send and recv GetTipFromAllPeers``() =
     let msg = GetTipFromAllPeers
 

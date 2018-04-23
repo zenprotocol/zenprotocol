@@ -147,7 +147,16 @@
         <field name="peerId" type="octets" size="4">Peer Id</field>
     </message>
 
-    <message name="Get Tip From All Peers" id="36">
+    <message name="Publish Transaction" id="36">
+        <field name="txHash" type="octets" size="32">Transaction Hash</field>
+    </message>
+
+    <message name="New Transaction" id="37">
+        <field name="peerId" type="octets" size="4">Peer Id</field>
+        <field name="txHash" type="octets" size="32">Transaction Hash</field>
+    </message>
+
+    <message name="Get Tip From All Peers" id="38">
 
     </message>
 </class>

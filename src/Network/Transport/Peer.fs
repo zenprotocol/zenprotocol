@@ -249,6 +249,9 @@ let handleActiveState socket next peer msg =
         | Message.Headers headers ->
             next (InProcMessage.Headers {peerId=(RoutingId.toBytes peer.routingId);headers=headers})
             peer
+        | Message.NewTransaction txHash ->
+            next (InProcMessage.NewTransaction {peerId=(RoutingId.toBytes peer.routingId);txHash=txHash})
+            peer
         | msg ->
             // TODO: unexpected msg, close peer
 

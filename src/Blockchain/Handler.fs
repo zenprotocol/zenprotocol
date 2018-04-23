@@ -95,6 +95,13 @@ let handleCommand chainParams command session timestamp (state:State) =
            let! initialBlockDownload = InitialBlockDownload.processHeaders chainParams session timestamp peerId headers state.initialBlockDownload
            return {state with initialBlockDownload = initialBlockDownload}
        }
+    | HandleNewTransaction (peerId, txHash) ->
+        effectsWriter {
+            if not (MemPool.containsTransaction txHash state.memoryState.mempool) then
+                do! getTransaction peerId txHash
+
+            return state
+        }
 
 let handleRequest chain (requestId:RequestId) request session timestamp state =
     match request with
