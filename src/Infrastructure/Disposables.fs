@@ -1,16 +1,18 @@
 module Infrastructure.Disposables
 
-let empty = 
+let empty =
     { new System.IDisposable with
         member x.Dispose() = () }
-        
-let toDisposable (x:System.IDisposable) = x 
 
-let dispose (x:System.IDisposable) = x.Dispose ()    
+let toDisposable (x:System.IDisposable) = x
 
-let fromFunction f = 
+let dispose (x:System.IDisposable) = x.Dispose ()
+
+let fromFunction f =
      { new System.IDisposable with
             member x.Dispose() = f() }
-            
-let fromList list = 
-    fromFunction (fun () -> List.iter dispose list)                         
+
+let fromList disposable =
+    fromFunction (fun () -> List.iter dispose disposable)
+
+let disposeList disposable = fromList disposable |> dispose

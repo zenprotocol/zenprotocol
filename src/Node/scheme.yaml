@@ -1,15 +1,17 @@
 chain: local
-miner: false
-threads: 1
 
-dataPath: ./data 
+dataPath: ./data
 
 externalIp: null
 listen: false
 bind: 127.0.0.1:29555
-seeds: 
+seeds:
   - 127.0.0.1:29555
 
 api:
   enabled: false
   bind: 127.0.0.1:31567
+
+miner:
+  enabled: false
+  threads: 1
