@@ -1,0 +1,24 @@
+<class
+        name = "Message"
+        signature = "19317"
+        title = "Miner Message"
+        script = "zproto_codec_fs"
+        source_dir = "./"
+        test_dir ="../Miner.Tests"
+        module ="Miner.Message"
+        test_module="Miner.Tests.MessageTests"
+>
+
+    <message name = "New Template" id = "1">
+        <field name="block" type="chunk">Block</field>
+    </message>
+
+    <message name = "Stop" id="2">
+
+    </message>
+
+    <message name = "Exit" id="3">
+
+    </message>
+
+</class>
