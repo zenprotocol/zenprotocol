@@ -52,7 +52,7 @@ let ``block with invalid header failed validation``(header:BlockHeader) (NonEmpt
     let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero;}
 
     Block.validate chain block = Error "proof of work failed"
-
+        
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``block with one invalid transaction fail validation``(header) (NonEmptyTransactions transactions) (NonNegativeInt index) =
     let index = 1 + (index % (List.length transactions))
@@ -67,7 +67,10 @@ let ``block with one invalid transaction fail validation``(header) (NonEmptyTran
 
     let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero;}
 
-    let expected = Error (sprintf "transaction %A failed validation due to General \"inputs empty\"" (Transaction.hash invalidTx))
+    let expected = Error (sprintf "transaction %A failed validation due to General \"structurally invalid input(s)\"" (Transaction.hash invalidTx))
+
+    if Block.validate chain block <> expected then
+        printfn "%A" (Block.validate chain block)
 
     Block.validate chain block = expected
 
@@ -146,12 +149,12 @@ let ``connecting block should fail when transaction inputs are invalid``(parent:
                 when error.StartsWith "transactions failed inputs validation due to"
                   || error = "Output lookup error"
                   || error.Contains "Orphan"
-                  || error.Contains "witnesses" -> true     //too many/few wts
+                  || error.Contains "witness" -> true     //too many/few wts
     | Error _ as res ->
         System.Console.WriteLine (sprintf "Got unexpected result %A" res)
         true
     | _ -> false
-
+    
 [<Test>]
 let ``block timestamp too early``() =
     let ema = {
@@ -289,7 +292,7 @@ let ``block with invalid contract failed connecting``() =
         {output with lock=ActivationSacrifice}
 
     let tx =
-        {contract = Some { code="ada";hints=goodHints;rlimit=0u;queries=goodTotalQueries }; inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
+        { version = Version0; contract = Some (V0 { code="ada";hints=goodHints;rlimit=0u;queries=goodTotalQueries }); inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
         |> Transaction.sign [ rootKeyPair ]
 
     let contract : Contract.T =
@@ -315,11 +318,15 @@ let ``block with invalid contract failed connecting``() =
 
 [<Test>]
 let ``block with coinbase lock within a regular transaction should fail``() =
+    let publicKey = Crypto.PublicKey <| Array.create 64 1uy
+    let signature = Crypto.Signature <| Array.create 64 1uy
+    let witness = PKWitness (publicKey, signature)
     let tx =
         {
+            version = Version0
             inputs = [Outpoint {txHash=Hash.zero;index=1ul}];
-            outputs=[{lock= Coinbase (15ul,Hash.zero);spend={amount=1UL;asset=Constants.Zen}}]
-            witnesses=[]
+            outputs=[{lock=Coinbase (15ul,Hash.zero);spend={amount=1UL;asset=Constants.Zen}}]
+            witnesses=[witness]
             contract=None
         }
 
@@ -339,7 +346,7 @@ let ``block with coinbase lock within a regular transaction should fail``() =
 
     let header =
         {
-            version = Block.Version
+            version = Version0
             parent = Hash.zero
             blockNumber = 15ul
             difficulty = 0x20fffffful;
@@ -361,6 +368,7 @@ let ``block with wrong coinbase reward``() =
 
     let tx =
         {
+            version = Version0
             inputs = [];
             outputs=[{lock= Coinbase (15ul,Hash.zero);spend={amount=1UL;asset=Constants.Zen}}]
             witnesses=[]
@@ -385,7 +393,7 @@ let ``block with wrong coinbase reward``() =
 
     let header =
         {
-            version = Block.Version
+            version = Version0
             parent = Hash.zero
             blockNumber = 15ul
             difficulty = ema.difficulty;
@@ -405,6 +413,7 @@ let ``block with wrong coinbase reward``() =
 let ``coinbase lock have wrong blockNumber``() =
     let tx =
         {
+            version = Version0
             inputs = [];
             outputs=[{lock= Coinbase (13ul,Hash.zero);spend={amount=1UL;asset=Constants.Zen}}]
             witnesses=[]
@@ -427,7 +436,7 @@ let ``coinbase lock have wrong blockNumber``() =
 
     let header =
         {
-            version = Block.Version
+            version = Version0
             parent = Hash.zero
             blockNumber = 15ul
             difficulty = 0x20fffffful;
@@ -447,6 +456,7 @@ let ``coinbase lock have wrong blockNumber``() =
 let ``block without coinbase``() =
     let tx =
         {
+            version = Version0
             inputs = [];
             outputs=[{lock= PK Hash.zero;spend={amount=1UL;asset=Constants.Zen}}]
             witnesses=[]
@@ -469,7 +479,7 @@ let ``block without coinbase``() =
 
     let header =
         {
-            version = Block.Version
+            version = Version0
             parent = Hash.zero
             blockNumber = 15ul
             difficulty = 0x20fffffful;
@@ -492,6 +502,7 @@ let ``block with coinbase with multiple asset as reward should fail``() =
 
     let tx =
         {
+            version = Version0
             inputs = [];
             outputs=
                 [
@@ -520,7 +531,7 @@ let ``block with coinbase with multiple asset as reward should fail``() =
 
     let header =
         {
-            version = Block.Version
+            version = Version0
             parent = Hash.zero
             blockNumber = 15ul
             difficulty = ema.difficulty;
@@ -544,6 +555,7 @@ let ``coinbase reward split over multiple outputs``() =
 
     let tx =
         {
+            version = Version0
             inputs = [];
             outputs=
                 [
@@ -572,7 +584,7 @@ let ``coinbase reward split over multiple outputs``() =
 
     let header =
         {
-            version = Block.Version
+            version = Version0
             parent = Hash.zero
             blockNumber = 15ul
             difficulty = 0x20fffffful;
@@ -595,6 +607,7 @@ let ``block spending mature transaction is valid``() =
 
     let origin =
         {
+            version = Version0
             inputs=[]
             outputs=[{lock =  Coinbase (1ul, (publicKeyHash rootAccount)); spend= {asset = Constants.Zen;amount=100000000UL}}]
             witnesses=[]
@@ -619,7 +632,6 @@ let ``block spending mature transaction is valid``() =
     Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ContractCache.empty ema block
     |>  should be ok
 
-
 [<Test>]
 let ``block spending unmature transaction is invalid``() =
     let rootAccount =
@@ -628,6 +640,7 @@ let ``block spending unmature transaction is invalid``() =
 
     let origin =
         {
+            version = Version0
             inputs=[]
             outputs=[{lock =  Coinbase (1ul, (publicKeyHash rootAccount)); spend= {asset = Constants.Zen;amount=100000000UL}}]
             witnesses=[]
@@ -703,6 +716,7 @@ let ``Overweight block should be rejected``() =
 
     let tx1Hash = Transaction.hash tx1
     let tx2 = {
+        version = Version0
         inputs = [Outpoint {txHash=tx1Hash;index=uint32 i}];
         outputs = [];
         witnesses = [ContractWitness cWitness];

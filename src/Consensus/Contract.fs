@@ -117,7 +117,7 @@ let load contractsPath expiry code hash =
         })
 
 let compile (contractsPath:string)
-            (contract:Consensus.Types.Contract) =
+            (contract:ContractV0) =
     let hash = computeHash contract.code
 
     hash

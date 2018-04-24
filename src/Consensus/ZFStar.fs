@@ -4,9 +4,9 @@
 open Operators.Checked
 
 open Consensus
-open Consensus.Types
-open Consensus.Hash
-open Consensus.TxSkeleton
+open Types
+open Hash
+open TxSkeleton
 open FSharp.Compatibility.OCaml
 open Zen.Types.Extracted
 open Zen.Types.Realized
@@ -51,9 +51,9 @@ let fstToFsOption mapper value =
 
 let fsToFstLock (outputLock:Types.Lock) : lock =
     match outputLock with
-    | Consensus.Types.PK (Hash.Hash pkHash) ->
+    | Types.PK (Hash.Hash pkHash) ->
         PKLock pkHash
-    | Consensus.Types.Contract (Hash.Hash pkHash) ->
+    | Types.Contract (Hash.Hash pkHash) ->
         ContractLock pkHash
     | Destroy ->
         DestroyLock
@@ -65,6 +65,8 @@ let fsToFstLock (outputLock:Types.Lock) : lock =
         ExtensionSacrificeLock cHash
     | Coinbase (blockNumber, (Hash.Hash pkHash)) ->
         CoinbaseLock (blockNumber,pkHash)
+    | Types.HighVLock (identifier, bytes) ->
+        HighVLock (identifier, Prims.Mkdtuple2 (int64 (Array.length bytes), bytes))
 
 let fsToFstOutpoint (o:Outpoint) : outpoint = {txHash = Hash.bytes o.txHash;index = o.index}
 
@@ -75,15 +77,17 @@ let fsToFstSignature (Crypto.Signature signature) : signature = signature
 let fstToFsLock (outputLock:lock) : Types.Lock =
     match outputLock with
     | PKLock pkHash ->
-        Consensus.Types.PK (Hash.Hash pkHash)
+        Types.PK (Hash.Hash pkHash)
     | ContractLock pkHash ->
-        Consensus.Types.Contract (Hash.Hash pkHash)
+        Types.Contract (Hash.Hash pkHash)
     | DestroyLock -> Destroy
     | FeeLock -> Fee
     | ActivationSacrificeLock -> ActivationSacrifice
     | ExtensionSacrificeLock cHash -> ExtensionSacrifice (Hash.Hash cHash)
     | CoinbaseLock (blockNumber,pkHash) ->
-            Coinbase (blockNumber, Hash.Hash pkHash)
+        Coinbase (blockNumber, Hash.Hash pkHash)
+    | HighVLock (identifier, (Prims.Mkdtuple2 (_, bytes))) ->
+        Types.HighVLock (identifier, bytes)
 
 let private fsToFstSpend (spend:Types.Spend) : spend =
     let tokenContract, tokenHash = spend.asset
@@ -151,7 +155,7 @@ let fstTofsMessage = function
             cHash = Hash.Hash cHash
             command = fstToFsString command
             data = fstToFsOption id data
-        } : Consensus.Types.Message)
+        } : Message)
         |> Some
         |> Ok
     | Native.option.None ->

@@ -15,7 +15,7 @@ let compile code = result {
     let! hints = Contract.recordHints code
     let! queries = Infrastructure.ZFStar.totalQueries hints
 
-    let contract : Consensus.Types.Contract = {
+    let contract : Consensus.Types.ContractV0 = {
         code = code
         hints = hints
         rlimit = rlimit

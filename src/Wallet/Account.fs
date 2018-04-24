@@ -322,7 +322,8 @@ let createTransactionFromLock lk spend (account, extendedKey) = result {
     let inputPoints = List.map (fst >> Outpoint) inputs
     let outputs = addChange spend amount account { spend = spend; lock = lk }
     return
-        Transaction.sign keys { inputs = inputPoints
+        Transaction.sign keys { version = Version0
+                                inputs = inputPoints
                                 outputs = outputs
                                 witnesses = []
                                 contract = None }
@@ -355,13 +356,14 @@ let createActivateContractTransaction chain code (numberOfBlocks:uint32) (accoun
         return Transaction.sign
             keys
             {
+                version = Version0
                 inputs = inputPoints
                 outputs = outputs
                 witnesses = []
-                contract = Some { code = code
-                                  hints = hints
-                                  rlimit = rlimit
-                                  queries = queries }
+                contract = Some (V0 { code = code
+                                      hints = hints
+                                      rlimit = rlimit
+                                      queries = queries })
             }
     }
 
@@ -392,6 +394,7 @@ let createExtendContractTransaction client chainParams cHash (numberOfBlocks:uin
         return Transaction.sign
             keys
             {
+                version = Version0
                 inputs = inputPoints
                 outputs = outputs
                 witnesses = []

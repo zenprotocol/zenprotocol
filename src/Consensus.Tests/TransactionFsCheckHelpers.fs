@@ -24,7 +24,7 @@ let pkKeyLockGenerator =
         return (private', public'), PK (PublicKey.hash public')
     }
 let amountGenerator =
-    Arb.generate<uint64>
+    Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
 let spendGenerator = 
     gen {
         let! asset = assetGenerator

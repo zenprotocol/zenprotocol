@@ -184,7 +184,7 @@ module PublicKey =
     let toString = serialize >> FsBech32.Base16.encode
 
     let hash = serialize >> Hash.compute
-
+    
 module Signature =
     let serialize (Signature signature) =
         let bytes = Array.create SerializedSignatureLength 0uy

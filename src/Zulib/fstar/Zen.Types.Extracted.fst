@@ -31,7 +31,8 @@ type lock =
     | ActivationSacrificeLock
     | ExtensionSacrificeLock of hash
     | CoinbaseLock of U32.t ** hash
-
+    | HighVLock of U32.t ** (l:nat & A.t U8.byte l)
+ 
 type output =
     { lock: lock;
       spend: spend }
@@ -50,5 +51,3 @@ unopteq type blockHeader = {
     timestamp: U64.t;
     difficulty: U32.t;
     nonce: nonce }
-
-

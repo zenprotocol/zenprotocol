@@ -94,7 +94,7 @@ let ``Invalid tx doesn't raise events or update state``() =
     use databaseContext = DatabaseContext.createTemporary "test"
 
     use session = DatabaseContext.createSession databaseContext
-    let invalidTx = {inputs=[];outputs=[];witnesses=[];contract=None}
+    let invalidTx = {version=Version0;inputs=[];outputs=[];witnesses=[];contract=None}
 
     let result = Handler.handleCommand chain (ValidateTransaction invalidTx) session 1UL state
 
@@ -350,7 +350,7 @@ let ``Invalid contract should not be added to ActiveContractSet or mempool``() =
     let tx =
         let input, output = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head
         let output' = {output with lock=PK (publicKeyHash rootAccount)}
-        { inputs=[ Outpoint input ]; outputs=[ output' ]; witnesses=[]; contract = Some { code = contractCode; hints = ""; rlimit = 0u; queries = 0u } }
+        { version=Version0; inputs=[ Outpoint input ]; outputs=[ output' ]; witnesses=[]; contract = Some (V0 { code = contractCode; hints = ""; rlimit = 0u; queries = 0u }) }
         |> (Transaction.sign [ rootKeyPair ])
 
     let txHash = Transaction.hash tx

@@ -14,6 +14,7 @@ let getUTXO _ = NoOutput
 [<Test>]
 let ``handling transaction add outputs to set``() =
     let tx1 = {
+        version = Version0
         inputs = []
         witnesses = []
         outputs = [{lock = PK Hash.zero; spend = {asset=Constants.Zen; amount=1UL}}]
@@ -22,6 +23,7 @@ let ``handling transaction add outputs to set``() =
     let tx1Hash = Transaction.hash tx1
 
     let tx2 = {
+        version = Version0
         inputs= [Outpoint {txHash = tx1Hash; index=0ul}]
         witnesses = []
         outputs=[]
@@ -37,6 +39,7 @@ let ``handling transaction add outputs to set``() =
 [<Test>]
 let ``handling transaction mark inputs as spent``() =
     let tx1 = {
+        version = Version0
         inputs = []
         witnesses = []
         outputs = [{lock = PK Hash.zero; spend = {asset=Constants.Zen; amount=1UL}}]
@@ -45,6 +48,7 @@ let ``handling transaction mark inputs as spent``() =
     let tx1Hash = Transaction.hash tx1
 
     let tx2 = {
+        version = Version0
         inputs= [Outpoint {txHash = tx1Hash; index=0ul}]
         witnesses = []
         outputs=[]
@@ -101,7 +105,8 @@ let ``Should be none utxos``(utxos:Map<Outpoint, Output>) (outpoints:List<Outpoi
 let ``Unspendable outputs should not be added to utxoset``() =
     let tx =
         {
-            inputs=[]
+            version = Version0
+            inputs = []
             outputs=[{lock=Destroy;spend={amount=1UL;asset=Constants.Zen}}]
             witnesses = []
             contract = None

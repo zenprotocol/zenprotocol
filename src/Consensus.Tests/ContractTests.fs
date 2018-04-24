@@ -62,12 +62,18 @@ let ``Should get 'elaborate' error for invalid code``() =
     , (Error "elaborate" : Result<Contract.T, string>))
     |> shouldEqual
 
+let mapError = function
+    | TransactionValidation.ValidationError.General error -> error
+    | other -> other.ToString()
+
 let validateInputs (contract:Contract.T) utxos tx  =
     let acs = ActiveContractSet.add contract.hash contract ActiveContractSet.empty
     TransactionValidation.validateInContext Chain.localParameters getUTXO contractPath 1ul acs Map.empty utxos (Transaction.hash tx) tx
-    |> Result.mapError (function
-        | TransactionValidation.ValidationError.General error -> error
-        | other -> other.ToString())
+    |> Result.mapError mapError
+
+let validateBasic tx  =
+    TransactionValidation.validateBasic tx
+    |> Result.mapError mapError
 
 let compileRunAndValidate inputTx utxoSet code =
     compileAndCheck code
@@ -82,6 +88,7 @@ let compileRunAndValidate inputTx utxoSet code =
                 Transaction.fromTxSkeleton finalTxSkeleton
                 |> Transaction.addWitnesses [ ContractWitness cw ])
             |> Result.map (Transaction.sign [ sampleKeyPair ])
+            |> Result.bind validateBasic
             |> Result.bind (validateInputs contract utxoSet))
             |> Result.map (fun (tx, _, _) -> tx)
     )
@@ -101,6 +108,74 @@ let ``Should get expected contract cost``() =
      |> Result.map (fun contract ->
         Contract.getCost contract sampleInputTx "" Anonymous None List.empty)
     , (Ok 215L : Result<int64, string>))
+    |> shouldEqual
+
+[<Test>]
+[<ParallelizableAttribute>]
+let ``Contract should be able to create its own tokens``() =
+    compileRunAndValidate sampleInputTx utxoSet
+         """
+         open Zen.Types
+         open Zen.Base
+         open Zen.Cost
+
+         module RT = Zen.ResultT
+         module Tx = Zen.TxSkeleton
+
+         let main txSkeleton contractHash command sender data wallet =
+           let! asset = Zen.Asset.getDefault contractHash in
+           let lock = ContractLock contractHash in
+           let spend = {
+               asset=asset;
+               amount=1000UL
+               } in
+
+           let pInput = Mint spend in
+
+           let! txSkeleton =
+               Tx.addInput pInput txSkeleton
+               >>= Tx.lockToContract spend.asset spend.amount contractHash in
+
+           RT.ok (txSkeleton, None)
+
+           val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 9
+                    let cf _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 21)
+           """
+    |> Result.mapError failwith
+    |> ignore
+
+[<Test>]
+[<ParallelizableAttribute>]
+let ``Contract should not be able to create zero amounts``() =
+    (compileRunAndValidate sampleInputTx utxoSet
+         """
+         open Zen.Types
+         open Zen.Base
+         open Zen.Cost
+
+         module RT = Zen.ResultT
+         module Tx = Zen.TxSkeleton
+
+         let main txSkeleton contractHash command sender data wallet =
+           let! asset = Zen.Asset.getDefault contractHash in
+           let lock = ContractLock contractHash in
+           let spend = {
+               asset=asset;
+               amount=0UL
+               } in
+
+           let pInput = Mint spend in
+
+           let! txSkeleton =
+               Tx.addInput pInput txSkeleton
+               >>= Tx.lockToContract spend.asset spend.amount contractHash in
+
+           RT.ok (txSkeleton, None)
+
+           val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 9
+                    let cf _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 21)
+           """
+    , (Error "structurally invalid input(s)" : Result<Transaction, string>))
     |> shouldEqual
 
 [<Test>]

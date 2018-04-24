@@ -23,6 +23,7 @@ let ``Should produce outputs overflow error``() =
     let input = getInput 1uy 0ul
 
     let tx = {
+        version = Version0
         inputs = [ Outpoint input ];
         witnesses = []
         outputs =
@@ -43,6 +44,7 @@ let ``Should produce inputs overflow error``() =
     let input1, input2 = getInput 1uy 0ul, getInput 2uy 0ul
 
     let tx = {
+        version = Version0
         inputs = [ Outpoint input1; Outpoint input2 ]
         witnesses = []
         outputs =

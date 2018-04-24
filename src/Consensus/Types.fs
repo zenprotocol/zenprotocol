@@ -8,6 +8,9 @@ open Zen.Types.Data
 [<LiteralAttribute>]
 let CoinbaseMaturity = 100ul
 
+[<Literal>]
+let Version0 = 0ul
+
 type Outpoint = {
     txHash: Hash
     index: uint32
@@ -32,6 +35,7 @@ type Lock =
     | ActivationSacrifice
     | ExtensionSacrifice of cHash:Hash
     | Destroy
+    | HighVLock of identifier:uint32 * byte[]
 
 type Output = {
     lock: Lock
@@ -55,7 +59,7 @@ type ContractWitness =
         beginOutputs: uint32
         inputsLength: uint32
         outputsLength: uint32
-        signature:(PublicKey * Signature) option
+        signature: (PublicKey * Signature) option
         cost: uint32
     }
     with
@@ -65,15 +69,21 @@ type ContractWitness =
 type Witness =
     | PKWitness of PublicKey * Signature
     | ContractWitness of ContractWitness
+    | HighVWitness of identifier:uint32 * byte[]
 
-type Contract = {
+type ContractV0 = {
     code: string
     hints: string
     rlimit: uint32
     queries: uint32
 }
 
+type Contract =
+    | V0 of ContractV0
+    | HighV of version:uint32 * byte[]
+
 type Transaction = {
+    version: uint32
     inputs: Input list
     outputs: Output list
     witnesses: Witness list
@@ -83,22 +93,22 @@ type Transaction = {
 type Nonce = uint64 * uint64
 
 type BlockHeader = {
-    version: uint32;
-    parent: Hash.Hash;
-    blockNumber: uint32;
-    commitments: Hash.Hash;
-    timestamp: uint64;
-    difficulty: uint32;
-    nonce: Nonce;
+    version: uint32
+    parent: Hash.Hash
+    blockNumber: uint32
+    commitments: Hash.Hash
+    timestamp: uint64
+    difficulty: uint32
+    nonce: Nonce
 }
 
 type Block = {
-    header:BlockHeader;
-    txMerkleRoot:Hash.Hash;
-    witnessMerkleRoot:Hash.Hash;
-    activeContractSetMerkleRoot:Hash.Hash;
-    commitments: Hash.Hash list;
-    transactions:Transaction list;
+    header: BlockHeader
+    txMerkleRoot: Hash.Hash
+    witnessMerkleRoot: Hash.Hash
+    activeContractSetMerkleRoot: Hash.Hash
+    commitments: Hash.Hash list
+    transactions: Transaction list
 }
 
 let Anonymous = Zen.Types.Main.Anonymous

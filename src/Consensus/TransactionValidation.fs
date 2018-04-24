@@ -65,47 +65,51 @@ let private activateContract (chainParams : Chain.ChainParameters) contractPath 
     result {
         match tx.contract with
         | Some contract ->
-            match ZFStar.totalQueries contract.hints with
-            | Error error ->
-                yield! GeneralError error
-            | Ok value when value <> contract.queries ->
-                yield! GeneralError "Total queries mismatch"
-            | _ -> ()
-
-            let cHash = Contract.computeHash contract.code
-
-            let! activationSacrifices = getActivationSacrifice tx
-
-            let! numberOfBlocks = getSacrificeBlocks chainParams contract.code activationSacrifices
-
-            match ActiveContractSet.tryFind cHash acs with
-            | Some contract ->
-                let contract = {contract with expiry = contract.expiry + numberOfBlocks}
-                return ActiveContractSet.add cHash contract acs, contractCache
-            | None ->
-                let! contract, contractCache = result {
-                    match ContractCache.tryFind cHash contractCache with
-                    | Some (mainFn, costFn) ->
-                        return (
-                            {
-                                hash = cHash
-                                mainFn = mainFn
-                                costFn = costFn
-                                expiry = numberOfBlocks
-                                code = contract.code
-                            } : Contract.T), contractCache
-                    | None ->
-                        let compile contract = 
-                            Contract.compile contractPath contract
-                            |> Result.bind (fun _ -> Contract.load contractPath (blockNumber + numberOfBlocks) contract.code cHash)
-                            |> Result.mapError (fun _ -> BadContract)
+            match contract with
+            | V0 contract ->
+                match ZFStar.totalQueries contract.hints with
+                | Error error ->
+                    yield! GeneralError error
+                | Ok value when value <> contract.queries ->
+                    yield! GeneralError "Total queries mismatch"
+                | _ -> ()
+    
+                let cHash = Contract.computeHash contract.code
+    
+                let! activationSacrifices = getActivationSacrifice tx
+    
+                let! numberOfBlocks = getSacrificeBlocks chainParams contract.code activationSacrifices
+    
+                match ActiveContractSet.tryFind cHash acs with
+                | Some contract ->
+                    let contract = {contract with expiry = contract.expiry + numberOfBlocks}
+                    return ActiveContractSet.add cHash contract acs, contractCache
+                | None ->
+                    let! contract, contractCache = result {
+                        match ContractCache.tryFind cHash contractCache with
+                        | Some (mainFn, costFn) ->
+                            return (
+                                {
+                                    hash = cHash
+                                    mainFn = mainFn
+                                    costFn = costFn
+                                    expiry = numberOfBlocks
+                                    code = contract.code
+                                } : Contract.T), contractCache
+                        | None ->
+                            let compile contract = 
+                                Contract.compile contractPath contract
+                                |> Result.bind (fun _ -> Contract.load contractPath (blockNumber + numberOfBlocks) contract.code cHash)
+                                |> Result.mapError (fun _ -> BadContract)
+                                
+                            let! contract = Measure.measure (sprintf "compiling contract %A" cHash) (lazy (compile contract))
+                            let contractCache = ContractCache.add contract contractCache
                             
-                        let! contract = Measure.measure (sprintf "compiling contract %A" cHash) (lazy (compile contract))
-                        let contractCache = ContractCache.add contract contractCache
-                        
-                        return contract, contractCache
-                }
-                return ActiveContractSet.add contract.hash contract acs, contractCache
+                            return contract, contractCache
+                    }
+                    return ActiveContractSet.add contract.hash contract acs, contractCache
+            | HighV _ ->
+                return acs, contractCache
         | None ->
             return acs, contractCache
     }
@@ -122,8 +126,8 @@ let private extendContracts chainParams acs tx = result {
         |> List.fold (fun acs (cHash, amount) -> result {
             let! acs = acs
             let! contract = match ActiveContractSet.tryFind cHash acs with
-                           | Some contract -> Ok contract
-                           | None -> GeneralError "Contract(s) must be active"
+                            | Some contract -> Ok contract
+                            | None -> GeneralError "Contract(s) must be active"
             let! blocks = getSacrificeBlocks chainParams contract.code amount
             let contract = {contract with expiry = contract.expiry + blocks}
             return ActiveContractSet.add contract.hash contract acs
@@ -261,6 +265,11 @@ let private checkWitnesses blockNumber acs (txHash, tx, inputs) =
             | None -> Error ContractNotActive
         | Error error -> Error error
 
+    let checkHighVWitness inputTx pInputs =
+        match pInputs with
+        | [] -> GeneralError "missing HighV witness input"
+        | _ :: tail -> Ok (inputTx, tail)
+
     let witnessesFolder state (witness, callingContract, message) =
         state
         |> Result.bind (fun (tx', pInputs) ->
@@ -269,6 +278,8 @@ let private checkWitnesses blockNumber acs (txHash, tx, inputs) =
                 checkPKWitness tx' pInputs serializedPublicKey signature
             | ContractWitness cw ->
                 checkContractWitness tx' acs cw callingContract message pInputs
+            | HighVWitness _ ->
+                checkHighVWitness tx' pInputs
         )
 
     let applyMaskIfContract pTx =
@@ -325,18 +336,6 @@ let private checkWitnesses blockNumber acs (txHash, tx, inputs) =
             return witnessedSkel
     }
 
-let private checkInputsNotEmpty tx =
-    if List.isEmpty tx.inputs then GeneralError "inputs empty"
-    else Ok tx
-
-let private checkOutputsNotEmpty tx =
-    if List.isEmpty tx.outputs then
-        GeneralError "outputs empty"
-    else if List.exists (fun output -> output.spend.amount = 0UL) tx.outputs then
-        GeneralError "outputs invalid"
-    else
-        Ok tx
-
 let private checkOutputsOverflow tx =
     if tx.outputs
         |> List.map (fun o -> o.spend)
@@ -350,43 +349,73 @@ let private checkDuplicateInputs tx =
     else GeneralError "inputs duplicated"
 
 let private checkStructure =
-    let isInvalidHash = Hash.isValid >> not
+    let isInvalidSpend = fun { asset = (cHash, token); amount = amount } ->
+        (cHash = Hash.zero && token <> Hash.zero) ||
+        amount = 0UL //Relieve for non spendables?
+    
+    let isNull = function | null -> true | _ -> false
+    let isEmptyArr arr = isNull arr || Array.length arr = 0
+    let isEmptyString str = isNull str || String.length str = 0
 
-    let isInvalidAsset = fun (cHash, token) ->
-        cHash |> isInvalidHash ||
-        token |> isInvalidHash ||
-        (cHash = Hash.zero && token <> Hash.zero)
-
-    (fun tx ->
+    let checkContractStructure = fun tx ->
         match tx.contract with
-        | Some contract when not <|
-            (String.length contract.code > 0 &&
-             String.length contract.hints > 0 &&
-             contract.rlimit > 0u &&
-             contract.queries > 0u) ->
+        | Some contract ->
+            match contract with
+            | V0 contract when 
+                isEmptyString contract.code ||
+                isEmptyString contract.hints ||
+                contract.rlimit = 0u ||
+                contract.queries = 0u -> false
+            | HighV (version, bytes) when 
+                version = Version0 || //reserved for V0
+                isEmptyArr bytes -> false
+            | _ -> true
+        | None -> true
+        |> function
+        | false -> 
             GeneralError "structurally invalid contract data"
-        | _ ->
-            Ok tx)
-    >=> (fun tx ->
-        if List.exists (function
-            | Outpoint outpoint -> isInvalidHash outpoint.txHash
-            | Mint spend -> isInvalidAsset spend.asset
+        | true -> Ok tx
+            
+    let checkInputsStructrue = fun tx ->
+        if List.isEmpty tx.inputs || List.exists (function
+            | Mint spend -> isInvalidSpend spend
+            | _ -> false
         ) tx.inputs then
-            GeneralError "structurally invalid input data"
+            GeneralError "structurally invalid input(s)"
         else
-            Ok tx)
-    >=> (fun tx ->
-        if List.exists (fun { lock = lock; spend = spend } ->
-           match lock with
-           | PK hash -> isInvalidHash hash
-           | Contract hash -> isInvalidHash hash
-           | Coinbase (_, pkHash) -> isInvalidHash pkHash
-           | _ -> false
-           || isInvalidAsset spend.asset
+            Ok tx
+            
+    let checkOutputsStructrue = fun tx ->
+        if List.isEmpty tx.outputs || List.exists (fun { lock = lock; spend = spend } ->
+            match lock with
+            | HighVLock (identifier, bytes) -> 
+                identifier <= 7u // last reserved identifier for lock types
+                || isEmptyArr bytes
+            | _ -> false
+            || isInvalidSpend spend
         ) tx.outputs then
-            GeneralError "structurally invalid output data"
+            GeneralError "structurally invalid output(s)"
         else
-            Ok tx)
+            Ok tx
+
+    let checkWitnessesStructure = fun tx ->
+        if List.isEmpty tx.witnesses || List.exists (function
+            | ContractWitness { command = command
+                                cost = cost } ->
+                isNull command || cost = 0ul
+            | HighVWitness (identifier, bytes) ->
+                identifier <= 2u // last reserved identifier for witness types
+                || isEmptyArr bytes
+            | _ -> false
+        ) tx.witnesses then
+            GeneralError "structurally invalid witness(es)"
+        else
+            Ok tx
+
+    checkContractStructure
+    >=> checkInputsStructrue
+    >=> checkOutputsStructrue
+    >=> checkWitnessesStructure
 
 let private checkNoCoinbaseLock tx =
     let anyCoinbase =
@@ -411,8 +440,6 @@ let internal tryGetUtxos getUTXO utxoSet tx =
 
 let validateBasic =
     checkStructure
-    >=> checkInputsNotEmpty
-    >=> checkOutputsNotEmpty
     >=> checkNoCoinbaseLock
     >=> checkOutputsOverflow
     >=> checkDuplicateInputs
@@ -446,6 +473,13 @@ let validateCoinbase blockNumber =
         | [] -> Ok tx
         | _ -> GeneralError "coinbase transaction must not have any witnesses"
 
+    let checkOutputsNotEmpty tx =
+        if List.isEmpty tx.outputs then
+            GeneralError "outputs empty"
+        else if List.exists (fun output -> output.spend.amount = 0UL) tx.outputs then
+            GeneralError "outputs invalid"
+        else
+            Ok tx
 
     checkOutputsNotEmpty
     >=> checkNoInputWithinCoinbaseTx

@@ -54,7 +54,7 @@ let localParameters = {
     testParameters with
         name="local"
         genesisHash =
-            get <| Hash.fromString "07473faf36113a546b319f935abecec99ee5d4de305d2ef429db40bee18b0e81";
+            get <| Hash.fromString "3e836bc18025357a73ecf92fd89426e0534be30ff0a42e4f997c40471bf3ed9f";
         genesisTime=1515594186383UL
         networkId=1002ul
 }

@@ -27,6 +27,7 @@ let ``Transaction with one PK lock in inputs should have corresponding cost``() 
     let outputLock = PK (PublicKey.hash publicKey)
     let output = { lock = outputLock; spend = { asset = Constants.Zen; amount = 1UL } }
     let tx = {
+        version = Version0
         inputs = [ Outpoint testInput1 ]
         witnesses = []
         outputs = [ output ]
@@ -48,7 +49,7 @@ let ``Transaction with many PK locks in inputs should have right cost``() =
     let outputs =
         [ for lk in outputLocks ->
             { lock = lk; spend = { asset = Constants.Zen; amount = 1UL} } ]
-    let tx = { inputs=inputs;witnesses=[];outputs=outputs;contract=None }
+    let tx = { version=Version0;inputs=inputs;witnesses=[];outputs=outputs;contract=None }
     let utxos = Map.ofList <| List.zip outpoints (List.map Unspent outputs)
     let sTx = Transaction.sign keys tx
     let txWeight = transactionWeight getUTXO utxos sTx
@@ -89,6 +90,7 @@ let ``Contract validated transaction should have the right cost``() =
         cost = 200u;
     }
     let tx = {
+        version = Version0
         inputs = mintInput::inputs;
         outputs = outputs;
         contract = None;
@@ -136,6 +138,7 @@ let ``Two contracts in sequence should have the right cost``() =
             cost = 50u;
     }
     let tx = {
+        version = Version0
         inputs = inputs;
         outputs = outputs;
         contract = None;
@@ -151,6 +154,7 @@ let ``Transaction with too many witnesses should fail``() =
     let outputLock = PK (PublicKey.hash publicKey)
     let output = { lock = outputLock; spend = { asset = Constants.Zen; amount = 1UL } }
     let tx = {
+        version = Version0
         inputs = [ Outpoint testInput1 ]
         witnesses = []
         outputs = [ output ]
@@ -167,6 +171,7 @@ let ``Transaction with too few witnesses should fail``() =
     let outputLock = PK (PublicKey.hash publicKey)
     let output = { lock = outputLock; spend = { asset = Constants.Zen; amount = 1UL } }
     let tx = {
+        version = Version0
         inputs = [ Outpoint testInput1 ]
         witnesses = []
         outputs = [ output ]
