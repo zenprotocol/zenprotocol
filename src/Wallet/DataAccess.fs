@@ -1,19 +1,19 @@
 module Wallet.DataAccess
 
-open MBrace.FsPickler
 open Account
 open Infrastructure
 open DataAccess
 open System.Text
 
-let private binarySerializer = FsPickler.CreateBinarySerializer()
+open Serialization
+
 let private getBytes str = Encoding.UTF8.GetBytes (str : string)
 
 [<Literal>]
-let private MainAccount = "MAIN"
+let private MainAccountName = "MAIN"
 
 [<Literal>]
-let private Secured = "SECURED"
+let private SecuredName = "SECURED"
 
 [<Literal>]
 let DbVersion = 0
@@ -26,11 +26,11 @@ type T = {
     dbVersion: SingleValue<int>
 }
 
-let private createCollection<'a> session name =
+let private createCollection session serializer deserializer name =
     Collection.create session name
         getBytes
-        binarySerializer.Pickle<'a>
-        binarySerializer.UnPickle<'a>
+        serializer
+        deserializer
 
 let createContext dataPath =
     Platform.combine dataPath "wallet"
@@ -38,13 +38,13 @@ let createContext dataPath =
 
 let init databaseContext =
     use session = DatabaseContext.createSession databaseContext
-    let accountCollection = createCollection<Account.T> session "accounts"
-    let securedCollection = createCollection<Secured.T> session "secured"
+    let accountCollection = createCollection session Wallet.serialize Wallet.deserialize "accounts"
+    let securedCollection = createCollection session Secured.serialize Secured.deserialize "secured"
 
     let dbVersion =
         SingleValue.create databaseContext "dbVersion"
-            binarySerializer.Pickle<int>
-            binarySerializer.UnPickle<int>
+            Version.serialize
+            Version.deserialize
 
     match SingleValue.tryGet dbVersion session with
     | Some version when version <> DbVersion ->
@@ -56,7 +56,7 @@ let init databaseContext =
     let t = {
         accountCollection = accountCollection
         securedCollection = securedCollection
-        dbVersion =dbVersion
+        dbVersion = dbVersion
     }
 
     Session.commit session
@@ -70,16 +70,16 @@ module Account =
     open Collection
 
     let put t session =
-        put t.accountCollection session MainAccount
+        put t.accountCollection session MainAccountName
 
     let tryGet t session =
-        tryGet t.accountCollection session MainAccount
+        tryGet t.accountCollection session MainAccountName
 
 module Secured =
     open Collection
 
     let put t session =
-        put t.securedCollection session Secured
+        put t.securedCollection session SecuredName
 
     let tryGet t session =
-        tryGet t.securedCollection session Secured
+        tryGet t.securedCollection session SecuredName
