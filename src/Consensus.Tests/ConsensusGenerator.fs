@@ -118,9 +118,9 @@ type ConsensusGenerator =
 
             return LeadingZerosHash (Hash.Hash (Array.append leadingZeros rest))
         })
-                
+
     static member DataGenerator() =
-        let makeDtuple arr = 
+        let makeDtuple arr =
             Prims.Mkdtuple2 (int64 (Array.length arr), arr)
         let array gen1 =
             gen {
@@ -129,7 +129,7 @@ type ConsensusGenerator =
 
                 return arr
             }
-        
+
         let i64 = Arb.generate<int64>
         let i64Gen =
             gen {
@@ -139,7 +139,7 @@ type ConsensusGenerator =
         let i64ArrayGen =
             gen {
                 let! arr = array i64
-                return I64Array (makeDtuple arr) 
+                return I64Array (makeDtuple arr)
             }
         let byte = Arb.generate<byte>
         let byteGen =
@@ -150,7 +150,7 @@ type ConsensusGenerator =
         let byteArrayGen =
             gen {
                 let! arr = array byte
-                return ByteArray (makeDtuple arr) 
+                return ByteArray (makeDtuple arr)
             }
         let u32 = Arb.generate<uint32>
         let u32Gen =
@@ -161,7 +161,7 @@ type ConsensusGenerator =
         let u32ArrayGen =
             gen {
                 let! arr = array u32
-                return U32Array (makeDtuple arr) 
+                return U32Array (makeDtuple arr)
             }
         let u64 = Arb.generate<uint64>
         let u64Gen =
@@ -172,9 +172,9 @@ type ConsensusGenerator =
         let u64ArrayGen =
             gen {
                 let! arr = array u64
-                return U64Array (makeDtuple arr) 
+                return U64Array (makeDtuple arr)
             }
-        let string = gen { 
+        let string = gen {
             let! s = Arb.generate<string> |> Gen.filter ((<>) null)
             return Consensus.ZFStar.fsToFstString s
         }
@@ -186,7 +186,7 @@ type ConsensusGenerator =
         let stringArrayGen =
             gen {
                 let! arr = array string
-                return StringArray (makeDtuple arr) 
+                return StringArray (makeDtuple arr)
             }
         let hash = Gen.arrayOfLength Hash.Length Arb.generate<byte>
         let hashGen =
@@ -197,7 +197,7 @@ type ConsensusGenerator =
         let hashArrayGen =
             gen {
                 let! arr = array hash
-                return HashArray (makeDtuple arr) 
+                return HashArray (makeDtuple arr)
             }
         let lock = gen {
             let! lock =
@@ -215,7 +215,7 @@ type ConsensusGenerator =
         let lockArrayGen =
             gen {
                 let! arr = array lock
-                return LockArray (makeDtuple arr) 
+                return LockArray (makeDtuple arr)
             }
         let tupleGen =
             gen {
@@ -223,8 +223,8 @@ type ConsensusGenerator =
                 let! b = Arb.generate<data>
                 return Tuple (a,b)
             }
-            
-        Arb.fromGen (Gen.oneof 
+
+        Arb.fromGen (Gen.oneof
         [
             i64Gen; i64ArrayGen;
             byteGen; byteArrayGen;
@@ -235,7 +235,7 @@ type ConsensusGenerator =
             lockGen; lockArrayGen;
             tupleGen
         ])
-        
+
     static member Transaction() =
         let outpointGenerator =
             gen {
@@ -263,14 +263,14 @@ type ConsensusGenerator =
 
         let outputGenerator =
             gen {
-                let notCoinbaseLock lock =
-                    match lock with
-                    | Coinbase _ -> false
-                    | _ -> true
+                let notCoinbaseLockOrAcivationSacrifice = function
+                | ActivationSacrifice _
+                | Coinbase _ -> false
+                | _ -> true
 
                 let! lock =
                     Arb.generate<Lock>
-                    |> Gen.filter notCoinbaseLock
+                    |> Gen.filter notCoinbaseLockOrAcivationSacrifice
                     |> Gen.filter (function
                     | HighVLock (identifier, _) -> identifier > 7u // last reserved identifier
                     | _ -> true)
@@ -300,7 +300,7 @@ type ConsensusGenerator =
                 else
                     return None
             }
-  
+
         let pkWitnessGenerator =
             gen {
                 let secretKey, publicKey = KeyPair.create()
@@ -312,7 +312,7 @@ type ConsensusGenerator =
             gen {
                 let! cHash = Gen.arrayOfLength Hash.Length Arb.generate<byte>
                 let! command = Arb.generate<string> |> Gen.filter ((<>) null)
-                
+
                 let! beginInputs = Arb.generate<uint32> |> Gen.filter (fun i -> i < nInputs)
                 let! beginOutputs = Arb.generate<uint32> |> Gen.filter (fun i -> i < nOutputs)
                 let! inputsLength = Arb.generate<uint32> |> Gen.filter ((<>) 0ul) |> Gen.filter (fun i -> i <= nInputs - beginInputs)
@@ -325,7 +325,7 @@ type ConsensusGenerator =
                 let secretKey, publicKey = KeyPair.create()
                 let! hash = Arb.generate<Hash.Hash>
                 let signature = sign secretKey hash
-                
+
                 let signature =
                     if hasSignature then
                         Some (publicKey, signature)
@@ -344,20 +344,26 @@ type ConsensusGenerator =
                     cost = cost
                 }
             }
-            
+
         let highVWitnessGenerator =
             gen {
-                let! identifier = 
+                let! identifier =
                     Arb.generate<uint32>
                     |> Gen.filter (fun i -> i > 2u) // last reserved identifier
                 let! bytes = Arb.generate<byte[]>
                 return HighVWitness (identifier, bytes)
             }
 
+        let activationSacrificeOutputGenerator =
+            gen {
+                let! amount = Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
+                return [{lock=ActivationSacrifice; spend={asset=Hash.zero,Hash.zero;amount=amount}}]
+            }
+
         Arb.fromGen (gen {
             let! inputs = Gen.nonEmptyListOf inputGenerator
             let! outputs = Gen.nonEmptyListOf outputGenerator
-            let! witnesses = 
+            let! witnesses =
                 [ highVWitnessGenerator
                   contractWitnessGenerator (List.length inputs |> uint32) (List.length outputs |> uint32)
                   pkWitnessGenerator ]
@@ -365,7 +371,14 @@ type ConsensusGenerator =
                 |> Gen.nonEmptyListOf
             let! contract = contractGenerator
 
-            return {version = Version0;inputs=inputs;outputs=outputs;contract=contract;witnesses=witnesses}
+            let! activationSacrificeOutputs =
+                if Option.isSome contract then
+                    activationSacrificeOutputGenerator
+                else
+                    Gen.constant []
+
+
+            return {version = Version0;inputs=inputs;outputs=List.append outputs activationSacrificeOutputs;contract=contract;witnesses=witnesses}
         })
 
         static member TxSkeleton() =
@@ -383,9 +396,9 @@ type ConsensusGenerator =
                         | Coinbase _ -> false
                         | _ -> true
 
-                    let! lock = 
-                        Arb.generate<Lock> 
-                        |> Gen.filter notCoinbaseLock 
+                    let! lock =
+                        Arb.generate<Lock>
+                        |> Gen.filter notCoinbaseLock
                         |> Gen.filter (function
                         | HighVLock (identifier, _) -> identifier > 7u // last reserved identifier
                         | _ -> true)

@@ -73,13 +73,13 @@ let private activateContract (chainParams : Chain.ChainParameters) contractPath 
                 | Ok value when value <> contract.queries ->
                     yield! GeneralError "Total queries mismatch"
                 | _ -> ()
-    
+
                 let cHash = Contract.computeHash contract.code
-    
+
                 let! activationSacrifices = getActivationSacrifice tx
-    
+
                 let! numberOfBlocks = getSacrificeBlocks chainParams contract.code activationSacrifices
-    
+
                 match ActiveContractSet.tryFind cHash acs with
                 | Some contract ->
                     let contract = {contract with expiry = contract.expiry + numberOfBlocks}
@@ -97,14 +97,14 @@ let private activateContract (chainParams : Chain.ChainParameters) contractPath 
                                     code = contract.code
                                 } : Contract.T), contractCache
                         | None ->
-                            let compile contract = 
+                            let compile contract =
                                 Contract.compile contractPath contract
                                 |> Result.bind (fun _ -> Contract.load contractPath (blockNumber + numberOfBlocks) contract.code cHash)
                                 |> Result.mapError (fun _ -> BadContract)
-                                
+
                             let! contract = Measure.measure (sprintf "compiling contract %A" cHash) (lazy (compile contract))
                             let contractCache = ContractCache.add contract contractCache
-                            
+
                             return contract, contractCache
                     }
                     return ActiveContractSet.add contract.hash contract acs, contractCache
@@ -352,7 +352,7 @@ let private checkStructure =
     let isInvalidSpend = fun { asset = (cHash, token); amount = amount } ->
         (cHash = Hash.zero && token <> Hash.zero) ||
         amount = 0UL //Relieve for non spendables?
-    
+
     let isNull = function | null -> true | _ -> false
     let isEmptyArr arr = isNull arr || Array.length arr = 0
     let isEmptyString str = isNull str || String.length str = 0
@@ -361,21 +361,21 @@ let private checkStructure =
         match tx.contract with
         | Some contract ->
             match contract with
-            | V0 contract when 
+            | V0 contract when
                 isEmptyString contract.code ||
                 isEmptyString contract.hints ||
                 contract.rlimit = 0u ||
                 contract.queries = 0u -> false
-            | HighV (version, bytes) when 
+            | HighV (version, bytes) when
                 version = Version0 || //reserved for V0
                 isEmptyArr bytes -> false
             | _ -> true
         | None -> true
         |> function
-        | false -> 
+        | false ->
             GeneralError "structurally invalid contract data"
         | true -> Ok tx
-            
+
     let checkInputsStructrue = fun tx ->
         if List.isEmpty tx.inputs || List.exists (function
             | Mint spend -> isInvalidSpend spend
@@ -384,11 +384,11 @@ let private checkStructure =
             GeneralError "structurally invalid input(s)"
         else
             Ok tx
-            
+
     let checkOutputsStructrue = fun tx ->
         if List.isEmpty tx.outputs || List.exists (fun { lock = lock; spend = spend } ->
             match lock with
-            | HighVLock (identifier, bytes) -> 
+            | HighVLock (identifier, bytes) ->
                 identifier <= 7u // last reserved identifier for lock types
                 || isEmptyArr bytes
             | _ -> false
@@ -429,6 +429,22 @@ let private checkNoCoinbaseLock tx =
     else
         Ok tx
 
+let private checkActivationSacrifice tx =
+    let isActivationSacrifise lock =
+        match lock with
+        | ActivationSacrifice _ -> true
+        | _ -> false
+
+    let anySacrifice = List.exists (fun output -> isActivationSacrifise output.lock) tx.outputs
+
+    if anySacrifice = Option.isSome tx.contract then
+        Ok tx
+    else
+        if anySacrifice then
+            GeneralError "tx with an activation sacrifice must include a contract"
+        else
+            GeneralError "tx with a contract must include an activation sacrifice"
+
 let internal tryGetUtxos getUTXO utxoSet tx =
     getUtxosResult getUTXO tx.inputs utxoSet
     |> Result.mapError (fun errors ->
@@ -443,6 +459,7 @@ let validateBasic =
     >=> checkNoCoinbaseLock
     >=> checkOutputsOverflow
     >=> checkDuplicateInputs
+    >=> checkActivationSacrifice
 
 let validateCoinbase blockNumber =
     let checkOnlyCoinbaseLocks blockNumber tx =

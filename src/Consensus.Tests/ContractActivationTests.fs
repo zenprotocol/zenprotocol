@@ -246,7 +246,7 @@ let ``Contract extension with exact amount``() =
         Account.createActivateContractTransaction localParams code activateBlocks rootAccount
         |> unwrap
 
-    let _, acs, _ = 
+    let _, acs, _ =
         validateInContext initialBlock ActiveContractSet.empty ContractCache.empty utxoSet (Transaction.hash tx) tx
         |> unwrap
 
@@ -268,7 +268,7 @@ let ``Contract extension with exact amount``() =
         {version = Version0; contract=None; inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
         |> Transaction.sign [rootKeyPair]
 
-    let _, acs, _ = 
+    let _, acs, _ =
         validateInContext initialBlock acs ContractCache.empty utxoSet (Transaction.hash tx) tx
         |> unwrap
 
@@ -382,4 +382,26 @@ let ``Contract activation with invalid queries should fail``() =
 
     validateInContext 1ul ActiveContractSet.empty ContractCache.empty utxoSet (Transaction.hash tx) tx
     |> should equal expected
-    
+
+[<Test>]
+let ``Contract with activation sacrifice but without a contract should fail``() =
+    let rootAccount = createTestAccount() |> fst
+
+    let activationSacrificeAmount = 1000UL
+    let outpoint = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
+    let outputs =
+        let output = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
+        [
+            {lock=ActivationSacrifice;spend={amount=activationSacrificeAmount;asset=Constants.Zen}}
+            {output with spend={output.spend with amount = output.spend.amount - activationSacrificeAmount}}
+        ]
+
+    let tx =
+        {version = Version0; contract = None; inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
+        |> Transaction.sign [rootKeyPair]
+
+
+    let expected:Result<Transaction,ValidationError> = General "tx with an activation sacrifice must include a contract" |> Error
+
+    validateBasic tx
+    |> should equal expected
