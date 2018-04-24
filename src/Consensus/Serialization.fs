@@ -2,6 +2,7 @@ module Consensus.Serialization
 
 open System
 open Crypto
+open Hash
 open Types
 open FsNetMQ
 open FsNetMQ.Stream
@@ -21,14 +22,18 @@ type TransactionSerializationMode =
 module Serialization =
     module Hash =
         let write hash = writeBytes (Hash.bytes hash) Hash.Length
-        let read = readBytes Hash.Length
-
+        let readBytes = readBytes Hash.Length
+        let read = reader {
+            let! bytes = readBytes
+            return Hash bytes
+        }
+        
     module Byte =
         let write byte = writeNumber1 byte
         let read = readNumber1
 
     type Operations<'a> = {
-        writeHash: Hash.Hash -> 'a -> 'a
+        writeHash: Hash -> 'a -> 'a
         writeByte: Byte -> 'a -> 'a
         writeBytes: Byte[] -> int32 -> 'a -> 'a
         writeString: String -> 'a -> 'a
@@ -161,7 +166,7 @@ module Serialization =
         let read = reader {
             let! cHash = Hash.read
             let! token = Hash.read
-            return Hash.Hash cHash, Hash.Hash token
+            return cHash, token
         }
 
     module Spend =
@@ -174,6 +179,16 @@ module Serialization =
             return { asset = asset; amount = amount }
         }
 
+    module Outpoint =
+        let write ops = fun { txHash = txHash; index = index } ->
+            ops.writeHash txHash
+            >> ops.writeNumber4 index
+        let read = reader {
+            let! txHash = Hash.read
+            let! index = readNumber4
+            return { txHash = txHash; index = index }
+        }
+
     module Input =
         [<Literal>]
         let private SerializedOutpoint = 1uy
@@ -181,10 +196,9 @@ module Serialization =
         let private SerializedMint = 2uy
 
         let write ops = function
-            | Outpoint { txHash = txHash; index = index } ->
+            | Outpoint outpoint ->
                 ops.writeByte SerializedOutpoint
-                >> ops.writeHash txHash
-                >> VarInt.write ops index
+                >> Outpoint.write ops outpoint
             | Mint spend ->
                 ops.writeByte SerializedMint
                 >> Spend.write ops spend
@@ -192,12 +206,11 @@ module Serialization =
             let! discriminator = Byte.read
             match discriminator with
             | SerializedOutpoint ->
-                let! txHash = Hash.read
-                let! index = VarInt.read
-                return Outpoint { txHash = Hash.Hash txHash; index = index }
+                let! outpoint = Outpoint.read 
+                return Outpoint outpoint
             | SerializedMint ->
                 let! spend = Spend.read
-                return (Mint spend)
+                return Mint spend
             | _ ->
                 yield! fail
         }
@@ -278,14 +291,14 @@ module Serialization =
                 match identifier with
                 | PKIdentifier ->
                     let! hash = Hash.read
-                    return Lock.PK (Hash.Hash hash)
+                    return Lock.PK hash
                 | ContractIdentifier ->
                     let! hash = Hash.read
-                    return Lock.Contract (Hash.Hash hash)
+                    return Lock.Contract hash
                 | CoinbaseIdentifier ->
                     let! blockNumber = readNumber4
                     let! pkHash = Hash.read
-                    return Lock.Coinbase (blockNumber, Hash.Hash pkHash)
+                    return Lock.Coinbase (blockNumber, pkHash)
                 | FeeIdentifier ->
                     return Lock.Fee
                 | ActivationSacrificeIdentifier ->
@@ -294,7 +307,7 @@ module Serialization =
                     return Lock.Destroy
                 | ExtensionSacrificeIdentifier ->
                     let! cHash = Hash.read
-                    return Lock.ExtensionSacrifice (Hash.Hash cHash)
+                    return Lock.ExtensionSacrifice cHash
                 | _ ->
                     let! bytes = List.readBody Byte.read count
                     return HighVLock (identifier, Array.ofList bytes)
@@ -356,10 +369,14 @@ module Serialization =
                 return Prims.Mkdtuple2 (int64 (Seq.length seq), Array.ofSeq seq)
             }
 
-        module Hash =
-            let write ops = Consensus.Hash.Hash >> ops.writeHash
-
-        module Lock =
+        module ZHash =
+            let write ops = Hash.Hash >> ops.writeHash
+            let read = reader {
+                let! hash = Hash.read
+                return hash |> Hash.bytes |> ZData.Hash
+            }
+            
+        module ZLock =
             let write ops = ZFStar.fstToFsLock >> Lock.write ops
             let read = reader {
                 let! lock = Lock.read
@@ -422,16 +439,16 @@ module Serialization =
                 >> Array.write ops String.write arr
             | ZData.Hash hash ->
                 ops.writeByte HashData
-                >> Hash.write ops hash
+                >> ZHash.write ops hash
             | ZData.HashArray (Prims.Mkdtuple2 (_, arr)) ->
                 ops.writeByte HashArrayData
-                >> Array.write ops Hash.write arr
+                >> Array.write ops ZHash.write arr
             | ZData.Lock l ->
                 ops.writeByte LockData
-                >> Lock.write ops l
+                >> ZLock.write ops l
             | ZData.LockArray (Prims.Mkdtuple2 (_, arr)) ->
                 ops.writeByte LockArrayData
-                >> Array.write ops Lock.write arr
+                >> Array.write ops ZLock.write arr
             | ZData.Tuple (a, b) ->
                 ops.writeByte TupleData
                 >> write ops a
@@ -482,16 +499,15 @@ module Serialization =
                 let! arr = Array.readDtuple String.read
                 return ZData.StringArray arr
             | HashData ->
-                let! hash = Hash.read
-                return ZData.Hash hash
+                yield! ZHash.read
             | HashArrayData ->
-                let! arr = Array.readDtuple Hash.read
+                let! arr = Array.readDtuple Hash.readBytes
                 return ZData.HashArray arr
             | LockData ->
-                let! lock = Lock.read
+                let! lock = ZLock.read
                 return ZData.Lock lock
             | LockArrayData ->
-                let! arr = Array.readDtuple Lock.read
+                let! arr = Array.readDtuple ZLock.read
                 return ZData.LockArray arr
             | SignatureData ->
                 let! signature = Signature.read
@@ -576,7 +592,7 @@ module Serialization =
                     })
                     let! cost = VarInt.read
                     return ContractWitness {
-                        cHash = Hash.Hash cHash
+                        cHash = cHash
                         command = command
                         data = data
                         beginInputs = beginInputs
@@ -701,9 +717,9 @@ module Serialization =
             let! nonce = Nonce.read
             return {
                 version = version
-                parent = Hash.Hash parent
+                parent = parent
                 blockNumber = blockNumber
-                commitments = Hash.Hash commitments
+                commitments = commitments
                 timestamp = timestamp
                 difficulty = difficulty
                 nonce = nonce
@@ -724,10 +740,10 @@ module Serialization =
                 yield! fail
             else return {
                 header = header
-                txMerkleRoot = Hash.Hash commitments.[0]
-                witnessMerkleRoot = Hash.Hash commitments.[1]
-                activeContractSetMerkleRoot = Hash.Hash commitments.[2]
-                commitments = List.map Hash.Hash commitments.[3 .. List.length commitments - 1]
+                txMerkleRoot = commitments.[0]
+                witnessMerkleRoot = commitments.[1]
+                activeContractSetMerkleRoot = commitments.[2]
+                commitments = commitments.[3 .. List.length commitments - 1]
                 transactions = transactions
             }
         }
@@ -772,10 +788,10 @@ module Block =
 
             return {
                 header = header
-                txMerkleRoot = Hash.Hash commitmentsList.[0]
-                witnessMerkleRoot = Hash.Hash commitmentsList.[1]
-                activeContractSetMerkleRoot = Hash.Hash commitmentsList.[2]
-                commitments = List.map Hash.Hash commitmentsList.[3 .. List.length commitmentsList - 1]
+                txMerkleRoot = commitmentsList.[0]
+                witnessMerkleRoot = commitmentsList.[1]
+                activeContractSetMerkleRoot = commitmentsList.[2]
+                commitments = commitmentsList.[3 .. List.length commitmentsList - 1]
                 transactions = transactions
             }
         }
