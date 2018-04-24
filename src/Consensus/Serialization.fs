@@ -143,6 +143,15 @@ module Serialization =
             let! list = readBody readerFn length
             return List.ofSeq list
         }
+        
+    module Map =
+        let write ops writerFn =
+            Map.toList
+            >> List.write ops writerFn
+        let read readerFn = reader {
+            let! list = List.read readerFn 
+            return (List.toSeq >> Map.ofSeq) list
+        }
 
     module Asset =
         let write ops = fun (cHash, token) ->
@@ -433,12 +442,11 @@ module Serialization =
             | ZData.PublicKey publicKey ->
                 ops.writeByte PublicKeyData
                 >> PublicKey.write ops publicKey
-            | ZData.Dict (ZData.DataDict (map, len)) ->
-                let entries = Map.toList map
-                ops.writeByte DictData
-                >> ops.writeNumber4 len
-                >> List.writeBody ops String.write (entries |> List.map fst)
-                >> List.writeBody ops write (entries |> List.map snd)
+
+            | ZData.Dict (ZData.DataDict (map, _)) ->
+                Map.write ops (fun ops (key, data)-> 
+                    String.write ops key
+                    >> write ops data) map
 
         let rec read = reader {
             let! discriminator = Byte.read
@@ -496,11 +504,13 @@ module Serialization =
                 let! b = read
                 return ZData.Tuple (a,b)
             | DictData ->
-                let! len = readNumber4
-                let! keys = List.readBody String.read len
-                let! values = List.readBody read len
-                let map = List.zip keys values |> Map.ofSeq
-                return ZData.Dict (ZData.DataDict (map, len))
+                let! map = Map.read <| reader {
+                    let! key = String.read
+                    let! data = read
+                    return key, data
+                }
+                return ZData.Dict (ZData.DataDict (map, Map.count map |> uint32))
+                
             | _ ->
                 yield! fail
         }
