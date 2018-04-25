@@ -142,3 +142,10 @@ type CheckPasswordJson = JsonProvider<"""
     "password": "secret"
 }
 """>
+
+type TransactionsRequestJson = JsonProvider<"""
+{
+    "skip": 1000,
+    "take": 1000
+}
+""">

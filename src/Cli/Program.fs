@@ -9,6 +9,11 @@ type ImportArgs =
     interface IArgParserTemplate with
         member arg.Usage = ""
 
+type PaginationArgs =
+    | [<MainCommand("COMMAND");ExactlyOnce>] Pagination_Arguments of skip:int * take:int
+    interface IArgParserTemplate with
+        member arg.Usage = ""
+
 type SendArgs =
     | [<MainCommand("COMMAND");ExactlyOnce>] Send_Arguments of asset:string * assetType:string * amount:int64 * address:string * password:string
     interface IArgParserTemplate with
@@ -51,7 +56,7 @@ type Arguments =
     | [<AltCommandLine("-l2")>] Local2
 #endif
     | [<CliPrefix(CliPrefix.None)>] Balance of ParseResults<NoArgs>
-    | [<CliPrefix(CliPrefix.None)>] History of ParseResults<NoArgs>
+    | [<CliPrefix(CliPrefix.None)>] History of ParseResults<PaginationArgs>
     | [<CliPrefix(CliPrefix.None)>] Address of ParseResults<NoArgs>
     | [<CliPrefix(CliPrefix.None)>] Resync of ParseResults<NoArgs>
     | [<CliPrefix(CliPrefix.None)>] Import of ParseResults<ImportArgs>
@@ -144,11 +149,15 @@ let main argv =
 
             Array.iter (fun (assertBalance:BalanceResponseJson.Root) ->
                 printfn " %s %s\t| %d" assertBalance.Asset assertBalance.AssetType assertBalance.Balance) balance
-        | Some (History _) ->
+        | Some (History args) ->
+            let skip, take = args.GetResult <@ Pagination_Arguments @>
             let transactions =
                 "wallet/transactions"
                 |> getUri
-                |> TransactionsResponseJson.Load
+                |> (new TransactionsRequestJson.Root(skip, take))
+                    .JsonValue.Request
+                |> getResponse
+                |> TransactionsResponseJson.Parse
 
             printfn "TxHash\t| Block\t Asset\t| Amount"
             printfn "==================================================="

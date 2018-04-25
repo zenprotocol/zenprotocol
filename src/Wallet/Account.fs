@@ -267,25 +267,30 @@ let getBalance account =
         | Some amount -> Map.add output.spend.asset (amount+output.spend.amount) balance
         | None -> Map.add output.spend.asset output.spend.amount balance) Map.empty unspent
 
-let getHistory account =
-    handleMempoolTransactions account
-    |> snd
-    |> List.map (fun txDelta ->
-        txDelta.txHash,
-        txDelta.deltas
-        |> List.fold (fun amounts spend ->
-            let asset, amount =
-                match spend with
-                | Spent spend -> spend.asset, 0L - int64 spend.amount
-                | Unspent spend -> spend.asset, int64 spend.amount
-            let amount' =
-                (match Map.tryFind asset amounts with
-                | Some amount -> amount
-                | None -> 0L)
-            Map.add asset (amount' + amount) amounts
-        ) Map.empty,
-        match txDelta.blockNumber with | Some blockNumber -> blockNumber | None -> 0ul
-    )
+
+let getHistory skip take account =
+    let list =
+        handleMempoolTransactions account
+        |> snd
+        |> List.map (fun txDelta ->
+            txDelta.txHash,
+            txDelta.deltas
+            |> List.fold (fun amounts spend ->
+                let asset, amount =
+                    match spend with
+                    | Spent spend -> spend.asset, 0L - int64 spend.amount
+                    | Unspent spend -> spend.asset, int64 spend.amount
+                let amount' =
+                    (match Map.tryFind asset amounts with
+                    | Some amount -> amount
+                    | None -> 0L)
+                Map.add asset (amount' + amount) amounts
+            ) Map.empty,
+            match txDelta.blockNumber with | Some blockNumber -> blockNumber | None -> 0ul
+        )
+
+    let list = List.skip (min skip (List.length list)) list
+    List.take (min take (List.length list)) list
 
 let private collectInputs account spend secretKey =
     let unspent, _ = getUnspentOutputs account

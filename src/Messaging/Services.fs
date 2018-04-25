@@ -163,7 +163,7 @@ module Wallet =
     type Request =
         | GetAddressPKHash
         | GetAddress
-        | GetTransactions
+        | GetTransactions of skip: int * take: int
         | GetBalance
         | ImportSeed of string list * password:string
         | Send of Hash * Spend * password:string
@@ -204,8 +204,8 @@ module Wallet =
     let importSeed client words password =
         send<unit> client serviceName (ImportSeed (words, password))
 
-    let getTransactions client =
-        send<TransactionsResponse> client serviceName GetTransactions
+    let getTransactions client skip take =
+        send<TransactionsResponse> client serviceName (GetTransactions (skip, take))
 
     let accountExists client =
         send<bool> client serviceName AccountExists

@@ -106,9 +106,9 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
                           |> Address.encode chain
         |> reply<string> requestId
         account
-    | GetTransactions ->
+    | GetTransactions (skip, take) ->
         getAccount
-        <@> Account.getHistory
+        <@> Account.getHistory skip take
         |> reply<TransactionsResponse> requestId
         account
     | ImportSeed (words, password) ->
