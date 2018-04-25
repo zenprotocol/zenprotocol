@@ -52,10 +52,12 @@ module private TxDelta =
     let write ops = fun txDelta ->
         ops.writeHash txDelta.txHash
         >> Seq.write ops SpendStatus.write txDelta.deltas
+        >> Option.write ops ops.writeNumber4 txDelta.blockNumber
     let read = reader {
         let! txHash = Hash.read
         let! deltas = List.read SpendStatus.read
-        return { txHash = txHash; deltas = deltas }
+        let! blockNumber = Option.read readNumber4
+        return { txHash = txHash; deltas = deltas; blockNumber = blockNumber }
     }
 
 module Wallet =

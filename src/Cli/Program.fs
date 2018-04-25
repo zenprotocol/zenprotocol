@@ -150,15 +150,15 @@ let main argv =
                 |> getUri
                 |> TransactionsResponseJson.Load
 
-            printfn "TxHash\t| Asset\t| Amount"
-            printfn "=========================================="
+            printfn "TxHash\t| Block\t Asset\t| Amount"
+            printfn "==================================================="
 
-            Array.iter (fun (transaction:TransactionsResponseJson.Root) ->
-                printfn "\n%s" transaction.TxHash
+            Array.iter (fun (entry:TransactionsResponseJson.Root) ->
+                printfn "\n%s\t%i" entry.TxHash entry.BlockNumber
 
                 Array.iter (fun (amount:TransactionsResponseJson.Delta) ->
                     printfn "\t| %s %s\t| %d" amount.Asset amount.AssetType amount.Amount
-                ) transaction.Deltas
+                ) entry.Deltas
 
             ) transactions
         | Some (Address _) ->

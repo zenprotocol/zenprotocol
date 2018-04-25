@@ -111,7 +111,8 @@ type TransactionsResponseJson = JsonProvider<"""
                 "assetType": "hash",
                 "amount": -2147483453648
             }
-        ]
+        ],
+        "blockNumber": 342347423
     }
 ]
 """>

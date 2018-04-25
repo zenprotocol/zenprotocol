@@ -154,7 +154,7 @@ module Network =
 
 module Wallet =
     type BalanceResponse = Map<Asset,uint64>
-    type TransactionsResponse = List<Hash*Map<Asset,int64>>
+    type TransactionsResponse = List<Hash*Map<Asset,int64>*uint32>
     type ActivateContractResponse = Transaction * Hash
 
     type Command =
