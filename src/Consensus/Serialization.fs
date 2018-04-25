@@ -86,6 +86,39 @@ module Serialization =
                 yield! fail
         }
 
+    module VarInt =
+        // https://github.com/bitcoin/bitcoin/blob/v0.13.2/src/serialize.h#L307L372
+
+        let write ops (x:uint32) =
+            let tmp = Array.zeroCreate 5
+
+            let rec loop n len =
+                tmp.[len] <- (byte (n &&& 0x7Ful)) ||| (if len <> 0 then 0x80uy else 0x00uy)
+
+                if n <= 0x7Ful then
+                    len
+                else
+                    loop ((n >>> 7) - 1ul) (len + 1)
+
+            let len = loop x 0
+            let bytes = tmp.[0..len] |> Array.rev
+
+            ops.writeBytes bytes (len + 1)
+
+        let read =
+            let rec loop n = reader {
+                let! data = readNumber1
+
+                let n = ((uint32 n) <<< 7) ||| ((uint32 data) &&& 0x7Ful)
+
+                if data &&& 0x80uy <> 0uy then
+                    yield! (loop (n + 1ul))
+                else
+                    yield n
+            }
+
+            loop 0ul
+
     module List =
         let writeBody ops writerFn list =
             let write list writerFn stream = //TODO: use fold?
@@ -95,7 +128,7 @@ module Serialization =
                 stream
             write list writerFn
         let write ops writerFn list =
-            ops.writeNumber4 (List.length list |> uint32)
+            VarInt.write ops (List.length list |> uint32)
             >> writeBody ops writerFn list
         let readBody readerFn length = reader {
             let! list = reader {
@@ -106,7 +139,7 @@ module Serialization =
             return List.ofSeq list
         }
         let read readerFn = reader {
-            let! length = readNumber4
+            let! length = VarInt.read
             let! list = readBody readerFn length
             return List.ofSeq list
         }
@@ -142,7 +175,7 @@ module Serialization =
             | Outpoint { txHash = txHash; index = index } ->
                 ops.writeByte SerializedOutpoint
                 >> ops.writeHash txHash
-                >> ops.writeNumber4 index
+                >> VarInt.write ops index
             | Mint spend ->
                 ops.writeByte SerializedMint
                 >> Spend.write ops spend
@@ -151,7 +184,7 @@ module Serialization =
             match discriminator with
             | SerializedOutpoint ->
                 let! txHash = Hash.read
-                let! index = readNumber4
+                let! index = VarInt.read
                 return Outpoint { txHash = Hash.Hash txHash; index = index }
             | SerializedMint ->
                 let! spend = Spend.read
@@ -198,7 +231,7 @@ module Serialization =
         [<Literal>]
         let private DestroyIdentifier = 7u
 
-        let private writerFn ops = function 
+        let private writerFn ops = function
             | PK hash
             | Contract hash
             | ExtensionSacrifice hash ->
@@ -214,7 +247,7 @@ module Serialization =
                 List.writeBody ops (fun ops -> ops.writeByte) (Array.toList bytes)
 
         let write ops = fun lock ->
-            let identifier = 
+            let identifier =
                 match lock with
                 | PK _ -> PKIdentifier
                 | Contract _ -> ContractIdentifier
@@ -224,14 +257,14 @@ module Serialization =
                 | ExtensionSacrifice _ -> ExtensionSacrificeIdentifier
                 | Destroy -> DestroyIdentifier
                 | HighVLock (identifier, _) -> identifier
-    
-            ops.writeNumber4 identifier
-            >> ops.writeNumber4 (writerFn counters lock 0ul)
+
+            VarInt.write ops identifier
+            >> VarInt.write ops (writerFn counters lock 0ul)
             >> writerFn ops lock
-            
+
         let read = reader {
-            let! identifier = readNumber4
-            let! count = readNumber4
+            let! identifier = VarInt.read
+            let! count = VarInt.read
             let! value = reader {
                 match identifier with
                 | PKIdentifier ->
@@ -486,32 +519,32 @@ module Serialization =
                 ops.writeHash cw.cHash
                 >> ops.writeString cw.command
                 >> Option.write ops (Data.write ops) cw.data
-                >> ops.writeNumber4 cw.beginInputs
-                >> ops.writeNumber4 cw.beginOutputs
-                >> ops.writeNumber4 cw.inputsLength
-                >> ops.writeNumber4 cw.outputsLength
+                >> VarInt.write ops cw.beginInputs
+                >> VarInt.write ops cw.beginOutputs
+                >> VarInt.write ops cw.inputsLength
+                >> VarInt.write ops cw.outputsLength
                 >> Option.write ops (fun (publicKey, signature) ->
                     PublicKey.write ops publicKey
                     >> Signature.write ops signature
                   ) cw.signature
-                >> ops.writeNumber4 cw.cost
+                >> VarInt.write ops cw.cost
             | HighVWitness (_, bytes) ->
                 List.writeBody ops (fun ops -> ops.writeByte) (Array.toList bytes)
 
         let write ops = fun witness ->
-            let identifier = 
+            let identifier =
                 match witness with
                 | PKWitness _ -> PKIdentifier
                 | ContractWitness _ -> ContractIdentifier
                 | HighVWitness (identifier, _) -> identifier
-                
-            ops.writeNumber4 identifier
-            >> ops.writeNumber4 (writerFn counters witness 0ul)
+
+            VarInt.write ops identifier
+            >> VarInt.write ops (writerFn counters witness 0ul)
             >> writerFn ops witness
 
         let read = reader {
-            let! identifier = readNumber4
-            let! count = readNumber4
+            let! identifier = VarInt.read
+            let! count = VarInt.read
             let! value = reader {
                 match identifier with
                 | PKIdentifier ->
@@ -522,16 +555,16 @@ module Serialization =
                     let! cHash = Hash.read
                     let! command = readString
                     let! data = Option.read Data.read
-                    let! beginInputs = readNumber4
-                    let! beginOutputs = readNumber4
-                    let! inputsLength = readNumber4
-                    let! outputsLength = readNumber4
+                    let! beginInputs = VarInt.read
+                    let! beginOutputs = VarInt.read
+                    let! inputsLength = VarInt.read
+                    let! outputsLength = VarInt.read
                     let! signature = Option.read (reader {
                         let! publicKey = PublicKey.read
                         let! signature = Signature.read
                         return publicKey, signature
                     })
-                    let! cost = readNumber4
+                    let! cost = VarInt.read
                     return ContractWitness {
                         cHash = Hash.Hash cHash
                         command = command
@@ -563,13 +596,13 @@ module Serialization =
         }
 
     module Contract =
-        let writerFn ops = function 
+        let writerFn ops = function
             | V0 contract ->
                 ops.writeLongString contract.code
                 >> ops.writeLongString contract.hints
-                >> ops.writeNumber4 contract.rlimit
-                >> ops.writeNumber4 contract.queries
-            | HighV (_, bytes) -> 
+                >> VarInt.write ops contract.rlimit
+                >> VarInt.write ops contract.queries
+            | HighV (_, bytes) ->
                 List.writeBody ops (fun ops -> ops.writeByte) (Array.toList bytes)
 
         let write ops = fun contract ->
@@ -578,20 +611,20 @@ module Serialization =
                 | V0 _ -> Version0
                 | HighV (identifier, _) -> identifier
 
-            ops.writeNumber4 identifier 
-            >> ops.writeNumber4 (writerFn counters contract 0ul)
+            VarInt.write ops identifier
+            >> VarInt.write ops (writerFn counters contract 0ul)
             >> writerFn ops contract
-        
+
         let read = reader {
-            let! version = readNumber4
-            let! count = readNumber4
+            let! version = VarInt.read
+            let! count = VarInt.read
             let! value = reader {
                 match version with
                 | Version0 ->
                     let! code = readLongString
                     let! hints = readLongString
-                    let! rlimit = readNumber4
-                    let! queries = readNumber4
+                    let! rlimit = VarInt.read
+                    let! queries = VarInt.read
                     return V0 {
                         code = code
                         hints = hints
