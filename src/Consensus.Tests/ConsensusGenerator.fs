@@ -445,3 +445,37 @@ type ConsensusGenerator =
 
                 return ({pInputs=inputs;outputs=outputs} : TxSkeleton.T)
             })
+
+    static member Output() =
+        Arb.fromGen (
+            gen {
+                let! lock =
+                    Arb.generate<Lock>
+                    |> Gen.filter (function
+                    | HighVLock (identifier, _) -> identifier > 7u // last reserved identifier
+                    | _ -> true)
+
+                let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+                let asset = Hash.Hash asset, Hash.zero
+                let! amount = Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
+
+                let output = {lock=lock;spend={asset=asset;amount=amount}}
+
+                return output
+            }
+        )
+
+    //TODO: refactor, avoid repeating code
+    static member PointedOutput() =
+        Arb.fromGen (
+            gen {
+                let! bytes = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+                let txHash = Hash.Hash bytes
+                let! index = Arb.generate<uint32>
+                
+                let outpoint = { txHash = txHash; index = index }
+                let! output = Arb.generate<Output>
+
+                return (outpoint, output)
+            }
+        )
