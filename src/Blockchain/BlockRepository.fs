@@ -1,13 +1,12 @@
 module Blockchain.BlockRepository
 
-open Infrastructure
-open Blockchain
 open Consensus
-open Consensus
-open Consensus.Types
+open Types
 open DataAccess
-open MBrace.FsPickler.Combinators
-open Blockchain.DatabaseContext
+open DatabaseContext
+open BlockState
+
+open Blockchain.Serialization
 
 let contains session blockHash =
     Collection.containsKey session.context.blocks session.session blockHash
