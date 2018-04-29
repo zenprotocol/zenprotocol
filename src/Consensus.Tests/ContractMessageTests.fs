@@ -19,7 +19,10 @@ open FsCheck.Experimental
 
 let result = new Infrastructure.Result.ResultBuilder<string>()
 
-let contractPath = "./test"
+let contractPath =
+    System.IO.Path.Combine
+        [| System.IO.Path.GetTempPath(); System.IO.Path.GetRandomFileName() |]
+
 
 [<Literal>]
 let rlimit = 2723280u

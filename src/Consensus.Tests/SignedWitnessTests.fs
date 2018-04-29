@@ -14,7 +14,10 @@ open TestsInfrastructure.Constraints
 
 
 let chain = Chain.getChainParameters Chain.Local
-let contractPath = "./test"
+let contractPath =
+    System.IO.Path.Combine
+        [| System.IO.Path.GetTempPath(); System.IO.Path.GetRandomFileName() |]
+
 
 let account = createTestAccount ()
 let publicKey = ExtendedKey.getPublicKey (snd account) |> Result.get

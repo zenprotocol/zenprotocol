@@ -19,7 +19,8 @@ let difficulty = 0x20fffffful
 
 let chain = getChainParameters Chain.Local
 
-let contractsPath = "./test"
+let contractsPath = System.IO.Path.Combine
+                        [| System.IO.Path.GetTempPath(); System.IO.Path.GetRandomFileName() |]
 
 let goodHints = match Contract.recordHints sampleContractCode with
                 | Ok hints -> hints

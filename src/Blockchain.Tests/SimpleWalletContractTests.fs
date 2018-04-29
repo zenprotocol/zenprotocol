@@ -69,7 +69,9 @@ let activateContract code account session state =
         (state, cHash)
     )
 
-let dataPath = ".data"
+let dataPath =
+    System.IO.Path.Combine
+        [| System.IO.Path.GetTempPath(); System.IO.Path.GetRandomFileName() |]
 let databaseContext = DatabaseContext.createTemporary dataPath
 let session = DatabaseContext.createSession databaseContext
 

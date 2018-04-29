@@ -6,7 +6,11 @@ open Infrastructure
 
 let result = new Infrastructure.Result.ResultBuilder<string>()
 
-let contractPath = "./test"
+let tempDir () =
+    System.IO.Path.Combine
+        [| System.IO.Path.GetTempPath(); System.IO.Path.GetRandomFileName() |]
+let contractPath = tempDir()
+
 
 [<Literal>]
 let rlimit = 2723280u
@@ -27,7 +31,7 @@ let compile code = result {
         |> Result.bind (Contract.load contractPath 100ul code)
 }
 
-let dataPath = ".data"
+let dataPath = tempDir()
 
 let clean() =
     Platform.cleanDirectory dataPath

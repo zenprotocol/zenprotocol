@@ -185,8 +185,6 @@ let sync tipBlockHash (getHeader:Hash -> BlockHeader) (getBlock:Hash -> Block) a
         else
             0ul
 
-
-
     // Find the fork block of the account and the blockchain, logging actions
     // to perform. Undo each block in the account's chain but not the blockchain,
     // and add each block in the blockchain but not the account's chain.
@@ -203,8 +201,6 @@ let sync tipBlockHash (getHeader:Hash -> BlockHeader) (getBlock:Hash -> Block) a
             locate (((getHeader x).parent, i-1ul), ((getHeader y).parent, j-1ul)) (Add (getBlock x, x) :: Undo (getBlock y) :: acc)
 
     let actions = locate ((tipBlockHash, blockNumber tipBlockHash), (account.tip, blockNumber account.tip)) []
-
-
     let toUndo, toAdd = List.partition (function | Undo _ -> true | _ -> false) actions
     let toUndo = List.rev toUndo     // Blocks to be undo were found backwards.
     let sortedActions = toUndo @ toAdd

@@ -15,7 +15,9 @@ open Org.BouncyCastle.Crypto.Digests
 open FsBech32
 open Zen.Types.Main
 
-let assemblyDirectory = "./test"
+let assemblyDirectory =
+    System.IO.Path.Combine
+        [| System.IO.Path.GetTempPath(); System.IO.Path.GetRandomFileName() |]
 
 [<Literal>]
 let rlimit = 2723280u
