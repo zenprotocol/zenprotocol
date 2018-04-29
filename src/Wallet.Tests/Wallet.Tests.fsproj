@@ -53,6 +53,7 @@
     <Compile Include="ExtendedKey\Helpers.fs" />
     <Compile Include="ExtendedKey\Tests.fs" />
     <Compile Include="KeyPathParserTests.fs" />
+    <Compile Include="SerializationTests.fs" />
     <Content Include="paket.references" />
     <ProjectReference Include="..\Consensus.Tests\Consensus.Tests.fsproj">
       <Project>{b5e951fc-ae90-4ef1-9365-3e2b5a56b510}</Project>
