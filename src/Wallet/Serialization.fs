@@ -107,9 +107,6 @@ module Wallet =
     let deserialize bytes =
         Stream (bytes, 0)
         |> run read
-        |> function
-        | Some value -> value
-        | None -> failwith "could not deserialize wallet data"
         
 module Version =
     let private write ops = uint32 >> ops.writeNumber4
@@ -127,9 +124,6 @@ module Version =
     let deserialize bytes =
         Stream (bytes, 0)
         |> run read
-        |> function
-        | Some value -> value
-        | None -> failwith "could not deserialize version data"
         
 module Secured =
     let private write ops = Seq.write ops (fun ops -> ops.writeByte)
@@ -144,6 +138,3 @@ module Secured =
     let deserialize bytes =
         Stream (bytes, 0)
         |> run read
-        |> function
-        | Some value -> value
-        | None -> failwith "could not deserialize secured data"

@@ -54,7 +54,6 @@ let tryGet collection (session:Session) key =
     if result = 0 then
         dataToByteArray valueData
         |> collection.valueDeseralizer
-        |> Some
     elif result = MDB_NOTFOUND then
         None
     else

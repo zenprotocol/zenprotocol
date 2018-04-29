@@ -66,7 +66,8 @@ let get (MultiCollection collection) session key =
             
             let bytes = dataToByteArray valueData            
             let value = collection.valueDeseralizer bytes
-            
+                        |> Option.get
+                        
             let moveNext = mdb_cursor_get (cursor, &keyData, &valueData, CursorOperation.NextDuplicate) = 0
             
             let values = value :: values

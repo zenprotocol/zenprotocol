@@ -22,7 +22,7 @@ type Collection<'key,'value> =
         database: uint32        
         keySerializer: 'key->byte[]
         valueSerializer: 'value->byte[]
-        valueDeseralizer: byte[]->'value
+        valueDeseralizer: byte[]->'value option
         indices: (Session->'key->'value->unit) list
     }
     interface System.IDisposable with   
@@ -64,7 +64,7 @@ type SingleValue<'value> =
         collection: Collection<byte[],byte[]>
         name:byte[]
         serializer: 'value->byte[]
-        deserializer: byte[]->'value
+        deserializer: byte[]->'value option
     }  
                         
             

@@ -58,7 +58,7 @@ let create dataPath =
     let databaseContext = DataAccess.DatabaseContext.create (Platform.combine dataPath "blockchain")
     use session = DatabaseContext.createSession databaseContext
 
-    let tip = SingleValue.create databaseContext "tip" Hash.bytes Hash.Hash
+    let tip = SingleValue.create databaseContext "tip" Hash.bytes (Hash.Hash >> Some)
 
     let blocks =
         Collection.create session "blocks" Hash.bytes
@@ -77,13 +77,13 @@ let create dataPath =
     let blockTransactions =
         Collection.create session "blockTransactions" Hash.bytes
             Hashes.serialize
-            Hashes.deserialize
+            (Hashes.deserialize >> Some)
 
     let transactions = Collection.create session "transactions" Hash.bytes
-                        (Transaction.serialize Full) (Transaction.deserialize Full >> Option.get)
+                        (Transaction.serialize Full) (Transaction.deserialize Full)
 
     let transactionBlocks = MultiCollection.create session "transactionBlocks"
-                                Hash.bytes Hash.bytes Hash.Hash
+                                Hash.bytes Hash.bytes (Hash.Hash >> Some)
 
     let blocks =
         blocks
