@@ -161,11 +161,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "package", "package", "{A4AF
 EndProject
 Project("{f2a71f9b-5d33-465a-a702-920d77279786}") = "Zulib.Tests", "Zulib.Tests\Zulib.Tests.fsproj", "{72AAB622-79A2-4FAC-B2B6-78173DE52EDC}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{5921920C-0DC3-41A0-848F-7F08B2C83101}"
-	ProjectSection(SolutionItems) = preProject
-		test.runsettings = test.runsettings
-	EndProjectSection
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
