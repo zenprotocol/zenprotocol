@@ -93,28 +93,28 @@ let setup = fun () ->
 let ``BlockState serialization round trip produces same result`` (value:BlockState.T) =
     value
     |> BlockState.serialize
-    |> BlockState.deserialize = value
+    |> BlockState.deserialize = Some value
 
 [<Property>]
 let ``ExtendedBlockHeader serialization round trip produces same result`` (value:ExtendedBlockHeader.T) =
     value
     |> ExtendedBlockHeader.serialize
-    |> ExtendedBlockHeader.deserialize = value
+    |> ExtendedBlockHeader.deserialize = Some value
 
 [<Property>]
 let ``OutputStatus serialization round trip produces same result`` (value:UtxoSet.OutputStatus) =
     value
     |> OutputStatus.serialize
-    |> OutputStatus.deserialize = value
+    |> OutputStatus.deserialize = Some value
 
 [<Property>]
 let ``PointedOutput serialization round trip produces same result`` (value:PointedOutput) =
     value
     |> PointedOutput.serialize
-    |> PointedOutput.deserialize = value
+    |> PointedOutput.deserialize = Some value
 
 [<Property>]
 let ``Version serialization round trip produces same result`` (value:int) =
     value
     |> Version.serialize
-    |> Version.deserialize = value
+    |> Version.deserialize = Some value

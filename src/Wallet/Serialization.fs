@@ -52,10 +52,12 @@ module private TxDelta =
     let write ops = fun txDelta ->
         ops.writeHash txDelta.txHash
         >> Seq.write ops SpendStatus.write txDelta.deltas
+        >> Option.write ops ops.writeNumber4 txDelta.blockNumber
     let read = reader {
         let! txHash = Hash.read
         let! deltas = List.read SpendStatus.read
-        return { txHash = txHash; deltas = deltas }
+        let! blockNumber = Option.read readNumber4
+        return { txHash = txHash; deltas = deltas; blockNumber = blockNumber }
     }
 
 module Wallet =
@@ -105,9 +107,6 @@ module Wallet =
     let deserialize bytes =
         Stream (bytes, 0)
         |> run read
-        |> function
-        | Some value -> value
-        | None -> failwith "could not deserialize wallet data"
         
 module Version =
     let private write ops = uint32 >> ops.writeNumber4
@@ -125,9 +124,6 @@ module Version =
     let deserialize bytes =
         Stream (bytes, 0)
         |> run read
-        |> function
-        | Some value -> value
-        | None -> failwith "could not deserialize version data"
         
 module Secured =
     let private write ops = Seq.write ops (fun ops -> ops.writeByte)
@@ -142,6 +138,3 @@ module Secured =
     let deserialize bytes =
         Stream (bytes, 0)
         |> run read
-        |> function
-        | Some value -> value
-        | None -> failwith "could not deserialize secured data"

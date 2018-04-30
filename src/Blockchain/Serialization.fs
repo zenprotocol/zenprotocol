@@ -46,9 +46,6 @@ module BlockState =
     let deserialize bytes =
         Stream (bytes, 0)
         |> run read
-        |> function
-        | Some value -> value
-        | None -> failwith "could not deserialize blockState data"
 
 module private BlockStatus =
     [<Literal>]
@@ -128,9 +125,6 @@ module ExtendedBlockHeader =
     let deserialize bytes =
         Stream (bytes, 0)
         |> run read
-        |> function
-        | Some value -> value
-        | None -> failwith "could not deserialize ExtendedBlockHeader data"
 
 module Outpoint =
     let serialize outpoint =
@@ -142,9 +136,6 @@ module Outpoint =
     let deserialize bytes =
         Stream (bytes, 0)
         |> run Outpoint.read
-        |> function
-        | Some value -> value
-        | None -> failwith "could not deserialize Outpoint data"
 
 module OutputStatus =
     [<Literal>]
@@ -186,9 +177,6 @@ module OutputStatus =
     let deserialize bytes =
         Stream (bytes, 0)
         |> run read
-        |> function
-        | Some value -> value
-        | None -> failwith "could not deserialize outputStatus data"
 
 module PointedOutput =
     open Zen.Types.Extracted
@@ -212,9 +200,6 @@ module PointedOutput =
     let deserialize bytes =
         Stream (bytes, 0)
         |> run read
-        |> function
-        | Some value -> value
-        | None -> failwith "could not deserialize pointedOutput data"
 
 module Version =
     let private write ops = uint32 >> ops.writeNumber4
@@ -232,9 +217,6 @@ module Version =
     let deserialize bytes =
         Stream (bytes, 0)
         |> run read
-        |> function
-        | Some value -> value
-        | None -> failwith "could not deserialize version data"
 
 module Hashes =
     let serialize hs =

@@ -111,7 +111,8 @@ type TransactionsResponseJson = JsonProvider<"""
                 "assetType": "hash",
                 "amount": -2147483453648
             }
-        ]
+        ],
+        "blockNumber": 342347423
     }
 ]
 """>
@@ -139,5 +140,12 @@ type GetPublicKeyJson = JsonProvider<"""
 type CheckPasswordJson = JsonProvider<"""
 {
     "password": "secret"
+}
+""">
+
+type TransactionsRequestJson = JsonProvider<"""
+{
+    "skip": 1000,
+    "take": 1000
 }
 """>

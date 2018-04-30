@@ -504,19 +504,19 @@ let ``Should get expected deltas``() =
     let output3B = {lock = PK (publicKeyHash account); spend={asset=Constants.Zen;amount=5UL}}
     let tx3 = {version=Version0;inputs=[Outpoint { txHash = tx2Hash; index = 1ul } ];outputs=[output3A;output3B];witnesses=[];contract=None}
 
-    let expected = [ (tx1Hash, Map.add Constants.Zen 10L Map.empty) ]
-    let expected = expected @ [ (tx2Hash, Map.add Constants.Zen -2L Map.empty) ]
+    let expected = [ (tx1Hash, Map.add Constants.Zen 10L Map.empty, 2u) ]
+    let expected = expected @ [ (tx2Hash, Map.add Constants.Zen -2L Map.empty, 2u) ]
 
-    should equal expected (Account.getHistory account)
+    should equal expected (Account.getHistory 0 10 account)
 
     let tx3Hash = Transaction.hash tx3
 
     // add tx3 to mempool
     let account' = Account.addTransaction tx3Hash tx3 account
 
-    let expected = expected @ [ (tx3Hash, Map.add Constants.Zen -3L Map.empty) ]
+    let expected = expected @ [ (tx3Hash, Map.add Constants.Zen -3L Map.empty, 0u) ]
 
-    should equal expected (Account.getHistory account')
+    should equal expected (Account.getHistory 0 10 account')
 
 [<Test>]
 let ``sign contract wintess``() =

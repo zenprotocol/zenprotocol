@@ -188,23 +188,27 @@ let handleRequest chain client (request,reply) =
             |> validateTx
         | Error error ->
             replyError error
-    | Get ("/wallet/transactions", _) ->
-        match Wallet.getTransactions client with
-        | Ok txs ->
-            let json =
-                txs
-                |> List.toArray
-                |> Array.map (fun (txHash, amounts) ->
-                    let deltas =
-                        amounts
-                        |> Map.toArray
-                        |> Array.map (fun ((asset, assetType), amount) ->
-                            new TransactionsResponseJson.Delta(Hash.toString asset, Hash.toString assetType, amount))
-                    (new TransactionsResponseJson.Root(Hash.toString txHash, deltas)).JsonValue)
-                |> JsonValue.Array
-            (new TransactionsResponseJson.Root(json)).JsonValue
-            |> JsonContent
-            |> reply StatusCode.OK
+    | Post ("/wallet/transactions", Some body) ->
+        match parseTransactionsRequestJson body with
+        | Ok (skip, take) ->
+            match Wallet.getTransactions client skip take with
+            | Ok txs ->
+                let json =
+                    txs
+                    |> List.toArray
+                    |> Array.map (fun (txHash, amounts, blockNumer) ->
+                        let deltas =
+                            amounts
+                            |> Map.toArray
+                            |> Array.map (fun ((asset, assetType), amount) ->
+                                new TransactionsResponseJson.Delta(Hash.toString asset, Hash.toString assetType, amount))
+                        (new TransactionsResponseJson.Root(Hash.toString txHash, deltas, int blockNumer)).JsonValue)
+                    |> JsonValue.Array
+                (new TransactionsResponseJson.Root(json)).JsonValue
+                |> JsonContent
+                |> reply StatusCode.OK
+            | Error error ->
+                replyError error
         | Error error ->
             replyError error
     | Post ("/wallet/contract/activate", Some body) ->

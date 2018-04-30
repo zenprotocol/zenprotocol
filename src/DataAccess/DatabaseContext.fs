@@ -53,7 +53,7 @@ let create pathToFolder : DatabaseContext =
     mdb_txn_begin(environment,IntPtr.Zero,0ul,&tx)
     |> checkErrorCode
     
-    let db = Collection.create {tx=tx;env=environment} "values" id id id                    
+    let db = Collection.create {tx=tx;env=environment} "values" id id (fun x -> Some x)                    
     
     mdb_txn_commit(tx)
     |> checkErrorCode

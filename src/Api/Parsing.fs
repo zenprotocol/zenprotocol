@@ -163,3 +163,14 @@ let parseCheckPasswordJson json =
             Ok json.Password
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
+        
+let parseTransactionsRequestJson json =
+    try
+        let json = TransactionsRequestJson.Parse json
+
+        if json.Skip < 0 || json.Take < 0 then
+            Error "Invalid values"
+        else
+            Ok (json.Skip, json.Take)
+    with _ as ex ->
+        Error ("Json is invalid: " + ex.Message)

@@ -32,6 +32,7 @@ type SpendStatus = Status<Spend>
 type TxDelta = {
     txHash: Hash
     deltas: List<SpendStatus>
+    blockNumber: Option<uint32>
 }
 
 type T = {
@@ -75,7 +76,7 @@ let private isKeyMatch account address =
     PublicKey.hash account.publicKey = address
 
 // update the outputs with transaction
-let private handleTransaction txHash (tx:Transaction) account outputs txDeltas =
+let private handleTransaction txHash (tx:Transaction) account outputs txDeltas blockNumber =
     let handleOutput (outputs,deltas) (index,output) =
         let add = (
             Map.add { txHash = txHash; index = index } (Unspent output) outputs,
@@ -102,20 +103,23 @@ let private handleTransaction txHash (tx:Transaction) account outputs txDeltas =
     let outputs, deltas = List.fold handleOutput (outputs, deltas) outputsWithIndex
 
     if List.length deltas > 0 then
-        outputs, List.add { txHash = txHash; deltas = deltas } txDeltas
+        outputs, List.add { txHash = txHash; deltas = deltas; blockNumber = blockNumber } txDeltas
     else
         outputs, txDeltas
 
-let private handleTransactions account transactions =
+let private handleTransactions account transactions blockNumber =
     List.fold (fun (outputs,txDeltas) (txHash,tx) ->
-       handleTransaction txHash tx account outputs txDeltas
+       handleTransaction txHash tx account outputs txDeltas blockNumber
     ) (account.outputs, account.deltas) transactions
+
+let private handleMempoolTransactions account =
+    handleTransactions account account.mempool None
 
 let handleBlock blockHash block account =
     let txHashes = List.map (fun tx -> Transaction.hash tx) block.transactions
     let transactions = List.zip txHashes block.transactions
 
-    let outputs, deltas = handleTransactions account transactions
+    let outputs, deltas = handleTransactions account transactions (Some block.header.blockNumber)
 
     // remove all transactions from list
     let set = Set.ofList txHashes
@@ -218,7 +222,7 @@ let sync tipBlockHash (getHeader:Hash -> BlockHeader) (getBlock:Hash -> Block) a
 
 let getUnspentOutputs account =
     // we first update the account according to the mempool transactions
-    let outputs, txDeltas = handleTransactions account account.mempool
+    let outputs, txDeltas = handleMempoolTransactions account
 
     let outputs =
         outputs
@@ -263,24 +267,30 @@ let getBalance account =
         | Some amount -> Map.add output.spend.asset (amount+output.spend.amount) balance
         | None -> Map.add output.spend.asset output.spend.amount balance) Map.empty unspent
 
-let getHistory account =
-    handleTransactions account account.mempool
-    |> snd
-    |> List.map (fun txDelta ->
-        txDelta.txHash,
-        txDelta.deltas
-        |> List.fold (fun amounts spend ->
-            let asset, amount =
-                match spend with
-                | Spent spend -> spend.asset, 0L - int64 spend.amount
-                | Unspent spend -> spend.asset, int64 spend.amount
-            let amount' =
-                (match Map.tryFind asset amounts with
-                | Some amount -> amount
-                | None -> 0L)
-            Map.add asset (amount' + amount) amounts
-        ) Map.empty
-    )
+
+let getHistory skip take account =
+    let list =
+        handleMempoolTransactions account
+        |> snd
+        |> List.map (fun txDelta ->
+            txDelta.txHash,
+            txDelta.deltas
+            |> List.fold (fun amounts spend ->
+                let asset, amount =
+                    match spend with
+                    | Spent spend -> spend.asset, 0L - int64 spend.amount
+                    | Unspent spend -> spend.asset, int64 spend.amount
+                let amount' =
+                    (match Map.tryFind asset amounts with
+                    | Some amount -> amount
+                    | None -> 0L)
+                Map.add asset (amount' + amount) amounts
+            ) Map.empty,
+            match txDelta.blockNumber with | Some blockNumber -> blockNumber | None -> 0ul
+        )
+
+    let list = List.skip (min skip (List.length list)) list
+    List.take (min take (List.length list)) list
 
 let private collectInputs account spend secretKey =
     let unspent, _ = getUnspentOutputs account
