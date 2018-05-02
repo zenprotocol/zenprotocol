@@ -31,6 +31,9 @@ module Result =
         | Ok x -> x
         | Error y -> failwithf "%A" y
 
+let tempDir () = System.IO.Path.Combine
+                    [| System.IO.Path.GetTempPath(); System.IO.Path.GetRandomFileName() |]
+
 let getTxOutpoints tx =
     let txHash = Transaction.hash tx
     [ for i in 0 .. List.length tx.outputs - 1 -> {txHash=txHash;index= uint32 i} ]
@@ -125,7 +128,7 @@ let validateChain session blocks state =
 
 [<Test>]
 let ``genesis block accepted``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
 
     let block = Block.createGenesis chain [rootTx] (0UL,0UL)
@@ -151,7 +154,7 @@ let ``genesis block accepted``() =
 
 [<Test>]
 let ``wrong genesis block should be rejected``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
 
     use session = DatabaseContext.createSession databaseContext
     let block = Block.createGenesis chain [rootTx] (0UL,1UL)
@@ -167,7 +170,7 @@ let ``wrong genesis block should be rejected``() =
 
 [<Test>]
 let ``validate new valid block which extended main chain``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
 
     let _, state =
@@ -206,7 +209,7 @@ let ``validate new valid block which extended main chain``() =
 
 [<Test>]
 let ``validate new invalid block which try to extended main chain``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
 
     let _, state =
@@ -236,7 +239,7 @@ let ``validate new invalid block which try to extended main chain``() =
 
 [<Test>]
 let ``validating orphan block yield a request for block from network``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
 
     use session = DatabaseContext.createSession databaseContext
 
@@ -258,7 +261,7 @@ let ``validating orphan block yield a request for block from network``() =
 
 [<Test>]
 let ``validate new block which connect orphan chain which extend main chain``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
 
     use session = DatabaseContext.createSession databaseContext
 
@@ -298,7 +301,7 @@ let ``validate new block which connect orphan chain which extend main chain``() 
 
 [<Test>]
 let ``validate new block which connect orphan chain which is not long enough to become main chain``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
 
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session
@@ -324,7 +327,7 @@ let ``validate new block which connect orphan chain which is not long enough to 
 
 [<Test>]
 let ``orphan chain become longer than main chain``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
 
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session
@@ -382,7 +385,7 @@ let ``orphan chain become longer than main chain``() =
 
 [<Test>]
 let ``new block extend fork chain which become longest``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
 
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session
@@ -415,7 +418,7 @@ let ``new block extend fork chain which become longest``() =
 
 [<Test>]
 let ``2 orphan chains, one become longer than main chain``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
 
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session
@@ -454,7 +457,7 @@ let ``2 orphan chains, one become longer than main chain``() =
 
 [<Test>]
 let ``2 orphan chains, two longer than main, one is longer``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
 
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session
@@ -494,7 +497,7 @@ let ``2 orphan chains, two longer than main, one is longer``() =
 
 [<Test>]
 let ``2 orphan chains, two longer than main, longest is invalid, should pick second long``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
 
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session
@@ -535,7 +538,7 @@ let ``2 orphan chains, two longer than main, longest is invalid, should pick sec
 
 [<Test>]
 let ``transaction in mempool and not in next block stays in mempool``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
 
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session
@@ -570,7 +573,7 @@ let ``transaction in mempool and not in next block stays in mempool``() =
 
 [<Test>]
 let ``orphan transactions added to mempool after origin tx found in block``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
 
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session
@@ -603,7 +606,7 @@ let ``orphan transactions added to mempool after origin tx found in block``() =
 
 [<Test>]
 let ``block with a contract activation is added to chain``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session
 
@@ -643,7 +646,7 @@ let ``block with a contract activation is added to chain``() =
 
 [<Test>]
 let ``validate new block header should ask for block``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
 
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session
@@ -662,7 +665,7 @@ let ``validate new block header should ask for block``() =
 
 [<Test>]
 let ``new block should publish to network``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
 
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session
@@ -683,7 +686,7 @@ let ``new block should publish to network``() =
 
 [<Test>]
 let ``mined block should publish to network``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
 
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session
@@ -701,7 +704,7 @@ let ``mined block should publish to network``() =
 
 [<Test>]
 let ``validate new tip should ask for block``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
 
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session
@@ -720,7 +723,7 @@ let ``validate new tip should ask for block``() =
 
 [<Test>]
 let ``Valid template for two transactions which don't depend on each other``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
 
     let _, genesisState =
@@ -776,7 +779,7 @@ let ``Valid template for two transactions which don't depend on each other``() =
 
 [<Test>]
 let ``Two transactions in the same block which depend on each other are valid``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
 
     let _, genesisState =
@@ -805,7 +808,7 @@ let ``Two transactions in the same block which depend on each other are valid``(
 
 [<Test>]
 let ``Two transactions in the same block which depend on each other are invalid if in reversed order``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
 
     let _, genesisState =
@@ -834,7 +837,7 @@ let ``Two transactions in the same block which depend on each other are invalid 
 
 [<Test>]
 let ``Template builder uses two transactions in the same block which depend on each other``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
 
     let _, genesisState =
@@ -867,7 +870,7 @@ let ``Template builder uses two transactions in the same block which depend on e
 
 [<Test>]
 let ``Out of order dependent transactions are rearranged``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
 
     let _, genesisState =

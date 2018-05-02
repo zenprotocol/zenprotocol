@@ -187,22 +187,19 @@ let private checkWitnesses blockNumber acs (txHash, tx, inputs) =
         let checkIssuedAndDestroyed (txSkeleton : TxSkeleton.T) =
             let isMismatchedSpend ({asset=cHash,_;amount=_} : Spend) =
                 cHash <> cw.cHash
-            let endInputs = cw.beginInputs + cw.inputsLength - 1u |> int
-            let endOutputs = cw.beginOutputs + cw.outputsLength - 1u |> int
-
-            if  endInputs >= List.length txSkeleton.pInputs ||
-                endOutputs >= List.length txSkeleton.outputs
+            if cw.endInputs >= (uint32 <| List.length txSkeleton.pInputs) ||
+               cw.endOutputs >= (uint32 <| List.length txSkeleton.outputs)
             then
                 GeneralError "invalid contract witness indices"
             else if
-                txSkeleton.pInputs.[int cw.beginInputs .. endInputs]
+                txSkeleton.pInputs.[int cw.beginInputs .. int cw.endInputs]
                 |> List.exists (function
                     | TxSkeleton.Input.Mint spend when isMismatchedSpend spend -> true
                     | _ -> false)
             then
                 GeneralError "illegal creation of tokens"
             else if
-                txSkeleton.outputs.[int cw.beginOutputs .. endOutputs]
+                txSkeleton.outputs.[int cw.beginOutputs .. int cw.endOutputs]
                 |> List.exists (function
                     | {lock=Destroy; spend=spend} when isMismatchedSpend spend -> true
                     | _ -> false)

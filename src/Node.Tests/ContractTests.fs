@@ -20,7 +20,10 @@ module Actor = FsNetMQ.Actor
 let busName = "test"
 let chain = Chain.Local
 let chainParams = Chain.getChainParameters chain
-let dataPath = ".data"
+let tempDir () =
+    System.IO.Path.Combine
+        [| System.IO.Path.GetTempPath(); System.IO.Path.GetRandomFileName() |]
+let dataPath = tempDir()
 let apiUri = "127.0.0.1:29555"
 
 let createBroker () =

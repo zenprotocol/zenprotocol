@@ -1,4 +1,4 @@
-﻿module Wallet.Main
+module Wallet.Main
 
 open DataAccess
 open Infrastructure

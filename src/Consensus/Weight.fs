@@ -1,4 +1,4 @@
-﻿module Consensus.Weight
+module Consensus.Weight
 
 open Consensus.Types
 open TxSkeleton

@@ -16,6 +16,9 @@ let difficulty = Difficulty.compress localParameters.proofOfWorkLimit
 
 let NetworkCommand = EffectsWriter.NetworkCommand
 
+let tempDir () = System.IO.Path.Combine
+                    [| System.IO.Path.GetTempPath(); System.IO.Path.GetRandomFileName() |]
+
 let peerHeader = {
     version=0ul;
     parent=Hash.zero;
@@ -63,7 +66,7 @@ let ``from genesis``() =
 
 [<Test>]
 let ``process valid headers``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
 
     let ibd = GettingHeaders ({peerId=peerId;peerTipHeader=peerHeader;peerTipHash=peerBlockHash},0UL,0UL)
@@ -86,7 +89,7 @@ let ``process valid headers``() =
 
 [<Test>]
 let ``process invalid headers``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
 
     let ibd = GettingHeaders ({peerId=peerId;peerTipHeader=peerHeader;peerTipHash=peerBlockHash},0UL,0UL)
@@ -117,7 +120,7 @@ let ``process invalid headers``() =
 
 [<Test>]
 let ``processing headers, all block in db``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
 
     let ibd = GettingHeaders ({peerId=peerId;peerTipHeader=peerHeader;peerTipHash=peerBlockHash},0UL,0UL)
@@ -148,7 +151,7 @@ let ``processing headers, all block in db``() =
 
 [<Test>]
 let ``block received``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
 
     let ibd = GettingHeaders ({peerId=peerId;peerTipHeader=peerHeader;peerTipHash=peerBlockHash},0UL,0UL)
@@ -171,7 +174,7 @@ let ``block received``() =
 
 [<Test>]
 let ``last block in a batch received``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
 
     let ibd = GettingHeaders ({peerId=peerId;peerTipHeader=peerHeader;peerTipHash=peerBlockHash},0UL,0UL)
@@ -195,7 +198,7 @@ let ``last block in a batch received``() =
 
 [<Test>]
 let ``last block in initial bload download received``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
 
     let headers = createHeaders 1001ul 3000ul
@@ -219,7 +222,7 @@ let ``last block in initial bload download received``() =
 
 [<Test>]
 let ``block invalid``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
 
     let ibd = GettingHeaders ({peerId=peerId;peerTipHeader=peerHeader;peerTipHash=peerBlockHash},0UL,0UL)
@@ -269,7 +272,7 @@ let ``timeout on get headers request``() =
 
 [<Test>]
 let ``timeout on downloading``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
 
     let ibd = GettingHeaders ({peerId=peerId;peerTipHeader=peerHeader;peerTipHash=peerBlockHash},0UL,0UL)
@@ -304,7 +307,7 @@ let ``timeout on downloading``() =
 
 [<Test>]
 let ``getting headers from genesis``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
 
     let headers = createHeaders 1ul 2000ul
@@ -333,7 +336,7 @@ let ``getting headers from genesis``() =
 
 [<Test>]
 let ``getting headers from unknown hash``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
 
     let headers = createHeaders 1ul 2000ul
@@ -362,7 +365,7 @@ let ``getting headers from unknown hash``() =
 
 [<Test>]
 let ``getting headers from none main chain hash``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
 
     let headers = createHeaders 1ul 2000ul
@@ -404,7 +407,7 @@ let ``getting headers from none main chain hash``() =
 
 [<Test>]
 let ``getting headers from middle``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
 
     let headers = createHeaders 1ul 2000ul
@@ -433,7 +436,7 @@ let ``getting headers from middle``() =
 
 [<Test>]
 let ``getting headers from multiple hashes``() =
-    use databaseContext = DatabaseContext.createEmpty "test"
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
 
     let headers = createHeaders 1ul 2000ul

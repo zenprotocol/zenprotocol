@@ -12,7 +12,10 @@ open Helper
 let chain = Chain.Local
 let localParams = Chain.getChainParameters chain
 let getUTXO _ = UtxoSet.NoOutput
-let contractPath = "./test"
+let contractPath =
+    System.IO.Path.Combine
+        [| System.IO.Path.GetTempPath(); System.IO.Path.GetRandomFileName() |]
+
 let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO rootTxHash rootTx
 
 let validateInContext = validateInContext localParams getUTXO contractPath
