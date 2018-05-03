@@ -12,3 +12,4 @@ FSharp.Compatibility.OCaml
 System.Reflection.Metadata
 Logary
 FsNetMQ
+SpecFlow.NUnit

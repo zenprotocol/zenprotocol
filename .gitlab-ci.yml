@@ -9,7 +9,9 @@ build:
  script:
  - mono .paket/paket.exe restore
  - chmod +x packages/zen_z3_linux/output/z3-linux
+ - chmod +x packages/SpecFlow/tools/specflow.exe
+ - mono packages/SpecFlow/tools/specflow.exe generateall src/Consensus.Features.Tests/Consensus.Features.Tests.csproj
  - pushd src/Zulib && ./build.sh && popd
  - msbuild src/zenprotocol.sln
- - cp packages/zen_secp256k1_linux/output/libsecp256k1.so /usr/lib 
+ - cp packages/zen_secp256k1_linux/output/libsecp256k1.so /usr/lib
  - ./run-tests
