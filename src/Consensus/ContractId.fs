@@ -23,6 +23,6 @@ let toString (contractId:ContractId) = contractId.ToString()
 
 let fromString b16 =
     Base16.decode b16
-    |> Option.map fromBytes
+    |> Option.bind fromBytes
 
 let contractHash (ContractId (_,cHash)) = cHash

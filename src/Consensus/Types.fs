@@ -18,6 +18,7 @@ type Outpoint = {
     index: uint32
 }
 
+[<StructuredFormatDisplay("{AsString}")>]
 type ContractId = ContractId of uint32 * Hash with
     override x.ToString() =
         let (ContractId (version,cHash)) = x
@@ -27,6 +28,7 @@ type ContractId = ContractId of uint32 * Hash with
 
     member x.AsString = x.ToString()
 
+[<StructuredFormatDisplay("{AsString}")>]
 type Asset = Asset of ContractId * Hash with
    override x.ToString() =
         let (Asset (contractId,subType)) = x
@@ -35,9 +37,9 @@ type Asset = Asset of ContractId * Hash with
         if contractId = (ContractId (Version0,Hash.zero)) && subType = Hash.zero then
             "00"
         elif subType = Hash.zero then
-            contractId.ToString()
+            contractId.AsString
         else
-            sprintf "%A%A" contractId subType
+            sprintf "%s%s" (contractId.AsString) (subType.AsString)
 
    member x.AsString = x.ToString()
 
