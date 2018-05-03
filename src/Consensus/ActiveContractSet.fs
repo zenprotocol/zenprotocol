@@ -15,11 +15,13 @@ let empty:T = SparseMerkleTree.create cwt (fun contract ->
         bytes
  )
 
-let add : _ -> _ -> T -> T = SparseMerkleTree.add<Contract.T>
+let add (ContractId (_,cHash)) = SparseMerkleTree.add<Contract.T> cHash
 
-let tryFind : _ -> T -> _ = SparseMerkleTree.tryFind<Contract.T>
+let tryFind (ContractId (version,cHash)) (acs:T) =
+    SparseMerkleTree.tryFind cHash acs
+    |> Option.filter (fun contract -> contract.version = version)
 
-let containsContract : _ -> T -> _ = SparseMerkleTree.containsKey<Contract.T>
+let containsContract contractId acs = tryFind contractId acs |> Option.isSome
 
 let getContracts (acs:T) =
     acs.data |> Map.toSeq |> Seq.map snd

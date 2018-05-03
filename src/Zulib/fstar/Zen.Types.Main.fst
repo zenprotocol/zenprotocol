@@ -10,13 +10,13 @@ val maxCost: nat
 let maxCost = 200
 
 type message =
-    { cHash: hash;
+    { contractId: contractId;
       command: string;
       data: option data }
 
 type sender =
     | PK of publicKey
-    | Contract of contractHash
+    | Contract of contractId
     | Anonymous
 
 (*
@@ -44,7 +44,7 @@ noeq type mainFunction =
     | MainFunc:
         cf:costFunction
         -> mf:( txSkel:txSkeleton
-                -> contractHash
+                -> contractId
                 -> command:string
                 -> sender:sender
                 -> data:option data

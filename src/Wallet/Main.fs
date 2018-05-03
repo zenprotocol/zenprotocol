@@ -139,17 +139,17 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
     | ActivateContract (code, numberOfBlocks, password) ->
         unlockAccount password
         >>= Account.createActivateContractTransaction chainParams code numberOfBlocks
-        <@> fun tx -> tx, Consensus.Contract.computeHash code
+        <@> fun tx -> tx, Consensus.Contract.makeContractId Version0 code
         |> reply<ActivateContractResponse> requestId
         account
-    | ExtendContract (cHash, numberOfBlocks, password) ->
+    | ExtendContract (contractId, numberOfBlocks, password) ->
         unlockAccount password
-        >>= Account.createExtendContractTransaction client chainParams cHash numberOfBlocks
+        >>= Account.createExtendContractTransaction client chainParams contractId numberOfBlocks
         |> reply<Transaction> requestId
         account
-    | ExecuteContract (cHash, command, data, provideReturnAddress, sign, spends, password) ->
+    | ExecuteContract (contractId, command, data, provideReturnAddress, sign, spends, password) ->
         unlockAccount password
-        >>= Account.createExecuteContractTransaction (Blockchain.executeContract client) cHash command data provideReturnAddress sign spends
+        >>= Account.createExecuteContractTransaction (Blockchain.executeContract client) contractId command data provideReturnAddress sign spends
         |> reply<Transaction> requestId
         account
     | AccountExists ->

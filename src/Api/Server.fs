@@ -83,22 +83,22 @@ let handleRequest chain client (request,reply) =
         let json =
             activeContracts
             |> List.map (fun contract ->
-                let address = Address.encode chain (Address.Contract contract.contractHash)
-                new ActiveContractsResponseJson.Root(Hash.toString contract.contractHash,address, contract.expiry |> int,contract.code))
+                let address = Address.encode chain (Address.Contract contract.contractId)
+                new ActiveContractsResponseJson.Root(ContractId.toString contract.contractId, address, contract.expiry |> int,contract.code))
             |> List.map (fun json -> json.JsonValue)
             |> List.toArray
             |> JsonValue.Array
 
         reply StatusCode.OK (JsonContent json)
-    | Get ("/contract/hash", query) ->
+    | Get ("/contract/contractId", query) ->
         match Map.tryFind "address" query with
         | None ->
               TextContent (sprintf "address is missing")
               |> reply StatusCode.BadRequest
         | Some address ->
             match Address.decodeContract chain address with
-            | FSharp.Core.Ok cHash ->
-                TextContent (Hash.toString cHash)
+            | FSharp.Core.Ok contractId ->
+                TextContent (ContractId.toString contractId)
                 |> reply StatusCode.OK
             | FSharp.Core.Error _ ->
                 TextContent (sprintf "invalid address %A" query)
@@ -120,7 +120,7 @@ let handleRequest chain client (request,reply) =
         | Ok balances ->
             balances
             |> Map.toSeq
-            |> Seq.map (fun ((asset, assetType), amount) -> new BalanceResponseJson.Root(Hash.toString asset, Hash.toString assetType, int64 amount))
+            |> Seq.map (fun (asset, amount) -> new BalanceResponseJson.Root(Asset.toString asset, int64 amount))
             |> Seq.map (fun json -> json.JsonValue)
             |> Seq.toArray
             |> JsonValue.Array
@@ -200,8 +200,8 @@ let handleRequest chain client (request,reply) =
                         let deltas =
                             amounts
                             |> Map.toArray
-                            |> Array.map (fun ((asset, assetType), amount) ->
-                                new TransactionsResponseJson.Delta(Hash.toString asset, Hash.toString assetType, amount))
+                            |> Array.map (fun (asset, amount) ->
+                                new TransactionsResponseJson.Delta(Asset.toString asset, amount))
                         (new TransactionsResponseJson.Root(Hash.toString txHash, deltas, int blockNumer)).JsonValue)
                     |> JsonValue.Array
                 (new TransactionsResponseJson.Root(json)).JsonValue
@@ -216,12 +216,12 @@ let handleRequest chain client (request,reply) =
         | Error error -> replyError error
         | Ok (code, numberOfBlocks, password) ->
             match Wallet.activateContract client code numberOfBlocks password with
-            | Ok (tx, cHash) ->
+            | Ok (tx, contractId) ->
                 let address =
-                    Address.Contract cHash
+                    Address.Contract contractId
                     |> Address.encode chain
                 Blockchain.validateTransaction client tx
-                let json = new ContractActivateResponseJson.Root (address, Hash.toString cHash)
+                let json = new ContractActivateResponseJson.Root (address, ContractId.toString contractId)
                 reply StatusCode.OK (JsonContent json.JsonValue)
             | Error error ->
                 replyError error

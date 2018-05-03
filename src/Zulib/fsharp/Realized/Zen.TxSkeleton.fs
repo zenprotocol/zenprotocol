@@ -84,9 +84,9 @@ let rec addInputs (inputs : Prims.list<input>)
 let addOutput (output : output) (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
     lazy (insertOutput output txSkeleton) |> Cost.C
 
-let lockToContract (asset : asset) (amount:uint64) (contractHash : hash)
+let lockToContract (asset : asset) (amount:uint64) (contractId : contractId)
     (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
-    lazy (let lock = ContractLock contractHash
+    lazy (let lock = ContractLock contractId
 
           let output =
               { lock = lock;
@@ -111,18 +111,18 @@ let lockToAddress (asset : asset) (amount:uint64) (address : lock) (txSkeleton :
           insertOutput output txSkeleton)
     |> Cost.C
 
-let addChangeOutput (asset : asset) (contractHash : contractHash)
+let addChangeOutput (asset : asset) (contractId : contractId)
     (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
     lazy (let tokensAvailable =
               getAvailableTokens asset txSkeleton |> Cost.__force
 
-          lockToContract asset tokensAvailable contractHash txSkeleton |> Cost.__force)
+          lockToContract asset tokensAvailable contractId txSkeleton |> Cost.__force)
     |> Cost.C
 
-let mint (amount : U64.t) ((contractHash, hash) : asset)
+let mint (amount : U64.t) (asset : asset)
     (txSkeleton : txSkeleton) : Cost.t<txSkeleton, unit> =
     lazy (let mintSpend =
-              { asset = contractHash, hash;
+              { asset = asset;
                 amount = amount }
 
           let input = Mint mintSpend
@@ -145,7 +145,7 @@ let destroy (amount : U64.t) (asset : asset)
 
 
 let fromWallet (asset:asset) (amount:U64.t)
-                (contractHash:hash) (wallet:wallet) (txSkeleton:txSkeleton) =
+                (contractId:contractId) (wallet:wallet) (txSkeleton:txSkeleton) =
 
     lazy (
         let inputs,collectedAmount = collect asset amount wallet Prims.Nil 0UL
@@ -157,7 +157,7 @@ let fromWallet (asset:asset) (amount:U64.t)
 
             // Do we need a change?
             if collectedAmount > amount then
-                lockToContract asset (collectedAmount - amount) contractHash txSkeleton
+                lockToContract asset (collectedAmount - amount) contractId txSkeleton
                 |> Cost.__force
                 |> Native.Some
             else

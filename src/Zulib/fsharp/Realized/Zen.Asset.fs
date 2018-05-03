@@ -16,24 +16,24 @@ let private filler len =
 
 let zeroHash = Array.zeroCreate 32
 
-let zenAsset : asset = zeroHash, zeroHash
+let zenAsset : asset = 0ul, zeroHash, zeroHash
 
-let getDefault (cHash : contractHash) : Cost.t<asset, unit> =
-    lazy (cHash, zeroHash)
+let getDefault ((version,cHash) : contractId) : Cost.t<asset, unit> =
+    lazy (version, cHash, zeroHash)
     |> Cost.C
 
-let fromString (cHash : contractHash) (value : Prims.string) : Cost.t<asset, unit> =
+let fromString ((version,cHash) : contractId) (value : Prims.string) : Cost.t<asset, unit> =
     lazy (
         let n = Array.length value
         let bytes =
             (filler (n + 3))
             |> Array.append value
             |> Array.append bom
-        cHash, bytes
+        version, cHash, bytes
     )
     |> Cost.C
 
-let fromInt (cHash : contractHash) (value : uint32) : Cost.t<asset, unit> =
+let fromInt ((version,cHash) : contractId) (value : uint32) : Cost.t<asset, unit> =
     lazy (
         let bytes = BitConverter.GetBytes value
         let bytes =
@@ -43,6 +43,6 @@ let fromInt (cHash : contractHash) (value : uint32) : Cost.t<asset, unit> =
         let bytes =
             bytes
             |> Array.append (filler (Array.length bytes))
-        cHash, bytes
+        version, cHash, bytes
     )
     |> Cost.C

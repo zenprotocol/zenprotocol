@@ -51,7 +51,8 @@
     <Compile Include="MerkleTree.fs" />
     <Compile Include="SparseMerkleTree.fs" />
     <Compile Include="Types.fs" />
-    <Compile Include="Constants.fs" />
+    <Compile Include="ContractId.fs" />
+    <Compile Include="Asset.fs" />
     <Compile Include="Difficulty.fs" />
     <Compile Include="TxSkeleton.fs" />
     <Compile Include="Chain.fs" />

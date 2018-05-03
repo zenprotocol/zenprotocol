@@ -4,6 +4,8 @@ open System
 open Consensus.Hash
 open Consensus.Crypto
 open Zen.Types.Data
+open Infrastructure
+open FsBech32
 
 [<LiteralAttribute>]
 let CoinbaseMaturity = 100ul
@@ -16,7 +18,28 @@ type Outpoint = {
     index: uint32
 }
 
-type Asset = Hash * Hash
+type ContractId = ContractId of uint32 * Hash with
+    override x.ToString() =
+        let (ContractId (version,cHash)) = x
+
+        Array.append (BigEndianBitConverter.uint32ToBytes version) (Hash.bytes cHash)
+        |> Base16.encode
+
+    member x.AsString = x.ToString()
+
+type Asset = Asset of ContractId * Hash with
+   override x.ToString() =
+        let (Asset (contractId,subType)) = x
+
+        // Check if Zen asset
+        if contractId = (ContractId (Version0,Hash.zero)) && subType = Hash.zero then
+            "00"
+        elif subType = Hash.zero then
+            contractId.ToString()
+        else
+            sprintf "%A%A" contractId subType
+
+   member x.AsString = x.ToString()
 
 type Spend = {
     asset: Asset
@@ -29,11 +52,11 @@ type Input =
 
 type Lock =
     | PK of Hash
-    | Contract of Hash
+    | Contract of ContractId
     | Coinbase of blockNumber:uint32 * pkHash:Hash
     | Fee
     | ActivationSacrifice
-    | ExtensionSacrifice of cHash:Hash
+    | ExtensionSacrifice of ContractId
     | Destroy
     | HighVLock of identifier:uint32 * byte[]
 
@@ -45,14 +68,14 @@ type Output = {
 type PointedOutput = Outpoint * Output
 
 type Message = {
-    cHash: Hash
+    contractId: ContractId
     command: string
     data: data option
 }
 
 type ContractWitness =
     {
-        cHash: Hash
+        contractId: ContractId
         command: string
         data: data option
         beginInputs: uint32
@@ -112,5 +135,5 @@ type Block = {
 }
 
 let Anonymous = Zen.Types.Main.Anonymous
-let ContractSender (Hash.Hash cHash)= Zen.Types.Main.Contract cHash
+let ContractSender (ContractId (version, Hash.Hash cHash)) = Zen.Types.Main.Contract (version,cHash)
 let PKSender (Crypto.PublicKey publicKey) = Zen.Types.Main.PK publicKey

@@ -86,7 +86,7 @@ let getBlockSacrificeAmount chain acs =
 
     let computeContractSacrifice (contract:Contract.T) =
         (contract.code
-         |> String.length 
+         |> String.length
          |> uint64) * chain.contractSacrificePerBytePerBlock
 
     Seq.sumBy computeContractSacrifice (ActiveContractSet.getContracts acs)
@@ -103,11 +103,11 @@ let getBlockCoinbase chain acs blockNumber transactions coinbasePkHash =
                 |> List.fold (fun totals output ->
                       let amount = defaultArg (Map.tryFind output.spend.asset totals) 0UL
                       Map.add output.spend.asset (output.spend.amount + amount) totals) Map.empty
-            let totalZen = defaultArg (Map.tryFind Constants.Zen blockFees) 0UL
+            let totalZen = defaultArg (Map.tryFind Asset.Zen blockFees) 0UL
             let blockSacrifice = getBlockSacrificeAmount chain acs
             let blockReward = blockReward blockNumber
 
-            Map.add Constants.Zen (totalZen + blockReward + blockSacrifice) blockFees
+            Map.add Asset.Zen (totalZen + blockReward + blockSacrifice) blockFees
 
         let lock = Coinbase (blockNumber, coinbasePkHash)
 
@@ -247,7 +247,7 @@ let connect chain getUTXO contractsPath parent timestamp utxoSet acs contractCac
 
     let checkDifficulty (block:Block) =
         let nextEma = EMA.add chain block.header.timestamp ema
-    
+
         if block.header.difficulty <> ema.difficulty then
             Error "incorrect proof of work"
         elif isGenesis chain block then
@@ -276,7 +276,7 @@ let connect chain getUTXO contractsPath parent timestamp utxoSet acs contractCac
 
                 let txHash = (Transaction.hash tx)
 
-                let! _,acs,contractCache = 
+                let! _,acs,contractCache =
                     TransactionValidation.validateInContext chain getUTXO contractsPath block.header.blockNumber acs contractCache set txHash tx
                     |> Result.mapError (sprintf "transactions failed inputs validation due to %A")
 
@@ -307,12 +307,12 @@ let connect chain getUTXO contractsPath parent timestamp utxoSet acs contractCac
                     |> List.filter (fun output -> output.lock = Fee)
                     |> List.fold folder Map.empty
 
-                let totalZen = defaultArg (Map.tryFind Constants.Zen blockFees) 0UL
+                let totalZen = defaultArg (Map.tryFind Asset.Zen blockFees) 0UL
 
                 let blockSacrifice = getBlockSacrificeAmount chain acs
                 let blockReward = blockReward block.header.blockNumber
 
-                Map.add Constants.Zen (totalZen + blockSacrifice + blockReward) blockFees
+                Map.add Asset.Zen (totalZen + blockSacrifice + blockReward) blockFees
 
             if coinbaseTotals <> blockRewardAndFees then
                 Error "block reward is incorrect"

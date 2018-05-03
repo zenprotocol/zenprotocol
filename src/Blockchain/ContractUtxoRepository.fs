@@ -7,15 +7,15 @@ open Consensus.Types
 open Consensus.UtxoSet
 open Infrastructure
 
-let getContractUtxo (session:Session) cHash (utxoSet:UtxoSet.T) = 
-    let contractUtxo = 
-        MultiCollection.get session.context.contractUtxo session.session cHash
+let getContractUtxo (session:Session) (contractId:ContractId) (utxoSet:UtxoSet.T) =
+    let contractUtxo =
+        MultiCollection.get session.context.contractUtxo session.session contractId
         |> Map.ofList
-        
+
     // updating the contract's utxo according to memory utxoset
     // we end up with recent block utxo and memory utxo
-    let memory,block = 
-        Map.fold (fun (memory,block) outpoint outputStatus -> 
+    let memory,block =
+        Map.fold (fun (memory,block) outpoint outputStatus ->
             if Map.containsKey outpoint block then
                 match outputStatus with
                 | NoOutput
@@ -24,17 +24,17 @@ let getContractUtxo (session:Session) cHash (utxoSet:UtxoSet.T) =
             else
                 match outputStatus with
                 | Unspent output ->
-                    if output.lock = Contract cHash then
+                    if output.lock = Contract contractId then
                         Map.add outpoint output memory,block
                     else
                         memory,block
                 | _ -> memory,block
-            
+
                 ) (Map.empty,contractUtxo) utxoSet
-                
-    // we randomize the lists in order to avoid using the same input as other contract run 
+
+    // we randomize the lists in order to avoid using the same input as other contract run
     let block = Map.toList block |> List.shuffle
     let memory = Map.toList memory |> List.shuffle
-    
+
     // combining th lists, we prefer to use block utxos in order to not be dependent on anoter transaction
     block @ memory
