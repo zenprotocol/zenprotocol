@@ -7,7 +7,7 @@ open Consensus.TxSkeleton
 
 open State
 
-let private validateInputs blockNumber acs txHash tx witnesses (inputs:TxSkeleton.Input list) =
+let private validateInputs blockNumber timestamp acs txHash tx witnesses (inputs:TxSkeleton.Input list) =
     match inputs with
     | [] -> Valid
     | head :: tail ->
@@ -16,7 +16,7 @@ let private validateInputs blockNumber acs txHash tx witnesses (inputs:TxSkeleto
             if ContractId.version contractId <> Version0 then
                 Invalid <| General "contract version not supported"
             else
-                ContractV0.validate acs txHash tx witnesses inputs
+                ContractV0.validate blockNumber timestamp acs txHash tx witnesses inputs
         | Lock (PK pkHash) -> PK.validate txHash witnesses pkHash tail
         | Lock (Coinbase (coinbaseBlockNumber, pkHash)) ->
             Coinbase.validate blockNumber txHash witnesses pkHash coinbaseBlockNumber tail
@@ -26,25 +26,25 @@ let private validateInputs blockNumber acs txHash tx witnesses (inputs:TxSkeleto
         | Lock Destroy
         | Lock (HighVLock _) -> Invalid <| General "input is not spendable"
 
-let rec private validateNext blockNumber acs txHash tx state =
+let rec private validateNext blockNumber timestamp acs txHash tx state =
     match state with
     | Invalid err -> Invalid err
     | NextInput (witnesses, inputs) ->
-        validateInputs blockNumber acs txHash tx witnesses inputs
-        |> validateNext blockNumber acs txHash tx
+        validateInputs blockNumber timestamp acs txHash tx witnesses inputs
+        |> validateNext blockNumber timestamp acs txHash tx
     | ExpectChainedContract (chainedContract,witnesses,inputs) ->
         if ContractId.version chainedContract.recipient <> Version0 then
             Invalid <| General "contract version not supported"
         else
-            ContractV0.validateChainedContract acs txHash tx witnesses inputs chainedContract
-            |> validateNext blockNumber acs txHash tx
+            ContractV0.validateChainedContract blockNumber timestamp acs txHash tx witnesses inputs chainedContract
+            |> validateNext blockNumber timestamp acs txHash tx
     | Valid -> Valid
 
-let validate blockNumber acs pInputs txHash tx txSkeleton =
+let validate blockNumber timestamp acs pInputs txHash tx txSkeleton =
     let witnesses = tx.witnesses
     let inputs = txSkeleton.pInputs
 
-    match validateNext blockNumber acs txHash txSkeleton (NextInput (witnesses,inputs)) with
+    match validateNext blockNumber timestamp acs txHash txSkeleton (NextInput (witnesses,inputs)) with
     | Valid -> Ok ()
     | Invalid error -> Error error
     | ExpectChainedContract _ -> Error <| General "chained contract witness expected"

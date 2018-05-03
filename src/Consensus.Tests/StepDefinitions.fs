@@ -6,7 +6,7 @@ open TechTalk.SpecFlow.BindingSkeletons
 open TechTalk.SpecFlow.Assist
 open Consensus.Crypto
 
-let pivate (?=) expected actual = Assert.AreEqual (expected, actual)
+let private (?=) expected actual = Assert.AreEqual (expected, actual)
 
 [<Binding>]
 module Binding =
@@ -155,6 +155,7 @@ module Binding =
             getUTXO
             "./test"
             1ul
+            1_000_000UL
             ActiveContractSet.empty
             Map.empty
             state.utxoset

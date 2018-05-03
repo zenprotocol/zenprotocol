@@ -62,7 +62,7 @@ let setup = fun () ->
     module RT = Zen.ResultT
     module Tx = Zen.TxSkeleton
 
-    let main txSkeleton contractHash command sender data wallet =
+    let main txSkeleton _ contractHash command sender data wallet =
         if command = "contract2_test" then
         begin
             let! contractToken = Zen.Asset.getDefault contractHash in
@@ -74,8 +74,8 @@ let setup = fun () ->
         else
             RT.autoFailw "unsupported command"
 
-    val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 9
-        let cf _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 21)
+    val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 9
+        let cf _ _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 21)
     """
     let contract2Id = Contract.makeContractId Version0 contract2Code
 
@@ -92,7 +92,7 @@ let setup = fun () ->
             module RT = Zen.ResultT
             module Tx = Zen.TxSkeleton
 
-            let main txSkeleton contractHash command sender data wallet =
+            let main txSkeleton _ contractHash command sender data wallet =
                 if command = "contract1_test" then
                 begin
                     let! asset = Zen.Asset.getDefault contractHash in
@@ -109,8 +109,8 @@ let setup = fun () ->
                 else
                     RT.autoFailw "unsupported command"
 
-            val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 9
-            let cf _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 26)
+            val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 9
+            let cf _ _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 26)
         """
 
     contracts <- result {
@@ -148,8 +148,9 @@ let ``Should produce execute contracts with message passed between them``() =
             }
 
         let stringData = Zen.Types.Data.data.String "Some string data"B |> Some
+        let context = {blockNumber=100u;timestamp=1_000_000UL}
 
-        let! (tx, message) = Contract.run contract1 TxSkeleton.empty "contract1_test" Anonymous stringData List.empty
+        let! (tx, message) = Contract.run contract1 TxSkeleton.empty context "contract1_test" Anonymous stringData List.empty
 
         let command =
             match message with
@@ -161,7 +162,7 @@ let ``Should produce execute contracts with message passed between them``() =
             | _ ->
                 failwithf "should be some message"
 
-        let! (tx, message) = Contract.run contract2 tx command Anonymous None List.empty
+        let! (tx, message) = Contract.run contract2 tx context command Anonymous None List.empty
 
         match message with
         | Some _ ->

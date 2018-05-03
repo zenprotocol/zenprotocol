@@ -239,7 +239,7 @@ let validate chain =
     >=> checkCommitments
 
 /// Apply block to UTXO and ACS, operation can fail
-let connect chain getUTXO contractsPath parent timestamp utxoSet acs contractCache ema =
+let connect chain getUTXO contractsPath (parent:BlockHeader) timestamp utxoSet acs contractCache ema =
     let checkBlockNumber (block:Block) =
         if parent.blockNumber + 1ul <> block.header.blockNumber then
             Error "blockNumber mismatch"
@@ -277,7 +277,7 @@ let connect chain getUTXO contractsPath parent timestamp utxoSet acs contractCac
                 let txHash = (Transaction.hash tx)
 
                 let! _,acs,contractCache =
-                    TransactionValidation.validateInContext chain getUTXO contractsPath block.header.blockNumber acs contractCache set txHash tx
+                    TransactionValidation.validateInContext chain getUTXO contractsPath block.header.blockNumber block.header.timestamp acs contractCache set txHash tx
                     |> Result.mapError (sprintf "transactions failed inputs validation due to %A")
 
                 let set = UtxoSet.handleTransaction getUTXO txHash tx set

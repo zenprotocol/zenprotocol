@@ -1,4 +1,4 @@
-﻿module Consensus.Tests.ContractTests
+module Consensus.Tests.ContractTests
 
 open Consensus
 open Consensus.Chain
@@ -42,6 +42,8 @@ let compile code = result {
         |> Result.bind (Contract.load contractPath 100ul code)
 }
 
+let context = { blockNumber=100u; timestamp = 1_000_000UL}
+
 [<Test>]
 let ``Should compile``() =
     compile sampleContractCode
@@ -61,7 +63,7 @@ let mapError = function
 
 let validateInputs (contract:Contract.T) utxos tx  =
     let acs = ActiveContractSet.add contract.contractId contract ActiveContractSet.empty
-    TransactionValidation.validateInContext Chain.localParameters getUTXO contractPath 1ul acs Map.empty utxos (Transaction.hash tx) tx
+    TransactionValidation.validateInContext Chain.localParameters getUTXO contractPath 1ul 1_000_000UL acs Map.empty utxos (Transaction.hash tx) tx
     |> Result.mapError mapError
 
 let validateBasic tx  =
@@ -71,9 +73,9 @@ let validateBasic tx  =
 let compileRunAndValidate inputTx utxoSet code =
     compile code
     |> Result.bind (fun contract ->
-        Contract.run contract inputTx "" Anonymous None List.empty
+        Contract.run contract inputTx context "" Anonymous None List.empty
         |> Result.bind (fun (tx, _) ->
-            let cost = Contract.getCost contract inputTx "" Anonymous None List.empty
+            let cost = Contract.getCost contract inputTx context "" Anonymous None List.empty
             tx
             |> TxSkeleton.checkPrefix inputTx
             |> Result.map (fun finalTxSkeleton ->
@@ -100,7 +102,7 @@ let ``Contract generated transaction should be valid``() =
 let ``Should get expected contract cost``() =
     (compile sampleContractCode
      |> Result.map (fun contract ->
-        Contract.getCost contract sampleInputTx "" Anonymous None List.empty)
+        Contract.getCost contract sampleInputTx context "" Anonymous None List.empty)
     , (Ok 212L : Result<int64, string>))
     |> shouldEqual
 
@@ -116,7 +118,7 @@ let ``Contract should be able to create its own tokens``() =
          module RT = Zen.ResultT
          module Tx = Zen.TxSkeleton
 
-         let main txSkeleton contractHash command sender data wallet =
+         let main txSkeleton _ contractHash command sender data wallet =
            let! asset = Zen.Asset.getDefault contractHash in
            let lock = ContractLock contractHash in
            let spend = {
@@ -132,8 +134,8 @@ let ``Contract should be able to create its own tokens``() =
 
            RT.ok (txSkeleton, None)
 
-           val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 9
-                    let cf _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 21)
+           val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 9
+                    let cf _ _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 21)
            """
     |> Result.mapError failwith
     |> ignore
@@ -150,7 +152,7 @@ let ``Contract should not be able to create zero amounts``() =
          module RT = Zen.ResultT
          module Tx = Zen.TxSkeleton
 
-         let main txSkeleton contractHash command sender data wallet =
+         let main txSkeleton _ contractHash command sender data wallet =
            let! asset = Zen.Asset.getDefault contractHash in
            let lock = ContractLock contractHash in
            let spend = {
@@ -166,8 +168,8 @@ let ``Contract should not be able to create zero amounts``() =
 
            RT.ok (txSkeleton, None)
 
-           val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 9
-                    let cf _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 21)
+           val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 9
+                    let cf _ _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 21)
            """
     , (Error "structurally invalid input(s)" : Result<Transaction, string>))
     |> shouldEqual
@@ -184,7 +186,7 @@ let ``Contract should not be able to create tokens other than its own``() =
          module RT = Zen.ResultT
          module Tx = Zen.TxSkeleton
 
-         let main txSkeleton contractHash command sender data wallet =
+         let main txSkeleton _ contractHash command sender data wallet =
            let asset = Zen.Asset.zenAsset in
            let lock = ContractLock contractHash in
            let spend = {
@@ -200,7 +202,7 @@ let ``Contract should not be able to create tokens other than its own``() =
 
            RT.ok (txSkeleton, None)
 
-         let cf _ _ _ _ _ = ret (64 + 64 + 18 <: nat)
+         let cf _ _ _ _ _ _ = ret (64 + 64 + 18 <: nat)
          """
     , (Error "illegal creation of tokens" : Result<Transaction, string>))
     |> shouldEqual
@@ -216,13 +218,13 @@ let ``Contract should be able to destroy its own tokens locked to it``() =
     module RT = Zen.ResultT
     module Tx = Zen.TxSkeleton
 
-    let main txSkeleton contractHash command sender data wallet =
+    let main txSkeleton _ contractHash command sender data wallet =
         let! asset = Zen.Asset.getDefault contractHash in
         let! txSkeleton1 = Tx.destroy 1000UL asset txSkeleton in
         RT.ok (txSkeleton1, None)
 
-    val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 7
-        let cf _ _ _ _ _ = ret (64 + (64 + 0) + 11)
+    val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 7
+        let cf _ _ _ _ _ _ = ret (64 + (64 + 0) + 11)
 
     """
 

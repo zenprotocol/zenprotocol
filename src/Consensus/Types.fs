@@ -139,3 +139,4 @@ type Block = {
 let Anonymous = Zen.Types.Main.Anonymous
 let ContractSender (ContractId (version, Hash.Hash cHash)) = Zen.Types.Main.Contract (version,cHash)
 let PKSender (Crypto.PublicKey publicKey) = Zen.Types.Main.PK publicKey
+type ContractContext = {blockNumber: uint32; timestamp: uint64}

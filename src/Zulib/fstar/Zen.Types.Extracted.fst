@@ -15,6 +15,7 @@ type contractId = U32.t ** contractHash
 type asset = U32.t ** contractHash ** hash
 type witness (n:nat) = A.t byte n
 type nonce = U64.t ** U64.t
+type timestamp = U64.t
 
 type outpoint =
     { txHash: hash;
@@ -49,6 +50,6 @@ unopteq type blockHeader = {
     parent: hash;
     blockNumber: U32.t;
     commitments: hash;
-    timestamp: U64.t;
+    timestamp: timestamp;
     difficulty: U32.t;
     nonce: nonce }

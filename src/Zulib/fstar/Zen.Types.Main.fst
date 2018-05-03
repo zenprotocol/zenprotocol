@@ -5,6 +5,8 @@ open Zen.Types.Realized
 open Zen.Cost
 open Zen.Types.Data
 
+module U32 = FStar.UInt32
+
 
 val maxCost: nat
 let maxCost = 200
@@ -18,6 +20,10 @@ type sender =
     | PK of publicKey
     | Contract of contractId
     | Anonymous
+
+type context =
+    { blockNumber: U32.t;
+      timestamp: timestamp }
 
 (*
 type contractArgs = {
@@ -33,6 +39,7 @@ noeq type costFunction =
     | CostFunc:
         #n:nat{n<=maxCost}
         -> f:(txSkeleton
+              -> context:context
               -> command:string
               -> sender
               -> data:option data
@@ -44,11 +51,12 @@ noeq type mainFunction =
     | MainFunc:
         cf:costFunction
         -> mf:( txSkel:txSkeleton
+                -> context:context
                 -> contractId
                 -> command:string
                 -> sender:sender
                 -> data:option data
                 -> wallet:wallet
-                -> contractResult `cost` force ((CostFunc?.f cf) txSkel command sender data wallet)
+                -> contractResult `cost` force ((CostFunc?.f cf) txSkel context command sender data wallet)
               )
         -> mainFunction

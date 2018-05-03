@@ -157,7 +157,7 @@ let ``transaction spending coinbase with maturity should be valid``() =
     }
     let utxos = Map.ofSeq [ testInput1, Unspent output ]
 
-    inputsValidationOk 115ul acs utxos tx keys
+    inputsValidationOk 115ul 1_000_000UL acs utxos tx keys
     |> shouldEqual
 
 [<Test>]
@@ -174,5 +174,5 @@ let ``transaction spending coinbase with no maturity should fail``() =
     }
     let utxos = Map.ofSeq [ testInput1, Unspent output ]
 
-    inputsValidationMsg "Coinbase not mature enough" 114ul acs utxos tx keys
+    inputsValidationMsg "Coinbase not mature enough" 114ul 1_000_000UL acs utxos tx keys
     |> shouldEqual
