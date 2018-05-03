@@ -42,7 +42,7 @@ type ConsensusGenerator =
                     [
                         {
                             lock=Coinbase (blockNumber, coinbasePkHash)
-                            spend={asset=Constants.Zen;amount=reward}
+                            spend={asset=Asset.Zen;amount=reward}
                         }
                     ]
                 contract = None
@@ -251,7 +251,7 @@ type ConsensusGenerator =
             gen {
                 let! bytes1 = Gen.arrayOfLength Hash.Length Arb.generate<byte>
                 let! bytes2 = Gen.arrayOfLength Hash.Length Arb.generate<byte>
-                let asset = (Hash.Hash bytes1, Hash.Hash bytes2) : Asset
+                let asset = Asset (ContractId (Version0, Hash.Hash bytes1), Hash.Hash bytes2)
                 let! amount = Arb.generate<uint32> |> Gen.filter ((<>) 0ul)
                 let amount = uint64 amount
 
@@ -275,7 +275,7 @@ type ConsensusGenerator =
                     | HighVLock (identifier, _) -> identifier > 7u // last reserved identifier
                     | _ -> true)
                 let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
-                let asset = Hash.Hash asset, Hash.zero
+                let asset = Asset (ContractId (Version0, Hash.Hash asset), Hash.zero)
                 let! amount = Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
 
                 return {lock=lock;spend={asset=asset;amount=amount}}
@@ -333,7 +333,7 @@ type ConsensusGenerator =
                         None
 
                 return ContractWitness {
-                    cHash = Hash.Hash cHash
+                    contractId = ContractId (Version0, Hash.Hash cHash)
                     command = command
                     data = data
                     beginInputs = beginInputs
@@ -357,7 +357,7 @@ type ConsensusGenerator =
         let activationSacrificeOutputGenerator =
             gen {
                 let! amount = Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
-                return [{lock=ActivationSacrifice; spend={asset=Hash.zero,Hash.zero;amount=amount}}]
+                return [{lock=ActivationSacrifice; spend={asset=Asset (ContractId (Version0,Hash.zero),Hash.zero);amount=amount}}]
             }
 
         Arb.fromGen (gen {
@@ -403,7 +403,7 @@ type ConsensusGenerator =
                         | HighVLock (identifier, _) -> identifier > 7u // last reserved identifier
                         | _ -> true)
                     let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
-                    let asset = Hash.Hash asset, Hash.zero
+                    let asset = Asset (ContractId (Version0,Hash.Hash asset), Hash.zero)
                     let! amount = Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
 
                     let output = {lock=lock;spend={asset=asset;amount=amount}}
@@ -415,7 +415,7 @@ type ConsensusGenerator =
                 gen {
                     let! bytes1 = Gen.arrayOfLength Hash.Length Arb.generate<byte>
                     let! bytes2 = Gen.arrayOfLength Hash.Length Arb.generate<byte>
-                    let asset = (Hash.Hash bytes1, Hash.Hash bytes2) : Asset
+                    let asset = Asset (ContractId (Version0,Hash.Hash bytes1), Hash.Hash bytes2)
                     let! amount = Arb.generate<uint32> |> Gen.filter ((<>) 0ul)
                     let amount = uint64 amount
 
@@ -430,7 +430,7 @@ type ConsensusGenerator =
                         | HighVLock (identifier, _) -> identifier > 7u // last reserved identifier
                         | _ -> true)
                     let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
-                    let asset = Hash.Hash asset, Hash.zero
+                    let asset = Asset (ContractId (Version0, Hash.Hash asset), Hash.zero)
                     let! amount = Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
 
                     return {lock=lock;spend={asset=asset;amount=amount}}
@@ -456,7 +456,7 @@ type ConsensusGenerator =
                     | _ -> true)
 
                 let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
-                let asset = Hash.Hash asset, Hash.zero
+                let asset = Asset (ContractId (Version0, Hash.Hash asset), Hash.zero)
                 let! amount = Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
 
                 let output = {lock=lock;spend={asset=asset;amount=amount}}
@@ -472,7 +472,7 @@ type ConsensusGenerator =
                 let! bytes = Gen.arrayOfLength Hash.Length Arb.generate<byte>
                 let txHash = Hash.Hash bytes
                 let! index = Arb.generate<uint32>
-                
+
                 let outpoint = { txHash = txHash; index = index }
                 let! output = Arb.generate<Output>
 

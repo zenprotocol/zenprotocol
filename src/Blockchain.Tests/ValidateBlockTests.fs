@@ -54,7 +54,7 @@ let rootAccountData = createTestAccount()
 let rootAccount, _ = rootAccountData
 
 let createTransaction account =
-    Result.get <| Account.createTransaction (publicKeyHash account) {asset=Constants.Zen;amount=100000000UL} (account, snd rootAccountData)
+    Result.get <| Account.createTransaction (publicKeyHash account) {asset=Asset.Zen;amount=100000000UL} (account, snd rootAccountData)
 
 
 // Default initial state of mempool and utxoset
@@ -610,7 +610,7 @@ let ``block with a contract activation is added to chain``() =
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session
 
-    let cHash = Contract.computeHash sampleContractCode
+    let contractId = Contract.makeContractId Version0 sampleContractCode
     let tx =
         Account.createActivateContractTransaction chain sampleContractCode 1000ul rootAccountData
         |>  function
@@ -618,14 +618,14 @@ let ``block with a contract activation is added to chain``() =
             | Error error -> failwith error
 
     let contract = {
-        hash = cHash
+        contractId=contractId
         mainFn = fun tx _ _ _ _ _  -> Ok (tx,None)
         costFn = fun _ _ _ _ _ -> 1L
         expiry=1002ul
         code = sampleContractCode
     }
 
-    let acs = ActiveContractSet.add cHash contract state.tipState.activeContractSet
+    let acs = ActiveContractSet.add contractId contract state.tipState.activeContractSet
 
     let block = Block.createTemplate chain genesisBlock.header timestamp state.tipState.ema acs [tx] Hash.zero
 

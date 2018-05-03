@@ -8,7 +8,7 @@ open Consensus.Crypto
 
 let pivate (?=) expected actual = Assert.AreEqual (expected, actual)
 
-[<Binding>] 
+[<Binding>]
 module Binding =
     open Consensus
     open Consensus.Crypto
@@ -16,21 +16,21 @@ module Binding =
     open FStar.UInt
 
     type label = string
-    
+
     type State = {
         keys : Map<string, KeyPair>
         txs : Map<string, Transaction>
         utxoset: UtxoSet.T
     }
-    
+
     let mutable state = {
         keys = Map.empty
         txs = Map.empty
         utxoset = Map.empty
     }
-    
+
     let getAsset = function
-    | "Zen" -> Constants.Zen
+    | "Zen" -> Asset.Zen
     | other -> failwithf "Unrecognized asset: %A" other
 
     let updateTx txLabel tx =
@@ -38,8 +38,8 @@ module Binding =
         tx
 
     let tryFindTx txLabel = Map.tryFind txLabel state.txs
-    
-    let findTx txLabel = 
+
+    let findTx txLabel =
         match tryFindTx txLabel with
         | Some tx -> tx
         | None -> failwithf "Referenced tx missing: %A" txLabel
@@ -67,13 +67,13 @@ module Binding =
         Map.find keyLabel state.keys
 
     let getLock lockType keyLabel =
-        match lockType with 
-        | "pk" -> 
+        match lockType with
+        | "pk" ->
             initKey keyLabel
             |> snd
             |> PublicKey.hash
             |> Lock.PK
-        | other -> 
+        | other ->
             failwithf "Undexpected lock type %A" other
 
     let getOutput amount asset lockType keyLabel = {
@@ -81,11 +81,11 @@ module Binding =
         lock = getLock lockType keyLabel
     }
 
-//    let [<BeforeScenario>] SetupScenario () = 
+//    let [<BeforeScenario>] SetupScenario () =
 //        ()
 
     let [<Given>] ``utxoset`` (table: Table) =
-        let mutable txs = Map.empty 
+        let mutable txs = Map.empty
 
         // init all mentioned txs with their outputs
         for row in table.Rows do
@@ -98,13 +98,13 @@ module Binding =
             let output = getOutput amount asset "pk" keyLabel
             let tx = { tx with outputs = Infrastructure.List.add output tx.outputs }
                      |> updateTx txLabel
-                     
+
             txs <- Map.add txLabel tx txs
 
-        // fold on mentioned txs, fold on their outputs    
+        // fold on mentioned txs, fold on their outputs
         let utxoset =
             txs
-            |> Map.fold (fun utxoset _ tx -> 
+            |> Map.fold (fun utxoset _ tx ->
                 let txHash = Transaction.hash tx
                 tx.outputs
                 |> List.mapi (fun i output -> (uint32 i, output))
@@ -121,16 +121,16 @@ module Binding =
         let tx = initTx txLabel
         { tx with outputs = Infrastructure.List.add output tx.outputs }
         |> updateTx txLabel
-        |> ignore        
-        
-        
+        |> ignore
+
+
     let [<When>] ``(.*) is added an input pointing to (.*) with index (.*)`` (txLabel:label) (refTxLabel:label) (index:uint32) =
         let refTx = findTx refTxLabel
         let outpoint = Outpoint { txHash = Transaction.hash refTx; index = index }
         let tx = initTx txLabel
         { tx with inputs = Infrastructure.List.add outpoint tx.inputs }
         |> updateTx txLabel
-        |> ignore        
+        |> ignore
 
     let [<When>] ``(.*) is signed with (.*)`` (txLabel:label) (keyLabels:label) =
         let tx = findTx txLabel
@@ -141,16 +141,16 @@ module Binding =
         let tx = Transaction.sign keyPairs tx
         updateTx txLabel tx
         |> ignore
-        
+
     let [<Then>] ``(.*) should pass validation`` (txLabel:label) =
         let tx = findTx txLabel
         let chainParams = Chain.getChainParameters Chain.Test
-        let getUTXO outpoint = 
+        let getUTXO outpoint =
             match Map.tryFind outpoint state.utxoset with
             | Some output -> output
             | None -> failwithf "Missing UTXO: %A" outpoint
-            
-        match TransactionValidation.validateInContext 
+
+        match TransactionValidation.validateInContext
             chainParams
             getUTXO
             "./test"

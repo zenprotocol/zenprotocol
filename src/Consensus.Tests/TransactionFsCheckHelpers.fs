@@ -7,31 +7,31 @@ open FsCheck
 open Hash
 open Crypto
 
-let hashGenerator = 
+let hashGenerator =
     gen {
         let! hash = Gen.arrayOfLength Hash.Length Arb.generate<byte>
         return hash |> Hash
     }
-let assetGenerator = 
+let assetGenerator =
     gen {
         let! contractHash = Gen.arrayOfLength Hash.Length Arb.generate<byte>
         let! tokenHash = Gen.arrayOfLength Hash.Length Arb.generate<byte>
-        return Hash contractHash, Hash tokenHash 
+        return Asset (ContractId (Version0, Hash contractHash), Hash tokenHash)
     }
-let pkKeyLockGenerator = 
+let pkKeyLockGenerator =
     gen {
         let private', public' = KeyPair.create()
         return (private', public'), PK (PublicKey.hash public')
     }
 let amountGenerator =
     Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
-let spendGenerator = 
+let spendGenerator =
     gen {
         let! asset = assetGenerator
         let! amount = amountGenerator
-        return { asset = asset; amount = amount } 
+        return { asset = asset; amount = amount }
     }
-let pkKeyOutputGenerator = 
+let pkKeyOutputGenerator =
     gen {
         let! pkKeyLock = pkKeyLockGenerator
         let! spend = spendGenerator
@@ -39,9 +39,9 @@ let pkKeyOutputGenerator =
     }
 let indexGenerator =
     Arb.generate<uint32>
-let outpointGenerator = 
+let outpointGenerator =
     gen {
         let! txHash = hashGenerator
-        let! index = indexGenerator 
+        let! index = indexGenerator
         return { txHash = txHash; index = index;}
     }

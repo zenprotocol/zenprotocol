@@ -17,7 +17,7 @@ let ``handling transaction add outputs to set``() =
         version = Version0
         inputs = []
         witnesses = []
-        outputs = [{lock = PK Hash.zero; spend = {asset=Constants.Zen; amount=1UL}}]
+        outputs = [{lock = PK Hash.zero; spend = {asset=Asset.Zen; amount=1UL}}]
         contract = None
     }
     let tx1Hash = Transaction.hash tx1
@@ -42,7 +42,7 @@ let ``handling transaction mark inputs as spent``() =
         version = Version0
         inputs = []
         witnesses = []
-        outputs = [{lock = PK Hash.zero; spend = {asset=Constants.Zen; amount=1UL}}]
+        outputs = [{lock = PK Hash.zero; spend = {asset=Asset.Zen; amount=1UL}}]
         contract = None
     }
     let tx1Hash = Transaction.hash tx1
@@ -73,7 +73,7 @@ let ``handling transaction mark inputs as spent``() =
 let ``Should find Utxo``() =
     let hash = Hash [| 100uy |]
     let outpoint = { txHash = hash; index = 100u }
-    let output = { lock = PK hash; spend = { asset = hash, Hash.zero; amount = 100UL }}
+    let output = { lock = PK hash; spend = { asset = Asset (ContractId (Version0, hash), Hash.zero); amount = 100UL }}
     let utxos = Map.ofSeq [ (outpoint, Unspent output) ]
     let outputResult = UtxoSet.getUtxos getUTXO [ outpoint ] utxos
 
@@ -107,7 +107,7 @@ let ``Unspendable outputs should not be added to utxoset``() =
         {
             version = Version0
             inputs = []
-            outputs=[{lock=Destroy;spend={amount=1UL;asset=Constants.Zen}}]
+            outputs=[{lock=Destroy;spend={amount=1UL;asset=Asset.Zen}}]
             witnesses = []
             contract = None
         }
