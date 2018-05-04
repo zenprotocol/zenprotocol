@@ -24,7 +24,7 @@ let ``Transaction should be orphan``() =
         txHash = Hash (Array.create 32 100uy)
         index = 0ul
     }
-    let output = { lock = PK testHash; spend = { asset = Constants.Zen; amount = 1UL } }
+    let output = { lock = PK testHash; spend = { asset = Asset.Zen; amount = 1UL } }
     let tx = {
         version = Version0
         inputs = [ Outpoint testInput1; Outpoint orphanInput ]
@@ -41,7 +41,7 @@ let ``Transaction basic validation should be Ok``() =
     let publicKey = Crypto.PublicKey <| Array.create 64 1uy
     let signature = Crypto.Signature <| Array.create 64 1uy
     let witness = PKWitness (publicKey, signature)
-    let output = { lock = PK testHash; spend = { asset = Constants.Zen; amount = 1UL } }
+    let output = { lock = PK testHash; spend = { asset = Asset.Zen; amount = 1UL } }
     let tx = {
         version = Version0
         inputs = [ Outpoint testInput1 ]
@@ -52,27 +52,27 @@ let ``Transaction basic validation should be Ok``() =
     basicValidationOk tx
     |> shouldEqual
 
-let checkBasicValidation msg tx = 
+let checkBasicValidation msg tx =
     tx
     |> basicValidationMsg msg
     |> shouldEqual
 
-let checkSerialization tx = 
-    try 
+let checkSerialization tx =
+    try
         Serialization.Transaction.serialize tx |> ignore
         false
     with _  ->
         true
-        
-        
+
+
 let tx = { version = Version0; inputs = []; witnesses = []; outputs = []; contract = None }
 
 [<Test>]
 let ``Transaction validation should fail with outputs invalid error``() =
     let check = checkBasicValidation "structurally invalid output(s)"
-    
+
     check { tx with inputs = [ Outpoint testInput1 ];
-                    outputs = [ { lock = PK testHash; spend = { asset = Constants.Zen; amount = 0UL } } ] }
+                    outputs = [ { lock = PK testHash; spend = { asset = Asset.Zen; amount = 0UL } } ] }
 
 [<Test>]
 let ``Transaction validation should fail with duplicate inputs error``() =
@@ -81,9 +81,9 @@ let ``Transaction validation should fail with duplicate inputs error``() =
     let publicKey = Crypto.PublicKey <| Array.create 64 1uy
     let signature = Crypto.Signature <| Array.create 64 1uy
     let witness = PKWitness (publicKey, signature)
-    
+
     check { tx with inputs = [ Outpoint testInput1; Outpoint testInput1 ]
-                    outputs = [ { lock = PK testHash; spend = { asset = Constants.Zen; amount = 1UL } } ]
+                    outputs = [ { lock = PK testHash; spend = { asset = Asset.Zen; amount = 1UL } } ]
                     witnesses = [ witness ] }
 
 let emptyArr = [||]
@@ -95,7 +95,7 @@ let ``Transaction validation should fail with structurally invalid contract data
     let check = checkBasicValidation "structurally invalid contract data"
     let checkV0 contract = check { tx with contract = Some (V0 contract) }
     let checkHighV contract = check { tx with contract = Some (HighV contract) }
-    
+
     checkV0 { code="x";hints="";rlimit=10u;queries=10u }
     checkV0 { code="";hints="x";rlimit=10u;queries=10u }
     checkV0 { code=null;hints="x";rlimit=10u;queries=10u }
@@ -115,12 +115,12 @@ let nullHash = Hash null
 [<Test>]
 let ``Transaction validation should fail with structurally invalid input data error``() =
     let check = checkBasicValidation "structurally invalid input(s)"
-    
-    let tx = { tx with outputs = [ { lock = PK validHash; spend = { asset = Constants.Zen; amount = 10UL } } ] }
+
+    let tx = { tx with outputs = [ { lock = PK validHash; spend = { asset = Asset.Zen; amount = 10UL } } ] }
     // empty imputs
     check { tx with inputs = [] }
     // zero amount
-    check { tx with inputs = [ Mint { asset = validHash, Hash.zero; amount = 0UL } ] }
+    check { tx with inputs = [ Mint { asset = Asset (ContractId (Version0, validHash), Hash.zero); amount = 0UL } ] }
 
 [<Test>]
 let ``Transaction validation should fail with structurally invalid output data``() =
@@ -134,35 +134,35 @@ let ``Transaction validation should fail with structurally invalid output data``
 
     // illegal identifier
     for identifier in [ 1u .. 7u ] do
-        check { tx with outputs = [ { lock = HighVLock (identifier, [| byte 0 |]); spend = { asset = Constants.Zen; amount = 10UL } } ] }
-    
-    // missing highvlock bytes
-    check { tx with outputs = [ { lock = HighVLock (100u, [||]); spend = { asset = Constants.Zen; amount = 10UL } } ] }
+        check { tx with outputs = [ { lock = HighVLock (identifier, [| byte 0 |]); spend = { asset = Asset.Zen; amount = 10UL } } ] }
 
-    check { tx with outputs = [ { lock = PK Hash.zero; spend = { asset = Hash.zero, validHash; amount = 10UL } } ] }
+    // missing highvlock bytes
+    check { tx with outputs = [ { lock = HighVLock (100u, [||]); spend = { asset = Asset.Zen; amount = 10UL } } ] }
+
+    check { tx with outputs = [ { lock = PK Hash.zero; spend = { asset = Asset (ContractId (Version0, Hash.zero), validHash); amount = 10UL } } ] }
 
     // zero amount
-    check { tx with outputs = [ { lock = PK validHash; spend = { asset = Constants.Zen; amount = 0UL } } ] }
+    check { tx with outputs = [ { lock = PK validHash; spend = { asset = Asset.Zen; amount = 0UL } } ] }
 
     // test with malformatted HighV lock
     for invalidArr in [ emptyArr; nullArr ] do
-        check { tx with outputs = [ { lock = HighVLock (0ul, invalidArr); spend = { asset = Constants.Zen; amount = 10UL } } ] }
+        check { tx with outputs = [ { lock = HighVLock (0ul, invalidArr); spend = { asset = Asset.Zen; amount = 10UL } } ] }
 
 [<Test>]
 let ``Transaction validation should fail with structurally invalid witness data``() =
-    let check witness = 
-        { tx with witnesses = [ witness ]; 
-                  inputs = [ Mint { asset = validHash, Hash.zero; amount = 10UL } ]
-                  outputs = [ { lock = PK validHash; spend = { asset = Constants.Zen; amount = 10UL } } ] }
+    let check witness =
+        { tx with witnesses = [ witness ];
+                  inputs = [ Mint { asset = Asset (ContractId (Version0, validHash), Hash.zero); amount = 10UL } ]
+                  outputs = [ { lock = PK validHash; spend = { asset = Asset.Zen; amount = 10UL } } ] }
         |> checkBasicValidation "structurally invalid witness(es)"
-        
+
     // test with malformatted HighVWitness
     check <| HighVWitness (1ul, nullArr)
     check <| HighVWitness (1ul, emptyArr)
-    
-    
+
+
     let validContractWitness = {
-        cHash = validHash
+        contractId=ContractId (Version0,validHash)
         command = "command"
         data = None
         beginInputs = 0ul
@@ -172,17 +172,17 @@ let ``Transaction validation should fail with structurally invalid witness data`
         signature = None
         cost = 1ul
     }
-        
+
     let check = ContractWitness >> check
-        
+
     check <| { validContractWitness with command = null }
     check <| { validContractWitness with cost = 0ul }
- 
+
 [<Test>]
 let ``Signed transaction should be valid``() =
     let _, publicKey = keys.[0]
     let outputLock = PK (PublicKey.hash publicKey)
-    let output = { lock = outputLock; spend = { asset = Constants.Zen; amount = 1UL } }
+    let output = { lock = outputLock; spend = { asset = Asset.Zen; amount = 1UL } }
     let tx = {
         version = Version0
         inputs = [ Outpoint testInput1 ]
@@ -197,7 +197,7 @@ let ``Signed transaction should be valid``() =
 [<Test>]
 let ``Signed transaction validation result should be invalid witness``() =
     let outputLock = PK testHash // testHash will not match keypair
-    let output = { lock = outputLock; spend = { asset = Constants.Zen; amount = 1UL } }
+    let output = { lock = outputLock; spend = { asset = Asset.Zen; amount = 1UL } }
     let tx = {
         version = Version0
         inputs = [ Outpoint testInput1 ]

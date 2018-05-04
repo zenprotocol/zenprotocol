@@ -54,6 +54,8 @@
     <Compile Include="TransactionNunitHelpers.fs" />
     <Compile Include="TransactionFsCheckHelpers.fs" />
     <Compile Include="ConsensusGenerator.fs" />
+    <Compile Include="ContractIdTests.fs" />
+    <Compile Include="AssetTests.fs" />
     <Compile Include="BlockHeaderTests.fs" />
     <Compile Include="DifficultyTests.fs" />
     <Compile Include="CryptoTests.fs" />

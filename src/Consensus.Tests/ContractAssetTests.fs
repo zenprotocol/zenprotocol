@@ -1,6 +1,7 @@
 module Consensus.Tests.ContractAssetTests
 
 open Consensus
+open Consensus.Types
 open NUnit.Framework
 open Infrastructure
 
@@ -26,7 +27,7 @@ let compile code = result {
         queries = queries
     }
 
-    return! 
+    return!
         Contract.compile contractPath contract
         |> Result.bind (Contract.load contractPath 100ul code)
 }

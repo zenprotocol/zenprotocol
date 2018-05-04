@@ -1,12 +1,12 @@
 module Consensus.ContractCache
 
-open Consensus.Hash
+open Consensus.Types
 open Consensus.Contract
 
-type T = Map<Hash, ContractMainFn * ContractCostFn>
+type T = Map<ContractId, ContractMainFn * ContractCostFn>
 
 let empty = Map.empty
 
 let tryFind = Map.tryFind
 
-let add contract = Map.add contract.hash (contract.mainFn, contract.costFn)
+let add contract = Map.add contract.contractId (contract.mainFn, contract.costFn)

@@ -103,7 +103,7 @@ let fstCode = """
     open Zen.Cost
     open Zen.ResultT
 
-    val main: txSkeleton -> hash -> string -> sender -> option data -> wallet
+    val main: txSkeleton -> contractId -> string -> sender -> option data -> wallet
         -> result (txSkeleton ** option message) `cost` 4
     let main tx chash command sender data _ =
         ok @ (tx, None)
@@ -120,7 +120,7 @@ let ``Should record hints``() =
 
 [<Test>]
 let ``Should invoke compiled``() =
-    compileAndInvoke fstCode [| input; null; null; null; null; null |]
+    compileAndInvoke fstCode [| input; 0ul;null; null; null; null; null |]
     |> shouldBeOk (input, Native.option<message>.None)
 
 [<Test>]
@@ -132,14 +132,14 @@ let ``Should throw with command's value``() =
         open Zen.Cost
         open Zen.ResultT
 
-        val main: txSkeleton -> hash -> string -> sender -> option data -> wallet
+        val main: txSkeleton -> contractId -> string -> sender -> option data -> wallet
             -> result (txSkeleton ** option message) `cost` 1
         let main tx chash command sender data _ =
             failw command
 
         val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 1
         let cf _ _ _ _ _ = Zen.Cost.ret 1
-        """ [| null; null; "test command"B; null; null; null |]
+        """ [| null; 0ul; null; "test command"B; null; null; null |]
     |> shouldBeError "test command"
 
 [<Test>]

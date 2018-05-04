@@ -18,9 +18,6 @@ module Tx = Zen.TxSkeleton
 let main txSkeleton contractHash command sender data wallet =
   let! asset = Zen.Asset.getDefault contractHash in
   let spend = { asset=asset; amount=1000UL } in
-  let lock = ContractLock contractHash in
-
-  let output = { lock=lock; spend=spend } in
   let pInput = Mint spend in
 
   let! txSkeleton =
@@ -30,22 +27,19 @@ let main txSkeleton contractHash command sender data wallet =
   RT.ok (txSkeleton, None)
 
 val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 9
-let cf _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 23)
+let cf _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 20)
 """
 
-let sampleContractHash =
-    sampleContractCode
-    |> Encoding.UTF8.GetBytes
-    |> Hash.compute
+let sampleContractId = Contract.makeContractId Version0 sampleContractCode
 
-let private sampleContractTester txSkeleton hash =
+let private sampleContractTester txSkeleton contractId =
     let spend = {
-        asset = hash, Hash.zero
+        asset = Asset.defaultOf contractId
         amount = 1000UL
     }
 
     let output = {
-        lock = Lock.Contract hash
+        lock = Lock.Contract contractId
         spend = spend
     }
 
@@ -65,7 +59,7 @@ let sampleInput = {
 
 let sampleOutput = {
     lock = PK (PublicKey.hash samplePublicKey)
-    spend = { asset = sampleContractHash, Hash.zero; amount = 1UL }
+    spend = { asset = Asset.defaultOf sampleContractId; amount = 1UL }
 }
 
 let sampleInputTx =
@@ -75,11 +69,11 @@ let sampleInputTx =
     }
 
 let sampleOutputTx, _ =
-    sampleContractTester sampleInputTx sampleContractHash
+    sampleContractTester sampleInputTx sampleContractId
 
 let sampleExpectedResult =
     Transaction.fromTxSkeleton sampleOutputTx
-    |> Transaction.addWitnesses [ ContractWitness <| TxSkeleton.getContractWitness sampleContractHash "" None sampleInputTx sampleOutputTx 215L ]
+    |> Transaction.addWitnesses [ ContractWitness <| TxSkeleton.getContractWitness sampleContractId "" None sampleInputTx sampleOutputTx 215L ]
     |> Transaction.sign [ sampleKeyPair ]
 
 let getSampleUtxoset utxos =

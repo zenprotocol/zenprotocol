@@ -16,7 +16,7 @@ type T =
         databaseContext:DataAccess.DatabaseContext
         tip:SingleValue<Hash.Hash>
         utxoSet:Collection<Outpoint, OutputStatus>
-        contractUtxo:MultiCollection<Hash.Hash,PointedOutput>
+        contractUtxo:MultiCollection<ContractId,PointedOutput>
         blocks:Collection<Hash.Hash,ExtendedBlockHeader.T>
         blockChildrenIndex: Index<Hash.Hash,ExtendedBlockHeader.T,Hash.Hash>
         blockState:Collection<Hash.Hash,BlockState.T>
@@ -69,7 +69,7 @@ let create dataPath =
         Index.create session blocks "blockChildren" Hash.Length Hash.bytes (fun _ key (value:ExtendedBlockHeader.T) ->
             value.header.parent,key)
 
-    let blockState = 
+    let blockState =
         Collection.create session "blockState" Hash.bytes
             BlockState.serialize
             BlockState.deserialize
@@ -96,7 +96,7 @@ let create dataPath =
             OutputStatus.deserialize
 
     let contractUtxo =
-        MultiCollection.create session "contractUtxo" Hash.bytes
+        MultiCollection.create session "contractUtxo" ContractId.toBytes
             PointedOutput.serialize
             PointedOutput.deserialize
 

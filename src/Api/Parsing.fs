@@ -9,16 +9,10 @@ open FsBech32
 open System.Text
 open Newtonsoft.Json
 
-let private getSpend asset assetType amount =
-    match Hash.fromString asset, Hash.fromString assetType with
-    | Ok asset, Ok assetType ->
-        Ok { asset = asset, assetType; amount = uint64 amount }
-    | Error msg, Ok _ ->
-        Error <| sprintf "Asset: %s" msg
-    | Ok _, Error msg ->
-        Error <| sprintf "AssetType: %s" msg
-    | Error msg1, Error msg2->
-        Error <| sprintf "Asset: %s, AssetType %s" msg1 msg2
+let private getSpend asset amount =
+    match Asset.fromString asset with
+    | Some asset -> Ok { asset = asset; amount = uint64 amount }
+    | None -> Error "invalid asset"
 
 let parseSendJson chain json =
     try
@@ -32,8 +26,7 @@ let parseSendJson chain json =
             | Error err ->
                 Error ("Address is invalid: " + err)
             | Ok pkHash ->
-                let s = json.Spend
-                getSpend s.Asset s.AssetType s.Amount
+                getSpend json.Asset json.Amount
                 |> Result.map (fun spend -> (pkHash, spend, json.Password))
     with _ as ex ->
         Error ("Json invalid: " + ex.Message)
@@ -41,7 +34,7 @@ let parseSendJson chain json =
 let parseContractExecuteJson chain json =
     try
         let json = ContractExecuteRequestJson.Parse json
-        
+
         if String.length json.Password = 0 then
             Error "Password is empty"
         else
@@ -50,14 +43,14 @@ let parseContractExecuteJson chain json =
             | Ok cHash ->
                 let mutable spends = Map.empty
                 let mutable errors = List.empty
-    
+
                 for item in json.Spends do
-                    getSpend item.Asset item.AssetType item.Amount
+                    getSpend item.Asset item.Amount
                     |> function
                     | Ok spend -> spends <- Map.add spend.asset spend.amount spends
                     | Error err -> errors <- err :: errors
                     |> ignore
-    
+
                 if List.isEmpty errors then
                     let data =
                         if System.String.IsNullOrEmpty json.Data then
@@ -69,13 +62,13 @@ let parseContractExecuteJson chain json =
                                 | Some data -> Some data
                                 | None -> failwith "Invalid Data"
                             | None -> failwith "Invalid Data"
-    
+
                     let sign =
                         if System.String.IsNullOrEmpty json.Options.Sign then
                             None
                         else
                             Some json.Options.Sign
-    
+
                     Ok (cHash, json.Command, data, json.Options.ReturnAddress, sign, spends, json.Password)
                 else
                     errors

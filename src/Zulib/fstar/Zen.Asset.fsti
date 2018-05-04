@@ -11,15 +11,15 @@ val zeroHash:hash
 val zenAsset:asset
 
 val getDefault:
-    contractHash
+    contractId
     -> asset `cost` 64
 
 val fromString:
-   contractHash
+   contractId
    -> s:string { S.length s <= 29 }
    -> asset `cost` 64
 
 val fromInt:
-   contractHash
+   contractId
    -> U32.t
    -> asset `cost` 64

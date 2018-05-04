@@ -15,7 +15,7 @@ type PaginationArgs =
         member arg.Usage = ""
 
 type SendArgs =
-    | [<MainCommand("COMMAND");ExactlyOnce>] Send_Arguments of asset:string * assetType:string * amount:int64 * address:string * password:string
+    | [<MainCommand("COMMAND");ExactlyOnce>] Send_Arguments of asset:string * amount:int64 * address:string * password:string
     interface IArgParserTemplate with
         member arg.Usage = ""
 
@@ -30,7 +30,7 @@ type ExtendContractArgs =
         member arg.Usage = ""
 
 type ExecuteContractArgs =
-    | [<MainCommand("COMMAND");ExactlyOnce>] ExecuteContract_Arguments of address:string * command:string * data:string * asset:string * assetType:string * amount:int64 * password:string
+    | [<MainCommand("COMMAND");ExactlyOnce>] ExecuteContract_Arguments of address:string * command:string * data:string * asset:string * amount:int64 * password:string
     interface IArgParserTemplate with
         member arg.Usage = ""
 
@@ -132,10 +132,10 @@ let main argv =
     try
         match results.TryGetSubCommand() with
         | Some (Send args) ->
-            let asset, assetType, amount, address, password = args.GetResult <@ Send_Arguments @>
+            let asset, amount, address, password = args.GetResult <@ Send_Arguments @>
             "wallet/send"
             |> getUri
-            |> (new SendRequestJson.Root(address, new SendRequestJson.Spend(asset, assetType, amount), password))
+            |> (new SendRequestJson.Root(address, asset, amount, password))
                 .JsonValue.Request
             |> printResponse
         | Some (Balance _) ->
@@ -148,7 +148,7 @@ let main argv =
             printfn "============================"
 
             Array.iter (fun (assertBalance:BalanceResponseJson.Root) ->
-                printfn " %s %s\t| %d" assertBalance.Asset assertBalance.AssetType assertBalance.Balance) balance
+                printfn " %s\t| %d" assertBalance.Asset assertBalance.Balance) balance
         | Some (History args) ->
             let skip, take = args.GetResult <@ Pagination_Arguments @>
             let transactions =
@@ -166,7 +166,7 @@ let main argv =
                 printfn "\n%s\t%i" entry.TxHash entry.BlockNumber
 
                 Array.iter (fun (amount:TransactionsResponseJson.Delta) ->
-                    printfn "\t| %s %s\t| %d" amount.Asset amount.AssetType amount.Amount
+                    printfn "\t| %s\t| %d" amount.Asset amount.Amount
                 ) entry.Deltas
 
             ) transactions
@@ -209,7 +209,7 @@ let main argv =
                         |> getResponse
                         |> ContractActivateResponseJson.Parse
 
-                    printfn "Contract activated.\nAddress: %s\nHash: %s" result.Address result.Hash
+                    printfn "Contract activated.\nAddress: %s\nHash: %s" result.Address result.ContractId
         | Some (Extend args) ->
             let address, numberOfBlocks, password = args.GetResult <@ ExtendContract_Arguments @>
             "wallet/contract/extend"
@@ -219,14 +219,14 @@ let main argv =
                 .JsonValue.Request
             |> printResponse
         | Some (Execute args) ->
-            let address, command, data, asset, assetType, amount, password =
+            let address, command, data, asset, amount, password =
                 args.GetResult <@ ExecuteContract_Arguments @>
             "wallet/contract/execute"
             |> getUri
             |> (new ContractExecuteRequestJson.Root(
                     address, command, data,
                     new ContractExecuteRequestJson.Options(true, ""),
-                        [| new ContractExecuteRequestJson.Spend(asset, assetType, amount) |],
+                        [| new ContractExecuteRequestJson.Spend(asset, amount) |],
                         password))
                 .JsonValue.Request
             |> printResponse
@@ -240,7 +240,7 @@ let main argv =
             printfn "========================================="
 
             Array.iter (fun (activeContract:ActiveContractsResponseJson.Root) ->
-                printfn " %s %s\t| %d" activeContract.Address activeContract.ContractHash activeContract.Expire) activeContracts
+                printfn " %s %s\t| %d" activeContract.Address activeContract.ContactId activeContract.Expire) activeContracts
         | Some (PublishBlock args) ->
             let block = args.GetResult <@ PublishBlock_Arguments @>
             "block/publish"

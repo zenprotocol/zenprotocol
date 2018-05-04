@@ -13,6 +13,7 @@ open Blockchain
 open Serialization
 open Consensus.Tests
 open Blockchain.ExtendedBlockHeader
+open Blockchain.BlockState
 
 type BlockchainGenerators =
     static member BlockState() =
@@ -21,11 +22,15 @@ type BlockchainGenerators =
             let! activeContractSet =
                 Gen.listOf <| gen {
                     let! hash = Gen.arrayOfLength Hash.Length Arb.generate<byte>
-                    let! blockNumber = Arb.generate<uint32>
+                    let! expiry = Arb.generate<uint32>
                     let! code = Arb.generate<string> |> Gen.filter ((<>) null)
-                    return Hash hash, blockNumber, code
+                    return {
+                        contractId=ContractId (Version0, Hash hash)
+                        expiry=expiry
+                        code=code
+                    }
                 }
-                
+
             return
                 ({
                     ema = ema
@@ -70,7 +75,7 @@ type BlockchainGenerators =
                 let! hash = Gen.arrayOfLength Hash.Length Arb.generate<byte>
                 return Hash hash
             }
-            
+
             return {
                 hash = Hash hash
                 header = header
@@ -83,7 +88,7 @@ type BlockchainGenerators =
             }
         }
         |> Arb.fromGen
-    
+
 [<OneTimeSetUp>]
 let setup = fun () ->
     Arb.register<ConsensusGenerator>() |> ignore

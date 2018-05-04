@@ -14,22 +14,26 @@ open Infrastructure
 open UtxoSet
 
 module BlockState =
-    let private write ops blockState = 
+    let private write ops blockState =
         ops.writeNumber4 blockState.ema.difficulty
         >> Seq.write ops (fun ops -> ops.writeNumber8) blockState.ema.delayed
-        >> Seq.write ops (fun ops (cHash, blockNumber, code) -> 
-            ops.writeHash cHash
-            >> ops.writeNumber4 blockNumber
-            >> ops.writeLongString code) blockState.activeContractSet
+        >> Seq.write ops (fun ops contractState ->
+            ContractId.write ops contractState.contractId
+            >> ops.writeNumber4 contractState.expiry
+            >> ops.writeLongString contractState.code) blockState.activeContractSet
 
     let private read = reader {
         let! difficulty = readNumber4
         let! delayed = List.read readNumber8
         let! activeContractSet = List.read <| reader {
-            let! cHash = Hash.read
-            let! blockNumber = readNumber4
+            let! contractId = ContractId.read
+            let! expiry = readNumber4
             let! code = readLongString
-            return cHash, blockNumber, code
+            return {
+                contractId=contractId
+                expiry=expiry
+                code=code
+            }
         }
         return {
             ema = { difficulty = difficulty; delayed = delayed }
@@ -62,27 +66,27 @@ module private BlockStatus =
         | Connected -> ops.writeByte SerializedConnected
         | MainChain -> ops.writeByte SerializedMainChain
         | Invalid -> ops.writeByte SerializedInvalid
-        
+
     let read = reader {
         let! discriminator = Byte.read
-        match discriminator with 
+        match discriminator with
         | SerializedOrphan -> return Orphan
         | SerializedConnected -> return Connected
         | SerializedMainChain -> return MainChain
         | SerializedInvalid -> return Invalid
         | _ -> yield! Serialization.fail
     }
-    
+
 module BigInt =
     let write ops =
-        BigInteger.toBytes32 
+        BigInteger.toBytes32
         >> Seq.write ops (fun ops -> ops.writeByte)
-    
+
     let read = reader {
         let! bytes = Array.read Byte.read
         return BigInteger.fromBytes32 bytes
     }
-        
+
 module ExtendedBlockHeader =
     let write ops extendedBlockHeader =
         ops.writeHash extendedBlockHeader.hash
@@ -103,7 +107,7 @@ module ExtendedBlockHeader =
         let! witnessMerkleRoot = Hash.read
         let! activeContractSetMerkleRoot = Hash.read
         let! commitments = List.read Hash.read
-        
+
         return {
             hash = hash
             header = header
@@ -154,20 +158,20 @@ module OutputStatus =
         | Unspent output ->
             ops.writeByte SerializedUnspent
             >> Output.write ops output
-        
+
     let read = reader {
         let! discriminator = Byte.read
-        match discriminator with 
+        match discriminator with
         | SerializedNoOutput -> return NoOutput
-        | SerializedSpent -> 
+        | SerializedSpent ->
             let! output = Output.read
             return Spent output
-        | SerializedUnspent -> 
+        | SerializedUnspent ->
             let! output = Output.read
             return Unspent output
         | _ -> yield! Serialization.fail
     }
-    
+
     let serialize outputStatus =
         write counters outputStatus 0ul
         |> int32
@@ -184,13 +188,13 @@ module PointedOutput =
     let write ops (outpoint, output) =
         Outpoint.write ops outpoint
         >> Output.write ops output
-    
+
     let read = reader {
         let! outpoint = Outpoint.read
         let! output = Output.read
         return outpoint, output
     }
-        
+
     let serialize outputStatus =
         write counters outputStatus 0ul
         |> int32
@@ -207,7 +211,7 @@ module Version =
         let! value = readNumber4
         return int32 value
     }
-    
+
     let serialize version =
         write counters version 0ul
         |> int32
@@ -223,7 +227,7 @@ module Hashes =
         hs
         |> Seq.map Hash.bytes
         |> Array.concat
-    
+
     let deserialize bytes =
         bytes
         |> Array.chunkBySize Hash.Length

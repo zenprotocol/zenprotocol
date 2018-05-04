@@ -342,7 +342,7 @@ let createActivateContractTransaction chain code (numberOfBlocks:uint32) (accoun
     let codeLength = String.length code |> uint64
 
     let activationSacrifice = chain.sacrificePerByteBlock * codeLength * (uint64 numberOfBlocks)
-    let spend = { amount = activationSacrifice; asset = Constants.Zen }
+    let spend = { amount = activationSacrifice; asset = Asset.Zen }
 
     result {
         let! zenKey = deriveZenKey extendedKey
@@ -351,10 +351,10 @@ let createActivateContractTransaction chain code (numberOfBlocks:uint32) (accoun
         let! (inputs,keys,amount) = collectInputs account spend secretKey
         let inputPoints = List.map (fst >> Outpoint) inputs
 
-        let cHash = Contract.computeHash code
+        let contractId = Contract.makeContractId Version0 code
 
         let! hints = Measure.measure
-                        (sprintf "recording hints for contract %A" cHash)
+                        (sprintf "recording hints for contract %A" contractId)
                         (lazy(Contract.recordHints code))
         let! queries = ZFStar.totalQueries hints
 
@@ -373,14 +373,14 @@ let createActivateContractTransaction chain code (numberOfBlocks:uint32) (accoun
             }
     }
 
-let createExtendContractTransaction client chainParams cHash (numberOfBlocks:uint32) (account, extendedKey) =
+let createExtendContractTransaction client chainParams (contractId:ContractId) (numberOfBlocks:uint32) (account, extendedKey) =
     let activeContracts = Blockchain.getActiveContracts client
 
     result {
         let! code =
             activeContracts
             |> List.tryFind (function
-                             | { contractHash = contractHash } when contractHash = cHash -> true
+                             | { contractId = contractId' } when contractId' = contractId -> true
                              | _ -> false)
             |> function
             | Some activeContract -> Ok activeContract.code
@@ -388,7 +388,7 @@ let createExtendContractTransaction client chainParams cHash (numberOfBlocks:uin
 
         let codeLength = String.length code |> uint64
         let extensionSacrifice = chainParams.sacrificePerByteBlock * codeLength * (uint64 numberOfBlocks)
-        let spend = { amount = extensionSacrifice; asset = Constants.Zen }
+        let spend = { amount = extensionSacrifice; asset = Asset.Zen }
 
         let! zenKey = deriveZenKey extendedKey
         let! secretKey = ExtendedKey.getPrivateKey zenKey
@@ -396,7 +396,7 @@ let createExtendContractTransaction client chainParams cHash (numberOfBlocks:uin
         let! (inputs,keys,amount) = collectInputs account spend secretKey
         let inputPoints = List.map (fst >> Outpoint) inputs
 
-        let outputs = addChange spend amount account { spend = spend; lock = ExtensionSacrifice cHash }
+        let outputs = addChange spend amount account { spend = spend; lock = ExtensionSacrifice contractId }
         return Transaction.sign
             keys
             {
@@ -450,7 +450,7 @@ let signFirstWitness signKey tx = result {
     | None -> return tx
 }
 
-let createExecuteContractTransaction executeContract cHash command data provideReturnAddress sign spends (account, extendedKey) = result {
+let createExecuteContractTransaction executeContract (contractId:ContractId) command data provideReturnAddress sign spends (account, extendedKey) = result {
     let mutable txSkeleton = TxSkeleton.empty
     let mutable keys = List.empty
 
@@ -487,7 +487,7 @@ let createExecuteContractTransaction executeContract cHash command data provideR
             <@> Some
         | None -> Ok None
 
-    let! unsignedTx = executeContract cHash command sender data txSkeleton
+    let! unsignedTx = executeContract contractId command sender data txSkeleton
 
     let sign tx = signFirstWitness signKey tx <@> Transaction.sign keys
 

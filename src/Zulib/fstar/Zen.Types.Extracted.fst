@@ -11,7 +11,8 @@ type hash      = A.t U8.byte 32
 type signature = A.t U8.byte 64
 type publicKey = A.t U8.byte 64
 type contractHash = hash
-type asset = contractHash ** hash
+type contractId = U32.t ** contractHash
+type asset = U32.t ** contractHash ** hash
 type witness (n:nat) = A.t byte n
 type nonce = U64.t ** U64.t
 
@@ -25,14 +26,14 @@ type spend =
 
 type lock =
     | PKLock of hash
-    | ContractLock of contractHash
+    | ContractLock of contractId
     | FeeLock
     | DestroyLock
     | ActivationSacrificeLock
-    | ExtensionSacrificeLock of hash
+    | ExtensionSacrificeLock of contractId
     | CoinbaseLock of U32.t ** hash
     | HighVLock of U32.t ** (l:nat & A.t U8.byte l)
- 
+
 type output =
     { lock: lock;
       spend: spend }

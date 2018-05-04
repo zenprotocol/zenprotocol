@@ -6,8 +6,7 @@ open System
 type BalanceResponseJson = JsonProvider<"""
 [
     {
-        "asset": "hash",
-        "assetType": "hash",
+        "asset": "asset",
         "balance": 2147483649
     }
 ]
@@ -16,18 +15,15 @@ type BalanceResponseJson = JsonProvider<"""
 type ContractActivateResponseJson = JsonProvider<"""
 {
     "address" : "address",
-    "hash" : "hash"
+    "contractId" : "contractId"
 }
 """>
 
 type SendRequestJson = JsonProvider<"""
 {
     "address": "address",
-    "spend": {
-        "asset": "hash",
-        "assetType": "hash",
-        "amount": 2147483649
-    },
+    "asset": "asset",
+    "amount": 2147483649,
     "password": "password"
 }
 """>
@@ -59,8 +55,7 @@ type ContractExecuteRequestJson = JsonProvider<"""
     },
     "spends": [
         {
-            "asset": "hash",
-            "assetType": "hash",
+            "asset": "asset",
             "amount": 2147483649
         }
     ],
@@ -77,7 +72,7 @@ type PublishBlockJson = JsonProvider<"""
 type ActiveContractsResponseJson = JsonProvider<"""
 [
     {
-        "contractHash": "hash",
+        "contactId": "contractId",
         "address":"address",
         "expire": 555,
         "code": "printfn hello world"
@@ -107,8 +102,7 @@ type TransactionsResponseJson = JsonProvider<"""
         "txHash": "hash",
         "deltas": [
             {
-                "asset": "hash",
-                "assetType": "hash",
+                "asset": "asset",
                 "amount": -2147483453648
             }
         ],

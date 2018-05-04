@@ -27,7 +27,7 @@ module Serialization =
             let! bytes = readBytes
             return Hash bytes
         }
-        
+
     module Byte =
         let write byte = writeNumber1 byte
         let read = readNumber1
@@ -147,7 +147,7 @@ module Serialization =
             let! length = VarInt.read
             yield! readBody readerFn length
         }
-        
+
     module List =
         let read readerFn = reader {
             let! seq = Seq.read readerFn
@@ -165,19 +165,31 @@ module Serialization =
             Map.toList
             >> Seq.write ops writerFn
         let read readerFn = reader {
-            let! seq = Seq.read readerFn 
+            let! seq = Seq.read readerFn
             return Map.ofSeq seq
         }
 
-    module Asset =
-        let write ops = fun (cHash, token) ->
-            ops.writeHash cHash
-            >> ops.writeHash token
+    module ContractId =
+        let write ops (ContractId (version,cHash)) =
+            VarInt.write ops version
+            >> ops.writeHash cHash
 
         let read = reader {
+            let! version = VarInt.read
             let! cHash = Hash.read
-            let! token = Hash.read
-            return cHash, token
+
+            return ContractId (version, cHash)
+        }
+
+    module Asset =
+        let write ops = fun (Asset (contractId,subType)) ->
+            ContractId.write ops contractId
+            >> ops.writeHash subType
+
+        let read = reader {
+            let! contractId = ContractId.read
+            let! subType = Hash.read
+            return Asset (contractId, subType)
         }
 
     module Spend =
@@ -217,7 +229,7 @@ module Serialization =
             let! discriminator = Byte.read
             match discriminator with
             | SerializedOutpoint ->
-                let! outpoint = Outpoint.read 
+                let! outpoint = Outpoint.read
                 return Outpoint outpoint
             | SerializedMint ->
                 let! spend = Spend.read
@@ -248,6 +260,7 @@ module Serialization =
             return publicKey
         }
 
+
     module Lock =
         [<Literal>]
         let private PKIdentifier = 1u
@@ -265,10 +278,10 @@ module Serialization =
         let private DestroyIdentifier = 7u
 
         let private writerFn ops = function
-            | PK hash
-            | Contract hash
-            | ExtensionSacrifice hash ->
-                ops.writeHash hash
+            | PK hash -> ops.writeHash hash
+            | Contract contractId -> ContractId.write ops contractId
+            | ExtensionSacrifice contractId ->
+                ContractId.write ops contractId
             | Fee
             | ActivationSacrifice
             | Destroy ->
@@ -304,8 +317,8 @@ module Serialization =
                     let! hash = Hash.read
                     return Lock.PK hash
                 | ContractIdentifier ->
-                    let! hash = Hash.read
-                    return Lock.Contract hash
+                    let! contractId = ContractId.read
+                    return Lock.Contract contractId
                 | CoinbaseIdentifier ->
                     let! blockNumber = readNumber4
                     let! pkHash = Hash.read
@@ -317,8 +330,8 @@ module Serialization =
                 | DestroyIdentifier ->
                     return Lock.Destroy
                 | ExtensionSacrificeIdentifier ->
-                    let! cHash = Hash.read
-                    return Lock.ExtensionSacrifice cHash
+                    let! contractId = ContractId.read
+                    return Lock.ExtensionSacrifice contractId
                 | _ ->
                     let! bytes = Seq.readBody Byte.read count
                     return HighVLock (identifier, Array.ofSeq bytes)
@@ -386,7 +399,7 @@ module Serialization =
                 let! hash = Hash.read
                 return hash |> Hash.bytes |> ZData.Hash
             }
-            
+
         module ZLock =
             let write ops = ZFStar.fstToFsLock >> Lock.write ops
             let read = reader {
@@ -472,7 +485,7 @@ module Serialization =
                 >> PublicKey.write ops publicKey
 
             | ZData.Dict (ZData.DataDict (map, _)) ->
-                Map.write ops (fun ops (key, data)-> 
+                Map.write ops (fun ops (key, data)->
                     String.write ops key
                     >> write ops data) map
 
@@ -537,7 +550,7 @@ module Serialization =
                     return key, data
                 }
                 return ZData.Dict (ZData.DataDict (map, Map.count map |> uint32))
-                
+
             | _ ->
                 yield! fail
         }
@@ -553,7 +566,7 @@ module Serialization =
                 PublicKey.write ops publicKey
                 >> Signature.write ops signature
             | ContractWitness cw ->
-                ops.writeHash cw.cHash
+                ContractId.write ops cw.contractId
                 >> ops.writeString cw.command
                 >> Option.write ops (Data.write ops) cw.data
                 >> VarInt.write ops cw.beginInputs
@@ -589,7 +602,7 @@ module Serialization =
                     let! signature = Signature.read
                     return PKWitness (publicKey, signature)
                 | ContractIdentifier ->
-                    let! cHash = Hash.read
+                    let! contractId = ContractId.read
                     let! command = readString
                     let! data = Option.read Data.read
                     let! beginInputs = VarInt.read
@@ -603,7 +616,7 @@ module Serialization =
                     })
                     let! cost = VarInt.read
                     return ContractWitness {
-                        cHash = cHash
+                        contractId = contractId
                         command = command
                         data = data
                         beginInputs = beginInputs

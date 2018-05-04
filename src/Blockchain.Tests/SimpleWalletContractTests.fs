@@ -63,10 +63,10 @@ let activateContract code account session state =
             |> Writer.unwrap
         let txHash = Transaction.hash tx
         events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (txHash, tx)))
-        let cHash = code |> System.Text.Encoding.UTF8.GetBytes |> Hash.compute
-        ActiveContractSet.containsContract cHash state.memoryState.activeContractSet
+        let contractId = Contract.makeContractId Version0 code
+        ActiveContractSet.containsContract contractId state.memoryState.activeContractSet
         |> should equal true
-        (state, cHash)
+        (state, contractId)
     )
 
 let dataPath =
@@ -75,7 +75,7 @@ let dataPath =
 let databaseContext = DatabaseContext.createTemporary dataPath
 let session = DatabaseContext.createSession databaseContext
 
-let mutable cHash = Hash.zero
+let mutable contractId = ContractId (Version0,Hash.zero)
 
 let clean() =
     Platform.cleanDirectory dataPath
@@ -113,7 +113,7 @@ let setUp = fun () ->
     """ account session state
     |> function
     | Ok (state', cHash') ->
-        cHash <- cHash'
+        contractId <- cHash'
         state <- state'
     | Error error ->
         failwith error
@@ -124,38 +124,38 @@ let tearDown = fun () ->
 
 [<Test>]
 let ``Wallet using contract should execute``() =
-    let output = {lock=Contract cHash;spend={asset=Constants.Zen;amount=10UL}}
+    let output = {lock=Contract contractId;spend={asset=Asset.Zen;amount=10UL}}
     let utxoSet = Map.add {txHash=Hash.zero;index=10ul} (UtxoSet.Unspent output) utxoSet
 
-    TransactionHandler.executeContract session sampleInputTx cHash "" None None { state.memoryState with utxoSet = utxoSet }
+    TransactionHandler.executeContract session sampleInputTx contractId "" None None { state.memoryState with utxoSet = utxoSet }
     |> shouldBeOk
 
 [<Test>]
 let ``Contract should not be able to lock more token than available``() =
-    let output = {lock=Contract cHash;spend={asset=Constants.Zen;amount=9UL}}
+    let output = {lock=Contract contractId;spend={asset=Asset.Zen;amount=9UL}}
     let utxoSet = Map.add {txHash=Hash.zero;index=1ul} (UtxoSet.Unspent output) utxoSet
 
-    TransactionHandler.executeContract session sampleInputTx cHash "" None None { state.memoryState with utxoSet = utxoSet }
+    TransactionHandler.executeContract session sampleInputTx contractId "" None None { state.memoryState with utxoSet = utxoSet }
     |> shouldBeErrorMessage "not enough Zens"
 
 [<Test>]
 let ``Contract should not have enough tokens when output is missing``() =
 
-    TransactionHandler.executeContract session sampleInputTx cHash "" None None state.memoryState
+    TransactionHandler.executeContract session sampleInputTx contractId "" None None state.memoryState
     |> shouldBeErrorMessage "not enough Zens"
 
 [<Test>]
 let ``Contract should not have enough tokens when output locked to PK address``() =
-    let output = {lock=PK cHash;spend={asset=Constants.Zen;amount=10UL}}
+    let output = {lock=PK Hash.zero;spend={asset=Asset.Zen;amount=10UL}}
     let utxoSet = Map.add {txHash=Hash.zero;index=10ul} (UtxoSet.Unspent output) utxoSet
 
-    TransactionHandler.executeContract session sampleInputTx cHash "" None None { state.memoryState with utxoSet = utxoSet }
+    TransactionHandler.executeContract session sampleInputTx contractId "" None None { state.memoryState with utxoSet = utxoSet }
     |> shouldBeErrorMessage "not enough Zens"
 
 [<Test>]
 let ``Contract should not have enough tokens when output is spent``() =
-    let output = {lock=PK cHash;spend={asset=Constants.Zen;amount=10UL}}
+    let output = {lock=PK Hash.zero;spend={asset=Asset.Zen;amount=10UL}}
     let utxoSet = Map.add {txHash=Hash.zero;index=10ul} (UtxoSet.Spent output) utxoSet
 
-    TransactionHandler.executeContract session sampleInputTx cHash "" None None { state.memoryState with utxoSet = utxoSet }
+    TransactionHandler.executeContract session sampleInputTx contractId "" None None { state.memoryState with utxoSet = utxoSet }
     |> shouldBeErrorMessage "not enough Zens"

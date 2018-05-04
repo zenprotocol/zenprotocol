@@ -22,7 +22,7 @@ let keys = getKeys 1
 [<Test>]
 let ``Signed transaction validation result should be invalid witness``() =
     let outputLock = PK testHash // testHash will not match keypair
-    let output = { lock = outputLock; spend = { asset = Constants.Zen; amount = 1UL } }
+    let output = { lock = outputLock; spend = { asset = Asset.Zen; amount = 1UL } }
     let tx = {
         version = Version0
         inputs = [ Outpoint testInput1 ]

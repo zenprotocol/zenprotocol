@@ -41,7 +41,7 @@ let compile code = result {
         queries = queries
     }
 
-    return! 
+    return!
         Contract.compile contractPath contract
         |> Result.bind (Contract.load contractPath 100ul code)
 }
@@ -77,11 +77,11 @@ let setup = fun () ->
     val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 9
         let cf _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 21)
     """
-    let contract2Hash = Contract.computeHash contract2Code
+    let contract2Id = Contract.makeContractId Version0 contract2Code
 
     let contract1Code =
-        contract2Hash
-        |> Hash.bytes
+        contract2Id
+        |> ContractId.toBytes
         |> System.Convert.ToBase64String
         |> sprintf """
             open Zen.Types
@@ -100,7 +100,7 @@ let setup = fun () ->
                         Tx.mint 25UL asset txSkeleton
                         >>= Tx.lockToContract asset 25UL contractHash in
                     let message = {
-                        cHash = hashFromBase64 "%s";
+                        contractId = contractIdFromBase64 "%s";
                         command = "contract2_test";
                         data = data
                     } in
@@ -130,8 +130,8 @@ let ``Should produce execute contracts with message passed between them``() =
     result {
         let! (contract1, contract2) = contracts
 
-        let spend1 = {asset = contract1.hash, Hash.zero; amount = 25UL}
-        let spend2 = {asset = contract2.hash, Hash.zero; amount = 50UL}
+        let spend1 = {asset = Asset (ContractId (Version0, contract1.hash), Hash.zero); amount = 25UL}
+        let spend2 = {asset = Asset (ContractId (Version0, contract2.hash), Hash.zero); amount = 50UL}
 
         let expectedTx =
             {
@@ -142,8 +142,8 @@ let ``Should produce execute contracts with message passed between them``() =
                     ]
                 outputs =
                     [
-                        {lock = Contract contract1.hash; spend = {asset = contract1.hash, Hash.zero; amount = 25UL}}
-                        {lock = Contract contract2.hash; spend = {asset = contract2.hash, Hash.zero; amount = 50UL}}
+                        {lock = Contract <| ContractId (Version0,contract1.hash); spend = {asset = Asset (ContractId (Version0, contract1.hash), Hash.zero); amount = 25UL}}
+                        {lock = Contract <| ContractId (Version0,contract2.hash); spend = {asset = Asset (ContractId (Version0, contract2.hash), Hash.zero); amount = 50UL}}
                     ]
             }
 
@@ -153,7 +153,7 @@ let ``Should produce execute contracts with message passed between them``() =
 
         let command =
             match message with
-            | Some {cHash=cHash;command=command;data=data} when cHash = contract2.hash ->
+            | Some {contractId=contractId;command=command;data=data} when contractId = ContractId (contract2.version,contract2.hash) ->
                 data
                 |> should equal stringData
 

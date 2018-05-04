@@ -39,7 +39,7 @@ let fromBytes bytes =
     | Length -> Some (Hash bytes)
     | _ -> None
 
-let toString h =
+let toString (h:Hash) =
     h.ToString()
 
 let fromString encoded =

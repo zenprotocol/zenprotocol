@@ -36,10 +36,11 @@ let updateHash (h:hash) (sha3:t): Cost.t<t, unit> =
 let updateAsset (asset:asset) (sha3:t): Cost.t<t, unit> =
     lazy (
         let sha3 = clone sha3
-        let chash,assetType = asset
+        let version,chash,subType = asset
 
+        sha3.BlockUpdate(U32ToBytes version, 0, 4)
         sha3.BlockUpdate(chash, 0, 32)
-        sha3.BlockUpdate(assetType, 0, 32)
+        sha3.BlockUpdate(subType, 0, 32)
         sha3
     )
     |> Cost.C

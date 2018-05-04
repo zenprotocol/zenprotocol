@@ -44,7 +44,7 @@ assume AddInputs_is_fold:
 val lockToContract:
   asset
   -> U64.t
-  -> contractHash
+  -> contractId
   -> txSkeleton
   -> txSkeleton `cost` 64
 
@@ -64,7 +64,7 @@ val lockToAddress:
 
 val addChangeOutput:
   asset
-  -> contractHash
+  -> contractId
   -> txSkeleton
   -> txSkeleton `cost` 64
 
@@ -83,7 +83,7 @@ val destroy:
 val fromWallet:
   asset ->
   amount:U64.t ->
-  contractHash ->
+  contractId ->
   wallet: wallet ->
   txSkeleton ->
   option txSkeleton `cost` (W.size wallet * 128 + 192)
