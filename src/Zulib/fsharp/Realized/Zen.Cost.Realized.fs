@@ -30,6 +30,10 @@ let inc ( _: Prims.nat)
         ( mx : cost<'Aa, Prims.unit> )
         : cost<'Aa, Prims.unit> = mx
 
+let force ( _: Prims.nat)
+          ( _: cost<'Aa, Prims.unit> ) : 'Aa =
+          failwith "force is not allowed in executable code."
+
 let left_id ( _: Prims.nat)
             ( _: 'Aa)
             ( _: 'Aa -> cost<'Ab, Prims.unit> )
@@ -47,11 +51,7 @@ let assoc ( _: Prims.nat)
           ( _: 'Ab -> cost<'Ac, Prims.unit> )
           : Prims.unit = ()
 
-let force ( _: Prims.nat)
-          ( _: cost<'Aa, Prims.unit> ) : 'Aa =
-          failwith "force is not allowed in executed code."
-
-type forceT<'DummyA,'DummyB> = Prims.unit
+let force_prop (_: 'Aa -> unit): unit = ()
 
 let force_ret ( _: 'Aa) : Prims.unit = ()
 
@@ -65,3 +65,9 @@ let force_bind ( _: Prims.nat)
                ( _: cost<'Aa, Prims.unit> )
                ( _: 'Aa -> cost<'Ab, Prims.unit> )
                : Prims.unit = ()
+
+let force_bind_inc ( _: Prims.nat)
+                   ( _: Prims.nat)
+                   ( _: cost<'Aa, Prims.unit> )
+                   ( _: 'Aa -> cost<'Ab, Prims.unit> )
+                   : Prims.unit = ()
