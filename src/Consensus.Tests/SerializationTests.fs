@@ -8,6 +8,7 @@ open NUnit.Framework
 open FsCheck
 open FsCheck.NUnit
 open Serialization
+open FsUnit
 
 let txInMode mode tx =
     match mode with
@@ -38,6 +39,16 @@ let ``Different transactions don't produce same hashing result``(tx1:Transaction
     (txInMode WithoutWitness tx1 <> txInMode WithoutWitness tx2) ==> lazy (
         Transaction.hash tx1 <> Transaction.hash tx2
     )
+
+[<Property>]
+let ``Block-header serialization round trip produces same result`` (h:BlockHeader) =
+    h
+    |> Header.serialize
+    |> Header.deserialize = Some h
+
+[<Property>]
+let ``Different block headers don't produce same serialization result`` (h1:BlockHeader) (h2:BlockHeader) =
+    (h1 <> h2) ==> lazy (Header.serialize h1 <> Header.serialize h2)
 
 [<Property>]
 let ``Block serialization round trip produces same result`` (bk:Block) =
@@ -71,4 +82,16 @@ let ``Data serialization round trip produces same result``(data:data) =
 [<Property>]
 let ``Different data don't produce same serialization result``(data1:data) (data2:data) =
     (data1 <> data2) ==> lazy (Data.serialize data1 <> Data.serialize data2)
+
+[<Property(StartSize=1,EndSize=1000000,MaxTest=1000)>]
+let ``serialize and deserialize varint yield the same number``(num:uint32)  =
+    let stream = FsNetMQ.Stream.create 5
+
+    let stream =
+        Serialization.Serialization.VarInt.write Serialization.Serialization.serializers num stream
+        |> FsNetMQ.Stream.reset
+
+    let num' = Serialization.Serialization.VarInt.read stream |> fst |> Option.get
+
+    num = num'
 

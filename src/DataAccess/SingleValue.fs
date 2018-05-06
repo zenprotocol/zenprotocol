@@ -10,7 +10,7 @@ let create (databaseContext:DatabaseContext) (name:string) serializer deserialze
     
 let tryGet<'value> (singleValue:SingleValue<'value>) (session:Session) =         
     Collection.tryGet singleValue.collection session singleValue.name
-    |> Option.map singleValue.deserializer        
+    |> Option.bind singleValue.deserializer        
         
 let put<'value> (singleValue:SingleValue<'value>) (session:Session) value = 
     Collection.put singleValue.collection session singleValue.name (singleValue.serializer value)     

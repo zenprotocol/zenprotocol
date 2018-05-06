@@ -23,12 +23,13 @@ let ``Should produce outputs overflow error``() =
     let input = getInput 1uy 0ul
 
     let tx = {
+        version = Version0
         inputs = [ Outpoint input ];
         witnesses = []
         outputs =
             [
-                { lock = PK testHash; spend = { asset = Constants.Zen; amount = UInt64.MaxValue } };
-                { lock = PK testHash; spend = { asset = Constants.Zen; amount = 1UL } }
+                { lock = PK testHash; spend = { asset = Asset.Zen; amount = UInt64.MaxValue } };
+                { lock = PK testHash; spend = { asset = Asset.Zen; amount = 1UL } }
             ]
         contract = None
     }
@@ -43,11 +44,12 @@ let ``Should produce inputs overflow error``() =
     let input1, input2 = getInput 1uy 0ul, getInput 2uy 0ul
 
     let tx = {
+        version = Version0
         inputs = [ Outpoint input1; Outpoint input2 ]
         witnesses = []
         outputs =
             [
-                { lock = PK testHash; spend = { asset = Constants.Zen; amount = 1UL } }
+                { lock = PK testHash; spend = { asset = Asset.Zen; amount = 1UL } }
             ]
         contract = None
     }

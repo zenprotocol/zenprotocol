@@ -59,17 +59,17 @@ let activateContract code account session state =
             |> Writer.unwrap
         let txHash = Transaction.hash tx
         events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (txHash, tx)))
-        let cHash = code |> System.Text.Encoding.UTF8.GetBytes |> Hash.compute
-        ActiveContractSet.containsContract cHash state.memoryState.activeContractSet
+        let contractId = Contract.makeContractId Version0 code
+        ActiveContractSet.containsContract contractId state.memoryState.activeContractSet
         |> should equal true
-        (state, cHash)
+        (state, contractId)
     )
 
 let dataPath = ".data"
 let databaseContext = DatabaseContext.createTemporary dataPath
 let session = DatabaseContext.createSession databaseContext
 
-let mutable cHash = Hash.zero
+let mutable contractId = ContractId (Version0, Hash.zero)
 
 let clean() =
     Platform.cleanDirectory dataPath
@@ -134,7 +134,7 @@ let setUp = fun () ->
     """ account session state
     |> function
     | Ok (state', cHash') ->
-        cHash <- cHash'
+        contractId <- cHash'
         state <- state'
     | Error error ->
         failwith error
@@ -150,7 +150,7 @@ let sampleKeyPair = KeyPair.create()
 let samplePrivateKey, samplePublicKey = sampleKeyPair
 let samplePKHash = PublicKey.hash samplePublicKey
 
-let Zen = Constants.Zen
+let Zen = Asset.Zen
 
 [<Test>]
 let ``Contract should detect unsupported command``() =
@@ -172,7 +172,7 @@ let ``Contract should detect unsupported command``() =
         |> Types.Data.Dict
         |> Some
 
-    TransactionHandler.executeContract session inputTx cHash "x" None data state.memoryState
+    TransactionHandler.executeContract session inputTx contractId "x" None data state.memoryState
     |> shouldBeErrorMessage "unsupported command"
 
 [<Test>]
@@ -210,14 +210,14 @@ let ``Should buy``() =
         |> Types.Data.Dict
         |> Some
 
-    TransactionHandler.executeContract session inputTx cHash "buy" None data { state.memoryState with utxoSet = utxoSet }
+    TransactionHandler.executeContract session inputTx contractId "buy" None data { state.memoryState with utxoSet = utxoSet }
     |> function
     | Ok tx ->
         tx.inputs |> should haveLength 2
         tx.inputs |> should contain (Outpoint input)
         tx.outputs |> should haveLength 2
-        tx.outputs |> should contain { lock = Contract cHash; spend = spend }
-        tx.outputs |> should contain { lock = PK samplePKHash; spend = { spend with asset = cHash, Hash.zero } }
+        tx.outputs |> should contain { lock = Contract contractId; spend = spend }
+        tx.outputs |> should contain { lock = PK samplePKHash; spend = { spend with asset = Asset.defaultOf contractId } }
         tx.witnesses |> should haveLength 1
         let wit, cost =
             match tx.witnesses.[0] with
@@ -226,7 +226,7 @@ let ``Should buy``() =
             | _ as wit -> wit, 0u
 
         let cw = ContractWitness {
-             cHash = cHash
+             contractId = contractId
              command = "buy"
              data = data
              beginInputs = 1u
@@ -252,10 +252,10 @@ let ``Should redeem``() =
     }
 
     let spendZen = { asset = Zen; amount = 5UL }
-    let spendContractAsset = { asset = cHash, Hash.zero; amount = 5UL }
+    let spendContractAsset = { asset = Asset.defaultOf contractId; amount = 5UL }
 
     let outputZen = {
-        lock = Contract cHash
+        lock = Contract contractId
         spend = spendZen
     }
 
@@ -287,7 +287,7 @@ let ``Should redeem``() =
         |> Types.Data.Dict
         |> Some
 
-    TransactionHandler.executeContract session inputTx cHash "redeem" None data { state.memoryState with utxoSet = utxoSet }
+    TransactionHandler.executeContract session inputTx contractId "redeem" None data { state.memoryState with utxoSet = utxoSet }
     |> function
     | Ok tx ->
         tx.inputs |> should haveLength 2
@@ -304,7 +304,7 @@ let ``Should redeem``() =
             | _ as wit -> wit, 0u
 
         let cw = ContractWitness {
-             cHash = cHash
+             contractId = contractId
              command = "redeem"
              data = data
              beginInputs = 1u

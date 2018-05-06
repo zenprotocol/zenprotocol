@@ -25,9 +25,7 @@ let maxConnections = 10
 let eventHandler transport event (connector,addressBook, ownAddress) =
     match event with
     | Event.TransactionAddedToMemPool (txHash, tx) ->
-        let bytes = Transaction.serialize Full tx
-
-        Transport.publishTransaction transport bytes
+        Transport.publishTransaction transport (Hash.bytes txHash)
         connector,addressBook,ownAddress
     | _ -> connector,addressBook,ownAddress
 
@@ -203,6 +201,13 @@ let transportHandler transport seeds client msg (connector,addressBook,ownAddres
         Blockchain.handleHeaders client peerId headers
 
         connector,addressBook,ownAddress
+    | InProcMessage.NewTransaction {peerId=peerId;txHash=txHash} ->
+        match Hash.fromBytes txHash with
+        | Some txHash ->
+            Blockchain.handleNewTransaction client peerId txHash
+
+            connector,addressBook,ownAddress
+        | None -> connector,addressBook,ownAddress
     | _ ->
         // TODO: log unknown message
         connector, addressBook,ownAddress

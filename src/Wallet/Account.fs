@@ -32,6 +32,7 @@ type SpendStatus = Status<Spend>
 type TxDelta = {
     txHash: Hash
     deltas: List<SpendStatus>
+    blockNumber: Option<uint32>
 }
 
 type T = {
@@ -75,7 +76,7 @@ let private isKeyMatch account address =
     PublicKey.hash account.publicKey = address
 
 // update the outputs with transaction
-let private handleTransaction txHash (tx:Transaction) account outputs txDeltas =
+let private handleTransaction txHash (tx:Transaction) account outputs txDeltas blockNumber =
     let handleOutput (outputs,deltas) (index,output) =
         let add = (
             Map.add { txHash = txHash; index = index } (Unspent output) outputs,
@@ -102,20 +103,23 @@ let private handleTransaction txHash (tx:Transaction) account outputs txDeltas =
     let outputs, deltas = List.fold handleOutput (outputs, deltas) outputsWithIndex
 
     if List.length deltas > 0 then
-        outputs, List.add { txHash = txHash; deltas = deltas } txDeltas
+        outputs, List.add { txHash = txHash; deltas = deltas; blockNumber = blockNumber } txDeltas
     else
         outputs, txDeltas
 
-let private handleTransactions account transactions =
+let private handleTransactions account transactions blockNumber =
     List.fold (fun (outputs,txDeltas) (txHash,tx) ->
-       handleTransaction txHash tx account outputs txDeltas
+       handleTransaction txHash tx account outputs txDeltas blockNumber
     ) (account.outputs, account.deltas) transactions
+
+let private handleMempoolTransactions account =
+    handleTransactions account account.mempool None
 
 let handleBlock blockHash block account =
     let txHashes = List.map (fun tx -> Transaction.hash tx) block.transactions
     let transactions = List.zip txHashes block.transactions
 
-    let outputs, deltas = handleTransactions account transactions
+    let outputs, deltas = handleTransactions account transactions (Some block.header.blockNumber)
 
     // remove all transactions from list
     let set = Set.ofList txHashes
@@ -181,8 +185,6 @@ let sync tipBlockHash (getHeader:Hash -> BlockHeader) (getBlock:Hash -> Block) a
         else
             0ul
 
-
-
     // Find the fork block of the account and the blockchain, logging actions
     // to perform. Undo each block in the account's chain but not the blockchain,
     // and add each block in the blockchain but not the account's chain.
@@ -199,8 +201,6 @@ let sync tipBlockHash (getHeader:Hash -> BlockHeader) (getBlock:Hash -> Block) a
             locate (((getHeader x).parent, i-1ul), ((getHeader y).parent, j-1ul)) (Add (getBlock x, x) :: Undo (getBlock y) :: acc)
 
     let actions = locate ((tipBlockHash, blockNumber tipBlockHash), (account.tip, blockNumber account.tip)) []
-
-
     let toUndo, toAdd = List.partition (function | Undo _ -> true | _ -> false) actions
     let toUndo = List.rev toUndo     // Blocks to be undo were found backwards.
     let sortedActions = toUndo @ toAdd
@@ -218,7 +218,7 @@ let sync tipBlockHash (getHeader:Hash -> BlockHeader) (getBlock:Hash -> Block) a
 
 let getUnspentOutputs account =
     // we first update the account according to the mempool transactions
-    let outputs, txDeltas = handleTransactions account account.mempool
+    let outputs, txDeltas = handleMempoolTransactions account
 
     let outputs =
         outputs
@@ -263,24 +263,30 @@ let getBalance account =
         | Some amount -> Map.add output.spend.asset (amount+output.spend.amount) balance
         | None -> Map.add output.spend.asset output.spend.amount balance) Map.empty unspent
 
-let getHistory account =
-    handleTransactions account account.mempool
-    |> snd
-    |> List.map (fun txDelta ->
-        txDelta.txHash,
-        txDelta.deltas
-        |> List.fold (fun amounts spend ->
-            let asset, amount =
-                match spend with
-                | Spent spend -> spend.asset, 0L - int64 spend.amount
-                | Unspent spend -> spend.asset, int64 spend.amount
-            let amount' =
-                (match Map.tryFind asset amounts with
-                | Some amount -> amount
-                | None -> 0L)
-            Map.add asset (amount' + amount) amounts
-        ) Map.empty
-    )
+
+let getHistory skip take account =
+    let list =
+        handleMempoolTransactions account
+        |> snd
+        |> List.map (fun txDelta ->
+            txDelta.txHash,
+            txDelta.deltas
+            |> List.fold (fun amounts spend ->
+                let asset, amount =
+                    match spend with
+                    | Spent spend -> spend.asset, 0L - int64 spend.amount
+                    | Unspent spend -> spend.asset, int64 spend.amount
+                let amount' =
+                    (match Map.tryFind asset amounts with
+                    | Some amount -> amount
+                    | None -> 0L)
+                Map.add asset (amount' + amount) amounts
+            ) Map.empty,
+            match txDelta.blockNumber with | Some blockNumber -> blockNumber | None -> 0ul
+        )
+
+    let list = List.skip (min skip (List.length list)) list
+    List.take (min take (List.length list)) list
 
 let private collectInputs account spend secretKey =
     let unspent, _ = getUnspentOutputs account
@@ -322,7 +328,8 @@ let createTransactionFromLock lk spend (account, extendedKey) = result {
     let inputPoints = List.map (fst >> Outpoint) inputs
     let outputs = addChange spend amount account { spend = spend; lock = lk }
     return
-        Transaction.sign keys { inputs = inputPoints
+        Transaction.sign keys { version = Version0
+                                inputs = inputPoints
                                 outputs = outputs
                                 witnesses = []
                                 contract = None }
@@ -335,7 +342,7 @@ let createActivateContractTransaction chain code (numberOfBlocks:uint32) (accoun
     let codeLength = String.length code |> uint64
 
     let activationSacrifice = chain.sacrificePerByteBlock * codeLength * (uint64 numberOfBlocks)
-    let spend = { amount = activationSacrifice; asset = Constants.Zen }
+    let spend = { amount = activationSacrifice; asset = Asset.Zen }
 
     result {
         let! zenKey = deriveZenKey extendedKey
@@ -344,10 +351,10 @@ let createActivateContractTransaction chain code (numberOfBlocks:uint32) (accoun
         let! (inputs,keys,amount) = collectInputs account spend secretKey
         let inputPoints = List.map (fst >> Outpoint) inputs
 
-        let cHash = Contract.computeHash code
+        let contractId = Contract.makeContractId Version0 code
 
         let! hints = Measure.measure
-                        (sprintf "recording hints for contract %A" cHash)
+                        (sprintf "recording hints for contract %A" contractId)
                         (lazy(Contract.recordHints code))
         let! queries = ZFStar.totalQueries hints
 
@@ -355,24 +362,25 @@ let createActivateContractTransaction chain code (numberOfBlocks:uint32) (accoun
         return Transaction.sign
             keys
             {
+                version = Version0
                 inputs = inputPoints
                 outputs = outputs
                 witnesses = []
-                contract = Some { code = code
-                                  hints = hints
-                                  rlimit = rlimit
-                                  queries = queries }
+                contract = Some (V0 { code = code
+                                      hints = hints
+                                      rlimit = rlimit
+                                      queries = queries })
             }
     }
 
-let createExtendContractTransaction client chainParams cHash (numberOfBlocks:uint32) (account, extendedKey) =
+let createExtendContractTransaction client chainParams (contractId:ContractId) (numberOfBlocks:uint32) (account, extendedKey) =
     let activeContracts = Blockchain.getActiveContracts client
 
     result {
         let! code =
             activeContracts
             |> List.tryFind (function
-                             | { contractHash = contractHash } when contractHash = cHash -> true
+                             | { contractId = contractId' } when contractId' = contractId -> true
                              | _ -> false)
             |> function
             | Some activeContract -> Ok activeContract.code
@@ -380,7 +388,7 @@ let createExtendContractTransaction client chainParams cHash (numberOfBlocks:uin
 
         let codeLength = String.length code |> uint64
         let extensionSacrifice = chainParams.sacrificePerByteBlock * codeLength * (uint64 numberOfBlocks)
-        let spend = { amount = extensionSacrifice; asset = Constants.Zen }
+        let spend = { amount = extensionSacrifice; asset = Asset.Zen }
 
         let! zenKey = deriveZenKey extendedKey
         let! secretKey = ExtendedKey.getPrivateKey zenKey
@@ -388,10 +396,11 @@ let createExtendContractTransaction client chainParams cHash (numberOfBlocks:uin
         let! (inputs,keys,amount) = collectInputs account spend secretKey
         let inputPoints = List.map (fst >> Outpoint) inputs
 
-        let outputs = addChange spend amount account { spend = spend; lock = ExtensionSacrifice cHash }
+        let outputs = addChange spend amount account { spend = spend; lock = ExtensionSacrifice contractId }
         return Transaction.sign
             keys
             {
+                version = Version0
                 inputs = inputPoints
                 outputs = outputs
                 witnesses = []
@@ -441,7 +450,7 @@ let signFirstWitness signKey tx = result {
     | None -> return tx
 }
 
-let createExecuteContractTransaction executeContract cHash command data provideReturnAddress sign spends (account, extendedKey) = result {
+let createExecuteContractTransaction executeContract (contractId:ContractId) command data provideReturnAddress sign spends (account, extendedKey) = result {
     let mutable txSkeleton = TxSkeleton.empty
     let mutable keys = List.empty
 
@@ -478,7 +487,7 @@ let createExecuteContractTransaction executeContract cHash command data provideR
             <@> Some
         | None -> Ok None
 
-    let! unsignedTx = executeContract cHash command sender data txSkeleton
+    let! unsignedTx = executeContract contractId command sender data txSkeleton
 
     let sign tx = signFirstWitness signKey tx <@> Transaction.sign keys
 

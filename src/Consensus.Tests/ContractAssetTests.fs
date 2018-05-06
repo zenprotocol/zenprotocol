@@ -1,12 +1,17 @@
 module Consensus.Tests.ContractAssetTests
 
 open Consensus
+open Consensus.Types
 open NUnit.Framework
 open Infrastructure
 
 let result = new Infrastructure.Result.ResultBuilder<string>()
 
-let contractPath = "./test"
+let tempDir () =
+    System.IO.Path.Combine
+        [| System.IO.Path.GetTempPath(); System.IO.Path.GetRandomFileName() |]
+let contractPath = tempDir()
+
 
 [<Literal>]
 let rlimit = 2723280u
@@ -15,19 +20,19 @@ let compile code = result {
     let! hints = Contract.recordHints code
     let! queries = Infrastructure.ZFStar.totalQueries hints
 
-    let contract : Consensus.Types.Contract = {
+    let contract : Consensus.Types.ContractV0 = {
         code = code
         hints = hints
         rlimit = rlimit
         queries = queries
     }
 
-    return! 
+    return!
         Contract.compile contractPath contract
         |> Result.bind (Contract.load contractPath 100ul code)
 }
 
-let dataPath = ".data"
+let dataPath = tempDir()
 
 let clean() =
     Platform.cleanDirectory dataPath

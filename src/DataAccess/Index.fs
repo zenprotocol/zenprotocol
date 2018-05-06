@@ -39,8 +39,9 @@ let getAll index (session:Session) key =
                     let value = 
                         dataToByteArray valueData
                         |> index.collection.valueDeseralizer
-                                       
-                    yield value                
+                        |> Option.get
+                          
+                    yield value
         }
         
     let mutable cursor = IntPtr.Zero      

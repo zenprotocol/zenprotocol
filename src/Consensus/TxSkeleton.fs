@@ -21,7 +21,7 @@ let empty =
 let (|Lock|) input =
     match input with
     | PointedOutput (_, {lock=lock}) -> lock
-    | Mint {asset=(cHash,_)} -> Contract cHash
+    | Mint {asset=Asset (contractId,_)} -> Contract contractId
 
 let addInputs inputs (txSkeleton:T) =
     {txSkeleton with pInputs=List.append txSkeleton.pInputs inputs}
@@ -101,11 +101,11 @@ let isSkeletonOf txSkeleton tx outputs =
     && outputs = outputsFromSkeleton
     && tx.outputs = txSkeleton.outputs
 
-let getContractWitness cHash command data initialTxSkelton finalTxSkeleton (cost:int64)  =
+let getContractWitness contractId command data initialTxSkelton finalTxSkeleton (cost:int64)  =
     let length list = List.length list |> uint32
 
     {
-        cHash = cHash
+        contractId = contractId
         command = command
         data = data
         beginInputs = length initialTxSkelton.pInputs

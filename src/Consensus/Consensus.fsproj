@@ -23,6 +23,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
     <OtherFlags>--warnon:1182</OtherFlags>
+    <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -50,7 +51,8 @@
     <Compile Include="MerkleTree.fs" />
     <Compile Include="SparseMerkleTree.fs" />
     <Compile Include="Types.fs" />
-    <Compile Include="Constants.fs" />
+    <Compile Include="ContractId.fs" />
+    <Compile Include="Asset.fs" />
     <Compile Include="Difficulty.fs" />
     <Compile Include="TxSkeleton.fs" />
     <Compile Include="Chain.fs" />

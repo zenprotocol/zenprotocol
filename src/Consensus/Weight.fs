@@ -1,4 +1,4 @@
-﻿module Consensus.Weight
+module Consensus.Weight
 
 open Consensus.Types
 open TxSkeleton
@@ -52,8 +52,12 @@ let contractWitnessWeight (cWit:ContractWitness) =
     signatureWeight + costWeight, int cWit.inputsLength, int cWit.outputsLength
 
 let activationWeight contract =
-    contract.queries * contract.rlimit |> bigint
-
+    match contract with
+    | V0 contract ->
+        contract.queries * contract.rlimit |> bigint
+    | HighV _ -> 
+        0I
+    
 let realWeights =
     {   pk=pkWitnessWeight;
         contract=contractWitnessWeight;
@@ -61,18 +65,22 @@ let realWeights =
         dataSize=0I         // Size of transaction not counted for now.
     }
 
+        
 let updateSkeleton (skeleton, currentSkeleton) nInputs nOutputs =
-    match  (List.splitAt nInputs skeleton.pInputs,
-            List.splitAt nOutputs skeleton.outputs) with
+    if nInputs > List.length skeleton.pInputs || 
+       nOutputs > List.length skeleton.outputs then
+        Error "invalid contract witness" 
+    else match (List.splitAt nInputs skeleton.pInputs,
+                List.splitAt nOutputs skeleton.outputs) with
     | (inputsDone, inputs), (outputsDone, outputs) ->
-        ({pInputs = inputs; outputs = outputs},
+        Ok ({pInputs = inputs; outputs = outputs},
          {pInputs = List.append currentSkeleton.pInputs inputsDone;
           outputs = List.append currentSkeleton.outputs outputsDone}
         )
 
 let accumulateWeights weights fixedSkeleton =
     let rec accumulateWeights skeletonPair total witnesses = result {
-        let skeleton, currentSkeleton = skeletonPair
+        let! skeleton, currentSkeleton = skeletonPair
         match skeleton.pInputs, witnesses with
         | [], [] -> return total    // Covers coinbase tranasctions
         | [], _ -> return! Error "Too many witnesses"
@@ -85,11 +93,11 @@ let accumulateWeights weights fixedSkeleton =
                     Ok <| weights.contract cWitness
                 | _ -> Error "Wrong witness type"
             return! accumulateWeights
-                        (updateSkeleton skeletonPair nInputs nOutputs)
+                        (updateSkeleton (skeleton, currentSkeleton) nInputs nOutputs)
                         (total+weight)
                         ws
     }
-    accumulateWeights (fixedSkeleton, TxSkeleton.empty) 0I
+    accumulateWeights (Ok (fixedSkeleton, TxSkeleton.empty)) 0I
 
 let txWeight weights
         getUTXO memUTXOs tx = result {

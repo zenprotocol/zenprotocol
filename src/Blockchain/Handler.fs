@@ -95,11 +95,18 @@ let handleCommand chainParams command session timestamp (state:State) =
            let! initialBlockDownload = InitialBlockDownload.processHeaders chainParams session timestamp peerId headers state.initialBlockDownload
            return {state with initialBlockDownload = initialBlockDownload}
        }
+    | HandleNewTransaction (peerId, txHash) ->
+        effectsWriter {
+            if not (MemPool.containsTransaction txHash state.memoryState.mempool) then
+                do! getTransaction peerId txHash
+
+            return state
+        }
 
 let handleRequest chain (requestId:RequestId) request session timestamp state =
     match request with
-    | ExecuteContract (cHash, command,sender ,data, txSkeleton) ->
-        TransactionHandler.executeContract session txSkeleton cHash command sender data state.memoryState
+    | ExecuteContract (contractId, command,sender ,data, txSkeleton) ->
+        TransactionHandler.executeContract session txSkeleton contractId command sender data state.memoryState
         |> requestId.reply
     | GetBlockTemplate pkHash ->
         let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList chain session state
@@ -129,10 +136,10 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
         ActiveContractSet.getContracts state.memoryState.activeContractSet
         |> Seq.map (fun contract ->
             {
-                contractHash = contract.hash
+                contractId = contract.contractId
                 expiry = contract.expiry
                 code = contract.code
-            })
+            }:ActiveContract)
         |> List.ofSeq
         |> requestId.reply<ActiveContract list>
     | GetHeaders ->

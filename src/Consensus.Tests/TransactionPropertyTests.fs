@@ -49,6 +49,7 @@ type ArbitraryGenerators =
                 let keys = List.map (fun output -> Map.find output keyMap) txOutputs
                 let tx =
                     {
+                        version = Version0
                         inputs = List.map Outpoint txInputs
                         outputs = txOutputs
                         witnesses = []
@@ -93,12 +94,17 @@ let ``Transaction should have invalid amounts`` ({ utxos = utxos; tx = tx; keys 
 
 [<Property>]
 let ``Transaction validation should fail with inputs empty error`` ({ utxos = _; tx = tx; keys = _ }) =
-    basicValidationMsg "inputs empty" { tx with inputs = List.empty }
+    basicValidationMsg "structurally invalid input(s)" { tx with inputs = List.empty }
+    |> shouldEqual
+
+[<Property>]
+let ``Transaction validation should fail with witnesses empty error`` ({ utxos = _; tx = tx; keys = _ }) =
+    basicValidationMsg "structurally invalid witness(es)" { tx with witnesses = List.empty }
     |> shouldEqual
 
 [<Property>]
 let ``Transaction validation should fail with outputs empty error`` ({ utxos = _; tx = tx; keys = _ }) =
     not <| List.isEmpty tx.inputs ==> lazy (
-        basicValidationMsg "outputs empty" { tx with outputs = List.empty }
+        basicValidationMsg "structurally invalid output(s)" { tx with outputs = List.empty }
         |> shouldEqual
     )

@@ -54,7 +54,7 @@ let private activateContract (chainParams : Chain.ChainParameters) contractPath 
             return! GeneralError "Contract activation must include activation sacrifice"
 
         let allUsingZen =
-            List.forall (fun output -> output.spend.asset = Constants.Zen) activationSacrifices
+            List.forall (fun output -> output.spend.asset = Asset.Zen) activationSacrifices
 
         if not allUsingZen then
             return! GeneralError "Sacrifice must be paid in Zen"
@@ -65,68 +65,72 @@ let private activateContract (chainParams : Chain.ChainParameters) contractPath 
     result {
         match tx.contract with
         | Some contract ->
-            match ZFStar.totalQueries contract.hints with
-            | Error error ->
-                yield! GeneralError error
-            | Ok value when value <> contract.queries ->
-                yield! GeneralError "Total queries mismatch"
-            | _ -> ()
+            match contract with
+            | V0 contract ->
+                match ZFStar.totalQueries contract.hints with
+                | Error error ->
+                    yield! GeneralError error
+                | Ok value when value <> contract.queries ->
+                    yield! GeneralError "Total queries mismatch"
+                | _ -> ()
 
-            let cHash = Contract.computeHash contract.code
+                let contractId = Contract.makeContractId Version0 contract.code
 
-            let! activationSacrifices = getActivationSacrifice tx
+                let! activationSacrifices = getActivationSacrifice tx
 
-            let! numberOfBlocks = getSacrificeBlocks chainParams contract.code activationSacrifices
+                let! numberOfBlocks = getSacrificeBlocks chainParams contract.code activationSacrifices
 
-            match ActiveContractSet.tryFind cHash acs with
-            | Some contract ->
-                let contract = {contract with expiry = contract.expiry + numberOfBlocks}
-                return ActiveContractSet.add cHash contract acs, contractCache
-            | None ->
-                let! contract, contractCache = result {
-                    match ContractCache.tryFind cHash contractCache with
-                    | Some (mainFn, costFn) ->
-                        return (
-                            {
-                                hash = cHash
-                                mainFn = mainFn
-                                costFn = costFn
-                                expiry = numberOfBlocks
-                                code = contract.code
-                            } : Contract.T), contractCache
-                    | None ->
-                        let compile contract = 
-                            Contract.compile contractPath contract
-                            |> Result.bind (fun _ -> Contract.load contractPath (blockNumber + numberOfBlocks) contract.code cHash)
-                            |> Result.mapError (fun _ -> BadContract)
-                            
-                        let! contract = Measure.measure (sprintf "compiling contract %A" cHash) (lazy (compile contract))
-                        let contractCache = ContractCache.add contract contractCache
-                        
-                        return contract, contractCache
-                }
-                return ActiveContractSet.add contract.hash contract acs, contractCache
+                match ActiveContractSet.tryFind contractId acs with
+                | Some contract ->
+                    let contract = {contract with expiry = contract.expiry + numberOfBlocks}
+                    return ActiveContractSet.add contractId contract acs, contractCache
+                | None ->
+                    let! contract, contractCache = result {
+                        match ContractCache.tryFind contractId contractCache with
+                        | Some (mainFn, costFn) ->
+                            return (
+                                {
+                                    contractId = contractId
+                                    mainFn = mainFn
+                                    costFn = costFn
+                                    expiry = numberOfBlocks
+                                    code = contract.code
+                                } : Contract.T), contractCache
+                        | None ->
+                            let compile contract =
+                                Contract.compile contractPath contract
+                                |> Result.bind (fun _ -> Contract.load contractPath (blockNumber + numberOfBlocks) contract.code contractId)
+                                |> Result.mapError (fun _ -> BadContract)
+
+                            let! contract = Measure.measure (sprintf "compiling contract %A" contractId) (lazy (compile contract))
+                            let contractCache = ContractCache.add contract contractCache
+
+                            return contract, contractCache
+                    }
+                    return ActiveContractSet.add contract.contractId contract acs, contractCache
+            | HighV _ ->
+                return acs, contractCache
         | None ->
             return acs, contractCache
     }
 
 let private extendContracts chainParams acs tx = result {
     let extensionSacrifices = List.filter(function | { lock = ExtensionSacrifice _ } -> true | _ -> false) tx.outputs
-    if List.exists (fun output -> output.spend.asset <> Constants.Zen) extensionSacrifices then
+    if List.exists (fun output -> output.spend.asset <> Asset.Zen) extensionSacrifices then
         return! GeneralError "Sacrifice must be paid in Zen"
 
     return!
         extensionSacrifices
         |> List.choose (function | { lock = ExtensionSacrifice cHash; spend = { amount = amount } } -> Some (cHash, amount)
                                  | _ -> None)
-        |> List.fold (fun acs (cHash, amount) -> result {
+        |> List.fold (fun acs (contractId, amount) -> result {
             let! acs = acs
-            let! contract = match ActiveContractSet.tryFind cHash acs with
-                           | Some contract -> Ok contract
-                           | None -> GeneralError "Contract(s) must be active"
+            let! contract = match ActiveContractSet.tryFind contractId acs with
+                            | Some contract -> Ok contract
+                            | _ -> GeneralError "Contract(s) must be active"
             let! blocks = getSacrificeBlocks chainParams contract.code amount
             let contract = {contract with expiry = contract.expiry + blocks}
-            return ActiveContractSet.add contract.hash contract acs
+            return ActiveContractSet.add contract.contractId contract acs
         }) (Ok acs)
 }
 
@@ -147,7 +151,7 @@ let getContractWallet (txSkeleton:TxSkeleton.T) cw =
     txSkeleton.pInputs.[int cw.beginInputs .. int cw.endInputs]
     |> List.choose (fun input ->
         match input with
-        | TxSkeleton.PointedOutput (outpoint,output) when output.lock = Contract cw.cHash ->
+        | TxSkeleton.PointedOutput (outpoint,output) when output.lock = Contract cw.contractId ->
             Some (outpoint,output)
         | _ -> None
     )
@@ -173,7 +177,7 @@ let private checkWitnesses blockNumber acs (txHash, tx, inputs) =
         | TxSkeleton.Input.PointedOutput (_, {lock=PK pkHash}) :: tail -> verifyPkHash pkHash tail
         | _ -> GeneralError "unexpected PK witness lock type"
 
-    let checkContractWitness inputTx acs cw callingContract message pInputs =
+    let checkContractWitness inputTx acs cw (callingContract:ContractId option) message pInputs =
         let checkMessage (txSkeleton, resultMessage) =
             if message = resultMessage then
                 Ok txSkeleton
@@ -181,24 +185,21 @@ let private checkWitnesses blockNumber acs (txHash, tx, inputs) =
                 GeneralError "invalid message"
 
         let checkIssuedAndDestroyed (txSkeleton : TxSkeleton.T) =
-            let isMismatchedSpend ({asset=cHash,_;amount=_} : Spend) =
-                cHash <> cw.cHash
-            let endInputs = cw.beginInputs + cw.inputsLength - 1u |> int
-            let endOutputs = cw.beginOutputs + cw.outputsLength - 1u |> int
-
-            if  endInputs >= List.length txSkeleton.pInputs ||
-                endOutputs >= List.length txSkeleton.outputs
+            let isMismatchedSpend ({asset=Asset (contractId,_);amount=_} : Spend) =
+                contractId <> cw.contractId
+            if cw.endInputs >= (uint32 <| List.length txSkeleton.pInputs) ||
+               cw.endOutputs >= (uint32 <| List.length txSkeleton.outputs)
             then
                 GeneralError "invalid contract witness indices"
             else if
-                txSkeleton.pInputs.[int cw.beginInputs .. endInputs]
+                txSkeleton.pInputs.[int cw.beginInputs .. int cw.endInputs]
                 |> List.exists (function
                     | TxSkeleton.Input.Mint spend when isMismatchedSpend spend -> true
                     | _ -> false)
             then
                 GeneralError "illegal creation of tokens"
             else if
-                txSkeleton.outputs.[int cw.beginOutputs .. endOutputs]
+                txSkeleton.outputs.[int cw.beginOutputs .. int cw.endOutputs]
                 |> List.exists (function
                     | {lock=Destroy; spend=spend} when isMismatchedSpend spend -> true
                     | _ -> false)
@@ -209,9 +210,8 @@ let private checkWitnesses blockNumber acs (txHash, tx, inputs) =
 
         let checkSender =
             match callingContract, cw.signature with
-            | Some cHash, None ->
-                let cHash = cHash
-                Ok <| ContractSender cHash
+            | Some contractId, None ->
+                Ok <| ContractSender contractId
             | None, Some (publicKey, signature) ->
                 match Crypto.verify publicKey signature txHash with
                 | Valid ->
@@ -221,7 +221,7 @@ let private checkWitnesses blockNumber acs (txHash, tx, inputs) =
             | None, None -> Ok Anonymous
             | Some _, Some _ -> GeneralError "invalid contract witness, chained contract cannot have a signature"
 
-        let rec popContractsLocksOf cHash pInputs left =
+        let rec popContractsLocksOf contractId pInputs left =
             if left = 0ul then
                 pInputs
             else
@@ -229,16 +229,21 @@ let private checkWitnesses blockNumber acs (txHash, tx, inputs) =
                 | [] -> []
                 | TxSkeleton.Input.PointedOutput (_, output) :: tail ->
                     match output.lock with
-                    | Contract cHash' when cHash' = cHash ->
-                        popContractsLocksOf cHash' tail (left - 1ul)
+                    | Contract contractId' when contractId' = contractId ->
+                        popContractsLocksOf contractId' tail (left - 1ul)
                     | _ -> pInputs
-                | TxSkeleton.Input.Mint mint :: tail when fst mint.asset = cHash ->
-                    popContractsLocksOf cHash tail (left - 1ul)
+                | TxSkeleton.Input.Mint mint :: tail ->
+                    let (Asset (contractId',_)) = mint.asset
+
+                    if contractId' = contractId then
+                        popContractsLocksOf contractId tail (left - 1ul)
+                    else
+                        pInputs
                 | _ -> pInputs
 
         match checkSender with
         | Ok sender ->
-            match ActiveContractSet.tryFind cw.cHash acs with
+            match ActiveContractSet.tryFind cw.contractId acs with
             | Some contract ->
                 let contractWallet = getContractWallet fulltxSkeleton cw
 
@@ -256,10 +261,15 @@ let private checkWitnesses blockNumber acs (txHash, tx, inputs) =
                         if List.length outputTx.pInputs - List.length inputTx.pInputs = int cw.inputsLength &&
                            List.length outputTx.outputs - List.length inputTx.outputs = int cw.outputsLength then
 
-                            Ok (outputTx, popContractsLocksOf cw.cHash pInputs cw.inputsLength)
+                            Ok (outputTx, popContractsLocksOf cw.contractId pInputs cw.inputsLength)
                         else GeneralError "input/output length mismatch")
-            | None -> Error ContractNotActive
+            | _ -> Error ContractNotActive
         | Error error -> Error error
+
+    let checkHighVWitness inputTx pInputs =
+        match pInputs with
+        | [] -> GeneralError "missing HighV witness input"
+        | _ :: tail -> Ok (inputTx, tail)
 
     let witnessesFolder state (witness, callingContract, message) =
         state
@@ -269,6 +279,8 @@ let private checkWitnesses blockNumber acs (txHash, tx, inputs) =
                 checkPKWitness tx' pInputs serializedPublicKey signature
             | ContractWitness cw ->
                 checkContractWitness tx' acs cw callingContract message pInputs
+            | HighVWitness _ ->
+                checkHighVWitness tx' pInputs
         )
 
     let applyMaskIfContract pTx =
@@ -295,7 +307,7 @@ let private checkWitnesses blockNumber acs (txHash, tx, inputs) =
                       else
                           match tx.witnesses.[i+1] with
                           | ContractWitness cw ->
-                              Some { cHash = cw.cHash; command = cw.command; data = cw.data }
+                              Some { contractId = cw.contractId; command = cw.command; data = cw.data }
                           | _ ->
                               None
                     | _ -> None
@@ -308,7 +320,7 @@ let private checkWitnesses blockNumber acs (txHash, tx, inputs) =
                         else
                             match tx.witnesses.[i-1] with
                             | ContractWitness cw ->
-                                Some cw.cHash
+                                Some cw.contractId
                             | _ ->
                                 None
                     | _ -> None
@@ -325,18 +337,6 @@ let private checkWitnesses blockNumber acs (txHash, tx, inputs) =
             return witnessedSkel
     }
 
-let private checkInputsNotEmpty tx =
-    if List.isEmpty tx.inputs then GeneralError "inputs empty"
-    else Ok tx
-
-let private checkOutputsNotEmpty tx =
-    if List.isEmpty tx.outputs then
-        GeneralError "outputs empty"
-    else if List.exists (fun output -> output.spend.amount = 0UL) tx.outputs then
-        GeneralError "outputs invalid"
-    else
-        Ok tx
-
 let private checkOutputsOverflow tx =
     if tx.outputs
         |> List.map (fun o -> o.spend)
@@ -350,43 +350,73 @@ let private checkDuplicateInputs tx =
     else GeneralError "inputs duplicated"
 
 let private checkStructure =
-    let isInvalidHash = Hash.isValid >> not
+    let isInvalidSpend = fun { asset = (Asset (ContractId (version,cHash), subType)); amount = amount } ->
+        cHash = Hash.zero && (subType <> Hash.zero || version <> Version0) ||
+            amount = 0UL //Relieve for non spendables?
 
-    let isInvalidAsset = fun (cHash, token) ->
-        cHash |> isInvalidHash ||
-        token |> isInvalidHash ||
-        (cHash = Hash.zero && token <> Hash.zero)
+    let isNull = function | null -> true | _ -> false
+    let isEmptyArr arr = isNull arr || Array.length arr = 0
+    let isEmptyString str = isNull str || String.length str = 0
 
-    (fun tx ->
+    let checkContractStructure = fun tx ->
         match tx.contract with
-        | Some contract when not <|
-            (String.length contract.code > 0 &&
-             String.length contract.hints > 0 &&
-             contract.rlimit > 0u &&
-             contract.queries > 0u) ->
+        | Some contract ->
+            match contract with
+            | V0 contract when
+                isEmptyString contract.code ||
+                isEmptyString contract.hints ||
+                contract.rlimit = 0u ||
+                contract.queries = 0u -> false
+            | HighV (version, bytes) when
+                version = Version0 || //reserved for V0
+                isEmptyArr bytes -> false
+            | _ -> true
+        | None -> true
+        |> function
+        | false ->
             GeneralError "structurally invalid contract data"
-        | _ ->
-            Ok tx)
-    >=> (fun tx ->
-        if List.exists (function
-            | Outpoint outpoint -> isInvalidHash outpoint.txHash
-            | Mint spend -> isInvalidAsset spend.asset
+        | true -> Ok tx
+
+    let checkInputsStructrue = fun tx ->
+        if List.isEmpty tx.inputs || List.exists (function
+            | Mint spend -> isInvalidSpend spend
+            | _ -> false
         ) tx.inputs then
-            GeneralError "structurally invalid input data"
+            GeneralError "structurally invalid input(s)"
         else
-            Ok tx)
-    >=> (fun tx ->
-        if List.exists (fun { lock = lock; spend = spend } ->
-           match lock with
-           | PK hash -> isInvalidHash hash
-           | Contract hash -> isInvalidHash hash
-           | Coinbase (_, pkHash) -> isInvalidHash pkHash
-           | _ -> false
-           || isInvalidAsset spend.asset
+            Ok tx
+
+    let checkOutputsStructrue = fun tx ->
+        if List.isEmpty tx.outputs || List.exists (fun { lock = lock; spend = spend } ->
+            match lock with
+            | HighVLock (identifier, bytes) ->
+                identifier <= 7u // last reserved identifier for lock types
+                || isEmptyArr bytes
+            | _ -> false
+            || isInvalidSpend spend
         ) tx.outputs then
-            GeneralError "structurally invalid output data"
+            GeneralError "structurally invalid output(s)"
         else
-            Ok tx)
+            Ok tx
+
+    let checkWitnessesStructure = fun tx ->
+        if List.isEmpty tx.witnesses || List.exists (function
+            | ContractWitness { command = command
+                                cost = cost } ->
+                isNull command || cost = 0ul
+            | HighVWitness (identifier, bytes) ->
+                identifier <= 2u // last reserved identifier for witness types
+                || isEmptyArr bytes
+            | _ -> false
+        ) tx.witnesses then
+            GeneralError "structurally invalid witness(es)"
+        else
+            Ok tx
+
+    checkContractStructure
+    >=> checkInputsStructrue
+    >=> checkOutputsStructrue
+    >=> checkWitnessesStructure
 
 let private checkNoCoinbaseLock tx =
     let anyCoinbase =
@@ -400,6 +430,22 @@ let private checkNoCoinbaseLock tx =
     else
         Ok tx
 
+let private checkActivationSacrifice tx =
+    let isActivationSacrifise lock =
+        match lock with
+        | ActivationSacrifice _ -> true
+        | _ -> false
+
+    let anySacrifice = List.exists (fun output -> isActivationSacrifise output.lock) tx.outputs
+
+    if anySacrifice = Option.isSome tx.contract then
+        Ok tx
+    else
+        if anySacrifice then
+            GeneralError "tx with an activation sacrifice must include a contract"
+        else
+            GeneralError "tx with a contract must include an activation sacrifice"
+
 let internal tryGetUtxos getUTXO utxoSet tx =
     getUtxosResult getUTXO tx.inputs utxoSet
     |> Result.mapError (fun errors ->
@@ -411,11 +457,10 @@ let internal tryGetUtxos getUTXO utxoSet tx =
 
 let validateBasic =
     checkStructure
-    >=> checkInputsNotEmpty
-    >=> checkOutputsNotEmpty
     >=> checkNoCoinbaseLock
     >=> checkOutputsOverflow
     >=> checkDuplicateInputs
+    >=> checkActivationSacrifice
 
 let validateCoinbase blockNumber =
     let checkOnlyCoinbaseLocks blockNumber tx =
@@ -446,6 +491,13 @@ let validateCoinbase blockNumber =
         | [] -> Ok tx
         | _ -> GeneralError "coinbase transaction must not have any witnesses"
 
+    let checkOutputsNotEmpty tx =
+        if List.isEmpty tx.outputs then
+            GeneralError "outputs empty"
+        else if List.exists (fun output -> output.spend.amount = 0UL) tx.outputs then
+            GeneralError "outputs invalid"
+        else
+            Ok tx
 
     checkOutputsNotEmpty
     >=> checkNoInputWithinCoinbaseTx

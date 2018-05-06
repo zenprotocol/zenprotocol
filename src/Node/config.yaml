@@ -1,6 +1,4 @@
 chain: test
-miner: false
-threads: 1
 
 dataPath: ./data
 
@@ -13,3 +11,7 @@ seeds:
 api:
   enabled: true
   bind: 127.0.0.1:31567
+
+miner:
+  enabled: false
+  threads: 1

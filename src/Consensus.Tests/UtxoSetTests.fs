@@ -14,14 +14,16 @@ let getUTXO _ = NoOutput
 [<Test>]
 let ``handling transaction add outputs to set``() =
     let tx1 = {
+        version = Version0
         inputs = []
         witnesses = []
-        outputs = [{lock = PK Hash.zero; spend = {asset=Constants.Zen; amount=1UL}}]
+        outputs = [{lock = PK Hash.zero; spend = {asset=Asset.Zen; amount=1UL}}]
         contract = None
     }
     let tx1Hash = Transaction.hash tx1
 
     let tx2 = {
+        version = Version0
         inputs= [Outpoint {txHash = tx1Hash; index=0ul}]
         witnesses = []
         outputs=[]
@@ -37,14 +39,16 @@ let ``handling transaction add outputs to set``() =
 [<Test>]
 let ``handling transaction mark inputs as spent``() =
     let tx1 = {
+        version = Version0
         inputs = []
         witnesses = []
-        outputs = [{lock = PK Hash.zero; spend = {asset=Constants.Zen; amount=1UL}}]
+        outputs = [{lock = PK Hash.zero; spend = {asset=Asset.Zen; amount=1UL}}]
         contract = None
     }
     let tx1Hash = Transaction.hash tx1
 
     let tx2 = {
+        version = Version0
         inputs= [Outpoint {txHash = tx1Hash; index=0ul}]
         witnesses = []
         outputs=[]
@@ -69,7 +73,7 @@ let ``handling transaction mark inputs as spent``() =
 let ``Should find Utxo``() =
     let hash = Hash [| 100uy |]
     let outpoint = { txHash = hash; index = 100u }
-    let output = { lock = PK hash; spend = { asset = hash, Hash.zero; amount = 100UL }}
+    let output = { lock = PK hash; spend = { asset = Asset (ContractId (Version0, hash), Hash.zero); amount = 100UL }}
     let utxos = Map.ofSeq [ (outpoint, Unspent output) ]
     let outputResult = UtxoSet.getUtxos getUTXO [ outpoint ] utxos
 
@@ -101,8 +105,9 @@ let ``Should be none utxos``(utxos:Map<Outpoint, Output>) (outpoints:List<Outpoi
 let ``Unspendable outputs should not be added to utxoset``() =
     let tx =
         {
-            inputs=[]
-            outputs=[{lock=Destroy;spend={amount=1UL;asset=Constants.Zen}}]
+            version = Version0
+            inputs = []
+            outputs=[{lock=Destroy;spend={amount=1UL;asset=Asset.Zen}}]
             witnesses = []
             contract = None
         }

@@ -147,19 +147,18 @@ let validateTransaction chainParams session contractPath blockNumber tx (state:M
                 return! validateInputs chainParams session contractPath blockNumber txHash tx state true
     }
 
-let executeContract session txSkeleton cHash command sender data state =
+let executeContract session txSkeleton contractId command sender data state =
     let isInTxSkeleton (txSkeleton:TxSkeleton.T) (outpoint,_)  =
         List.exists (fun input ->
             match input with
             | TxSkeleton.Mint _ -> false
             | TxSkeleton.PointedOutput (outpoint',_) -> outpoint' = outpoint) txSkeleton.pInputs
 
-    let rec run (txSkeleton:TxSkeleton.T) cHash command sender data witnesses totalCost =
-        match ActiveContractSet.tryFind cHash state.activeContractSet with
-        | None -> Error "Contract not active"
+    let rec run (txSkeleton:TxSkeleton.T) (contractId:ContractId) command sender data witnesses totalCost =
+        match ActiveContractSet.tryFind contractId state.activeContractSet with
         | Some contract ->
             let contractWallet =
-                ContractUtxoRepository.getContractUtxo session cHash state.utxoSet
+                ContractUtxoRepository.getContractUtxo session contractId state.utxoSet
                 |> List.reject (isInTxSkeleton txSkeleton)
 
             Contract.run contract txSkeleton command sender data contractWallet
@@ -167,7 +166,7 @@ let executeContract session txSkeleton cHash command sender data state =
 
                 TxSkeleton.checkPrefix txSkeleton tx
                 |> Result.bind (fun finalTxSkeleton ->
-                    let witness = TxSkeleton.getContractWitness contract.hash command data txSkeleton finalTxSkeleton 0L
+                    let witness = TxSkeleton.getContractWitness contract.contractId command data txSkeleton finalTxSkeleton 0L
 
                     // To commit to the cost we need the real contract wallet
                     let contractWallet = TransactionValidation.getContractWallet tx witness
@@ -180,19 +179,20 @@ let executeContract session txSkeleton cHash command sender data state =
                     let witnesses = List.add (ContractWitness witness) witnesses
 
                     match message with
-                    | Some {cHash=cHash; command=command; data=data} ->
-                        run finalTxSkeleton cHash command (ContractSender contract.hash) data witnesses totalCost
+                    | Some {contractId=contractId; command=command; data=data} ->
+                        run finalTxSkeleton contractId command (ContractSender contract.contractId) data witnesses totalCost
                     | None ->
                         Ok (finalTxSkeleton, witnesses, totalCost)
                 )
             )
+        | _ -> Error "Contract not active"
 
     let sender =
         match sender with
         | Some publicKey -> PKSender publicKey
         | None -> Anonymous
 
-    run txSkeleton cHash command sender data [] 0L
+    run txSkeleton contractId command sender data [] 0L
     |> Result.map (fun (finalTxSkeleton, witnesses, totalCost) ->
         eventX "Running contract chain with cost: {totalCost}"
         >> setField "totalCost" totalCost

@@ -67,7 +67,11 @@ let HeadersMessageId = 34uy
 [<LiteralAttribute>]
 let DisconnectPeerMessageId = 35uy
 [<LiteralAttribute>]
-let GetTipFromAllPeersMessageId = 36uy
+let PublishTransactionMessageId = 36uy
+[<LiteralAttribute>]
+let NewTransactionMessageId = 37uy
+[<LiteralAttribute>]
+let GetTipFromAllPeersMessageId = 38uy
 
 type Connect =
         string
@@ -195,6 +199,14 @@ type Headers = {
 type DisconnectPeer =
         byte[]
 
+type PublishTransaction =
+        byte[]
+
+type NewTransaction = {
+        peerId : byte[]
+        txHash : byte[]
+    }
+
 
 type T =
     | Connect of Connect
@@ -227,6 +239,8 @@ type T =
     | SendHeaders of SendHeaders
     | Headers of Headers
     | DisconnectPeer of DisconnectPeer
+    | PublishTransaction of PublishTransaction
+    | NewTransaction of NewTransaction
     | GetTipFromAllPeers
 
 module Connect =
@@ -890,6 +904,48 @@ module DisconnectPeer =
             return msg
         }
 
+module PublishTransaction =
+    let txHashSize = 32
+    let getMessageSize (msg:PublishTransaction) =
+            32
+
+    let write (msg:PublishTransaction) stream =
+        stream
+        |> Stream.writeBytes msg 32
+
+    let read =
+        reader {
+            let! msg = Stream.readBytes 32
+
+            return msg
+        }
+
+
+module NewTransaction =
+    let peerIdSize = 4
+    let txHashSize = 32
+    let getMessageSize (msg:NewTransaction) =
+        0 +
+            4 +
+            32 +
+            0
+
+    let write (msg:NewTransaction) stream =
+        stream
+        |> Stream.writeBytes msg.peerId 4
+        |> Stream.writeBytes msg.txHash 32
+
+    let read =
+        reader {
+            let! peerId = Stream.readBytes 4
+            let! txHash = Stream.readBytes 32
+
+            return ({
+                        peerId = peerId;
+                        txHash = txHash;
+                    }: NewTransaction)
+        }
+
 
 let private decode stream =
     let readMessage messageId stream =
@@ -1014,6 +1070,14 @@ let private decode stream =
             match DisconnectPeer.read stream with
             | None,stream -> None,stream
             | Some msg, stream -> Some (DisconnectPeer msg), stream
+        | PublishTransactionMessageId ->
+            match PublishTransaction.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (PublishTransaction msg), stream
+        | NewTransactionMessageId ->
+            match NewTransaction.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (NewTransaction msg), stream
         | GetTipFromAllPeersMessageId ->
             Some GetTipFromAllPeers, stream
         | _ -> None, stream
@@ -1077,6 +1141,8 @@ let send socket msg =
         | SendHeaders msg -> SendHeaders.write msg
         | Headers msg -> Headers.write msg
         | DisconnectPeer msg -> DisconnectPeer.write msg
+        | PublishTransaction msg -> PublishTransaction.write msg
+        | NewTransaction msg -> NewTransaction.write msg
         | GetTipFromAllPeers -> id
 
     let messageId =
@@ -1111,6 +1177,8 @@ let send socket msg =
         | SendHeaders _ -> SendHeadersMessageId
         | Headers _ -> HeadersMessageId
         | DisconnectPeer _ -> DisconnectPeerMessageId
+        | PublishTransaction _ -> PublishTransactionMessageId
+        | NewTransaction _ -> NewTransactionMessageId
         | GetTipFromAllPeers _ -> GetTipFromAllPeersMessageId
 
     let messageSize =
@@ -1145,6 +1213,8 @@ let send socket msg =
         | SendHeaders msg -> SendHeaders.getMessageSize msg
         | Headers msg -> Headers.getMessageSize msg
         | DisconnectPeer msg -> DisconnectPeer.getMessageSize msg
+        | PublishTransaction msg -> PublishTransaction.getMessageSize msg
+        | NewTransaction msg -> NewTransaction.getMessageSize msg
         | GetTipFromAllPeers -> 0
 
     //  Signature + message ID + message size

@@ -21,12 +21,13 @@
     <Optimize>false</Optimize>
     <Tailcalls>false</Tailcalls>
     <OutputPath>bin\$(Configuration)\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DefineConstants>DEBUG;TRACE;MONO_LOG_LEVEL=debug</DefineConstants>
     <WarningLevel>3</WarningLevel>
     <OtherFlags>--warnon:1182</OtherFlags>
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <Tailcalls>true</Tailcalls>
@@ -53,7 +54,10 @@
     <Compile Include="ExtendedKey\Helpers.fs" />
     <Compile Include="ExtendedKey\Tests.fs" />
     <Compile Include="KeyPathParserTests.fs" />
+    <Compile Include="SerializationTests.fs" />
     <Content Include="paket.references" />
+    <Compile Include="AddressTests.fs" />
+    <None Include="app.config" />
     <ProjectReference Include="..\Consensus.Tests\Consensus.Tests.fsproj">
       <Project>{b5e951fc-ae90-4ef1-9365-3e2b5a56b510}</Project>
       <Name>Consensus.Tests</Name>
@@ -74,7 +78,6 @@
       <Project>{289a59eb-d1d4-499f-87b9-f75b799829c0}</Project>
       <Name>Wallet</Name>
     </ProjectReference>
-    <Compile Include="AddressTests.fs" />
     <ProjectReference Include="..\TestsInfrastructure\TestsInfrastructure.fsproj">
       <Project>{9DF227BB-E98D-49D7-A33B-C0D5B170F430}</Project>
       <Name>TestsInfrastructure</Name>

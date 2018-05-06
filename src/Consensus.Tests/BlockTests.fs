@@ -19,7 +19,8 @@ let difficulty = 0x20fffffful
 
 let chain = getChainParameters Chain.Local
 
-let contractsPath = "./test"
+let contractsPath = System.IO.Path.Combine
+                        [| System.IO.Path.GetTempPath(); System.IO.Path.GetRandomFileName() |]
 
 let goodHints = match Contract.recordHints sampleContractCode with
                 | Ok hints -> hints
@@ -67,7 +68,10 @@ let ``block with one invalid transaction fail validation``(header) (NonEmptyTran
 
     let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero;}
 
-    let expected = Error (sprintf "transaction %A failed validation due to General \"inputs empty\"" (Transaction.hash invalidTx))
+    let expected = Error (sprintf "transaction %A failed validation due to General \"structurally invalid input(s)\"" (Transaction.hash invalidTx))
+
+    if Block.validate chain block <> expected then
+        printfn "%A" (Block.validate chain block)
 
     Block.validate chain block = expected
 
@@ -146,7 +150,7 @@ let ``connecting block should fail when transaction inputs are invalid``(parent:
                 when error.StartsWith "transactions failed inputs validation due to"
                   || error = "Output lookup error"
                   || error.Contains "Orphan"
-                  || error.Contains "witnesses" -> true     //too many/few wts
+                  || error.Contains "witness" -> true     //too many/few wts
     | Error _ as res ->
         System.Console.WriteLine (sprintf "Got unexpected result %A" res)
         true
@@ -161,7 +165,7 @@ let ``block timestamp too early``() =
     let rootAccount = createTestAccount()
     let account1, _ = create()
     let tx =
-        Account.createTransaction (publicKeyHash account1) {asset=Constants.Zen;amount=1UL} rootAccount
+        Account.createTransaction (publicKeyHash account1) {asset=Asset.Zen;amount=1UL} rootAccount
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
 
     let acs = ActiveContractSet.empty
@@ -184,7 +188,7 @@ let ``block timestamp in the future``() =
     let rootAccount = createTestAccount()
     let account1, _ = create()
     let tx =
-        Account.createTransaction (publicKeyHash account1) {asset=Constants.Zen;amount=1UL} rootAccount
+        Account.createTransaction (publicKeyHash account1) {asset=Asset.Zen;amount=1UL} rootAccount
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
 
     let acs = ActiveContractSet.empty
@@ -203,7 +207,7 @@ let ``block with mismatch commitments fail connecting``() =
     let rootAccount = createTestAccount()
     let account1, _ = create()
     let tx =
-        Account.createTransaction (publicKeyHash account1) { asset = Constants.Zen; amount = 1UL } rootAccount
+        Account.createTransaction (publicKeyHash account1) { asset = Asset.Zen; amount = 1UL } rootAccount
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
 
     let acs = ActiveContractSet.empty
@@ -224,7 +228,7 @@ let ``can connect valid block``() =
     let rootAccount = createTestAccount()
     let account1, _ = create()
     let tx =
-        Account.createTransaction (publicKeyHash account1) { asset = Constants.Zen; amount = 1UL } rootAccount
+        Account.createTransaction (publicKeyHash account1) { asset = Asset.Zen; amount = 1UL } rootAccount
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
 
     let acs = ActiveContractSet.empty
@@ -262,14 +266,14 @@ let ``can connect block with a contract``() =
 
     let contract : Contract.T =
         {
-            hash=Contract.computeHash SampleContract.sampleContractCode
+            contractId=Contract.makeContractId Version0 SampleContract.sampleContractCode
             mainFn = fun tx _ _ _ _ _ -> Ok (tx,None)
             costFn = fun _ _ _ _ _ -> 0L
             expiry=1001ul
             code=SampleContract.sampleContractCode
         }
 
-    let acs = ActiveContractSet.empty |> ActiveContractSet.add contract.hash contract
+    let acs = ActiveContractSet.empty |> ActiveContractSet.add contract.contractId contract
     let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO rootTxHash rootTx
     let ema = EMA.create chain
 
@@ -289,19 +293,19 @@ let ``block with invalid contract failed connecting``() =
         {output with lock=ActivationSacrifice}
 
     let tx =
-        {contract = Some { code="ada";hints=goodHints;rlimit=0u;queries=goodTotalQueries }; inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
+        { version = Version0; contract = Some (V0 { code="ada";hints=goodHints;rlimit=0u;queries=goodTotalQueries }); inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
         |> Transaction.sign [ rootKeyPair ]
 
     let contract : Contract.T =
         {
-            hash=Contract.computeHash "ada"
+            contractId=Contract.makeContractId Version0 "ada"
             mainFn = fun tx _ _ _ _ _ -> Ok (tx,None)
             costFn = fun _ _ _ _ _ -> 0L
             expiry=1000ul
             code=""
         }
 
-    let acs = ActiveContractSet.empty |> ActiveContractSet.add contract.hash contract
+    let acs = ActiveContractSet.empty |> ActiveContractSet.add contract.contractId contract
     let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO rootTxHash rootTx
     let ema = EMA.create chain
 
@@ -315,11 +319,15 @@ let ``block with invalid contract failed connecting``() =
 
 [<Test>]
 let ``block with coinbase lock within a regular transaction should fail``() =
+    let publicKey = Crypto.PublicKey <| Array.create 64 1uy
+    let signature = Crypto.Signature <| Array.create 64 1uy
+    let witness = PKWitness (publicKey, signature)
     let tx =
         {
+            version = Version0
             inputs = [Outpoint {txHash=Hash.zero;index=1ul}];
-            outputs=[{lock= Coinbase (15ul,Hash.zero);spend={amount=1UL;asset=Constants.Zen}}]
-            witnesses=[]
+            outputs=[{lock=Coinbase (15ul,Hash.zero);spend={amount=1UL;asset=Asset.Zen}}]
+            witnesses=[witness]
             contract=None
         }
 
@@ -339,7 +347,7 @@ let ``block with coinbase lock within a regular transaction should fail``() =
 
     let header =
         {
-            version = Block.Version
+            version = Version0
             parent = Hash.zero
             blockNumber = 15ul
             difficulty = 0x20fffffful;
@@ -361,8 +369,9 @@ let ``block with wrong coinbase reward``() =
 
     let tx =
         {
+            version = Version0
             inputs = [];
-            outputs=[{lock= Coinbase (15ul,Hash.zero);spend={amount=1UL;asset=Constants.Zen}}]
+            outputs=[{lock= Coinbase (15ul,Hash.zero);spend={amount=1UL;asset=Asset.Zen}}]
             witnesses=[]
             contract=None
         }
@@ -385,7 +394,7 @@ let ``block with wrong coinbase reward``() =
 
     let header =
         {
-            version = Block.Version
+            version = Version0
             parent = Hash.zero
             blockNumber = 15ul
             difficulty = ema.difficulty;
@@ -405,8 +414,9 @@ let ``block with wrong coinbase reward``() =
 let ``coinbase lock have wrong blockNumber``() =
     let tx =
         {
+            version = Version0
             inputs = [];
-            outputs=[{lock= Coinbase (13ul,Hash.zero);spend={amount=1UL;asset=Constants.Zen}}]
+            outputs=[{lock= Coinbase (13ul,Hash.zero);spend={amount=1UL;asset=Asset.Zen}}]
             witnesses=[]
             contract=None
         }
@@ -427,7 +437,7 @@ let ``coinbase lock have wrong blockNumber``() =
 
     let header =
         {
-            version = Block.Version
+            version = Version0
             parent = Hash.zero
             blockNumber = 15ul
             difficulty = 0x20fffffful;
@@ -447,8 +457,9 @@ let ``coinbase lock have wrong blockNumber``() =
 let ``block without coinbase``() =
     let tx =
         {
+            version = Version0
             inputs = [];
-            outputs=[{lock= PK Hash.zero;spend={amount=1UL;asset=Constants.Zen}}]
+            outputs=[{lock= PK Hash.zero;spend={amount=1UL;asset=Asset.Zen}}]
             witnesses=[]
             contract=None
         }
@@ -469,7 +480,7 @@ let ``block without coinbase``() =
 
     let header =
         {
-            version = Block.Version
+            version = Version0
             parent = Hash.zero
             blockNumber = 15ul
             difficulty = 0x20fffffful;
@@ -492,11 +503,12 @@ let ``block with coinbase with multiple asset as reward should fail``() =
 
     let tx =
         {
+            version = Version0
             inputs = [];
             outputs=
                 [
-                    {lock= Coinbase (15ul,Hash.zero);spend={amount=Block.blockReward 15ul;asset=Constants.Zen}}
-                    {lock= Coinbase (15ul,Hash.zero);spend={amount=1UL;asset=Hash.Hash (Array.create 32 1uy), Hash.zero}}
+                    {lock= Coinbase (15ul,Hash.zero);spend={amount=Block.blockReward 15ul;asset=Asset.Zen}}
+                    {lock= Coinbase (15ul,Hash.zero);spend={amount=1UL;asset=Asset (ContractId (Version0,Hash.Hash (Array.create 32 1uy)), Hash.zero)}}
                 ]
             witnesses=[]
             contract=None
@@ -520,7 +532,7 @@ let ``block with coinbase with multiple asset as reward should fail``() =
 
     let header =
         {
-            version = Block.Version
+            version = Version0
             parent = Hash.zero
             blockNumber = 15ul
             difficulty = ema.difficulty;
@@ -544,11 +556,12 @@ let ``coinbase reward split over multiple outputs``() =
 
     let tx =
         {
+            version = Version0
             inputs = [];
             outputs=
                 [
-                    {lock= Coinbase (15ul,Hash.zero);spend={amount=(Block.blockReward 15ul) / 2UL;asset=Constants.Zen}}
-                    {lock= Coinbase (15ul,Hash.zero);spend={amount=(Block.blockReward 15ul) / 2UL;asset=Constants.Zen}}
+                    {lock= Coinbase (15ul,Hash.zero);spend={amount=(Block.blockReward 15ul) / 2UL;asset=Asset.Zen}}
+                    {lock= Coinbase (15ul,Hash.zero);spend={amount=(Block.blockReward 15ul) / 2UL;asset=Asset.Zen}}
                 ]
             witnesses=[]
             contract=None
@@ -572,7 +585,7 @@ let ``coinbase reward split over multiple outputs``() =
 
     let header =
         {
-            version = Block.Version
+            version = Version0
             parent = Hash.zero
             blockNumber = 15ul
             difficulty = 0x20fffffful;
@@ -595,8 +608,9 @@ let ``block spending mature transaction is valid``() =
 
     let origin =
         {
+            version = Version0
             inputs=[]
-            outputs=[{lock =  Coinbase (1ul, (publicKeyHash rootAccount)); spend= {asset = Constants.Zen;amount=100000000UL}}]
+            outputs=[{lock =  Coinbase (1ul, (publicKeyHash rootAccount)); spend= {asset = Asset.Zen;amount=100000000UL}}]
             witnesses=[]
             contract=None
         }
@@ -605,7 +619,7 @@ let ``block spending mature transaction is valid``() =
     let rootAccount = Account.addTransaction originHash origin rootAccount
 
     let tx =
-        Account.createTransaction (publicKeyHash account1) { asset = Constants.Zen; amount = 1UL } (rootAccount, rootExtendedKey)
+        Account.createTransaction (publicKeyHash account1) { asset = Asset.Zen; amount = 1UL } (rootAccount, rootExtendedKey)
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
 
 
@@ -619,7 +633,6 @@ let ``block spending mature transaction is valid``() =
     Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ContractCache.empty ema block
     |>  should be ok
 
-
 [<Test>]
 let ``block spending unmature transaction is invalid``() =
     let rootAccount =
@@ -628,8 +641,9 @@ let ``block spending unmature transaction is invalid``() =
 
     let origin =
         {
+            version = Version0
             inputs=[]
-            outputs=[{lock =  Coinbase (1ul, (publicKeyHash rootAccount)); spend= {asset = Constants.Zen;amount=100000000UL}}]
+            outputs=[{lock =  Coinbase (1ul, (publicKeyHash rootAccount)); spend= {asset = Asset.Zen;amount=100000000UL}}]
             witnesses=[]
             contract=None
         }
@@ -638,7 +652,7 @@ let ``block spending unmature transaction is invalid``() =
     let rootAccount = Account.addTransaction originHash origin rootAccount
 
     let tx =
-        Account.createTransaction (publicKeyHash account1) { asset = Constants.Zen; amount = 1UL } (rootAccount, rootExtendedKey)
+        Account.createTransaction (publicKeyHash account1) { asset = Asset.Zen; amount = 1UL } (rootAccount, rootExtendedKey)
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
 
 
@@ -659,14 +673,14 @@ let ``block spending unmature transaction is invalid``() =
 let ``contract get removed when expiring arrive``() =
     let contract : Contract.T =
         {
-            hash=Contract.computeHash SampleContract.sampleContractCode
+            contractId=Contract.makeContractId Version0 SampleContract.sampleContractCode
             mainFn= fun tx _ _ _ _ _ -> Ok (tx,None)
             costFn = fun _ _ _ _ _ -> 0L
             expiry=1ul
             code=""
         }
 
-    let acs = ActiveContractSet.empty |> ActiveContractSet.add contract.hash contract
+    let acs = ActiveContractSet.empty |> ActiveContractSet.add contract.contractId contract
     let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO rootTxHash rootTx
     let ema = EMA.create chain
 
@@ -679,9 +693,9 @@ let ``contract get removed when expiring arrive``() =
 [<Test>]
 let ``Overweight block should be rejected``() =
     let rootAccount = createTestAccount()
-    let cLock = Lock.Contract Hash.zero
+    let cLock = Lock.Contract (ContractId (Version0,Hash.zero))
     let cWitness = {
-        cHash = Hash.zero;
+        contractId = ContractId (Version0, Hash.zero);
         command = "nothing";
         data = None;
         beginInputs = 0u;
@@ -692,7 +706,7 @@ let ``Overweight block should be rejected``() =
         cost = System.UInt32.MaxValue       // Weight >>> max block weight
         }
     let tx1 =
-        Account.createTransactionFromLock cLock { asset = Constants.Zen; amount = 1UL } rootAccount
+        Account.createTransactionFromLock cLock { asset = Asset.Zen; amount = 1UL } rootAccount
         |> (function | Ok x -> x | _ -> failwith "failed transaction generation")
 
     // find the exact output
@@ -703,6 +717,7 @@ let ``Overweight block should be rejected``() =
 
     let tx1Hash = Transaction.hash tx1
     let tx2 = {
+        version = Version0
         inputs = [Outpoint {txHash=tx1Hash;index=uint32 i}];
         outputs = [];
         witnesses = [ContractWitness cWitness];

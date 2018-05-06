@@ -14,7 +14,10 @@ open TestsInfrastructure.Constraints
 
 
 let chain = Chain.getChainParameters Chain.Local
-let contractPath = "./test"
+let contractPath =
+    System.IO.Path.Combine
+        [| System.IO.Path.GetTempPath(); System.IO.Path.GetRandomFileName() |]
+
 
 let account = createTestAccount ()
 let publicKey = ExtendedKey.getPublicKey (snd account) |> Result.get
@@ -58,7 +61,7 @@ let code = sprintf
             let cf _ _ _ _ _ = ret (338 <: nat)
             """ serializePK
 
-let cHash = Contract.computeHash code
+let contractId = Contract.makeContractId Version0 code
 
 let mutable acs = ActiveContractSet.empty
 
@@ -73,19 +76,20 @@ let setup () =
             queries = ZFStar.totalQueries hints |> Result.get
         }
     let contract =
-        Contract.compile contractPath contractActivation 
+        Contract.compile contractPath contractActivation
         |> Result.bind (Contract.load contractPath 100ul code)
         |> Result.get
 
-    acs <- ActiveContractSet.add cHash contract ActiveContractSet.empty
+    acs <- ActiveContractSet.add contractId contract ActiveContractSet.empty
 
 [<Test>]
 let ``contract witness with valid signature``() =
-    let spend = {asset=cHash,Hash.zero;amount=1UL}
+    let spend = {asset=Asset.defaultOf contractId;amount=1UL}
     let tx =
         {
+            version = Version0
             inputs=[Mint spend]
-            outputs=[{lock=Contract cHash;spend=spend}]
+            outputs=[{lock=Contract contractId;spend=spend}]
             witnesses=[]
             contract=None
         }
@@ -95,7 +99,7 @@ let ``contract witness with valid signature``() =
     let signature = ExtendedKey.sign txHash (snd account) |> Result.get
 
     let contractWintess = ContractWitness {
-                                              cHash=cHash;
+                                              contractId=contractId;
                                               command="";
                                               data=None;
                                               beginInputs = 0ul;
@@ -113,11 +117,12 @@ let ``contract witness with valid signature``() =
 
 [<Test>]
 let ``contract witness with invalid publickey``() =
-    let spend = {asset=cHash,Hash.zero;amount=1UL}
+    let spend = {asset=Asset.defaultOf contractId;amount=1UL}
     let tx =
         {
+            version = Version0
             inputs=[Mint spend]
-            outputs=[{lock=Contract cHash;spend=spend}]
+            outputs=[{lock=Contract contractId;spend=spend}]
             witnesses=[]
             contract=None
         }
@@ -128,7 +133,7 @@ let ``contract witness with invalid publickey``() =
     let signature = ExtendedKey.sign txHash (snd account) |> Result.get
 
     let contractWintess = ContractWitness {
-                                              cHash=cHash;
+                                              contractId=contractId;
                                               command="";
                                               data=None;
                                               beginInputs = 0ul;
@@ -148,11 +153,12 @@ let ``contract witness with invalid publickey``() =
 
 [<Test>]
 let ``contract witness with no signature``() =
-    let spend = {asset=cHash,Hash.zero;amount=1UL}
+    let spend = {asset=Asset.defaultOf contractId;amount=1UL}
     let tx =
         {
+            version = Version0
             inputs=[Mint spend]
-            outputs=[{lock=Contract cHash;spend=spend}]
+            outputs=[{lock=Contract contractId;spend=spend}]
             witnesses=[]
             contract=None
         }
@@ -161,7 +167,7 @@ let ``contract witness with no signature``() =
 
 
     let contractWintess = ContractWitness {
-                                              cHash=cHash;
+                                              contractId=contractId;
                                               command="";
                                               data=None;
                                               beginInputs = 0ul;
@@ -182,11 +188,12 @@ let ``contract witness with no signature``() =
 
 [<Test>]
 let ``contract witness with unexpcected public key``() =
-    let spend = {asset=cHash,Hash.zero;amount=1UL}
+    let spend = {asset=Asset.defaultOf contractId;amount=1UL}
     let tx =
         {
+            version = Version0
             inputs=[Mint spend]
-            outputs=[{lock=Contract cHash;spend=spend}]
+            outputs=[{lock=Contract contractId;spend=spend}]
             witnesses=[]
             contract=None
         }
@@ -199,7 +206,7 @@ let ``contract witness with unexpcected public key``() =
     let signature = ExtendedKey.sign txHash key |> Result.get
 
     let contractWintess = ContractWitness {
-                                              cHash=cHash;
+                                              contractId=contractId;
                                               command="";
                                               data=None;
                                               beginInputs = 0ul;

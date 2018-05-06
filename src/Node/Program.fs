@@ -19,12 +19,11 @@ type Argument =
     | Bind of string
     | Ip of string
     | Wipe of full:Wipe option
-    | Miner
-    | [<AltCommandLine("-t")>] Threads of int
-    | [<AltCommandLine("-lr")>] Localhost
-    | [<AltCommandLine("-l1")>] Local1
-    | [<AltCommandLine("-l2")>] Local2
-    | Seed
+    | Miner of threads:int option
+    | [<AltCommandLine("-lr");Hidden>] Localhost
+    | [<AltCommandLine("-l1");Hidden>] Local1
+    | [<AltCommandLine("-l2");Hidden>] Local2
+    | [<Hidden>]Seed
     | Data_Path of string
     with
         interface IArgParserTemplate with
@@ -34,12 +33,11 @@ type Argument =
                 | Bind _ -> "Set the address the node should listen on"
                 | Chain _ -> "specify chain (local,test or main)."
                 | Ip _ -> "specify the IP the node should relay to other peers"
-                | Wipe _ -> "wipe database, specify full if you want to remove wallet well"
-                | Miner -> "enable miner"
-                | Threads _ -> "number of threads to use for miner"
-                | Localhost -> "specify if the node should ast as localhost"
-                | Local1 -> "run node with local1 settings, used for tests"
-                | Local2 -> "run node with local2 settings, used for tests"
+                | Wipe _ -> "wipe database, specify full if you want wipe wallet private key"
+                | Miner _ -> "enable miner and optionally specify number of threads"
+                | Localhost -> "specify if the node should act as localhost, for tests only"
+                | Local1 -> "run node with local1 settings, for tests only"
+                | Local2 -> "run node with local2 settings, for tests only"
                 | Seed -> "run node as a seed"
                 | Data_Path _ -> "path to data folder"
 
@@ -124,14 +122,15 @@ let main argv =
         | Wipe full ->
             wipe <- true
             wipeFull <- Option.isSome full
-        | Miner ->
-            config.miner <- true
-        | Threads n ->
-            config.threads <- n
+        | Miner threads ->
+            config.miner.enabled <- true
+
+            match threads with
+            | Some threads -> config.miner.threads <- threads
+            | None -> ()
         | Seed ->
             config.listen <- true
             config.seeds.Clear ()
-            config.miner <- true
         | Data_Path dataPath ->
             config.dataPath <- dataPath
     ) (results.GetAllResults())
@@ -150,15 +149,12 @@ let main argv =
         if wipeFull then Wallet.Main.Full elif wipe then Wallet.Main.Reset else Wallet.Main.NoWipe
         |> Wallet.Main.main dataPath busName chain
 
-    use minerActors =
-        if config.miner then
-            List.init config.threads ( fun _ ->
-                Miner.Main.main busName chainParams
-                |> Disposables.toDisposable )
-            |> Disposables.fromList
+    use minerActor =
+        if config.miner.enabled then
+            Miner.Main.main busName chainParams config.miner.threads
+            |> Disposables.toDisposable
         else
-            [ Disposables.empty ]
-            |> Disposables.fromList
+            Disposables.empty
 
     use apiActor =
         if config.api.enabled then
@@ -170,16 +166,13 @@ let main argv =
     if chain = Chain.Local then
         let (>>=) m f = Option.bind f m
 
+//        let block = Consensus.Block.createGenesis Chain.localParameters [Consensus.Tests.Helper.rootTx] (0UL,0UL)
+//
+//        printfn "%A" (Block.hash block.header)
+//        printfn "----"
+//        printfn "%A" (Serialization.Block.serialize block |> FsBech32.Base16.encode)
         let block =
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000" +
-            "10ee6ef1eb8bcf752290c0765c52e83a0cf72963773c3aa6f18524f97b4b55ee100000160e073fe" +
-            "8f20ffffff000000000000000000000000000000000000000327568a196fd2af61b99bd5578e80f" +
-            "44bb4b685973fd87f334623a503b5b67c65f54f0947eb311b6fdd36ccd5ab7b8fada7b55502abba" +
-            "816e8d65d83a26092ed9be653064be80f760b9d471dc9afbac2b24236c9f2eb0f08b7427942852d" +
-            "c780200000001000000000000000101eca101ba1e938c6a8cd10e031f2ac363f4176dcf4450e244" +
-            "2ebedb825fd33b1e000000000000000000000000000000000000000000000000000000000000000" +
-            "000000000000000000000000000000000000000000000000000000000000000000000000005f5e1" +
-            "000000000000"
+            "00000000000000000000000000000000000000000000000000000000000000000000000000000001fb90e268129ea33391eb1efc90b098c14d3242aa8964b22a177984609bdb366700000160e073fe8f20ffffff0000000000000000000000000000000003f54701a2815b5161d7dc6aae81622c234a4ba36b1a40c6fc821a56fc83eb21ddecb808dd6246e4489bc1c3a3835d779f55a254161102e4aa0d5c56effcf67d83be653064be80f760b9d471dc9afbac2b24236c9f2eb0f08b7427942852dc7802010000000000010120eca101ba1e938c6a8cd10e031f2ac363f4176dcf4450e2442ebedb825fd33b1e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005f5e1000000"
             |> FsBech32.Base16.decode
             >>= Serialization.Block.deserialize
             |> Option.get

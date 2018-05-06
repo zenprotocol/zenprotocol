@@ -10,7 +10,7 @@ module Blockchain =
     let serviceName = "blockchain"
 
     type ActiveContract = {
-        contractHash:Hash
+        contractId:ContractId
         code:string
         expiry:uint32
     }
@@ -37,9 +37,10 @@ module Blockchain =
         | ValidateMinedBlock of Types.Block
         | RequestHeaders of peerId:byte[] * startBlockHashes:Hash list * endBlockHash :Hash
         | HandleHeaders of peerId:byte[] * BlockHeader list
+        | HandleNewTransaction of peerId:byte[] * txHash:Hash
 
     type Request =
-        | ExecuteContract of Hash * string * Crypto.PublicKey option * data option * TxSkeleton.T
+        | ExecuteContract of ContractId * string * Crypto.PublicKey option * data option * TxSkeleton.T
         | GetBlockTemplate of pkHash:Hash
         | GetTip
         | GetBlock of Hash
@@ -63,8 +64,8 @@ module Blockchain =
     let handleMemPool client peerId txHashes =
         Command.send client serviceName (HandleMemPool (peerId,txHashes))
 
-    let executeContract client cHash command sender data txSkeleton =
-        ExecuteContract (cHash,command, sender, data, txSkeleton)
+    let executeContract client contractId command sender data txSkeleton =
+        ExecuteContract (contractId,command, sender, data, txSkeleton)
         |> Request.send<Request, Result<Transaction,string>> client serviceName
 
     let validateBlock client peerId block =
@@ -122,6 +123,10 @@ module Blockchain =
     let getMempool client =
         GetMempool |> Request.send<Request, (Hash.Hash * Transaction) list> client serviceName
 
+    let handleNewTransaction client peerId txHash =
+        HandleNewTransaction (peerId,txHash)
+        |> Command.send client serviceName
+
 module Network =
     type Command =
         | SendMemPool of peerId:byte[] * Hash list
@@ -149,8 +154,8 @@ module Network =
 
 module Wallet =
     type BalanceResponse = Map<Asset,uint64>
-    type TransactionsResponse = List<Hash*Map<Asset,int64>>
-    type ActivateContractResponse = Transaction * Hash
+    type TransactionsResponse = List<Hash*Map<Asset,int64>*uint32>
+    type ActivateContractResponse = Transaction * ContractId
 
     type Command =
         | Resync
@@ -158,13 +163,13 @@ module Wallet =
     type Request =
         | GetAddressPKHash
         | GetAddress
-        | GetTransactions
+        | GetTransactions of skip: int * take: int
         | GetBalance
         | ImportSeed of string list * password:string
         | Send of Hash * Spend * password:string
         | ActivateContract of string * uint32 * password:string
-        | ExtendContract of Hash * uint32 * password:string
-        | ExecuteContract of Hash * string * data option * provideReturnAddress:bool * sign:string option * Map<Asset, uint64> * password:string
+        | ExtendContract of ContractId * uint32 * password:string
+        | ExecuteContract of ContractId * string * data option * provideReturnAddress:bool * sign:string option * Map<Asset, uint64> * password:string
         | AccountExists
         | CheckPassword of password:string
         | GetPublicKey of string * password:string
@@ -199,8 +204,8 @@ module Wallet =
     let importSeed client words password =
         send<unit> client serviceName (ImportSeed (words, password))
 
-    let getTransactions client =
-        send<TransactionsResponse> client serviceName GetTransactions
+    let getTransactions client skip take =
+        send<TransactionsResponse> client serviceName (GetTransactions (skip, take))
 
     let accountExists client =
         send<bool> client serviceName AccountExists

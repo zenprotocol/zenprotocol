@@ -65,13 +65,16 @@ let activateContract code account session state =
             |> Writer.unwrap
         let txHash = Transaction.hash tx
         events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (txHash, tx)))
-        let cHash = code |> System.Text.Encoding.UTF8.GetBytes |> Hash.compute
-        ActiveContractSet.containsContract cHash state.memoryState.activeContractSet
+        let contractId = Contract.makeContractId Version0 code
+        ActiveContractSet.containsContract contractId state.memoryState.activeContractSet
         |> should equal true
-        (state, cHash)
+        (state, contractId)
     )
 
-let dataPath = ".data"
+let tempDir () =
+    System.IO.Path.Combine
+        [| System.IO.Path.GetTempPath(); System.IO.Path.GetRandomFileName() |]
+let dataPath = tempDir()
 let databaseContext = DatabaseContext.createEmpty dataPath
 let session = DatabaseContext.createSession databaseContext
 
@@ -117,11 +120,11 @@ let main txSkeleton contractHash command sender data wallet =
 val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 7
 let cf _ _ _ _ _ = ret (64 + 64 + 0 + 25)
 """
-let contract2Hash = Contract.computeHash contract2Code
+let contract2Id = Contract.makeContractId Version0 contract2Code
 
 let contract1Code =
-    contract2Hash
-    |> Hash.bytes
+    contract2Id
+    |> ContractId.toBytes
     |> System.Convert.ToBase64String
     |> sprintf """
 // contract 1: this contract receives Zen tokens; mints and locks it's own tokens to the return-address, and passes a message to contract 2
@@ -148,7 +151,7 @@ let main txSkeleton contractHash command sender data wallet =
             >>= Tx.lockToAddress asset tokens returnAddress in
 
         let message = {
-            cHash = hashFromBase64 "%s";
+            contractId = contractIdFromBase64 "%s";
             command = "contract2_test";
             data
         } in
@@ -168,7 +171,7 @@ let ``Should execute contract chain and get a valid transaction``() =
     let _, samplePublicKey = sampleKeyPair
     let samplePKHash = PublicKey.hash samplePublicKey
 
-    let Zen = Constants.Zen
+    let Zen = Asset.Zen
 
     let input = {
         txHash = Hash.zero
@@ -195,7 +198,7 @@ let ``Should execute contract chain and get a valid transaction``() =
         }
 
     result {
-        let! (state, cHash1) = activateContract contract1Code account session state
+        let! (state, contractId1) = activateContract contract1Code account session state
         let! (state, _) = activateContract contract2Code account session state
 
         let returnAddress =
@@ -210,7 +213,7 @@ let ``Should execute contract chain and get a valid transaction``() =
             |> Types.Data.Dict
             |> Some
 
-        let! tx = TransactionHandler.executeContract session inputTx cHash1 "" None data state.memoryState
+        let! tx = TransactionHandler.executeContract session inputTx contractId1 "" None data state.memoryState
 
         let tx = Transaction.sign [ sampleKeyPair ] tx
         let txHash = Transaction.hash tx

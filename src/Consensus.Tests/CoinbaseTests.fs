@@ -22,8 +22,9 @@ let keys = getKeys 1
 let ``coinbase cannot have any locks other than coinbase lock``() =
     let tx =
       {
+         version = Version0
          inputs = [];
-         outputs=[{lock= PK Hash.zero;spend={amount=1UL;asset=Constants.Zen}}]
+         outputs=[{lock= PK Hash.zero;spend={amount=1UL;asset=Asset.Zen}}]
          witnesses=[]
          contract=None
       }
@@ -36,8 +37,9 @@ let ``coinbase cannot have any locks other than coinbase lock``() =
 let ``coinbase with wrong block nubmer should fail``() =
     let tx =
       {
+         version = Version0
          inputs = [];
-         outputs=[{lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Constants.Zen}}]
+         outputs=[{lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Asset.Zen}}]
          witnesses=[]
          contract=None
       }
@@ -50,8 +52,9 @@ let ``coinbase with wrong block nubmer should fail``() =
 let ``coinbase with inputs should fail``() =
     let tx =
       {
+         version = Version0
          inputs = [Outpoint {txHash=Hash.zero;index=1ul}];
-         outputs=[{lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Constants.Zen}}]
+         outputs=[{lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Asset.Zen}}]
          witnesses=[]
          contract=None
       }
@@ -64,8 +67,9 @@ let ``coinbase with inputs should fail``() =
 let ``coinbase with witnesses fail``() =
     let tx =
       {
+         version = Version0
          inputs = []
-         outputs=[{lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Constants.Zen}}]
+         outputs=[{lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Asset.Zen}}]
          witnesses=[PKWitness (Consensus.Tests.Helper.rootPublicKey ,Signature Array.empty)]
          contract=None
       }
@@ -78,10 +82,11 @@ let ``coinbase with witnesses fail``() =
 let ``coinbase with contract should fail``() =
     let tx =
       {
+         version = Version0
          inputs = [];
-         outputs=[{lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Constants.Zen}}]
+         outputs=[{lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Asset.Zen}}]
          witnesses=[]
-         contract=Some { code="ad";hints="ad";rlimit=0u;queries=0u }
+         contract=Some (V0 { code="ad";hints="ad";rlimit=0u;queries=0u })
       }
 
     let expected:Result<Transaction,ValidationError> = Error (General "coinbase transaction cannot activate a contract")
@@ -92,8 +97,9 @@ let ``coinbase with contract should fail``() =
 let ``valid coinbase should pass``() =
     let tx =
       {
+         version = Version0
          inputs = [];
-         outputs=[{lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Constants.Zen}}]
+         outputs=[{lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Asset.Zen}}]
          witnesses=[]
          contract=None
       }
@@ -106,11 +112,12 @@ let ``valid coinbase should pass``() =
 let ``coinbase with two outputs should pass``() =
     let tx =
       {
+         version = Version0
          inputs = [];
          outputs=
             [
-                {lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Constants.Zen}}
-                {lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Constants.Zen}}
+                {lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Asset.Zen}}
+                {lock= Coinbase (15ul, Hash.zero);spend={amount=1UL;asset=Asset.Zen}}
             ]
          witnesses=[]
          contract=None
@@ -124,6 +131,7 @@ let ``coinbase with two outputs should pass``() =
 let ``coinbase with no outputs``() =
     let tx =
       {
+         version = Version0
          inputs = []
          outputs= []
          witnesses=[]
@@ -138,8 +146,9 @@ let ``coinbase with no outputs``() =
 let ``transaction spending coinbase with maturity should be valid``() =
     let _, publicKey = keys.[0]
     let outputLock = Coinbase (15ul,PublicKey.hash publicKey)
-    let output = { lock = outputLock; spend = { asset = Constants.Zen; amount = 1UL } }
+    let output = { lock = outputLock; spend = { asset = Asset.Zen; amount = 1UL } }
     let tx = {
+        version = Version0
         inputs = [ Outpoint testInput1 ]
         witnesses = []
         outputs = [ output ]
@@ -154,8 +163,9 @@ let ``transaction spending coinbase with maturity should be valid``() =
 let ``transaction spending coinbase with no maturity should fail``() =
     let _, publicKey = keys.[0]
     let outputLock = Coinbase (15ul,PublicKey.hash publicKey)
-    let output = { lock = outputLock; spend = { asset = Constants.Zen; amount = 1UL } }
+    let output = { lock = outputLock; spend = { asset = Asset.Zen; amount = 1UL } }
     let tx = {
+        version = Version0
         inputs = [ Outpoint testInput1 ]
         witnesses = []
         outputs = [ output ]

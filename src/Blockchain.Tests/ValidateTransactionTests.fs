@@ -26,9 +26,8 @@ open Helper
 let chain = Chain.getChainParameters Chain.Local
 // Helper functions for the tests
 let getStringBytes (str : string) = System.Text.Encoding.UTF8.GetBytes str
-let getStringHash = getStringBytes >> Hash.compute
 let createTransaction address amount account =
-    match Account.createTransaction address { asset = Constants.Zen; amount = amount } account with
+    match Account.createTransaction address { asset = Asset.Zen; amount = amount } account with
     | Result.Ok tx -> tx
     | Result.Error error -> failwith error
 let getTxOutpoints txHash tx = [ for i in 0 .. List.length tx.outputs - 1 -> {txHash=txHash;index= uint32 i} ]
@@ -94,7 +93,7 @@ let ``Invalid tx doesn't raise events or update state``() =
     use databaseContext = DatabaseContext.createTemporary "test"
 
     use session = DatabaseContext.createSession databaseContext
-    let invalidTx = {inputs=[];outputs=[];witnesses=[];contract=None}
+    let invalidTx = {version=Version0;inputs=[];outputs=[];witnesses=[];contract=None}
 
     let result = Handler.handleCommand chain (ValidateTransaction invalidTx) session 1UL state
 
@@ -308,7 +307,7 @@ let ``Valid contract should be added to ActiveContractSet``() =
 
     use session = DatabaseContext.createSession databaseContext
     let rootAccount = createTestAccount()
-    let cHash = getStringHash sampleContractCode
+    let contractId = Contract.makeContractId Version0 sampleContractCode
 
     let tx =
         match Account.createActivateContractTransaction chain sampleContractCode 1ul rootAccount with
@@ -325,7 +324,7 @@ let ``Valid contract should be added to ActiveContractSet``() =
     let events, state' = Writer.unwrap result
 
     // Checking that the contract is in the ACS
-    ActiveContractSet.containsContract cHash state'.memoryState.activeContractSet |> should equal true
+    ActiveContractSet.containsContract contractId state'.memoryState.activeContractSet |> should equal true
 
     // Checking that TransactionAddedToMemPool was published
     events |> should haveLength 1
@@ -345,12 +344,12 @@ let ``Invalid contract should not be added to ActiveContractSet or mempool``() =
     use session = DatabaseContext.createSession databaseContext
     let rootAccount = createTestAccount() |> fst
     let contractCode = "x"
-    let cHash = getStringHash contractCode
+    let contractId = Contract.makeContractId Version0 contractCode
 
     let tx =
         let input, output = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head
         let output' = {output with lock=PK (publicKeyHash rootAccount)}
-        { inputs=[ Outpoint input ]; outputs=[ output' ]; witnesses=[]; contract = Some { code = contractCode; hints = ""; rlimit = 0u; queries = 0u } }
+        { version=Version0; inputs=[ Outpoint input ]; outputs=[ output' ]; witnesses=[]; contract = Some (V0 { code = contractCode; hints = ""; rlimit = 0u; queries = 0u }) }
         |> (Transaction.sign [ rootKeyPair ])
 
     let txHash = Transaction.hash tx
@@ -361,7 +360,7 @@ let ``Invalid contract should not be added to ActiveContractSet or mempool``() =
     let events, state' = Writer.unwrap result
 
     // Checking that the contract is not in the ACS
-    ActiveContractSet.containsContract cHash state'.memoryState.activeContractSet |> should equal false
+    ActiveContractSet.containsContract contractId state'.memoryState.activeContractSet |> should equal false
 
     events |> should haveLength 0
 
@@ -395,7 +394,7 @@ let ``contract activation arrived, running orphan transaction``() =
         |> Writer.unwrap
 
     let tx =
-        TransactionHandler.executeContract session sampleInputTx sampleContractHash "" None None stateWithContract.memoryState
+        TransactionHandler.executeContract session sampleInputTx sampleContractId "" None None stateWithContract.memoryState
         |> getResult
     let txHash = Transaction.hash tx
 

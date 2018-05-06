@@ -6,29 +6,20 @@ open Types
 open UtxoSet
 open FStar
 open Infrastructure
-open MBrace.FsPickler
 open Serialization
 
 [<Literal>]
 let DbVersion = 0
-
-// TODO:Move to own file
-// TODO:Implement serialize and deserialize for persistence
-type BlockState =
-    {
-        ema:EMA.T
-        activeContractSet:(Hash.Hash*uint32*string) list
-    }
 
 type T =
     {
         databaseContext:DataAccess.DatabaseContext
         tip:SingleValue<Hash.Hash>
         utxoSet:Collection<Outpoint, OutputStatus>
-        contractUtxo:MultiCollection<Hash.Hash,PointedOutput>
+        contractUtxo:MultiCollection<ContractId,PointedOutput>
         blocks:Collection<Hash.Hash,ExtendedBlockHeader.T>
         blockChildrenIndex: Index<Hash.Hash,ExtendedBlockHeader.T,Hash.Hash>
-        blockState:Collection<Hash.Hash,BlockState>
+        blockState:Collection<Hash.Hash,BlockState.T>
         blockTransactions: Collection<Hash.Hash, Hash.Hash seq>
         transactions:Collection<Hash.Hash, Transaction>
         transactionBlocks:MultiCollection<Hash.Hash, Hash.Hash>
@@ -56,19 +47,6 @@ type Session =
     interface System.IDisposable with
         member x.Dispose () = Disposables.dispose x.session
 
-let binarySerializer = FsPickler.CreateBinarySerializer()
-
-let private serializeHashes hs =
-    hs
-    |> Seq.map Hash.bytes
-    |> Array.concat
-
-let private deserializeHashes bytes =
-    bytes
-    |> Array.chunkBySize Hash.Length
-    |> Array.toSeq
-    |> Seq.map Hash.Hash
-
 let createSession context : Session =
     let session = DataAccess.DatabaseContext.createSession context.databaseContext
     {
@@ -80,25 +58,32 @@ let create dataPath =
     let databaseContext = DataAccess.DatabaseContext.create (Platform.combine dataPath "blockchain")
     use session = DatabaseContext.createSession databaseContext
 
-    let tip = SingleValue.create databaseContext "tip" Hash.bytes Hash.Hash
+    let tip = SingleValue.create databaseContext "tip" Hash.bytes (Hash.Hash >> Some)
 
-    let blocks = Collection.create session "blocks" Hash.bytes
-                    binarySerializer.Pickle<ExtendedBlockHeader.T> binarySerializer.UnPickle<ExtendedBlockHeader.T>
+    let blocks =
+        Collection.create session "blocks" Hash.bytes
+            ExtendedBlockHeader.serialize
+            ExtendedBlockHeader.deserialize
 
     let blockChildrenIndex =
         Index.create session blocks "blockChildren" Hash.Length Hash.bytes (fun _ key (value:ExtendedBlockHeader.T) ->
             value.header.parent,key)
 
-    let blockState = Collection.create session "blockState" Hash.bytes
-                        binarySerializer.Pickle<BlockState> binarySerializer.UnPickle<BlockState>
+    let blockState =
+        Collection.create session "blockState" Hash.bytes
+            BlockState.serialize
+            BlockState.deserialize
 
-    let blockTransactions = Collection.create session "blockTransactions" Hash.bytes serializeHashes deserializeHashes
+    let blockTransactions =
+        Collection.create session "blockTransactions" Hash.bytes
+            Hashes.serialize
+            (Hashes.deserialize >> Some)
 
     let transactions = Collection.create session "transactions" Hash.bytes
-                        (Transaction.serialize Full) (Transaction.deserialize Full >> Option.get)
+                        (Transaction.serialize Full) (Transaction.deserialize Full)
 
     let transactionBlocks = MultiCollection.create session "transactionBlocks"
-                                Hash.bytes Hash.bytes Hash.Hash
+                                Hash.bytes Hash.bytes (Hash.Hash >> Some)
 
     let blocks =
         blocks
@@ -106,19 +91,19 @@ let create dataPath =
 
     let utxoSet =
         Collection.create session "utxoSet"
-            binarySerializer.Pickle<Outpoint>
-            binarySerializer.Pickle<OutputStatus>
-            binarySerializer.UnPickle<OutputStatus>
+            Outpoint.serialize
+            OutputStatus.serialize
+            OutputStatus.deserialize
 
     let contractUtxo =
-        MultiCollection.create session "contractUtxo" Hash.bytes
-            binarySerializer.Pickle<PointedOutput>
-            binarySerializer.UnPickle<PointedOutput>
+        MultiCollection.create session "contractUtxo" ContractId.toBytes
+            PointedOutput.serialize
+            PointedOutput.deserialize
 
     let dbVersion =
         SingleValue.create databaseContext "dbVersion"
-            binarySerializer.Pickle<int>
-            binarySerializer.UnPickle<int>
+            Version.serialize
+            Version.deserialize
 
     match SingleValue.tryGet dbVersion session with
     | Some version when version <> DbVersion ->

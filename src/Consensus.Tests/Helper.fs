@@ -52,8 +52,9 @@ let addTransaction txHash tx accountData =
 
 let rootTx =
     {
+        version = Version0
         inputs=[];
-        outputs=[{lock = PK rootPKHash; spend= {asset = Constants.Zen;amount=100000000UL}}];
+        outputs=[{lock = PK rootPKHash; spend= {asset = Asset.Zen;amount=100000000UL}}];
         witnesses=[]
         contract=None
     }

@@ -25,8 +25,9 @@ let ``Transaction with one PK lock in inputs should have corresponding cost``() 
     let oneKeyPair = List.take 1 keys
     let _, publicKey = keys.[0]
     let outputLock = PK (PublicKey.hash publicKey)
-    let output = { lock = outputLock; spend = { asset = Constants.Zen; amount = 1UL } }
+    let output = { lock = outputLock; spend = { asset = Asset.Zen; amount = 1UL } }
     let tx = {
+        version = Version0
         inputs = [ Outpoint testInput1 ]
         witnesses = []
         outputs = [ output ]
@@ -47,8 +48,8 @@ let ``Transaction with many PK locks in inputs should have right cost``() =
             PK (PublicKey.hash publicKey) ]
     let outputs =
         [ for lk in outputLocks ->
-            { lock = lk; spend = { asset = Constants.Zen; amount = 1UL} } ]
-    let tx = { inputs=inputs;witnesses=[];outputs=outputs;contract=None }
+            { lock = lk; spend = { asset = Asset.Zen; amount = 1UL} } ]
+    let tx = { version=Version0;inputs=inputs;witnesses=[];outputs=outputs;contract=None }
     let utxos = Map.ofList <| List.zip outpoints (List.map Unspent outputs)
     let sTx = Transaction.sign keys tx
     let txWeight = transactionWeight getUTXO utxos sTx
@@ -61,9 +62,9 @@ let ``Transaction with many PK locks in inputs should have right cost``() =
 [<Test>]
 let ``Contract validated transaction should have the right cost``() =
     let cHash = testHash
-    let cAsset = testHash, Hash.zero
-    let cLock = Contract cHash
-    let cSpend = { asset = Constants.Zen; amount = 1UL }
+    let cAsset = Asset (ContractId (Version0, testHash), Hash.zero)
+    let cLock = Contract <| ContractId (Version0,cHash)
+    let cSpend = { asset = Asset.Zen; amount = 1UL }
     let mintInput = Types.Input.Mint { asset = cAsset; amount = 100UL }
     let outpoints = List.map2 getInput [1uy..10uy] [0ul..9ul]
     let inputs = List.map Outpoint outpoints
@@ -72,13 +73,13 @@ let ``Contract validated transaction should have the right cost``() =
     let outputSpends = [
         {asset=cAsset;amount=50UL};
         {asset=cAsset;amount=50UL};
-        {asset=Constants.Zen;amount=10UL}
+        {asset=Asset.Zen;amount=10UL}
     ]
     let outputs = [
         for spend in outputSpends -> {lock=cLock;spend=spend}
     ]
     let cWitness = {
-        cHash = cHash;
+        contractId=ContractId (Version0,cHash);
         command = "foo";
         data = None;
         beginInputs = 0u;       //
@@ -89,6 +90,7 @@ let ``Contract validated transaction should have the right cost``() =
         cost = 200u;
     }
     let tx = {
+        version = Version0
         inputs = mintInput::inputs;
         outputs = outputs;
         contract = None;
@@ -100,9 +102,9 @@ let ``Contract validated transaction should have the right cost``() =
 [<Test>]
 let ``Two contracts in sequence should have the right cost``() =
     let cHash = testHash
-    let cAsset = testHash, Hash.zero
-    let cLock = Contract cHash
-    let cSpend = { asset = Constants.Zen; amount = 1UL }
+    let cAsset = Asset (ContractId (Version0, testHash), Hash.zero)
+    let cLock = Contract <| ContractId (Version0,cHash)
+    let cSpend = { asset = Asset.Zen; amount = 1UL }
     let outpoints = List.map2 getInput [1uy..10uy] [0ul..9ul]
     let inputs = List.map Outpoint outpoints
     let utxos =
@@ -110,13 +112,13 @@ let ``Two contracts in sequence should have the right cost``() =
     let outputSpends = [
         {asset=cAsset;amount=50UL};
         {asset=cAsset;amount=50UL};
-        {asset=Constants.Zen;amount=10UL}
+        {asset=Asset.Zen;amount=10UL}
     ]
     let outputs = [
         for spend in outputSpends -> {lock=cLock;spend=spend}
     ]
     let cWitness1 = {
-        cHash = cHash;
+        contractId=ContractId (Version0,cHash);
         command = "foo";
         data = None;
         beginInputs = 0u;
@@ -136,6 +138,7 @@ let ``Two contracts in sequence should have the right cost``() =
             cost = 50u;
     }
     let tx = {
+        version = Version0
         inputs = inputs;
         outputs = outputs;
         contract = None;
@@ -149,8 +152,9 @@ let ``Transaction with too many witnesses should fail``() =
     let twoKeyPairs = List.take 2 keys
     let _, publicKey = keys.[0]
     let outputLock = PK (PublicKey.hash publicKey)
-    let output = { lock = outputLock; spend = { asset = Constants.Zen; amount = 1UL } }
+    let output = { lock = outputLock; spend = { asset = Asset.Zen; amount = 1UL } }
     let tx = {
+        version = Version0
         inputs = [ Outpoint testInput1 ]
         witnesses = []
         outputs = [ output ]
@@ -165,8 +169,9 @@ let ``Transaction with too many witnesses should fail``() =
 let ``Transaction with too few witnesses should fail``() =
     let _, publicKey = keys.[0]
     let outputLock = PK (PublicKey.hash publicKey)
-    let output = { lock = outputLock; spend = { asset = Constants.Zen; amount = 1UL } }
+    let output = { lock = outputLock; spend = { asset = Asset.Zen; amount = 1UL } }
     let tx = {
+        version = Version0
         inputs = [ Outpoint testInput1 ]
         witnesses = []
         outputs = [ output ]
