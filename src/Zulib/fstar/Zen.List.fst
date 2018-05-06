@@ -169,9 +169,9 @@ let sumBy #_ f ls =
             : int `cost` (length ls * 4 + 4) = sum ls' in
     force_map_length f ls;
     map f ls
-    |> refine_prop_in (fun ls' -> length ls' == length ls)
+    |> refine_in (fun ls' -> length ls' == length ls)
     >>= sum
-    |> retype (int `cost` (length ls * 6 + 6))
+    |> cast (int `cost` (length ls * 6 + 6))
 
 val sumByT(#a:Type)(#n:nat):
     (a -> int `cost` n)
@@ -182,9 +182,9 @@ let sumByT #_ #n f ls =
             : int `cost` (length ls * 4 + 4) = sum ls' in
     force_mapT_length f ls;
     mapT f ls
-    |> refine_prop_in (fun ls' -> length ls' == length ls)
+    |> refine_in (fun ls' -> length ls' == length ls)
     >>= sum
-    |> retype (int `cost` (length ls * (n + 6) + 6))
+    |> cast (int `cost` (length ls * (n + 6) + 6))
 
 val or_: ls : list bool -> bool `cost` (length ls * 4 + 4)
 let or_ = fold ( || ) true
@@ -199,9 +199,9 @@ let any #_ f ls =
         or_ bools in
     force_map_length f ls;
     map f ls
-    |> refine_prop_in (fun ls' -> length ls' == length ls)
+    |> refine_in (fun ls' -> length ls' == length ls)
     >>= or_
-    |> retype (bool `cost` (length ls * 6 + 6))
+    |> cast (bool `cost` (length ls * 6 + 6))
 
 val anyT(#a:Type)(#n:nat):
     (a -> bool `cost` n)
@@ -213,9 +213,9 @@ let anyT #_ #n f ls =
         or_ bools in
     force_mapT_length f ls;
     mapT f ls
-    |> refine_prop_in (fun ls' -> length ls' == length ls)
+    |> refine_in (fun ls' -> length ls' == length ls)
     >>= or_
-    |> retype (bool `cost` (length ls * (n + 6) + 6))
+    |> cast (bool `cost` (length ls * (n + 6) + 6))
 
 val and_: ls: list bool -> bool `cost` (length ls * 4 + 4)
 let and_ = fold ( && ) true
@@ -230,9 +230,9 @@ let all #_ f ls =
         and_ bools in
     force_map_length f ls;
     map f ls
-    |> refine_prop_in (fun ls' -> length ls' == length ls)
+    |> refine_in (fun ls' -> length ls' == length ls)
     >>= and_
-    |> retype (bool `cost` (length ls * 6 + 6))
+    |> cast (bool `cost` (length ls * 6 + 6))
 
 val allT(#a:Type)(#n:nat):
     (a -> bool `cost` n)
@@ -244,9 +244,9 @@ let allT #_ #n f ls =
         and_ bools in
     force_mapT_length f ls;
     mapT f ls
-    |> refine_prop_in (fun ls' -> length ls' == length ls)
+    |> refine_in (fun ls' -> length ls' == length ls)
     >>= and_
-    |> retype (bool `cost` (length ls * (n + 6) + 6))
+    |> cast (bool `cost` (length ls * (n + 6) + 6))
 
 val max : ls:list int{length ls > 0} -> int `cost` (length ls * 7 + 7)
 let max ls = foldT (fun max x -> (if x > max then x else max) |> incRet 3)
