@@ -72,7 +72,7 @@ type PublishBlockJson = JsonProvider<"""
 type ActiveContractsResponseJson = JsonProvider<"""
 [
     {
-        "contactId": "contractId",
+        "contractId": "contractId",
         "address":"address",
         "expire": 555,
         "code": "printfn hello world"

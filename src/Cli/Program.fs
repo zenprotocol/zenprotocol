@@ -240,7 +240,7 @@ let main argv =
             printfn "========================================="
 
             Array.iter (fun (activeContract:ActiveContractsResponseJson.Root) ->
-                printfn " %s %s\t| %d" activeContract.Address activeContract.ContactId activeContract.Expire) activeContracts
+                printfn " %s %s\t| %d" activeContract.Address activeContract.ContractId activeContract.Expire) activeContracts
         | Some (PublishBlock args) ->
             let block = args.GetResult <@ PublishBlock_Arguments @>
             "block/publish"
