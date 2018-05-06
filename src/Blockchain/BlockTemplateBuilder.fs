@@ -1,6 +1,7 @@
 ﻿module Blockchain.BlockTemplateBuilder
 
 open Infrastructure
+open Consensus.ValidationError
 open Consensus.TransactionValidation
 open Blockchain.State
 open Consensus

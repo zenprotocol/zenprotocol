@@ -40,5 +40,6 @@ let fromString b16 =
                 Some <| Asset (ContractId (version,assetType),subType)
             | _ -> None
 
-
 let defaultOf contractId = Asset(contractId,Hash.zero)
+
+let contractId (Asset (contractId,_)) = contractId

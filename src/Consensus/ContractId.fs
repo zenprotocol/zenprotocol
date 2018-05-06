@@ -26,3 +26,5 @@ let fromString b16 =
     |> Option.bind fromBytes
 
 let contractHash (ContractId (_,cHash)) = cHash
+
+let version (ContractId (version,_)) = version

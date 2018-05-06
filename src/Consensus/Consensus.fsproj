@@ -65,6 +65,12 @@
     <Compile Include="Contract.fs" />
     <Compile Include="ContractCache.fs" />
     <Compile Include="ActiveContractSet.fs" />
+    <Compile Include="ValidationError.fs" />
+    <Compile Include="InputValidation\State.fs" />
+    <Compile Include="InputValidation\PK.fs" />
+    <Compile Include="InputValidation\Coinbase.fs" />
+    <Compile Include="InputValidation\ContractV0.fs" />
+    <Compile Include="InputValidation\StateMachine.fs" />
     <Compile Include="TransactionValidation.fs" />
     <Compile Include="Block.fs" />
     <Content Include="Consensus.fsproj.paket.template" />
