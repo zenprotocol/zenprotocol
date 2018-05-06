@@ -140,20 +140,21 @@ let private fsToFstPointedOutput ((outpoint, output):PointedOutput) : pointedOut
 let private fsToFstOutpointOutputTuple (outpoint:Types.Outpoint, output) : (outpoint * output) =
     { txHash = Hash.bytes outpoint.txHash; index = outpoint.index }, fsToFstOutput output
 
-let private fstToFsTx (txSkeleton: txSkeleton) : TxSkeleton.T =
-    { pInputs = txSkeleton.inputs |> snd
-                                  |> Map.toList
-                                  |> List.collect(snd >> snd)
-                                  |> List.sortBy fst
-                                  |> List.map (snd >> fstToFsInput);
-     outputs = txSkeleton.outputs |> snd
-                                  |> Map.toList
-                                  |> List.collect(snd >> snd)
-                                  |> List.sortBy fst
-                                  |> List.map (snd >> fstToFsOutput) }
+let private fstToFsTx: txSkeleton -> TxSkeleton.T = function
+    | {inputs=_,inputMap; outputs=_,outputMap} ->
+        let pInputs = inputMap  |> Map.toList
+                                |> List.collect(snd >> snd)
+                                |> List.sortBy fst
+                                |> List.map (snd >> fstToFsInput)
+        let outputs = outputMap |> Map.toList
+                                |> List.collect(snd >> snd)
+                                |> List.sortBy fst
+                                |> List.map (snd >> fstToFsOutput)
+         
+        { pInputs=pInputs; outputs=outputs }
 
 let fstTofsMessage (msg: Zen.Types.Main.message) : Consensus.Types.Message =
-    { cHash = Hash.Hash msg.cHash
+    { contractId = fstToFsContractId msg.contractId
       command = fstToFsString msg.command
       data = fstToFsOption msg.data }
 
