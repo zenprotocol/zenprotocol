@@ -18,38 +18,60 @@ unfold val op_Array_Access (#a:Type)(#l:nat): array a l -> i:nat{i<l} -> cost a 
 unfold let op_Array_Access #_ #_ arr i = item i arr
 
 (** create returns an array of length l in which each element is x. *)
-val create(#a:Type): l:nat -> x:a -> cost (array a l) (l+1)
+val create(#a:Type): l:pos -> x:a -> cost (array a l) l
 let create(#_) l x = init l (const_ x >> ret)
 
 (** sub returns the subrange of arr from i to (i+j). *)
-val sub(#a:Type)(#l:nat): arr:array a l -> i:nat{i<l} -> j:nat{j+i <= l}
-  -> cost (array a j) ((j+1)*2)
+val sub(#a:Type)(#l:pos): arr:array a l -> i:nat{i<l} -> j:pos{j+i <= l}
+  -> cost (array a j) (j * 2)
 let sub #_ #_ arr i j = init j (fun idx -> arr.(idx+i))
 
 (** Creates an array whose elements are the results of applying the supplied function to each of the elements of a supplied array. *)
 val map(#a #b:Type)(#n #l:nat): (a -> cost b n) -> array a l
-  -> cost (array b l) ((l+1)*(n+2))
-let map #_ #_ #_ #l f arr = init l (get arr >=> f)
+  -> cost (array b l) ((n+2)*l)
+let map #_ #_ #_ #l f arr =
+    if l = 0 then ret empty else
+    init l (get arr >=> f)
 
 (** [concat a1 a2] returns an array containing the elements of a1 followed by the elements of a2. *)
 val concat(#a:Type)(#l1 #l2:nat): array a l1 -> array a l2
-  -> cost (array a (l1+l2)) ((l1+l2+1)*2)
-let concat #_ #l1 #l2 a1 a2 =
-  let fetch (i:nat{ i < (l1+l2)}) = if i < l1 then a1.(i) else a2.(i-l1) in
+  -> cost (array a (l1+l2)) (2*(l1+l2))
+let concat #a #l1 #l2 a1 a2 =
+  let fetch (i:nat{ i < (l1+l2)}): a `cost` 1 =
+    if i < l1 then a1.(i) else a2.(i-l1)
+  in
+  if l1 + l2 = 0 then ret empty else
   init (l1+l2) fetch
 
 (** [concat3 a1 a2 a3] returns an array containing the elements of a1 followed by the elements of a2 followed by the elements of a3. *)
 val concat3(#a:Type)(#l1 #l2 #l3:nat): array a l1 -> array a l2 -> array a l3
-  -> cost (array a (l1+l2+l3)) ((l1+l2+l3+1)*2)
+  -> cost (array a (l1+l2+l3)) (2 * (l1+l2+l3))
 let concat3 #_ #l1 #l2 #l3 a1 a2 a3 =
   let fetch (i:nat{ i < (l1+l2+l3)}) = if i < l1      then a1.(i)
                                   else if i < l1 + l2 then a2.(i-l1)
-                                  else                     a3.(i-l1-l2) in
+                                  else                     a3.(i-l1-l2)
+  in
+  if (l1+l2+l3) = 0 then ret empty else
   init (l1+l2+l3) fetch
+
+val chunkBySize(#a:Type)(#l:nat):
+    size:pos
+    -> a `array` l
+    -> array (array a size) (l / size)
+       `cost`
+       ((l/size)*(2*size+1))
+let chunkBySize #a #l size arr =
+    let chunk (i: nat{i < (l / size)})
+              : array a size `cost` (2*size) =
+              assert(i <= (l/size) - 1);
+              sub arr (i * size) size
+    in
+    if l / size = 0 then ret empty else
+    init (l / size) chunk
 
 (** [split arr i] returns a tuple of the elements of [arr] before [arr.(i)], and the remaining elements. *)
 val split(#a:Type)(#l:nat{l >= 2}): arr:array a l -> i:nat{0 < i /\ i < l}
-  -> cost (array a i ** array a (l-i)) (2*(l+2))
+  -> cost (array a i ** array a (l-i)) (2*l)
 let split #_ #l arr i =
     let fst, snd = sub arr 0 i, sub arr i (l-i) in
     Mktuple2 <$> fst <*> snd
@@ -59,7 +81,7 @@ val split3(#a:Type)(#l:nat{l >= 3}):
   arr: array a l
   -> i:nat{0 < i /\ i < (l-1)}
   -> j:nat{i < j /\ j < l}
-  -> cost (array a i ** array a (j-i) ** array a (l-j)) (2*(l+3))
+  -> cost (array a i ** array a (j-i) ** array a (l-j)) (2*l)
 let split3 #_ #l arr i j =
     let fst, snd, third = sub arr 0 i, sub arr i (j-i), sub arr j (l-j) in
     Mktuple3 <$> fst <*> snd <*> third
@@ -70,7 +92,7 @@ val split4(#a:Type)(#l:nat{l >= 4}):
   -> i:nat{0 < i /\ i < (l-2)}
   -> j:nat{i < j /\ j < (l-1)}
   -> k:nat{j < k /\ k < l}
-  -> cost (array a i ** array a (j-i) ** array a (k-j) ** array a (l-k)) (2*(l+4))
+  -> cost (array a i ** array a (j-i) ** array a (k-j) ** array a (l-k)) (2*l)
 let split4 #_ #l arr i j k =
     let fst, snd, third, fourth =
         sub arr 0 i, sub arr i (j-i), sub arr j (k-j), sub arr k (l-k) in
