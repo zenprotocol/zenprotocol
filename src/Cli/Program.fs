@@ -209,7 +209,7 @@ let main argv =
                         |> getResponse
                         |> ContractActivateResponseJson.Parse
 
-                    printfn "Contract activated.\nAddress: %s\nHash: %s" result.Address result.ContractId
+                    printfn "Contract activated.\nAddress: %s\nContract Id: %s" result.Address result.ContractId
         | Some (Extend args) ->
             let address, numberOfBlocks, password = args.GetResult <@ ExtendContract_Arguments @>
             "wallet/contract/extend"
@@ -236,7 +236,7 @@ let main argv =
                 |> getUri
                 |> ActiveContractsResponseJson.Load
 
-            printfn "Address\t\t| Hash\t\t | Expire"
+            printfn "Address\t\t| Contract Id\t\t | Expire"
             printfn "========================================="
 
             Array.iter (fun (activeContract:ActiveContractsResponseJson.Root) ->
