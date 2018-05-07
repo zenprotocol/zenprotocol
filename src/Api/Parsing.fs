@@ -40,7 +40,7 @@ let parseContractExecuteJson chain json =
         else
             match Address.decodeContract chain json.Address with
             | Error err -> Error ("Address is invalid: " + err)
-            | Ok cHash ->
+            | Ok contractId ->
                 let mutable spends = Map.empty
                 let mutable errors = List.empty
 
@@ -69,7 +69,7 @@ let parseContractExecuteJson chain json =
                         else
                             Some json.Options.Sign
 
-                    Ok (cHash, json.Command, data, json.Options.ReturnAddress, sign, spends, json.Password)
+                    Ok (contractId, json.Command, data, json.Options.ReturnAddress, sign, spends, json.Password)
                 else
                     errors
                     |> String.concat " "
@@ -103,7 +103,7 @@ let parseContractExtendJson chain json =
         else
             match Address.decodeContract chain json.Address with
             | Error err -> Error ("Address is invalid: " + err)
-            | Ok cHash -> Ok (cHash, uint32 json.NumberOfBlocks, json.Password)
+            | Ok contractId -> Ok (contractId, uint32 json.NumberOfBlocks, json.Password)
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
 
@@ -156,7 +156,7 @@ let parseCheckPasswordJson json =
             Ok json.Password
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
-        
+
 let parseTransactionsRequestJson json =
     try
         let json = TransactionsRequestJson.Parse json
