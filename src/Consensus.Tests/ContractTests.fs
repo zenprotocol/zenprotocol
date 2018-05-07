@@ -274,3 +274,41 @@ let ``Contract should be able to destroy its own tokens locked to it``() =
     (compileRunAndValidate sampleInputTx utxoSet sampleContractCode
     , (Ok sampleExpectedResult : Result<Transaction, string>))
     |> shouldEqual
+
+[<Test>]
+[<ParallelizableAttribute>]
+let ``Contract should be able to use its context``() =
+    let code = """
+    open Zen.Types
+    open Zen.Base
+    open Zen.Cost
+    
+    module RT = Zen.ResultT
+    module Tx = Zen.TxSkeleton
+    
+    let main txSkeleton contractContext contractHash command sender data wallet =
+    let! asset = Zen.Asset.getDefault contractHash in
+    let lock = ContractLock contractHash in
+    let spend = {
+        asset=asset;
+        amount=contractContext.timestamp
+    } in
+    
+    let pInput = Mint spend in
+    
+    let! txSkeleton =
+    Tx.addInput pInput txSkeleton
+    >>= Tx.lockToContract spend.asset spend.amount contractHash in
+    
+    RT.ok (txSkeleton, None)
+    
+    val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 9
+    let cf _ _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 22)
+    """
+    compileRunAndValidate sampleInputTx utxoSet code
+    |> Result.mapError failwith
+    |> Result.map (fun tx -> tx.outputs.[1].spend.amount )
+    |> Result.map (fun amt ->
+        (amt, context.timestamp) |> shouldEqual
+    )
+    |> ignore
