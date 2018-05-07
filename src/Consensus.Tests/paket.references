@@ -13,3 +13,4 @@ System.Reflection.Metadata
 Logary
 FsNetMQ
 SpecFlow.NUnit
+FsBech32
