@@ -148,11 +148,16 @@ let private checkDuplicateInputs tx =
     if List.distinct tx.inputs == tx.inputs then Ok tx
     else GeneralError "inputs duplicated"
 
+let private checkMintsOnly tx =
+    if List.forall (function | Mint _ -> true | _ -> false) tx.inputs then
+        GeneralError "inputs consist of mints only"
+    else
+        Ok tx
+    
 let private checkStructure =
     let isInvalidSpend = fun { asset = (Asset (ContractId (version,cHash), subType)); amount = amount } ->
         cHash = Hash.zero && (subType <> Hash.zero || version <> Version0) ||
             amount = 0UL //Relieve for non spendables?
-
     let isNull = function | null -> true | _ -> false
     let isEmptyArr arr = isNull arr || Array.length arr = 0
     let isEmptyString str = isNull str || String.length str = 0
@@ -259,6 +264,7 @@ let validateBasic =
     >=> checkNoCoinbaseLock
     >=> checkOutputsOverflow
     >=> checkDuplicateInputs
+    >=> checkMintsOnly
     >=> checkActivationSacrifice
 
 let validateCoinbase blockNumber =

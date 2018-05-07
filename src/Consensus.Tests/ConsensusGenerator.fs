@@ -361,7 +361,11 @@ type ConsensusGenerator =
             }
 
         Arb.fromGen (gen {
-            let! inputs = Gen.nonEmptyListOf inputGenerator
+            let checkMintsOnly = 
+                List.forall (function | Mint _ -> true | _ -> false) 
+                >> not
+
+            let! inputs = Gen.nonEmptyListOf inputGenerator |> Gen.filter checkMintsOnly
             let! outputs = Gen.nonEmptyListOf outputGenerator
             let! witnesses =
                 [ highVWitnessGenerator
