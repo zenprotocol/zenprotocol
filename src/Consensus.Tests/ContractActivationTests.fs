@@ -2,6 +2,7 @@ module Consensus.Tests.ContractActivationTests
 
 open Consensus
 open Consensus.Types
+open Consensus.ValidationError
 open Consensus.TransactionValidation
 open Wallet
 open NUnit.Framework

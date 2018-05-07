@@ -150,3 +150,12 @@ let getCost contract = contract.costFn
 
 let run contract txSkeleton command sender data wallet =
     contract.mainFn txSkeleton contract.contractId command sender data wallet
+
+let getContractWallet (txSkeleton:TxSkeleton.T) (w:ContractWitness) =
+    txSkeleton.pInputs.[int w.beginInputs .. int w.endInputs]
+    |> List.choose (fun input ->
+        match input with
+        | TxSkeleton.PointedOutput (outpoint,output) when output.lock = Consensus.Types.Contract w.contractId ->
+            Some (outpoint,output)
+        | _ -> None
+    )

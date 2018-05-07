@@ -3,6 +3,7 @@ module Consensus.Tests.TransactionHelpers
 open Consensus
 open Consensus.Types
 open Consensus.Chain
+open ValidationError
 open TransactionValidation
 
 
@@ -16,7 +17,7 @@ let private contractPath = "./test"
 let private inputsValidation blockNumber acs utxos signedTx txHash =
     let getUTXO _ = UtxoSet.NoOutput
 
-    validateInContext Chain.localParameters getUTXO contractPath blockNumber acs Map.empty utxos txHash signedTx 
+    validateInContext Chain.localParameters getUTXO contractPath blockNumber acs Map.empty utxos txHash signedTx
     |> Result.map (fun (tx, _, _) -> tx)
 
 let inputsValidationMsg msg blockNumber acs utxos tx keys =

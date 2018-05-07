@@ -6,6 +6,7 @@ open FsUnit
 open Consensus
 open Consensus.Crypto
 open Consensus.Types
+open Consensus.ValidationError
 open Consensus.TransactionValidation
 open Consensus.Tests.Helper
 open Wallet
