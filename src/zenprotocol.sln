@@ -137,6 +137,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Zulib", "Zulib", "{0CA87DC0
 		Zulib\fstar\Zen.ContractResult.NoMessage.fst = Zulib\fstar\Zen.ContractResult.NoMessage.fst
 		Zulib\fstar\Zen.Hash.Sha3.fsti = Zulib\fstar\Zen.Hash.Sha3.fsti
 		Zulib\fsharp\Realized\Zen.Hash.Sha3.fs = Zulib\fsharp\Realized\Zen.Hash.Sha3.fs
+		Zulib\fstar\Zen.Bitcoin.fsti = Zulib\fstar\Zen.Bitcoin.fsti
+		Zulib\fstar\Zen.List.fst = Zulib\fstar\Zen.List.fst
+		Zulib\fsharp\Realized\Zen.Bitcoin.fs = Zulib\fsharp\Realized\Zen.Bitcoin.fs
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ContractExamples", "ContractExamples", "{38137384-85D5-41FE-B40B-27E4F54898D0}"
