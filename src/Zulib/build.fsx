@@ -1,6 +1,6 @@
 
-//#r @"../../packages/System.Reflection.Metadata/lib/portable-net45+win8/System.Reflection.Metadata.dll"
-#r @"../../packages/System.Reflection.Metadata/lib/netstandard1.1/System.Reflection.Metadata.dll"
+#r @"../../packages/System.Reflection.Metadata/lib/portable-net45+win8/System.Reflection.Metadata.dll"
+//#r @"../../packages/System.Reflection.Metadata/lib/netstandard1.1/System.Reflection.Metadata.dll"
 #r @"../../packages/FAKE/tools/FakeLib.dll"
 #r @"../../packages/Zen.FSharp.Compiler.Service/lib/net45/Zen.FSharp.Compiler.Service.dll"
 
@@ -159,6 +159,7 @@ Target "Build" (fun _ ->
       "fsharp/Extracted/Zen.ContractResult.NoMessage.fs";
       "fsharp/Realized/Zen.Hash.Sha3.fs";
       "fsharp/Realized/Zen.Crypto.fs";
+      "fsharp/Realized/Zen.Bitcoin.fs";
     |]
 
   let checker = FSharpChecker.Create()

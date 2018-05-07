@@ -6,6 +6,7 @@ open Messaging.Events
 open Infrastructure
 open Consensus
 open Consensus.Transaction
+open Consensus.ValidationError
 open Consensus.TransactionValidation
 open Consensus.Types
 open State
@@ -169,7 +170,7 @@ let executeContract session txSkeleton contractId command sender data state =
                     let witness = TxSkeleton.getContractWitness contract.contractId command data txSkeleton finalTxSkeleton 0L
 
                     // To commit to the cost we need the real contract wallet
-                    let contractWallet = TransactionValidation.getContractWallet tx witness
+                    let contractWallet = Contract.getContractWallet tx witness
                     let cost = Contract.getCost contract txSkeleton command sender data contractWallet
                     let totalCost = cost + totalCost
 
