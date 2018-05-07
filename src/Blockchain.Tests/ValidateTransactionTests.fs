@@ -393,30 +393,33 @@ let ``contract activation arrived, running orphan transaction``() =
         Handler.handleCommand chain (ValidateTransaction activationTransaction) session 1UL state
         |> Writer.unwrap
 
-    let tx =
-        TransactionHandler.executeContract session sampleInputTx sampleContractId "" None None stateWithContract.memoryState
-        |> getResult
-    let txHash = Transaction.hash tx
+    let txHash,tx =
+        let tx =
+            TransactionHandler.executeContract session sampleInputTx sampleContractId "" None None stateWithContract.memoryState
+            |> getResult
+        let txHash = Transaction.hash tx
+        let pkWitness =
+            let signature = Crypto.sign samplePrivateKey txHash
+            PKWitness (samplePublicKey, signature)
+        txHash, { tx with witnesses = pkWitness :: tx.witnesses }
 
     let events, state =
         Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
         |> Writer.unwrap
 
-    // Checking that both transaction added to mempool and published
     events |> should haveLength 0
     OrphanPool.containsTransaction txHash state.memoryState.orphanPool |> should equal true
 
-    // This will actually fail and the transaction will not pass, however it is enough for our test
-    // to see that the transaction was run and removed from orphan pool as it is not valid
     let events, state =
         Handler.handleCommand chain (ValidateTransaction activationTransaction) session 1UL state
         |> Writer.unwrap
 
-    events |> should haveLength 1
+    events |> should haveLength 2
     OrphanPool.containsTransaction txHash state.memoryState.orphanPool |> should equal false
     MemPool.containsTransaction activationTxHash state.memoryState.mempool |> should equal true
-    MemPool.containsTransaction txHash state.memoryState.mempool |> should equal false
+    MemPool.containsTransaction txHash state.memoryState.mempool |> should equal true
     events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (activationTxHash,activationTransaction)))
+    events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (txHash,tx)))
 
 [<Test>]
 let ``Transaction already in db but not part of the main chain``() =

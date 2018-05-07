@@ -6,6 +6,7 @@ open Consensus.Hash
 open Consensus.UtxoSet
 open NUnit.Framework
 open Crypto
+open ValidationError
 open TransactionValidation
 open FsUnit
 open TransactionNunitHelpers

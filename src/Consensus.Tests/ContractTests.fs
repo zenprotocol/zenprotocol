@@ -56,7 +56,7 @@ let ``Should get 'elaborate' error for invalid code``() =
     |> shouldEqual
 
 let mapError = function
-    | TransactionValidation.ValidationError.General error -> error
+    | ValidationError.ValidationError.General error -> error
     | other -> other.ToString()
 
 let validateInputs (contract:Contract.T) utxos tx  =
@@ -271,98 +271,4 @@ let ``Contract should be able to destroy its own tokens locked to it``() =
 
     (compileRunAndValidate sampleInputTx utxoSet sampleContractCode
     , (Ok sampleExpectedResult : Result<Transaction, string>))
-    |> shouldEqual
-
-[<Test>]
-[<ParallelizableAttribute>]
-let ``Contract should not be able to destroy tokens other than its own - single output``() =
-    let contractCode = """
-    open Zen.Types
-    open Zen.Base
-    open Zen.Cost
-    open Zen.Asset
-
-    module RT = Zen.ResultT
-    module Tx = Zen.TxSkeleton
-
-    let main txSkeleton contractHash command sender data wallet =
-        let! txSkeleton1 = Tx.destroy 1000UL zenAsset txSkeleton in // should be impossible
-        RT.ok (txSkeleton1, None)
-
-    val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 3
-        let cf _ _ _ _ _ = ret (64 + 8)
-    """
-
-    let contractId = Contract.makeContractId Version0 contractCode
-
-    let outputToDestroy = {
-        lock = Contract contractId
-        spend = { asset = Asset.defaultOf contractId; amount = 1000UL }
-    }
-
-    let sampleInput2 = {
-        txHash = Hash.zero
-        index = 2u
-    }
-
-    let sampleInputTx =
-        {
-            pInputs = [ PointedOutput (sampleInput, sampleOutput) ; PointedOutput (sampleInput2, outputToDestroy) ]
-            outputs = [ sampleOutput ]
-        }
-
-    let utxoSet =
-        getSampleUtxoset (UtxoSet.asDatabase)
-        |> Map.add sampleInput2 (OutputStatus.Unspent outputToDestroy)
-
-    (compileRunAndValidate sampleInputTx utxoSet contractCode
-    , (Error "illegal destruction of tokens" : Result<Transaction, string>))
-    |> shouldEqual
-
-[<Test>]
-[<ParallelizableAttribute>]
-let ``Contract should not be able to destroy tokens other than its own - multiple (two) outputs``() =
-    let contractCode = """
-    open Zen.Types
-    open Zen.Base
-    open Zen.Cost
-    open Zen.Asset
-
-    module RT = Zen.ResultT
-    module Tx = Zen.TxSkeleton
-
-    let main txSkeleton contractHash command sender data wallet =
-        let! asset = Zen.Asset.getDefault contractHash in
-        let txSkeleton1 = Tx.destroy 1000UL zenAsset txSkeleton in // should be impossible
-        let! txSkeleton2 = txSkeleton1 >>= Tx.destroy 1000UL asset in // should be possible
-        RT.ok (txSkeleton2, None)
-
-    val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 9
-        let cf _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 15)
-    """
-
-    let contractId = Contract.makeContractId Version0 contractCode
-
-    let outputToDestroy = {
-        lock = Contract contractId
-        spend = { asset = Asset.defaultOf contractId; amount = 1000UL }
-    }
-
-    let sampleInput2 = {
-        txHash = Hash.zero
-        index = 2u
-    }
-
-    let sampleInputTx =
-        {
-            pInputs = [ PointedOutput (sampleInput, sampleOutput) ; PointedOutput (sampleInput2, outputToDestroy) ]
-            outputs = [ sampleOutput ]
-        }
-
-    let utxoSet =
-        getSampleUtxoset (UtxoSet.asDatabase)
-        |> Map.add sampleInput2 (OutputStatus.Unspent outputToDestroy)
-
-    (compileRunAndValidate sampleInputTx utxoSet contractCode
-    , (Error "illegal destruction of tokens" : Result<Transaction, string>))
     |> shouldEqual
