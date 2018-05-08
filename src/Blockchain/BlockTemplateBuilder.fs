@@ -1,4 +1,4 @@
-﻿module Blockchain.BlockTemplateBuilder
+module Blockchain.BlockTemplateBuilder
 
 open Infrastructure
 open Consensus.ValidationError
@@ -29,14 +29,14 @@ let weights session state =
                 | _ -> ()
             ]
 
-let selectOrderedTransactions (chain:Chain.ChainParameters) (session:DatabaseContext.Session) blockNumber acs contractCache transactions =
+let selectOrderedTransactions (chain:Chain.ChainParameters) (session:DatabaseContext.Session) blockNumber timestamp acs contractCache transactions =
     let contractPath = session.context.contractPath
     let maxWeight = chain.maxBlockWeight
 
     let tryAddTransaction (state, added, notAdded, altered, weight) (txHash,tx,wt) =
         let newWeight = weight+wt
         if newWeight > maxWeight then (state, added, notAdded, false, weight) else
-        validateInContext chain (getUTXO session) contractPath (blockNumber + 1ul)
+        validateInContext chain (getUTXO session) contractPath (blockNumber + 1ul) timestamp
             state.activeContractSet state.contractCache state.utxoSet txHash tx
         |> function
             | Error (Orphan | ContractNotActive) ->
@@ -70,6 +70,6 @@ let selectOrderedTransactions (chain:Chain.ChainParameters) (session:DatabaseCon
     foldUntilUnchanged initialState transactions
 
 
-let makeTransactionList chain (session:DatabaseContext.Session) (state:State) =
+let makeTransactionList chain (session:DatabaseContext.Session) (state:State) timestamp =
     let txs = weights session state |> List.sortBy (fun (_,_,wt) -> -wt)
-    selectOrderedTransactions chain session state.tipState.tip.header.blockNumber state.tipState.activeContractSet state.memoryState.contractCache txs
+    selectOrderedTransactions chain session state.tipState.tip.header.blockNumber timestamp state.tipState.activeContractSet state.memoryState.contractCache txs

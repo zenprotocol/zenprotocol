@@ -14,20 +14,20 @@ let getSignedTx tx keys =
 
 let private contractPath = "./test"
 
-let private inputsValidation blockNumber acs utxos signedTx txHash =
+let private inputsValidation blockNumber timestamp acs utxos signedTx txHash =
     let getUTXO _ = UtxoSet.NoOutput
 
-    validateInContext Chain.localParameters getUTXO contractPath blockNumber acs Map.empty utxos txHash signedTx
+    validateInContext Chain.localParameters getUTXO contractPath blockNumber timestamp acs Map.empty utxos txHash signedTx
     |> Result.map (fun (tx, _, _) -> tx)
 
-let inputsValidationMsg msg blockNumber acs utxos tx keys =
+let inputsValidationMsg msg blockNumber timestamp acs utxos tx keys =
     let signedTx, txHash = getSignedTx tx keys
-    inputsValidation blockNumber acs utxos signedTx txHash,
+    inputsValidation blockNumber timestamp acs utxos signedTx txHash,
     (Error (General msg) : Result<Transaction, ValidationError>)
 
-let inputsValidationOk blockNumber acs utxos tx keys =
+let inputsValidationOk blockNumber timestamp acs utxos tx keys =
     let signedTx, txHash = getSignedTx tx keys
-    inputsValidation blockNumber acs utxos signedTx txHash,
+    inputsValidation blockNumber timestamp acs utxos signedTx txHash,
     (Ok signedTx : Result<Transaction, ValidationError>)
 
 let basicValidationMsg msg tx =
@@ -38,7 +38,7 @@ let basicValidationOk tx =
     validateBasic tx,
     (Ok tx : Result<Transaction, ValidationError>)
 
-let inputsValidationOrphan blockNumber acs utxos tx keys =
+let inputsValidationOrphan blockNumber timestamp acs utxos tx keys =
     let signedTx, txHash = getSignedTx tx keys
-    inputsValidation blockNumber acs utxos signedTx txHash,
+    inputsValidation blockNumber timestamp acs utxos signedTx txHash,
     (Error Orphan : Result<Transaction, ValidationError>)

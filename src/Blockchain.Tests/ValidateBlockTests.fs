@@ -1,4 +1,4 @@
-﻿module Blockchain.Tests.ValidateBlockTests
+module Blockchain.Tests.ValidateBlockTests
 
 open NUnit.Framework
 open FsUnit
@@ -619,8 +619,8 @@ let ``block with a contract activation is added to chain``() =
 
     let contract = {
         contractId=contractId
-        mainFn = fun tx _ _ _ _ _  -> Ok (tx,None)
-        costFn = fun _ _ _ _ _ -> 1L
+        mainFn = fun tx _ _ _ _ _ _  -> Ok (tx,None)
+        costFn = fun _ _ _ _ _ _ -> 1L
         expiry=1002ul
         code = sampleContractCode
     }
@@ -856,8 +856,9 @@ let ``Template builder uses two transactions in the same block which depend on e
         |>  Result.get
     let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction firstTx) session (timestamp+1UL) genesisState
     let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction secondTx) session (timestamp+1UL) updatedState
-    let ema' = EMA.add chain genesisBlock.header.timestamp ema
-    let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList chain session updatedState
+    let timestamp = genesisBlock.header.timestamp
+    let ema' = EMA.add chain timestamp ema
+    let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList chain session updatedState (timestamp + 100_000UL)
 
     let twoTxBlock = Block.createTemplate chain genesisBlock.header (timestamp+1UL) ema' memState.activeContractSet validatedTransactions Hash.zero
     let oldHash = genesisState.tipState.tip.hash
@@ -889,10 +890,11 @@ let ``Out of order dependent transactions are rearranged``() =
     let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction firstTx) session (timestamp+1UL) genesisState
     let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction secondTx) session (timestamp+1UL) updatedState
     let blockNumber = updatedState.tipState.tip.header.blockNumber
+    let timestamp = updatedState.tipState.tip.header.timestamp
     let acs = updatedState.tipState.activeContractSet
     let txList = List.map (fun tx -> (Transaction.hash tx, tx, 0I)) [firstTx;secondTx]
-    let _, validatedTransactions = BlockTemplateBuilder.selectOrderedTransactions chain session blockNumber acs Map.empty txList
-    let _, validatedTransactions_ = BlockTemplateBuilder.selectOrderedTransactions chain session blockNumber acs Map.empty <| List.rev txList
+    let _, validatedTransactions = BlockTemplateBuilder.selectOrderedTransactions chain session blockNumber (timestamp + 100_000UL) acs Map.empty txList
+    let _, validatedTransactions_ = BlockTemplateBuilder.selectOrderedTransactions chain session blockNumber (timestamp + 100_000UL) acs Map.empty <| List.rev txList
 
     List.length validatedTransactions |> should equal 2
     validatedTransactions |> should equal validatedTransactions_

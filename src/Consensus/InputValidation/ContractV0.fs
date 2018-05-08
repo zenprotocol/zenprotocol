@@ -1,15 +1,14 @@
 module Consensus.InputValidation.ContractV0
 
 open Consensus
-open Consensus
 open Consensus.Types
 open Consensus.ValidationError
 open Consensus.TxSkeleton
 open State
 
 
-let private validateCost contract initialTx sender contractWallet (w:ContractWitness) =
-    let cost = Contract.getCost contract initialTx w.command sender w.data contractWallet
+let private validateCost contract initialTx context sender contractWallet (w:ContractWitness) =
+    let cost = Contract.getCost contract initialTx context w.command sender w.data contractWallet
 
     if uint32 cost <> w.cost then
         GeneralError (sprintf "Contract witness committed to cost %d, but cost of execution is %d" (uint32 cost) w.cost)
@@ -42,7 +41,7 @@ let rec private validateInputs contractId inputs amount =
                 validateInputs contractId inputs (amount - 1ul)
             | _ -> GeneralError "cannot unlock input"
 
-let private validateWitness acs txHash finalTx sender inputs (w:ContractWitness) = result {
+let private validateWitness context acs txHash finalTx sender inputs (w:ContractWitness) = result {
     match ActiveContractSet.tryFind w.contractId acs with
     | None ->
         return! Error ContractNotActive
@@ -54,11 +53,11 @@ let private validateWitness acs txHash finalTx sender inputs (w:ContractWitness)
 
         let contractWallet = Contract.getContractWallet finalTx w
 
-        do! validateCost contract inputTx sender contractWallet w
+        do! validateCost contract inputTx context sender contractWallet w
 
         // running the contract
         let! outputTx,message =
-             Contract.run contract inputTx w.command sender w.data contractWallet
+             Contract.run contract inputTx context w.command sender w.data contractWallet
              |> Result.mapError General
 
         // check that the output tx is subset of the final tx
@@ -105,11 +104,11 @@ let private resultToState witnesses result =
         | Some chainedContract -> ExpectChainedContract (chainedContract, witnesses, inputs)
         | None -> NextInput (witnesses, inputs)
 
-let validate acs txHash tx witnesses inputs =
+let validate blockNumber timestamp acs txHash tx witnesses inputs =
     match witnesses with
     | ContractWitness w :: witnesses ->
         getSender w txHash
-        |> Result.bind (fun sender -> validateWitness acs txHash tx sender inputs w)
+        |> Result.bind (fun sender -> validateWitness {blockNumber=blockNumber;timestamp=timestamp} acs txHash tx sender inputs w)
         |> resultToState witnesses
     | _ -> Invalid <| General "expecting a contract 0 witness"
 
@@ -121,12 +120,12 @@ let private isChainContract (w:ContractWitness) (chainContract:ChainedContractSt
     w.data = chainContract.data &&
     Option.isNone w.signature
 
-let validateChainedContract acs txHash tx witnesses inputs chainedContract  =
+let validateChainedContract blockNumber timestamp acs txHash tx witnesses inputs chainedContract  =
     match witnesses with
     | ContractWitness w :: witnesses when isChainContract w chainedContract ->
         let sender = ContractSender chainedContract.sender
 
-        validateWitness acs txHash tx sender inputs w
+        validateWitness {blockNumber=blockNumber;timestamp=timestamp} acs txHash tx sender inputs w
         |> resultToState witnesses
 
     | _ -> Invalid <| General "expecting chained contract witness"

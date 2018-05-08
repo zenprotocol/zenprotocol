@@ -114,7 +114,7 @@ let setUp = fun () ->
 
       RT.of_option "contract doesn't have enough zens to pay you" result
 
-    let main txSkeleton contractHash command sender data wallet =
+    let main txSkeleton _ contractHash command sender data wallet =
       let! returnAddress = data >!> tryDict >?> tryFindLock "returnAddress" in
 
       match returnAddress with
@@ -129,8 +129,8 @@ let setUp = fun () ->
       | None ->
         RT.autoFailw "returnAddress is required"
 
-    val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 24
-        let cf _ _ _ _ wallet = ret (3 + 66 + (64 + (64 + (64 + 64 + (Zen.Wallet.size wallet * 128 + 192) + 0)) + 31) + 28)
+    val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 24
+        let cf _ _ _ _ _ wallet = ret (3 + 66 + (64 + (64 + (64 + 64 + (Zen.Wallet.size wallet * 128 + 192) + 0)) + 31) + 28)
     """ account session state
     |> function
     | Ok (state', cHash') ->
@@ -172,7 +172,7 @@ let ``Contract should detect unsupported command``() =
         |> Types.Data.Dict
         |> Some
 
-    TransactionHandler.executeContract session inputTx contractId "x" None data state.memoryState
+    TransactionHandler.executeContract session inputTx 1ul 1_000_000UL contractId "x" None data state.memoryState
     |> shouldBeErrorMessage "unsupported command"
 
 [<Test>]
@@ -210,7 +210,7 @@ let ``Should buy``() =
         |> Types.Data.Dict
         |> Some
 
-    TransactionHandler.executeContract session inputTx contractId "buy" None data { state.memoryState with utxoSet = utxoSet }
+    TransactionHandler.executeContract session inputTx 1ul 1_000_000UL contractId "buy" None data { state.memoryState with utxoSet = utxoSet }
     |> function
     | Ok tx ->
         tx.inputs |> should haveLength 2
@@ -287,7 +287,7 @@ let ``Should redeem``() =
         |> Types.Data.Dict
         |> Some
 
-    TransactionHandler.executeContract session inputTx contractId "redeem" None data { state.memoryState with utxoSet = utxoSet }
+    TransactionHandler.executeContract session inputTx 1ul 1_000_000UL contractId "redeem" None data { state.memoryState with utxoSet = utxoSet }
     |> function
     | Ok tx ->
         tx.inputs |> should haveLength 2

@@ -14,10 +14,10 @@ open Logary.Message
 
 let getUTXO = UtxoSetRepository.get
 
-let private validateOrphanTransaction chainParams session contractPath blockNumber state txHash tx  =
+let private validateOrphanTransaction chainParams session contractPath blockNumber timestamp state txHash tx  =
     effectsWriter
         {
-            match TransactionValidation.validateInContext chainParams (getUTXO session) contractPath (blockNumber + 1ul)
+            match TransactionValidation.validateInContext chainParams (getUTXO session) contractPath (blockNumber + 1ul) timestamp
                     state.activeContractSet state.contractCache state.utxoSet txHash tx with
             | Ok (tx, acs, contractCache) ->
                 let utxoSet = UtxoSet.handleTransaction (getUTXO session) txHash tx state.utxoSet
@@ -59,21 +59,21 @@ let private validateOrphanTransaction chainParams session contractPath blockNumb
                 return {state with orphanPool = orphanPool}
         }
 
-let rec validateOrphanTransactions chainParams session contractPath blockNumber state =
+let rec validateOrphanTransactions chainParams session contractPath blockNumber timestamp state =
     effectsWriter {
-        let! state' = OrphanPool.foldWriter (validateOrphanTransaction chainParams session contractPath blockNumber) state state.orphanPool
+        let! state' = OrphanPool.foldWriter (validateOrphanTransaction chainParams session contractPath blockNumber timestamp) state state.orphanPool
 
         // if orphan pool changed we run again until there is no change
         if state'.orphanPool <> state.orphanPool then
-            return! validateOrphanTransactions chainParams session contractPath blockNumber state'
+            return! validateOrphanTransactions chainParams session contractPath blockNumber timestamp state'
         else
             return state'
     }
 
-let validateInputs chainParams session contractPath blockNumber txHash tx (state:MemoryState) shouldPublishEvents =
+let validateInputs chainParams session contractPath blockNumber timestamp txHash tx (state:MemoryState) shouldPublishEvents =
     effectsWriter
         {
-            match TransactionValidation.validateInContext chainParams (getUTXO session) contractPath (blockNumber + 1ul)
+            match TransactionValidation.validateInContext chainParams (getUTXO session) contractPath (blockNumber + 1ul) timestamp
                     state.activeContractSet state.contractCache state.utxoSet txHash tx with
             | Error Orphan ->
                 let orphanPool = OrphanPool.add txHash tx state.orphanPool
@@ -123,11 +123,11 @@ let validateInputs chainParams session contractPath blockNumber txHash tx (state
                         contractCache = contractCache
                     }
 
-                return! validateOrphanTransactions chainParams session contractPath blockNumber state
+                return! validateOrphanTransactions chainParams session contractPath blockNumber timestamp state
         }
 
 
-let validateTransaction chainParams session contractPath blockNumber tx (state:MemoryState) =
+let validateTransaction chainParams session contractPath blockNumber timestamp tx (state:MemoryState) =
     effectsWriter {
         let txHash = Transaction.hash tx
 
@@ -145,10 +145,10 @@ let validateTransaction chainParams session contractPath blockNumber tx (state:M
 
                 return state
             | Ok tx ->
-                return! validateInputs chainParams session contractPath blockNumber txHash tx state true
+                return! validateInputs chainParams session contractPath blockNumber timestamp txHash tx state true
     }
 
-let executeContract session txSkeleton contractId command sender data state =
+let executeContract session txSkeleton blockNumber timestamp contractId command sender data state =
     let isInTxSkeleton (txSkeleton:TxSkeleton.T) (outpoint,_)  =
         List.exists (fun input ->
             match input with
@@ -162,7 +162,10 @@ let executeContract session txSkeleton contractId command sender data state =
                 ContractUtxoRepository.getContractUtxo session contractId state.utxoSet
                 |> List.reject (isInTxSkeleton txSkeleton)
 
-            Contract.run contract txSkeleton command sender data contractWallet
+            let contractContext = 
+                {blockNumber=blockNumber ;timestamp=timestamp}
+
+            Contract.run contract txSkeleton contractContext command sender data contractWallet
             |> Result.bind (fun (tx, message) ->
 
                 TxSkeleton.checkPrefix txSkeleton tx
@@ -171,7 +174,7 @@ let executeContract session txSkeleton contractId command sender data state =
 
                     // To commit to the cost we need the real contract wallet
                     let contractWallet = Contract.getContractWallet tx witness
-                    let cost = Contract.getCost contract txSkeleton command sender data contractWallet
+                    let cost = Contract.getCost contract txSkeleton contractContext command sender data contractWallet
                     let totalCost = cost + totalCost
 
                     // We can now commit to the cost, so lets alter it with the real cost

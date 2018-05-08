@@ -46,9 +46,10 @@ let tearDown = fun () ->
     clean()
 
 let compileAndRun code =
+    let stubContext:Types.ContractContext = {blockNumber=1000u;timestamp=1000000UL}
     compile code
     |> Result.bind (fun contract ->
-        Contract.run contract TxSkeleton.empty "" Types.Anonymous None List.empty
+        Contract.run contract TxSkeleton.empty stubContext "" Types.Anonymous None List.empty
         |> Result.map (fun (tx, _) -> tx)
     )
 
@@ -70,7 +71,7 @@ let ``Should generate assets from a string and from an int``() =
         module Tx = Zen.TxSkeleton
         module S = FStar.String
 
-        let main txSkeleton contractHash command sender data wallet =
+        let main txSkeleton _ contractHash command sender data wallet =
             let str = "Test" in
 
             if S.length str < 29 then
@@ -86,8 +87,8 @@ let ``Should generate assets from a string and from an int``() =
             else
                 RT.autoFailw "unexpected"
 
-        val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 11
-        let cf _ _ _ _ _ = ret (64 + (64 + (64 + 64 + 0)) + 26)
+        val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 11
+        let cf _ _ _ _ _ _ = ret (64 + (64 + (64 + 64 + 0)) + 26)
         """
     compileAndRun contractCode
     |> shouldBeOk

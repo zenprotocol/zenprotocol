@@ -197,7 +197,7 @@ let rec private undoBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:Extend
         undoBlocks session forkBlock parent utxoSet mempool contractCache
 
 // After applying block or blocks we must readd mempool transactions to the ACS and UTXO
-let getMemoryState chainParams session contractPath blockNumber mempool orphanPool acs contractCache =
+let getMemoryState chainParams session contractPath blockNumber timestamp mempool orphanPool acs contractCache =
 
     // We start with an empty mempool and current orphan pool
     // We first validate all orphan transactions according to the new state
@@ -213,12 +213,12 @@ let getMemoryState chainParams session contractPath blockNumber mempool orphanPo
     }
 
 
-    let memoryState = TransactionHandler.validateOrphanTransactions chainParams session contractPath blockNumber memoryState
+    let memoryState = TransactionHandler.validateOrphanTransactions chainParams session contractPath blockNumber timestamp memoryState
 
     Map.fold (fun writer txHash (_,tx) ->
         Writer.bind writer (fun memoryState ->
 
-            TransactionHandler.validateInputs chainParams session contractPath blockNumber txHash tx memoryState false)) memoryState mempool
+            TransactionHandler.validateInputs chainParams session contractPath blockNumber timestamp txHash tx memoryState false)) memoryState mempool
 
 let rollForwardChain chainParams contractPath timestamp state session block persistentBlock acs contractCache ema =
     effectsWriter {
@@ -248,7 +248,7 @@ let rollForwardChain chainParams contractPath timestamp state session block pers
             UtxoSetRepository.save session utxoSet
 
             let tipState = {activeContractSet=acs;ema=ema;tip=tip}
-            let! memoryState = getMemoryState chainParams session contractPath tip.header.blockNumber mempool state.memoryState.orphanPool acs contractCache
+            let! memoryState = getMemoryState chainParams session contractPath tip.header.blockNumber tip.header.timestamp mempool state.memoryState.orphanPool acs contractCache
 
             do! addBlocks session persistentBlock tip
 
@@ -264,7 +264,7 @@ let rollForwardChain chainParams contractPath timestamp state session block pers
             return {state with tipState=tipState;memoryState=memoryState}
         | None ->
             let tipState = {activeContractSet=acs;ema=ema;tip=persistentBlock}
-            let! memoryState = getMemoryState chainParams session contractPath persistentBlock.header.blockNumber mempool state.memoryState.orphanPool acs contractCache
+            let! memoryState = getMemoryState chainParams session contractPath persistentBlock.header.blockNumber timestamp mempool state.memoryState.orphanPool acs contractCache
 
             eventX "BlockHandler: New tip #{blockNumber} {tip}"
             >> setField "blockNumber" tipState.tip.header.blockNumber
@@ -417,7 +417,7 @@ let private handleForkChain chain contractPath session timestamp (state:State) p
                 do! addBlocks session forkBlock tip
 
                 let tipState = {activeContractSet=acs;ema=ema;tip=tip}
-                let! memoryState = getMemoryState chain session contractPath tip.header.blockNumber mempool state.memoryState.orphanPool acs contractCache
+                let! memoryState = getMemoryState chain session contractPath tip.header.blockNumber timestamp mempool state.memoryState.orphanPool acs contractCache
 
                 // Not publishing new blocks during the initial download phase
                 if not <| InitialBlockDownload.isActive state.initialBlockDownload then
@@ -583,7 +583,7 @@ let private handleHeader chain session timestamp get header state =
                 return state
     }
 
-let handleNewBlockHeader chain session timestamp peerId header (state:State) =
+let handleNewBlockHeader chain session timestamp peerId (header:BlockHeader) (state:State) =
     effectsWriter {
         // we ignore new blocks while IBD is in progress
         if InitialBlockDownload.isActive state.initialBlockDownload then
@@ -595,7 +595,7 @@ let handleNewBlockHeader chain session timestamp peerId header (state:State) =
             return! handleHeader chain session timestamp (getBlockFrom peerId) header state
     }
 
-let handleTip chain session timestamp peerId header (state:State) =
+let handleTip chain session timestamp peerId (header:BlockHeader) (state:State) =
     effectsWriter {
         if InitialBlockDownload.isActive state.initialBlockDownload then
             return state

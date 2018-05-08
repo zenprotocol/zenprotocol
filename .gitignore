@@ -336,3 +336,5 @@ ASALocalRun/
 data/
 
 package/*.tgz
+
+src/Consensus.Features.Tests/*.cs

@@ -1,4 +1,4 @@
-﻿module Consensus.TransactionValidation
+module Consensus.TransactionValidation
 
 open Consensus
 open Types
@@ -250,7 +250,7 @@ let private checkActivationSacrifice tx =
         else
             GeneralError "tx with a contract must include an activation sacrifice"
 
-let internal tryGetUtxos getUTXO utxoSet tx =
+let private tryGetUtxos getUTXO utxoSet tx =
     getUtxosResult getUTXO tx.inputs utxoSet
     |> Result.mapError (fun errors ->
         if List.exists
@@ -311,12 +311,12 @@ let validateCoinbase blockNumber =
     >=> checkNoContractInCoinbase
     >=> checkOutputsOverflow
 
-let validateInContext chainParams getUTXO contractPath blockNumber acs contractCache set txHash tx = result {
+let validateInContext chainParams getUTXO contractPath blockNumber timestamp acs contractCache set txHash tx = result {
     let! outputs = tryGetUtxos getUTXO set tx
     let txSkel = TxSkeleton.fromTransaction tx outputs
 
     do! checkAmounts txSkel
-    do! InputValidation.StateMachine.validate blockNumber acs outputs txHash tx txSkel
+    do! InputValidation.StateMachine.validate blockNumber timestamp acs outputs txHash tx txSkel
 
     let! acs, contractCache = activateContract chainParams contractPath blockNumber acs contractCache tx
     let! acs = extendContracts chainParams acs tx
