@@ -485,7 +485,8 @@ module Serialization =
                 >> PublicKey.write ops publicKey
 
             | ZData.Dict (ZData.DataDict (map, _)) ->
-                Map.write ops (fun ops (key, data)->
+                ops.writeByte DictData
+                >> Map.write ops (fun ops (key, data)->
                     String.write ops key
                     >> write ops data) map
 
