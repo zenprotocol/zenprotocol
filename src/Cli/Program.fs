@@ -221,6 +221,9 @@ let main argv =
         | Some (Execute args) ->
             let address, command, data, asset, amount, password =
                 args.GetResult <@ ExecuteContract_Arguments @>
+
+            let data = if data = "None" || data = "none" || data = "null" then "" else data
+
             "wallet/contract/execute"
             |> getUri
             |> (new ContractExecuteRequestJson.Root(
