@@ -45,6 +45,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Targets", "Targets", "{CC32
 		lmdb.targets = lmdb.targets
 		RefFStar.props = RefFStar.props
 		secp256k1_windows.targets = secp256k1_windows.targets
+		GenerateTests.targets = GenerateTests.targets
 	EndProjectSection
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Miner", "Miner\Miner.fsproj", "{26EE7861-DF8C-46EA-889B-0A585B687209}"
