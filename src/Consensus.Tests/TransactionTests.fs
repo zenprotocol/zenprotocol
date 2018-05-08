@@ -208,3 +208,29 @@ let ``Signed transaction validation result should be invalid witness``() =
     let utxos = Map.ofSeq [ testInput1, Unspent output ]
     inputsValidationMsg "PK witness mismatch" 1ul acs utxos tx keys
     |> shouldEqual
+
+[<Test>]
+let ``Transaction validation should fail when inputs consist only of mints``() =
+    let asset = Asset (ContractId (Version0, validHash), Hash.zero)
+    let output = { lock = PK testHash; spend = { asset = asset; amount = 10UL } }
+
+    let contractWitness = {
+        contractId = ContractId (Version0, validHash)
+        command = ""
+        data = None
+        beginInputs = 0ul
+        beginOutputs = 0ul
+        inputsLength = 0ul
+        outputsLength = 0ul
+        signature = None
+        cost = 1ul
+    }
+    {
+        version = Version0
+        inputs = [ Mint { asset = asset; amount = 10UL } ]
+        witnesses = [ ContractWitness contractWitness ]
+        outputs = [ output ]
+        contract = None
+    }
+    |> basicValidationMsg "inputs consist of mints only"
+    |> shouldEqual

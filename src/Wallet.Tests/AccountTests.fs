@@ -199,6 +199,37 @@ let ``create execute contract transaction``() =
 
     tx.inputs |> should haveLength 1
 
+[<Test>]
+let ``create execute contract transaction without explicitly spending any Zen should allocate fee``() =
+    let account = createTestAccount ()
+
+    let executeContract _ _ _ _ txSkeleton =
+        let tx =
+            txSkeleton
+            |> TxSkeleton.addOutput {lock=Contract <| ContractId  (Version0,Hash.zero);spend={asset=Asset.Zen;amount=1UL}}
+            |> Transaction.fromTxSkeleton
+
+        tx |> Ok
+
+    let spends = Map.empty
+
+    let result = Account.createExecuteContractTransaction executeContract (ContractId (Version0,Hash.zero)) "" None true None spends account
+
+    result |> should be ok
+
+    let tx = Result.get result
+    
+    tx.outputs
+    |> List.exists (fun output -> output.lock = Fee && output.spend = { asset = Asset.Zen; amount = 1UL })
+    |> should equal true
+
+    let tx =
+        match result with
+        | Ok tx -> tx
+        | Error error -> failwith error
+
+    tx.inputs |> should haveLength 1
+
 
 [<Test>]
 let ``account sync up``() =
