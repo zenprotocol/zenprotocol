@@ -110,7 +110,7 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
         |> requestId.reply
     | GetBlockTemplate pkHash ->
         let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList chain session state timestamp
-        let block = Block.createTemplate chain state.tipState.tip.header (Timestamp.now ()) state.tipState.ema memState.activeContractSet validatedTransactions pkHash
+        let block = Block.createTemplate chain state.tipState.tip.header timestamp state.tipState.ema memState.activeContractSet validatedTransactions pkHash
 
         requestId.reply block
     | GetBlock blockHash ->
