@@ -82,7 +82,7 @@ let private activateContract (chainParams : Chain.ChainParameters) contractPath 
                                     contractId = contractId
                                     mainFn = mainFn
                                     costFn = costFn
-                                    expiry = numberOfBlocks
+                                    expiry = blockNumber + numberOfBlocks
                                     code = contract.code
                                 } : Contract.T), contractCache
                         | None ->
