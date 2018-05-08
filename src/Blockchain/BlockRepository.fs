@@ -71,9 +71,9 @@ let saveBlockState session blockHash (acs:ActiveContractSet.T) ema =
 let getBlockState session blockHash =
     let blockState = Collection.get session.context.blockState session.session blockHash
 
-    let getOk (cHash,result) =
+    let getOk (contractId,result) =
         match result with
-        | Ok x -> cHash,x
+        | Ok x -> contractId,x
         | Error error -> failwithf "cannot load contract from db due to %A" error
 
     let acs =

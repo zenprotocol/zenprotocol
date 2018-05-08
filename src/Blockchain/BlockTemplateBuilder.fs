@@ -29,7 +29,7 @@ let weights session state =
                 | _ -> ()
             ]
 
-let selectOrderedTransactions (chain:Chain.ChainParameters) (session:DatabaseContext.Session) blockNumber acs transactions =
+let selectOrderedTransactions (chain:Chain.ChainParameters) (session:DatabaseContext.Session) blockNumber acs contractCache transactions =
     let contractPath = session.context.contractPath
     let maxWeight = chain.maxBlockWeight
 
@@ -64,7 +64,7 @@ let selectOrderedTransactions (chain:Chain.ChainParameters) (session:DatabaseCon
         activeContractSet = acs;
         orphanPool = OrphanPool.create();
         mempool = MemPool.empty
-        contractCache = ContractCache.empty
+        contractCache = contractCache
     }
 
     foldUntilUnchanged initialState transactions
@@ -72,4 +72,4 @@ let selectOrderedTransactions (chain:Chain.ChainParameters) (session:DatabaseCon
 
 let makeTransactionList chain (session:DatabaseContext.Session) (state:State) =
     let txs = weights session state |> List.sortBy (fun (_,_,wt) -> -wt)
-    selectOrderedTransactions chain session state.tipState.tip.header.blockNumber state.tipState.activeContractSet txs
+    selectOrderedTransactions chain session state.tipState.tip.header.blockNumber state.tipState.activeContractSet state.memoryState.contractCache txs

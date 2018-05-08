@@ -228,8 +228,8 @@ let handleRequest chain client (request,reply) =
     | Post ("/wallet/contract/extend", Some body) ->
         match parseContractExtendJson chain body with
         | Error error -> replyError error
-        | Ok (cHash, numberOfBlocks, password) ->
-            match Wallet.extendContract client cHash numberOfBlocks password with
+        | Ok (contractId, numberOfBlocks, password) ->
+            match Wallet.extendContract client contractId numberOfBlocks password with
             | Ok tx ->
                 Blockchain.validateTransaction client tx
                 reply StatusCode.OK NoContent
@@ -238,8 +238,8 @@ let handleRequest chain client (request,reply) =
     | Post ("/wallet/contract/execute", Some body) ->
         match parseContractExecuteJson chain body with
         | Error error -> replyError error
-        | Ok (cHash, command, data, returnAddress, sign, spends, password) ->
-            Wallet.executeContract client cHash command data returnAddress sign spends password
+        | Ok (contractId, command, data, returnAddress, sign, spends, password) ->
+            Wallet.executeContract client contractId command data returnAddress sign spends password
             |> validateTx
     | Get ("/wallet/resync", _) ->
         Wallet.resyncAccount client
