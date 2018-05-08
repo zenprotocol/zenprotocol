@@ -4,7 +4,6 @@ framework: 47
 
 nuget FSharp.Core 4.3.4
 nuget NUnit
-nuget NUnit.ConsoleRunner
 nuget FsUnit
 nuget FsCheck.NUnit >= 3.0.0-alpha2
 nuget FAKE
@@ -39,3 +38,7 @@ nuget zen_z3_osx 4.5.1.8-v1f29cebd4df6
 nuget zen_secp256k1_linux 0.1.0.26-v6ad5cdb42a1a
 nuget zen_secp256k1_osx 0.1.0.26-v6ad5cdb42a1a
 nuget zen_z3_windows 4.5.1.7-v1f29cebd4df
+
+source https://www.myget.org/F/nunit/api/v3/index.json
+
+nuget NUnit.ConsoleRunner  ~> 3.9.0-dev-03997
