@@ -20,7 +20,7 @@ module BlockState =
         >> Seq.write ops (fun ops contractState ->
             ContractId.write ops contractState.contractId
             >> ops.writeNumber4 contractState.expiry
-            >> ops.writeLongString contractState.code) blockState.activeContractSet
+            >> ops.writeString contractState.code) blockState.activeContractSet
 
     let private read = reader {
         let! difficulty = readNumber4

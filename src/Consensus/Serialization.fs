@@ -20,8 +20,16 @@ type TransactionSerializationMode =
     | WithoutWitness
 
 module Serialization =
+    let readString = readLongString
+    
+    let writeBytesOfLength =
+        writeBytes
+
+    let writeBytes bytes =
+        writeBytes bytes (Seq.length bytes)
+
     module Hash =
-        let write hash = writeBytes (Hash.bytes hash) Hash.Length
+        let write hash = writeBytesOfLength (Hash.bytes hash) Hash.Length
         let readBytes = readBytes Hash.Length
         let read = reader {
             let! bytes = readBytes
@@ -32,12 +40,27 @@ module Serialization =
         let write byte = writeNumber1 byte
         let read = readNumber1
 
+    let getVarIntBytes (i:uint32) =
+        // https://github.com/bitcoin/bitcoin/blob/v0.13.2/src/serialize.h#L307L372
+        let tmp = Array.zeroCreate 5
+
+        let rec loop n len =
+            tmp.[len] <- (byte (n &&& 0x7Ful)) ||| (if len <> 0 then 0x80uy else 0x00uy)
+
+            if n <= 0x7Ful then
+                len
+            else
+                loop ((n >>> 7) - 1ul) (len + 1)
+
+        let len = loop i 0
+        tmp.[0..len] |> Array.rev
+
     type Operations<'a> = {
         writeHash: Hash -> 'a -> 'a
         writeByte: Byte -> 'a -> 'a
-        writeBytes: Byte[] -> int32 -> 'a -> 'a
+        writeBytes: Byte[] -> 'a -> 'a
+        writeBytesOfLength: Byte[] -> int32 -> 'a -> 'a
         writeString: String -> 'a -> 'a
-        writeLongString: String -> 'a -> 'a
         writeNumber4: uint32 -> 'a -> 'a
         writeNumber8: uint64 -> 'a -> 'a
     }
@@ -46,20 +69,28 @@ module Serialization =
         writeHash = Hash.write
         writeByte = Byte.write
         writeBytes = writeBytes
-        writeString = writeString
-        writeLongString = writeLongString
+        writeBytesOfLength = writeBytesOfLength
+        writeString = writeLongString
         writeNumber4 = writeNumber4
         writeNumber8 = writeNumber8
     }
 
     let counters: Operations<uint32> = {
-        writeHash = fun _ l -> l + (uint32 <| Hash.Length)
-        writeByte = fun _ l -> l + 1u
-        writeBytes = fun _ len l -> l + uint32 len
-        writeString = fun str l -> l + 1u + (uint32 <| String.length str)
-        writeLongString = fun str l -> l + 4u + (uint32 <| String.length str)
-        writeNumber4 = fun _ l -> l + 4u
-        writeNumber8 = fun _ l -> l + 8u
+        writeHash = fun _ count -> count + (uint32 <| Hash.Length)
+        writeByte = fun _ count -> count + 1u
+        writeBytes = fun bytes count -> count + (uint32 <| Seq.length bytes)
+        writeBytesOfLength = fun _ len count -> count + (uint32 len)
+        writeString = fun str count ->
+            str
+            |> String.length  
+            |> uint32
+            |> getVarIntBytes
+            |> Array.length
+            |> uint32
+            |> (+) count
+            |> (+) (String.length str |> uint32)
+        writeNumber4 = fun _ count -> count + 4u
+        writeNumber8 = fun _ count -> count + 8u
     }
 
     let fail stream =
@@ -90,25 +121,12 @@ module Serialization =
             | _ ->
                 yield! fail
         }
-
+        
     module VarInt =
-        // https://github.com/bitcoin/bitcoin/blob/v0.13.2/src/serialize.h#L307L372
-
         let write ops (x:uint32) =
-            let tmp = Array.zeroCreate 5
+            let bytes = getVarIntBytes x
 
-            let rec loop n len =
-                tmp.[len] <- (byte (n &&& 0x7Ful)) ||| (if len <> 0 then 0x80uy else 0x00uy)
-
-                if n <= 0x7Ful then
-                    len
-                else
-                    loop ((n >>> 7) - 1ul) (len + 1)
-
-            let len = loop x 0
-            let bytes = tmp.[0..len] |> Array.rev
-
-            ops.writeBytes bytes (len + 1)
+            ops.writeBytes bytes
 
         let read =
             let rec loop n = reader {
@@ -125,6 +143,8 @@ module Serialization =
             loop 0ul
 
     module Seq =
+        let writeHeader ops seq =
+            VarInt.write ops (Seq.length seq |> uint32)
         let writeBody ops writerFn seq =
             let write seq writerFn stream = //TODO: use fold?
                 let mutable stream = stream //TODO: this is not 'stream' if ops are Counters
@@ -133,7 +153,7 @@ module Serialization =
                 stream
             write seq writerFn
         let write ops writerFn seq =
-            VarInt.write ops (Seq.length seq |> uint32)
+            writeHeader ops seq
             >> writeBody ops writerFn seq
         let readBody readerFn length = reader {
             let! list = reader {
@@ -240,7 +260,7 @@ module Serialization =
 
     module Signature =
         let write ops signature =
-            ops.writeBytes (Signature.serialize signature) SerializedSignatureLength
+            ops.writeBytesOfLength (Signature.serialize signature) SerializedSignatureLength
 
         let read = reader {
             let! bytes = readBytes SerializedSignatureLength
@@ -251,7 +271,7 @@ module Serialization =
 
     module PublicKey =
         let write ops publicKey =
-            ops.writeBytes (PublicKey.serialize publicKey) SerializedPublicKeyLength
+            ops.writeBytesOfLength (PublicKey.serialize publicKey) SerializedPublicKeyLength
 
         let read = reader {
             let! bytes = readBytes SerializedPublicKeyLength
@@ -290,7 +310,7 @@ module Serialization =
                 ops.writeNumber4 blockNumber
                 >> ops.writeHash pkHash
             | HighVLock (_, bytes) ->
-                Seq.writeBody ops (fun ops -> ops.writeByte) bytes
+                ops.writeBytes bytes
 
         let write ops = fun lock ->
             let identifier =
@@ -442,7 +462,8 @@ module Serialization =
                 >> ops.writeByte b
             | ZData.ByteArray (Prims.Mkdtuple2 (_, arr)) ->
                 ops.writeByte ByteArrayData
-                >> Array.write ops (fun ops -> ops.writeByte) arr
+                >> Seq.writeHeader ops arr
+                >> ops.writeBytes arr
             | ZData.U32 i ->
                 ops.writeByte U32Data
                 >> ops.writeNumber4 i
@@ -580,8 +601,8 @@ module Serialization =
                   ) cw.signature
                 >> VarInt.write ops cw.cost
             | HighVWitness (_, bytes) ->
-                Seq.writeBody ops (fun ops -> ops.writeByte) bytes
-
+                ops.writeBytes bytes
+                
         let write ops = fun witness ->
             let identifier =
                 match witness with
@@ -649,12 +670,12 @@ module Serialization =
     module Contract =
         let writerFn ops = function
             | V0 contract ->
-                ops.writeLongString contract.code
-                >> ops.writeLongString contract.hints
+                ops.writeString contract.code
+                >> ops.writeString contract.hints
                 >> VarInt.write ops contract.rlimit
                 >> VarInt.write ops contract.queries
             | HighV (_, bytes) ->
-                Seq.writeBody ops (fun ops -> ops.writeByte) bytes
+                ops.writeBytes bytes
 
         let write ops = fun contract ->
             let identifier =
@@ -672,8 +693,8 @@ module Serialization =
             let! value = reader {
                 match version with
                 | Version0 ->
-                    let! code = readLongString
-                    let! hints = readLongString
+                    let! code = readString
+                    let! hints = readString
                     let! rlimit = VarInt.read
                     let! queries = VarInt.read
                     return V0 {
