@@ -6,8 +6,22 @@ let id(#_) x = x
 val const_(#a #b:Type): a -> b -> a
 let const_ #_ #_ x _ = x
 
+val cast: a:Type -> a -> a
+let cast a x = x
+
 val retype(#a:Type): b:Type{b==a} -> a -> b
 let retype #_ _ x = x
+
+val refine(#a:Type):
+    p:(a -> prop)
+    -> x:a
+    -> Pure (result:a{p result})
+            (requires (p x))
+            (ensures (fun _ -> True))
+let refine #_ _ x = x
+
+val refineType: a:Type u#t -> p:(a -> prop) -> Type u#t
+let refineType a p = x:a{p x}
 
 (** [|>] is equivalent to F#'s [|>]. *)
 val ( |> ) (#a #b:Type): a -> (a->b) -> b

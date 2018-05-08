@@ -1,5 +1,6 @@
 ﻿module Consensus.ZFStar
 #nowarn "664"   // Ignore type erasure warnings.
+#nowarn "62"    // Ignore ML compatibility warnings.
 
 open Operators.Checked
 
@@ -39,14 +40,14 @@ let private throwNotImplemented s1 s2 =
     |> System.NotImplementedException
     |> raise
 
-let fsToFstOption mapper value =
+let fsToFstOption value =
     match value with
-    | FSharp.Core.Some value -> mapper value |> FStar.Pervasives.Native.Some
+    | FSharp.Core.Some value -> FStar.Pervasives.Native.Some value
     | FSharp.Core.None -> FStar.Pervasives.Native.None
 
-let fstToFsOption mapper value =
+let fstToFsOption value =
     match value with
-    | Native.Some value -> mapper value |> FSharp.Core.Some
+    | Native.Some value -> FSharp.Core.Some value
     | Native.None -> FSharp.Core.None
 
 let fsToFstContractId (ContractId (version, Hash.Hash hash)) : contractId = version,hash
@@ -139,38 +140,29 @@ let private fsToFstPointedOutput ((outpoint, output):PointedOutput) : pointedOut
 let private fsToFstOutpointOutputTuple (outpoint:Types.Outpoint, output) : (outpoint * output) =
     { txHash = Hash.bytes outpoint.txHash; index = outpoint.index }, fsToFstOutput output
 
-let private fstToFsTx : txSkeleton -> _ = function
+let private fstToFsTx: txSkeleton -> TxSkeleton.T = function
     | {inputs=_,inputMap; outputs=_,outputMap} ->
-        let inputs =
-            Map.toList inputMap
-            |> List.collect(fun (_, (_, inputs)) -> inputs)
-            |> List.sortBy fst
-            |> List.map (snd >> fstToFsInput)
-        let outputs =
-            Map.toList outputMap
-            |> List.collect(fun (_, (_, outputs)) -> outputs)
-            |> List.sortBy fst
-            |> List.map (snd >> fstToFsOutput)
-        Ok {pInputs=inputs; outputs=outputs}
+        let pInputs = inputMap  |> Map.toList
+                                |> List.collect(snd >> snd)
+                                |> List.sortBy fst
+                                |> List.map (snd >> fstToFsInput)
+        let outputs = outputMap |> Map.toList
+                                |> List.collect(snd >> snd)
+                                |> List.sortBy fst
+                                |> List.map (snd >> fstToFsOutput)
+         
+        { pInputs=pInputs; outputs=outputs }
 
-let fstTofsMessage = function
-    | Native.option.Some ({ contractId = contractId; command = command; data = data } : Zen.Types.Main.message) ->
-        ({
-            contractId = fstToFsContractId contractId
-            command = fstToFsString command
-            data = fstToFsOption id data
-        } : Message)
-        |> Some
-        |> Ok
-    | Native.option.None ->
-        Ok None
+let fstTofsMessage (msg: Zen.Types.Main.message) : Consensus.Types.Message =
+    { contractId = fstToFsContractId msg.contractId
+      command = fstToFsString msg.command
+      data = fstToFsOption msg.data }
 
-let convertResult (tx, message : message Native.option) =
-    fstTofsMessage message
-    |> Result.bind (fun message ->
-        fstToFsTx tx
-        |> Result.map (fun tx' -> (tx', message))
-    )
+let convertResult (tx, message : Native.option<message>)
+    : TxSkeleton.T * Option<Message> =
+    fstToFsTx tx, message
+                  |> fstToFsOption
+                  |> Option.map fstTofsMessage
 
 let convertWallet (wallet:PointedOutput list) : Prims.list<pointedOutput>=
     List.map fsToFstPointedOutput wallet

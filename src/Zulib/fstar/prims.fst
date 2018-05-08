@@ -339,38 +339,3 @@ val length(#a:Type): list a -> nat
 let rec length #_ = function
   | [] -> 0
   | _::tl -> length tl + 1
-
-
-
-(*********************************************************************************)
-(* Marking terms for normalization *)
-(*********************************************************************************)
-abstract let normalize_term (#a:Type) (x:a) : a = x
-abstract let normalize (a:Type0) = a
-
-abstract
-type norm_step =
-    | Simpl
-    | Weak
-    | HNF
-    | Primops
-    | Delta
-    | Zeta
-    | Iota
-    | UnfoldOnly : list string -> norm_step // each string is a fully qualified name like `A.M.f`
-
-// Helpers, so we don't expose the actual inductive
-let simplify : norm_step = Simpl
-let weak    : norm_step = Weak
-let hnf     : norm_step = HNF
-let primops : norm_step = Primops
-let delta   : norm_step = Delta
-let zeta    : norm_step = Zeta
-let iota    : norm_step = Iota
-let delta_only (s:list string) : norm_step = UnfoldOnly s
-
-// Normalization marker
-abstract let norm (s:list norm_step) (#a:Type) (x:a) : a = x
-
-val assert_norm : p:Type -> Pure unit (requires (normalize p)) (ensures (fun _ -> p))
-let assert_norm p = ()
