@@ -120,8 +120,6 @@ type ConsensusGenerator =
         })
 
     static member DataGenerator() =
-        let makeDtuple arr =
-            Prims.Mkdtuple2 (int64 (Array.length arr), arr)
         let array gen1 =
             gen {
                 let! len = Arb.generate<int32>
@@ -136,11 +134,6 @@ type ConsensusGenerator =
                 let! a = i64
                 return I64 a
             }
-        let i64ArrayGen =
-            gen {
-                let! arr = array i64
-                return I64Array (makeDtuple arr)
-            }
         let byte = Arb.generate<byte>
         let byteGen =
             gen {
@@ -150,7 +143,7 @@ type ConsensusGenerator =
         let byteArrayGen =
             gen {
                 let! arr = array byte
-                return ByteArray (makeDtuple arr)
+                return ByteArray arr
             }
         let u32 = Arb.generate<uint32>
         let u32Gen =
@@ -158,21 +151,11 @@ type ConsensusGenerator =
                 let! a = u32
                 return U32 a
             }
-        let u32ArrayGen =
-            gen {
-                let! arr = array u32
-                return U32Array (makeDtuple arr)
-            }
         let u64 = Arb.generate<uint64>
         let u64Gen =
             gen {
                 let! a = u64
                 return U64 a
-            }
-        let u64ArrayGen =
-            gen {
-                let! arr = array u64
-                return U64Array (makeDtuple arr)
             }
         let string = gen {
             let! s = Arb.generate<string> |> Gen.filter ((<>) null)
@@ -183,21 +166,11 @@ type ConsensusGenerator =
                 let! a = string
                 return String a
             }
-        let stringArrayGen =
-            gen {
-                let! arr = array string
-                return StringArray (makeDtuple arr)
-            }
         let hash = Gen.arrayOfLength Hash.Length Arb.generate<byte>
         let hashGen =
             gen {
                 let! a = hash
                 return Hash a
-            }
-        let hashArrayGen =
-            gen {
-                let! arr = array hash
-                return HashArray (makeDtuple arr)
             }
         let lock = gen {
             let! lock =
@@ -212,28 +185,15 @@ type ConsensusGenerator =
                 let! a = lock
                 return Zen.Types.Data.data.Lock a
             }
-        let lockArrayGen =
-            gen {
-                let! arr = array lock
-                return LockArray (makeDtuple arr)
-            }
-        let tupleGen =
-            gen {
-                let! a = Arb.generate<data>
-                let! b = Arb.generate<data>
-                return Tuple (a,b)
-            }
-
         Arb.fromGen (Gen.oneof
         [
-            i64Gen; i64ArrayGen;
+            i64Gen;
             byteGen; byteArrayGen;
-            u32Gen; u32ArrayGen;
-            u64Gen; u64ArrayGen;
-            stringGen; stringArrayGen;
-            hashGen; hashArrayGen;
-            lockGen; lockArrayGen;
-            tupleGen
+            u32Gen;
+            u64Gen;
+            stringGen;
+            hashGen;
+            lockGen;
         ])
 
     static member Transaction() =

@@ -414,13 +414,13 @@ let addReturnAddressToData publicKey data =
 
         Zen.Dictionary.add "returnAddress"B (ZData.Lock (ZFStar.fsToFstLock returnAddress)) dict
         |> Cost.__force
-        |> ZData.DataDict
         |> ZData.Dict
+        |> ZData.Collection
         |> Some
         |> Ok
 
     match data with
-    | Some (ZData.Dict (ZData.DataDict dict)) -> addReturnAddressToData' dict
+    | Some (ZData.Collection (ZData.Dict dict)) -> addReturnAddressToData' dict
     | None -> addReturnAddressToData' Zen.Dictionary.empty
     | _ -> Error "data can only be empty or dict in order to add return address"
 

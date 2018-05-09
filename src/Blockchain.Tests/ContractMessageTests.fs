@@ -136,11 +136,16 @@ open Zen.Cost
 open Zen.Asset
 open Zen.Data
 
+module D = Zen.Dictionary
 module RT = Zen.ResultT
 module Tx = Zen.TxSkeleton
 
-let main txSkeleton _ contractHash command sender data wallet =
-    let! returnAddress = data >!> tryDict >?> tryFindLock "returnAddress" in
+let main txSkeleton _  contractHash command sender data wallet =
+    let! returnAddress =
+        data >!= tryCollection
+             >?= tryDict
+             >?= D.tryFind "returnAddress"
+             >?= tryLock in
 
     match returnAddress with
     | Some returnAddress ->
@@ -160,8 +165,8 @@ let main txSkeleton _ contractHash command sender data wallet =
     | None ->
         RT.autoFailw "returnAddress is required"
 
-val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 15
-let cf _ _ _ _ _ _ = ret (3 + 66 + (64 + (64 + (64 + 64 + 0))) + 34)
+val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 19
+let cf _ _ _ _ _ _ = ret (2 + 2 + 64 + 2 + (64 + (64 + (64 + 64 + 0))) + 39)
 """
 
 [<Test>]
@@ -213,8 +218,8 @@ let ``Should execute contract chain and get a valid transaction``() =
         let data =
             Dictionary.add "returnAddress"B returnAddress  Dictionary.empty
             |> Cost.Realized.__force
-            |> Types.Data.DataDict
             |> Types.Data.Dict
+            |> Types.Data.Collection
             |> Some
 
         let! tx = TransactionHandler.executeContract session inputTx blockNumber timestamp contractId1 "" None data state.memoryState
