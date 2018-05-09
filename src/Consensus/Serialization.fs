@@ -398,6 +398,7 @@ module Serialization =
         let private I64Data = 1uy
         [<Literal>]
         let private ByteData = 2uy
+<<<<<<< eeee0d17f609143c40f60071a5eb3ab9d64f30c8
         [<Literal>]
         let private ByteArrayData = 3uy
         [<Literal>]
@@ -419,6 +420,29 @@ module Serialization =
         [<Literal>]
         let private CollectionDictData = 12uy
         [<Literal>]
+=======
+        [<Literal>]
+        let private ByteArrayData = 3uy
+        [<Literal>]
+        let private U32Data = 4uy
+        [<Literal>]
+        let private U64Data = 5uy
+        [<Literal>]
+        let private StringData = 6uy
+        [<Literal>]
+        let private HashData = 7uy
+        [<Literal>]
+        let private LockData = 8uy
+        [<Literal>]
+        let private SignatureData = 9uy
+        [<Literal>]
+        let private PublicKeyData = 10uy
+        [<Literal>]
+        let private CollectionArrayData = 11uy
+        [<Literal>]
+        let private CollectionDictData = 12uy
+        [<Literal>]
+>>>>>>> updates to zulib
         let private CollectionListData = 13uy
 
         module Int64 =
@@ -441,8 +465,13 @@ module Serialization =
                 let! seq = Seq.read readerFn
                 return Array.ofSeq seq
             }
+<<<<<<< eeee0d17f609143c40f60071a5eb3ab9d64f30c8
         module Hash =
             let write ops = Hash.Hash >> Hash.write ops
+=======
+        module ZHash =
+            let write ops = Hash.Hash >> ops.writeHash
+>>>>>>> updates to zulib
             let read = reader {
                 let! hash = Hash.read
                 return hash |> Hash.bytes
