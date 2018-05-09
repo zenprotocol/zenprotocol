@@ -10,6 +10,7 @@ type dictionary<'a> =
 
 type t<'a> = dictionary<'a>
 
+let size (d: dictionary<'A>): Prims.nat = int64 (snd d)
 let empty : dictionary<'a> = Map.empty, 0u
 
 let add (s:S.t) (x:'a) ((d, n):dictionary<'a>)
