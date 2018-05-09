@@ -38,7 +38,7 @@ let isActive ibd =
     | Inactive -> false
     | _ -> true
 
-let shouldStartInitialBlockDownload tip peerTip = peerTip.blockNumber >= tip.blockNumber + treshhold
+let shouldStartInitialBlockDownload (tip:BlockHeader) (peerTip:BlockHeader) = peerTip.blockNumber >= tip.blockNumber + treshhold
 
 let getPeerHeader ibd =
     match ibd with
@@ -46,7 +46,7 @@ let getPeerHeader ibd =
     | DownloadingBlocks (syncing,_,_)
     | GettingHeaders (syncing,_,_) -> Some syncing.peerTipHeader
 
-let start timestamp tipHash tipHeader peerId peerTipHeader = effectsWriter {
+let start timestamp tipHash (tipHeader:BlockHeader) peerId peerTipHeader = effectsWriter {
     let peerTipHash = Block.hash peerTipHeader
 
     eventX "Starting initial block download from {tip} to {peerTip}"
@@ -61,7 +61,7 @@ let start timestamp tipHash tipHeader peerId peerTipHeader = effectsWriter {
     return GettingHeaders ({peerId=peerId;peerTipHash=peerTipHash;peerTipHeader=peerTipHeader}, timestamp, timestamp)
 }
 
-let processHeaders chain session timestamp peerId headers ibd = effectsWriter {
+let processHeaders chain session timestamp peerId (headers:BlockHeader list) ibd = effectsWriter {
     let processHeaders' syncing = effectsWriter {
         eventX "Processing #{headers} headers from #{from} to #{to}"
         >> setField "headers" (List.length headers)

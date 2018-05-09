@@ -43,6 +43,9 @@
     <Reference Include="Zulib">
       <HintPath>..\Zulib\bin\Zulib.dll</HintPath>
     </Reference>
+    <Reference Include="Zulib, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null">
+      <HintPath>..\Zulib\bin\Zulib.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
@@ -145,6 +148,17 @@
         </Reference>
         <Reference Include="FParsecCS">
           <HintPath>..\..\packages\FParsec\lib\net40-client\FParsecCS.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
+      <ItemGroup>
+        <Reference Include="FsBech32">
+          <HintPath>..\..\packages\FsBech32\lib\net45\FsBech32.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>

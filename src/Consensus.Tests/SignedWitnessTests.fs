@@ -39,7 +39,7 @@ let code = sprintf
             module Crypto = Zen.Crypto
             module CR = Zen.ContractResult.NoMessage
 
-            let main txSkeleton contractHash command sender data wallet =
+            let main txSkeleton _ contractHash command sender data wallet =
                 let! pk = Crypto.parsePublicKey "%s" in
 
                 match sender with
@@ -58,8 +58,8 @@ let code = sprintf
                     else RT.autoFailw "expected different pk"
                 | _ -> RT.autoFailw "expected pk"
 
-            //val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 1
-            let cf _ _ _ _ _ = ret (338 <: nat)
+            //val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 1
+            let cf _ _ _ _ _ _ = ret (338 <: nat)
             """ serializePK
 
 let contractId = Contract.makeContractId Version0 code
@@ -112,7 +112,7 @@ let ``contract witness with valid signature``() =
                                           }
     let tx = {tx with witnesses= [contractWintess]}
 
-    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2ul acs UtxoSet.asDatabase ContractCache.empty txHash tx
+    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty txHash tx
 
     result |> should be ok
 
@@ -146,7 +146,7 @@ let ``contract witness with invalid publickey``() =
                                           }
     let tx = {tx with witnesses= [contractWintess]}
 
-    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2ul acs UtxoSet.asDatabase ContractCache.empty txHash tx
+    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty txHash tx
 
     let expected:TxResult = Error (General "invalid contract witness signature")
 
@@ -180,7 +180,7 @@ let ``contract witness with no signature``() =
                                           }
     let tx = {tx with witnesses= [contractWintess]}
 
-    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2ul acs UtxoSet.asDatabase ContractCache.empty txHash tx
+    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty txHash tx
 
     let expected:TxResult = Error (General "expected pk")
 
@@ -219,7 +219,7 @@ let ``contract witness with unexpcected public key``() =
                                           }
     let tx = {tx with witnesses= [contractWintess]}
 
-    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2ul acs UtxoSet.asDatabase ContractCache.empty txHash tx
+    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty txHash tx
 
     let expected:TxResult = Error (General "expected different pk")
 

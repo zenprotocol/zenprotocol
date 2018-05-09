@@ -168,6 +168,11 @@ let convertWallet (wallet:PointedOutput list) : Prims.list<pointedOutput>=
     List.map fsToFstPointedOutput wallet
     |> fsToFstList
 
+let convertContext (context:ContractContext) : context =
+    match context with
+    | {blockNumber=blockNumber;timestamp=timestamp}
+        -> {blockNumber=blockNumber;timestamp=timestamp}
+
 let fsToFstTxSkeleton (txSkeleton:TxSkeleton.T) : txSkeleton =
     let insertInput txSkeleton pointedOutput =
         insertInput pointedOutput txSkeleton

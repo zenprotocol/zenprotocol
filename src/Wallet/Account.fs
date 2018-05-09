@@ -424,7 +424,7 @@ let addReturnAddressToData publicKey data =
     | None -> addReturnAddressToData' Zen.Dictionary.empty
     | _ -> Error "data can only be empty or dict in order to add return address"
 
-let signFirstWitness signKey tx = result {
+let private signFirstWitness signKey tx = result {
     match signKey with
     | Some signKey ->
         let! witnessIndex =
@@ -451,6 +451,7 @@ let signFirstWitness signKey tx = result {
 }
 
 let createExecuteContractTransaction executeContract (contractId:ContractId) command data provideReturnAddress sign spends (account, extendedKey) = result {
+    let Zen = Asset.Zen
     let mutable txSkeleton = TxSkeleton.empty
     let mutable keys = List.empty
 
@@ -458,14 +459,34 @@ let createExecuteContractTransaction executeContract (contractId:ContractId) com
     let! secretKey = ExtendedKey.getPrivateKey zenKey
     let pkHash = PublicKey.hash account.publicKey
 
-    for (asset, amount) in Map.toSeq spends do
+    if Map.isEmpty spends then
+        // To avoid rejection of a valid contract transaction due to possible all-mint inputs 
+        // or same txhash, until we implement fees, we include a temp fee of one kalapa
+        let tempFeeAmount = 1UL
+
         let! inputs, keys', collectedAmount =
-            collectInputs account { asset = asset; amount = amount } secretKey
+            collectInputs account { asset = Zen; amount = tempFeeAmount } secretKey
         let inputs = List.map TxSkeleton.Input.PointedOutput inputs
+
         txSkeleton <-
             TxSkeleton.addInputs inputs txSkeleton
-            |> TxSkeleton.addChange asset collectedAmount amount pkHash
+            |> TxSkeleton.addChange Zen collectedAmount tempFeeAmount pkHash
+
+        let feeOutput = { lock = Fee; spend = { amount = tempFeeAmount; asset = Zen } }
+        txSkeleton <- TxSkeleton.addOutput feeOutput txSkeleton
+
         keys <- List.append keys keys'
+    else
+        for (asset, amount) in Map.toSeq spends do
+            let! inputs, keys', collectedAmount =
+                collectInputs account { asset = asset; amount = amount } secretKey
+            let inputs = List.map TxSkeleton.Input.PointedOutput inputs
+    
+            txSkeleton <-
+                TxSkeleton.addInputs inputs txSkeleton
+                |> TxSkeleton.addChange asset collectedAmount amount pkHash
+    
+            keys <- List.append keys keys'
 
     let! data =
         if provideReturnAddress then

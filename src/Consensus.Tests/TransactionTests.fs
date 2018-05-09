@@ -33,7 +33,7 @@ let ``Transaction should be orphan``() =
         contract = None
     }
     let utxos = Map.ofSeq [ testInput1, Unspent output ]
-    inputsValidationOrphan 1ul acs utxos tx keys
+    inputsValidationOrphan 1ul 1_000_000UL acs utxos tx keys
     |> shouldEqual
 
 [<Test>]
@@ -191,7 +191,7 @@ let ``Signed transaction should be valid``() =
         contract = None
     }
     let utxos = Map.ofSeq [ testInput1, Unspent output ]
-    inputsValidationOk 1ul acs utxos tx keys
+    inputsValidationOk 1ul 1_000_000UL acs utxos tx keys
     |> shouldEqual
 
 [<Test>]
@@ -206,5 +206,30 @@ let ``Signed transaction validation result should be invalid witness``() =
         contract = None
     }
     let utxos = Map.ofSeq [ testInput1, Unspent output ]
-    inputsValidationMsg "PK witness mismatch" 1ul acs utxos tx keys
+    inputsValidationMsg "PK witness mismatch" 1ul 1_000_000UL acs utxos tx keys
+    |> shouldEqual
+[<Test>]
+let ``Transaction validation should fail when inputs consist only of mints``() =
+    let asset = Asset (ContractId (Version0, validHash), Hash.zero)
+    let output = { lock = PK testHash; spend = { asset = asset; amount = 10UL } }
+
+    let contractWitness = {
+        contractId = ContractId (Version0, validHash)
+        command = ""
+        data = None
+        beginInputs = 0ul
+        beginOutputs = 0ul
+        inputsLength = 0ul
+        outputsLength = 0ul
+        signature = None
+        cost = 1ul
+    }
+    {
+        version = Version0
+        inputs = [ Mint { asset = asset; amount = 10UL } ]
+        witnesses = [ ContractWitness contractWitness ]
+        outputs = [ output ]
+        contract = None
+    }
+    |> basicValidationMsg "inputs consist of mints only"
     |> shouldEqual

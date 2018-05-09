@@ -192,4 +192,4 @@ let ``Contract activation weight should be positive``() =
 
     actWeight |> should be ok
     let (Ok wt) = actWeight
-    wt |> should equal 62_635_440I
+    wt |> should be (greaterThan 0I)

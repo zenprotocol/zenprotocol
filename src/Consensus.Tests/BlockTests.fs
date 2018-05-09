@@ -1,4 +1,4 @@
-﻿module Consensus.Tests.BlockTests
+module Consensus.Tests.BlockTests
 
 open Consensus
 open Consensus.Chain
@@ -76,7 +76,7 @@ let ``block with one invalid transaction fail validation``(header) (NonEmptyTran
     Block.validate chain block = expected
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
-let ``block with valid transactions pass validation``(header) (NonEmptyTransactions transactions) =
+let ``block with valid transactions pass validation``(header:BlockHeader) (NonEmptyTransactions transactions) =
     let transactions = coinbase header.blockNumber transactions :: transactions
 
     let txMerkleRoot =
@@ -267,8 +267,8 @@ let ``can connect block with a contract``() =
     let contract : Contract.T =
         {
             contractId=Contract.makeContractId Version0 SampleContract.sampleContractCode
-            mainFn = fun tx _ _ _ _ _ -> Ok (tx,None)
-            costFn = fun _ _ _ _ _ -> 0L
+            mainFn = fun tx _ _ _ _ _ _ -> Ok (tx,None)
+            costFn = fun _ _ _ _ _ _ -> 0L
             expiry=1001ul
             code=SampleContract.sampleContractCode
         }
@@ -299,8 +299,8 @@ let ``block with invalid contract failed connecting``() =
     let contract : Contract.T =
         {
             contractId=Contract.makeContractId Version0 "ada"
-            mainFn = fun tx _ _ _ _ _ -> Ok (tx,None)
-            costFn = fun _ _ _ _ _ -> 0L
+            mainFn = fun tx _ _ _ _ _ _ -> Ok (tx,None)
+            costFn = fun _ _ _ _ _ _ -> 0L
             expiry=1000ul
             code=""
         }
@@ -674,8 +674,8 @@ let ``contract get removed when expiring arrive``() =
     let contract : Contract.T =
         {
             contractId=Contract.makeContractId Version0 SampleContract.sampleContractCode
-            mainFn= fun tx _ _ _ _ _ -> Ok (tx,None)
-            costFn = fun _ _ _ _ _ -> 0L
+            mainFn= fun tx _ _ _ _ _ _ -> Ok (tx,None)
+            costFn = fun _ _ _ _ _ _ -> 0L
             expiry=1ul
             code=""
         }

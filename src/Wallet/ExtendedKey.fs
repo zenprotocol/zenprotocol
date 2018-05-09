@@ -88,7 +88,7 @@ let fromMnemonicPhrase (mnemonicPhrase:string) =
     try
          let mnemonicSentence = new NBitcoin.Mnemonic(mnemonicPhrase, NBitcoin.Wordlist.English)
 
-         mnemonicSentence.DeriveSeed mnemonicPhrase
+         mnemonicSentence.DeriveSeed ()
          |> create
     with _ as ex ->
         Error ex.Message

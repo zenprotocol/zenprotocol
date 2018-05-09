@@ -14,10 +14,10 @@ open Zen.Cost.Realized
 open Zen.Types.Realized
 open Zen.Types.Data
 open Zen.Types.Main
-open Zen.Types.Main
 
 type private zfstarMainFn =
     txSkeleton
+        -> context
         -> contractId
         -> Prims.string
         -> sender
@@ -27,6 +27,7 @@ type private zfstarMainFn =
 
 type private zfstarCostFn =
     txSkeleton
+        -> context
         -> Prims.string
         -> sender
         -> Native.option<data>
@@ -37,6 +38,7 @@ type ContractWallet = PointedOutput list
 
 type ContractMainFn =
     TxSkeleton.T
+        -> ContractContext
         -> ContractId
         -> string
         -> sender
@@ -46,6 +48,7 @@ type ContractMainFn =
 
 type ContractCostFn =
     TxSkeleton.T
+        -> ContractContext
         -> string
         -> sender
         -> data option
@@ -85,23 +88,25 @@ let private getMainFunction assembly =
         Exception.toError "get contract mainFunc" ex
 
 let private wrapMainFn (mainFn : zfstarMainFn) : ContractMainFn =
-    fun txSkeleton (ContractId (version, Hash.Hash cHash)) command sender data contractWallet ->
+    fun txSkeleton (context:ContractContext) (ContractId (version, Hash.Hash cHash)) command sender data contractWallet ->
         let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
         let command' = ZFStar.fsToFstString command
         let data' = ZFStar.fsToFstOption data
         let contractWallet' = ZFStar.convertWallet contractWallet
-        mainFn txSkeleton' (version,cHash) command' sender data' contractWallet'
+        let context' = ZFStar.convertContext context
+        mainFn txSkeleton' context' (version,cHash) command' sender data' contractWallet'
         |> ZFStar.unCost
         |> ZFStar.toResult
         |> Result.map ZFStar.convertResult
 
 let private wrapCostFn (costFn: zfstarCostFn) : ContractCostFn =
-    fun txSkeleton command sender data contractWallet ->
+    fun txSkeleton context command sender data contractWallet ->
         let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
         let command' = ZFStar.fsToFstString command
         let data' = ZFStar.fsToFstOption data
         let contractWallet' = ZFStar.convertWallet contractWallet
-        costFn txSkeleton' command' sender data' contractWallet'
+        let context' = ZFStar.convertContext context
+        costFn txSkeleton' context' command' sender data' contractWallet'
         |> ZFStar.unCost
 
 let private getModuleName : Hash -> string =
@@ -148,8 +153,8 @@ let recordHints (code:string) : Result<string, string> =
 
 let getCost contract = contract.costFn
 
-let run contract txSkeleton command sender data wallet =
-    contract.mainFn txSkeleton contract.contractId command sender data wallet
+let run contract txSkeleton context command sender data wallet =
+    contract.mainFn txSkeleton context contract.contractId command sender data wallet
 
 let getContractWallet (txSkeleton:TxSkeleton.T) (w:ContractWitness) =
     txSkeleton.pInputs.[int w.beginInputs .. int w.endInputs]

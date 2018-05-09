@@ -100,7 +100,7 @@ open Zen.Asset
 module RT = Zen.ResultT
 module Tx = Zen.TxSkeleton
 
-let main txSkeleton contractHash command sender data wallet =
+let main txSkeleton _ contractHash command sender data wallet =
     let isFromContract =
         match sender with
         | Contract contractHash' -> contractHash' <> contractHash
@@ -117,8 +117,8 @@ let main txSkeleton contractHash command sender data wallet =
     else
         RT.autoFailw "unsupported command"
 
-val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 7
-let cf _ _ _ _ _ = ret (64 + 64 + 0 + 25)
+val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 7
+let cf _ _ _ _ _ _ = ret (64 + 64 + 0 + 25)
 """
 let contract2Id = Contract.makeContractId Version0 contract2Code
 
@@ -140,9 +140,9 @@ module D = Zen.Dictionary
 module RT = Zen.ResultT
 module Tx = Zen.TxSkeleton
 
-let main txSkeleton contractHash command sender data wallet =
-    let! returnAddress = 
-        data >!= tryCollection 
+let main txSkeleton _ contractHash command sender data wallet =
+    let! returnAddress =
+        data >!= tryCollection
              >?= tryDict
              >?= D.tryFind "returnAddress"
              >?= tryLock in
@@ -165,8 +165,8 @@ let main txSkeleton contractHash command sender data wallet =
     | None ->
         RT.autoFailw "returnAddress is required"
 
-val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 19
-let cf _ _ _ _ _ = ret (2 + 2 + 64 + 2 + (64 + (64 + (64 + 64 + 0))) + 39)
+val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 19
+let cf _ _ _ _ _ _ = ret (2 + 2 + 64 + 2 + (64 + (64 + (64 + 64 + 0))) + 39)
 """
 
 [<Test>]
@@ -196,6 +196,10 @@ let ``Should execute contract chain and get a valid transaction``() =
     let memoryState = { state.memoryState with utxoSet = utxoSet }
     let state = { state with memoryState = memoryState }
 
+    let blockNumber = 1u
+    let timestamp = 1_000_000UL
+    let context = {blockNumber=blockNumber;timestamp=timestamp}
+
     let inputTx =
         {
             pInputs = [ PointedOutput (input, output) ]
@@ -218,13 +222,13 @@ let ``Should execute contract chain and get a valid transaction``() =
             |> Types.Data.Collection
             |> Some
 
-        let! tx = TransactionHandler.executeContract session inputTx contractId1 "" None data state.memoryState
+        let! tx = TransactionHandler.executeContract session inputTx blockNumber timestamp contractId1 "" None data state.memoryState
 
         let tx = Transaction.sign [ sampleKeyPair ] tx
         let txHash = Transaction.hash tx
 
         let events, memoryState =
-            TransactionHandler.validateTransaction chain session dataPath 1ul tx state.memoryState
+            TransactionHandler.validateTransaction chain session dataPath blockNumber timestamp tx state.memoryState
             |> Writer.unwrap
 
         //expect the transaction to be valid
@@ -242,7 +246,7 @@ let ``Should execute contract chain and get a valid transaction``() =
         let txHash = Transaction.hash tx
 
         let events, memoryState =
-            TransactionHandler.validateTransaction chain session dataPath  1ul tx state.memoryState
+            TransactionHandler.validateTransaction chain session dataPath blockNumber timestamp tx state.memoryState
             |> Writer.unwrap
 
         //exptect the transaction to be invalid

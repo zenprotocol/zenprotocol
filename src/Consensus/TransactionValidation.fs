@@ -1,4 +1,4 @@
-﻿module Consensus.TransactionValidation
+module Consensus.TransactionValidation
 
 open Consensus
 open Types
@@ -82,7 +82,7 @@ let private activateContract (chainParams : Chain.ChainParameters) contractPath 
                                     contractId = contractId
                                     mainFn = mainFn
                                     costFn = costFn
-                                    expiry = numberOfBlocks
+                                    expiry = blockNumber + numberOfBlocks
                                     code = contract.code
                                 } : Contract.T), contractCache
                         | None ->
@@ -148,11 +148,16 @@ let private checkDuplicateInputs tx =
     if List.distinct tx.inputs == tx.inputs then Ok tx
     else GeneralError "inputs duplicated"
 
+let private checkMintsOnly tx =
+    if List.forall (function | Mint _ -> true | _ -> false) tx.inputs then
+        GeneralError "inputs consist of mints only"
+    else
+        Ok tx
+    
 let private checkStructure =
     let isInvalidSpend = fun { asset = (Asset (ContractId (version,cHash), subType)); amount = amount } ->
         cHash = Hash.zero && (subType <> Hash.zero || version <> Version0) ||
             amount = 0UL //Relieve for non spendables?
-
     let isNull = function | null -> true | _ -> false
     let isEmptyArr arr = isNull arr || Array.length arr = 0
     let isEmptyString str = isNull str || String.length str = 0
@@ -245,7 +250,7 @@ let private checkActivationSacrifice tx =
         else
             GeneralError "tx with a contract must include an activation sacrifice"
 
-let internal tryGetUtxos getUTXO utxoSet tx =
+let private tryGetUtxos getUTXO utxoSet tx =
     getUtxosResult getUTXO tx.inputs utxoSet
     |> Result.mapError (fun errors ->
         if List.exists
@@ -259,6 +264,7 @@ let validateBasic =
     >=> checkNoCoinbaseLock
     >=> checkOutputsOverflow
     >=> checkDuplicateInputs
+    >=> checkMintsOnly
     >=> checkActivationSacrifice
 
 let validateCoinbase blockNumber =
@@ -305,12 +311,12 @@ let validateCoinbase blockNumber =
     >=> checkNoContractInCoinbase
     >=> checkOutputsOverflow
 
-let validateInContext chainParams getUTXO contractPath blockNumber acs contractCache set txHash tx = result {
+let validateInContext chainParams getUTXO contractPath blockNumber timestamp acs contractCache set txHash tx = result {
     let! outputs = tryGetUtxos getUTXO set tx
     let txSkel = TxSkeleton.fromTransaction tx outputs
 
     do! checkAmounts txSkel
-    do! InputValidation.StateMachine.validate blockNumber acs outputs txHash tx txSkel
+    do! InputValidation.StateMachine.validate blockNumber timestamp acs outputs txHash tx txSkel
 
     let! acs, contractCache = activateContract chainParams contractPath blockNumber acs contractCache tx
     let! acs = extendContracts chainParams acs tx

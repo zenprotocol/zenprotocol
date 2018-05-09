@@ -1,9 +1,7 @@
 #!/bin/sh
 
 rm -r Release
-cd ../src/Zulib
-./build.sh
-cd ../..
+cd ..
 rm -r src/Node/bin/Release
 msbuild src /property:Configuration=Release /t:Node:rebuild
 cd package

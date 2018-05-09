@@ -23,7 +23,7 @@ let handleCommand chainParams command session timestamp (state:State) =
         effectsWriter {
             let! memoryState =
                 TransactionHandler.validateTransaction chainParams session contractPath state.tipState.tip.header.blockNumber
-                    tx state.memoryState
+                    timestamp tx state.memoryState
             return {state with memoryState = memoryState}
         }
     | RequestMemPool peerId ->
@@ -106,11 +106,11 @@ let handleCommand chainParams command session timestamp (state:State) =
 let handleRequest chain (requestId:RequestId) request session timestamp state =
     match request with
     | ExecuteContract (contractId, command,sender ,data, txSkeleton) ->
-        TransactionHandler.executeContract session txSkeleton contractId command sender data state.memoryState
+        TransactionHandler.executeContract session txSkeleton state.tipState.tip.header.blockNumber timestamp contractId command sender data state.memoryState
         |> requestId.reply
     | GetBlockTemplate pkHash ->
-        let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList chain session state
-        let block = Block.createTemplate chain state.tipState.tip.header (Timestamp.now ()) state.tipState.ema memState.activeContractSet validatedTransactions pkHash
+        let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList chain session state timestamp
+        let block = Block.createTemplate chain state.tipState.tip.header timestamp state.tipState.ema memState.activeContractSet validatedTransactions pkHash
 
         requestId.reply block
     | GetBlock blockHash ->

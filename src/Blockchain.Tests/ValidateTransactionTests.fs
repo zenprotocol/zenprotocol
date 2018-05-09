@@ -1,4 +1,4 @@
-﻿module Blockchain.Tests.ValidateTransactionTests
+module Blockchain.Tests.ValidateTransactionTests
 
 // This tests only for ValidateTransaction command
 // We don't need to cover the entire outcome of transaction validation
@@ -395,7 +395,7 @@ let ``contract activation arrived, running orphan transaction``() =
 
     let txHash,tx =
         let tx =
-            TransactionHandler.executeContract session sampleInputTx sampleContractId "" None None stateWithContract.memoryState
+            TransactionHandler.executeContract session sampleInputTx 1ul 1_000_000UL sampleContractId "" None None stateWithContract.memoryState
             |> getResult
         let txHash = Transaction.hash tx
         let pkWitness =

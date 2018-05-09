@@ -1,4 +1,4 @@
-﻿module Consensus.Tests.SampleContract
+module Consensus.Tests.SampleContract
 
 open Consensus
 open Types
@@ -15,7 +15,7 @@ open Zen.Cost
 module RT = Zen.ResultT
 module Tx = Zen.TxSkeleton
 
-let main txSkeleton contractHash command sender data wallet =
+let main txSkeleton _ contractHash command sender data wallet =
   let! asset = Zen.Asset.getDefault contractHash in
   let spend = { asset=asset; amount=1000UL } in
   let pInput = Mint spend in
@@ -26,8 +26,8 @@ let main txSkeleton contractHash command sender data wallet =
 
   RT.ok (txSkeleton, None)
 
-val cf: txSkeleton -> string -> sender -> option data -> wallet -> cost nat 9
-let cf _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 20)
+val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 9
+let cf _ _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 20)
 """
 
 let sampleContractId = Contract.makeContractId Version0 sampleContractCode
