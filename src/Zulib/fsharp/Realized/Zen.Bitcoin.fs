@@ -56,7 +56,7 @@ let private compressNbits (bTarget:bigint) : target =
     let toCopy = min n 3
     let res = Array.zeroCreate<byte> 4
     Array.blit bs (n-toCopy) res 0 toCopy
-    res.[3] <- (byte n)
+    res.[3] <- (Microsoft.FSharp.Core.Operators.byte n)
     res
 
 let private hashToBigint (hash:hash) =
@@ -92,11 +92,27 @@ let calculateNextWorkRequired
             compressNbits bNext
         ) |> Cost.C
 
+let private doubleHash (bs: byte array) =
+    use sha = new SHA256Managed()
+    let h = sha.ComputeHash(bs,0,Array.length bs)
+    sha.ComputeHash(h,0,32)
+
+let private hashPath auditPath index txHash =
+    let concatAndHash a (i, b) =
+        let conc =
+            if ((index >>> i) &&& 1u) <> 0u
+            then Array.append b a
+            else Array.append a b
+        doubleHash conc
+    Array.fold concatAndHash txHash (Array.indexed auditPath)
+
 let checkInclusion (_:int)
                    (auditPath : hash array)
+                   (index : uint32)
                    (txHash: hash)
                    (header:bitcoinHeader) : Cost.t<bool,unit> =
     lazy (
-        // TODO: implement check of inclusion
-        true
+        let r = hashPath auditPath index txHash
+        let merkleRoot = header.[36..67]
+        r = merkleRoot
     ) |> Cost.C
