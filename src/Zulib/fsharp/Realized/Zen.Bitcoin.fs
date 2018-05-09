@@ -33,12 +33,30 @@ let computeHeaderHash (header:bitcoinHeader) : Cost.t<hash,unit> =
         sha.ComputeHash(h,0,32)
     ) |> Cost.C
 
+let private uncompressNbits (target:target) : bigint =
+    let exponent = (int32 target.[3]) - 3
+    let significand =
+        if target.[2] &&& 0x80uy <> 0uy then 0 else
+        65536 * int32 target.[2]
+        + 256 * int32 target.[1]
+        + int32 target.[0]
+    if exponent <= 3 then
+        bigint (significand >>> (3-exponent))
+    else
+        let r = bigint significand * pown 256I exponent
+        if r >= pown 2I 256 then 0I else r
+
+let private hashToBigint (hash:hash) =
+    hash
+    |> Array.mapi (fun i (b:byte) -> (bigint (int32 b)) * pown 256I i)
+    |> Array.sum
+
+
 let checkProofOfWork
     (h:hash)
     (target:target) : Cost.t<bool,unit> =
     lazy(
-        // TODO: implemet actual PoW check
-        true
+        (hashToBigint h) <= (uncompressNbits target)
     ) |> Cost.C
 
 let calculateNextWorkRequired
@@ -57,5 +75,3 @@ let checkInclusion (_:int)
         // TODO: implement check of inclusion
         true
     ) |> Cost.C
-
-
