@@ -192,12 +192,16 @@ module Serialization =
         }
 
     module List =
+        let write ops writerFn (ls: list<'B>) =
+            Seq.write ops writerFn ls
         let read readerFn = reader {
             let! seq = Seq.read readerFn
             return List.ofSeq seq
         }
 
     module Array =
+        let write ops writerFn (arr: array<'B>) =
+            Seq.write ops writerFn arr
         let read readerFn = reader {
             let! seq = Seq.read readerFn
             return Array.ofSeq seq
@@ -384,9 +388,6 @@ module Serialization =
         }
 
     module Data =
-        open Consensus
-        open System.Collections.ObjectModel
-
         [<Literal>]
         let private I64Data = 1uy
         [<Literal>]
@@ -421,19 +422,6 @@ module Serialization =
                 return int64 i
             }
 
-        module List =
-            let write = Seq.write
-            let read readerFn = reader {
-                let! seq = Seq.read readerFn
-                return List.ofSeq seq
-            }
-
-        module Array =
-            let write = Seq.write
-            let read readerFn = reader {
-                let! seq = Seq.read readerFn
-                return Array.ofSeq seq
-            }
         module Hash =
             let write ops = Hash.Hash >> Hash.write ops
             let read = reader {
