@@ -94,8 +94,7 @@ let utxoSet =
 let ``Contract generated transaction should be valid``() =
     (compileRunAndValidate sampleInputTx utxoSet sampleContractCode
     , (Ok sampleExpectedResult : Result<Transaction, string>))
-    |> fun (a,b) -> printfn "%A %A" a b
-    //|> shouldEqual
+    |> shouldEqual
 
 [<Test>]
 [<ParallelizableAttribute>]

@@ -8,6 +8,7 @@ open Zen.Types.Data
 open Infrastructure
 open Result
 open ValidationError
+open Logary.Message
 
 let private addSpend s m =
     let (+) a b =
@@ -89,7 +90,11 @@ let private activateContract (chainParams : Chain.ChainParameters) contractPath 
                             let compile contract =
                                 Contract.compile contractPath contract
                                 |> Result.bind (fun _ -> Contract.load contractPath (blockNumber + numberOfBlocks) contract.code contractId)
-                                |> Result.mapError (fun _ -> BadContract)
+                                |> Result.mapError (fun error -> 
+                                    eventX "Contract activation failed: {error}"
+                                    >> setField "error" (sprintf "%A" error)
+                                    |> Log.info
+                                    BadContract)
 
                             let! contract = Measure.measure (sprintf "compiling contract %A" contractId) (lazy (compile contract))
                             let contractCache = ContractCache.add contract contractCache

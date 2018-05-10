@@ -26,7 +26,7 @@ let create<'command,'request,'event,'result> busName serviceName (f:ActorFunctio
         let onError error = 
             eventX "Unhandled exception in '{serviceName}': {error}"
             >> setField "serviceName" serviceName
-            >> setField "error" error
+            >> setField "error" (sprintf "%A" error)
             |> Log.error
 
             System.Environment.FailFast(sprintf "Unhandled exception in '%s'" serviceName, error)

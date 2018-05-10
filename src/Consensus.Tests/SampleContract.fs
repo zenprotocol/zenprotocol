@@ -73,7 +73,7 @@ let sampleOutputTx, _ =
 
 let sampleExpectedResult =
     Transaction.fromTxSkeleton sampleOutputTx
-    |> Transaction.addWitnesses [ ContractWitness <| TxSkeleton.getContractWitness sampleContractId "" None sampleInputTx sampleOutputTx 215L ]
+    |> Transaction.addWitnesses [ ContractWitness <| TxSkeleton.getContractWitness sampleContractId "" None sampleInputTx sampleOutputTx 212L ]
     |> Transaction.sign [ sampleKeyPair ]
 
 let getSampleUtxoset utxos =
