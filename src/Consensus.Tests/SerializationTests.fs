@@ -52,7 +52,7 @@ let ``Block-header serialization round trip produces same result`` (h:BlockHeade
 let ``Different block headers don't produce same serialization result`` (h1:BlockHeader) (h2:BlockHeader) =
     (h1 <> h2) ==> lazy (Header.serialize h1 <> Header.serialize h2)
 
-[<Property>]
+[<Property(EndSize=10000)>]
 let ``Block serialization round trip produces same result`` (bk:Block) =
     bk
     |> Block.serialize
@@ -75,7 +75,7 @@ let ``Different blocks don't produce same hashing result``(bk1:Block) (bk2:Block
 
 open Consensus.Tests
 open Zen.Types.Data
-    
+
 [<Property(EndSize=10000)>]
 let ``Data serialization round trip produces same result``(data:data) =
     data
@@ -86,7 +86,7 @@ let ``Data serialization round trip produces same result``(data:data) =
 let ``Different data don't produce same serialization result``(data1:data) (data2:data) =
     (data1 <> data2) ==> lazy (Data.serialize data1 <> Data.serialize data2)
 
-[<Property(EndSize=1000000,MaxTest=1000)>]
+[<Property(EndSize=10000)>]
 let ``serialize and deserialize varint yield the same number``(num:uint32)  =
     let stream = FsNetMQ.Stream.create 5
 
