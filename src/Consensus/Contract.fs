@@ -73,7 +73,6 @@ with
 
 type T = Contract
 
-
 let private getMainFunction assembly =
     try
         let getProperty name =
@@ -135,6 +134,12 @@ let load contractsPath expiry code (ContractId (version,hash)) =
             expiry = expiry
             code = code
         })
+
+let getFunctions assembly =
+    getMainFunction assembly
+    |> Result.map (fun (MainFunc (CostFunc (_, costFn), mainFn) : mainFunction) ->
+        wrapMainFn mainFn, wrapCostFn costFn
+        )
 
 let compile (contractsPath:string)
             (contract:ContractV0) =
