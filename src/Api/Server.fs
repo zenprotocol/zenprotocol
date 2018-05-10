@@ -244,7 +244,7 @@ let handleRequest chain client (request,reply) =
     | Get ("/wallet/resync", _) ->
         Wallet.resyncAccount client
         reply StatusCode.OK NoContent
-    | Post ("/block/publish", Some body) ->
+    | Post ("/blockchain/publishblock", Some body) ->
         match parsePublishBlockJson body with
         | Error error -> replyError error
         | Ok block ->

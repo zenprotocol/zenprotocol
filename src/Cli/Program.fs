@@ -246,7 +246,7 @@ let main argv =
                 printfn " %s %s\t| %d" activeContract.Address activeContract.ContractId activeContract.Expire) activeContracts
         | Some (PublishBlock args) ->
             let block = args.GetResult <@ PublishBlock_Arguments @>
-            "block/publish"
+            "/blockchain/publishblock"
             |> getUri
             |> (new PublishBlockJson.Root(block))
                 .JsonValue.Request
