@@ -250,6 +250,24 @@ let handleRequest chain client (request,reply) =
         | Ok block ->
             Blockchain.validateMinedBlock client block
             reply StatusCode.OK NoContent
+    | Get ("/blockchain/blocktemplate", query) ->
+        let pkHash =
+            match Map.tryFind "address" query with
+            | None -> Wallet.getAddressPKHash client
+            | Some address -> Address.decodePK chain address
+
+        match pkHash with
+        | FSharp.Core.Ok pkHash ->
+            let block =
+                Blockchain.getBlockTemplate client pkHash
+                |> Block.toHex
+
+            JsonValue.String block
+            |> JsonContent
+            |> reply StatusCode.OK
+        | FSharp.Core.Error _ ->
+            TextContent (sprintf "invalid address %A" query)
+            |> reply StatusCode.BadRequest
     | _ ->
         reply StatusCode.NotFound NoContent
 
