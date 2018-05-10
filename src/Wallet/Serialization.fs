@@ -18,10 +18,10 @@ module private Status =
 
     let write ops writerFn = function
         | Spent value ->
-            ops.writeByte SerializedSpent
+            Byte.write ops SerializedSpent
             >> writerFn value
         | Unspent value ->
-            ops.writeByte SerializedUnspent
+            Byte.write ops SerializedUnspent
             >> writerFn value
     let read readerFn = reader {
         let! discriminator = Byte.read
@@ -50,7 +50,7 @@ module private OutputStatus =
     
 module private TxDelta =
     let write ops = fun txDelta ->
-        ops.writeHash txDelta.txHash
+        Hash.write ops txDelta.txHash
         >> Seq.write ops SpendStatus.write txDelta.deltas
         >> Option.write ops ops.writeNumber4 txDelta.blockNumber
     let read = reader {
@@ -67,9 +67,9 @@ module Wallet =
             Outpoint.write ops outpoint
             >> OutputStatus.write ops outputStatus) wallet.outputs
         >> Seq.write ops (fun ops (hash, tx) ->
-            ops.writeHash hash
+            Hash.write ops hash
             >> Transaction.write WithoutWitness ops tx) wallet.mempool
-        >> ops.writeHash wallet.tip
+        >> Hash.write ops wallet.tip
         >> ops.writeNumber4 wallet.blockNumber
         >> PublicKey.write ops wallet.publicKey
         
@@ -126,8 +126,8 @@ module Version =
         |> run read
         
 module Secured =
-    let private write ops = Seq.write ops (fun ops -> ops.writeByte)
-    let private read = Array.read Byte.read
+    let private write ops = Bytes.write ops
+    let private read = Bytes.read
     
     let serialize secured =
         write counters secured 0ul

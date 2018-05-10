@@ -68,7 +68,7 @@ let setup = fun () ->
     Arb.register<Consensus.Tests.ConsensusGenerator>() |> ignore
     Arb.register<WalletGenerators>() |> ignore
 
-[<Property>]
+[<Property(EndSize=10000)>]
 let ``Wallet serialization round trip produces same result`` (value:Account.T) =
     value
     |> Wallet.serialize

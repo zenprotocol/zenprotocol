@@ -20,7 +20,7 @@ module BlockState =
         >> Seq.write ops (fun ops contractState ->
             ContractId.write ops contractState.contractId
             >> ops.writeNumber4 contractState.expiry
-            >> ops.writeString contractState.code) blockState.activeContractSet
+            >> String.write ops contractState.code) blockState.activeContractSet
 
     let private read = reader {
         let! difficulty = readNumber4
@@ -28,7 +28,7 @@ module BlockState =
         let! activeContractSet = List.read <| reader {
             let! contractId = ContractId.read
             let! expiry = readNumber4
-            let! code = readLongString
+            let! code = String.read
             return {
                 contractId=contractId
                 expiry=expiry
@@ -62,10 +62,10 @@ module private BlockStatus =
     let private SerializedInvalid = 4uy
 
     let write ops = function
-        | Orphan -> ops.writeByte SerializedOrphan
-        | Connected -> ops.writeByte SerializedConnected
-        | MainChain -> ops.writeByte SerializedMainChain
-        | Invalid -> ops.writeByte SerializedInvalid
+        | Orphan -> Byte.write ops SerializedOrphan
+        | Connected -> Byte.write ops SerializedConnected
+        | MainChain -> Byte.write ops SerializedMainChain
+        | Invalid -> Byte.write ops SerializedInvalid
 
     let read = reader {
         let! discriminator = Byte.read
@@ -80,23 +80,23 @@ module private BlockStatus =
 module BigInt =
     let write ops =
         BigInteger.toBytes32
-        >> Seq.write ops (fun ops -> ops.writeByte)
+        >> Bytes.write ops
 
     let read = reader {
-        let! bytes = Array.read Byte.read
+        let! bytes = Bytes.read
         return BigInteger.fromBytes32 bytes
     }
 
 module ExtendedBlockHeader =
     let write ops extendedBlockHeader =
-        ops.writeHash extendedBlockHeader.hash
+        Hash.write ops extendedBlockHeader.hash
         >> Header.write ops extendedBlockHeader.header
         >> BlockStatus.write ops extendedBlockHeader.status
         >> Option.write ops (BigInt.write ops) extendedBlockHeader.chainWork
-        >> ops.writeHash extendedBlockHeader.txMerkleRoot
-        >> ops.writeHash extendedBlockHeader.witnessMerkleRoot
-        >> ops.writeHash extendedBlockHeader.activeContractSetMerkleRoot
-        >> Seq.write ops (fun ops -> ops.writeHash) extendedBlockHeader.commitments
+        >> Hash.write ops extendedBlockHeader.txMerkleRoot
+        >> Hash.write ops extendedBlockHeader.witnessMerkleRoot
+        >> Hash.write ops extendedBlockHeader.activeContractSetMerkleRoot
+        >> Seq.write ops Hash.write extendedBlockHeader.commitments
 
     let read = reader {
         let! hash = Hash.read
@@ -151,12 +151,12 @@ module OutputStatus =
 
     let write ops = function
         | NoOutput ->
-            ops.writeByte SerializedNoOutput
+            Byte.write ops SerializedNoOutput
         | Spent output ->
-            ops.writeByte SerializedSpent
+            Byte.write ops SerializedSpent
             >> Output.write ops output
         | Unspent output ->
-            ops.writeByte SerializedUnspent
+            Byte.write ops SerializedUnspent
             >> Output.write ops output
 
     let read = reader {
