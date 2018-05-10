@@ -434,8 +434,8 @@ module Serialization =
                 let! seq = Seq.read readerFn
                 return Array.ofSeq seq
             }
-        module ZHash =
-            let write ops = Hash.Hash >> ops.writeHash
+        module Hash =
+            let write ops = Hash.Hash >> Hash.write ops
             let read = reader {
                 let! hash = Hash.read
                 return hash |> Hash.bytes
@@ -475,11 +475,11 @@ module Serialization =
                 Byte.write ops I64Data
                 >> Int64.write ops i
             | ZData.Byte b ->
-                ops.writeByte ByteData
-                >> ops.writeByte b
+                Byte.write ops ByteData
+                >> Byte.write ops b
             | ZData.ByteArray arr ->
-                ops.writeByte ByteArrayData
-                >> Array.write ops (fun ops -> ops.writeByte) arr
+                Byte.write ops ByteArrayData
+                >> Bytes.write ops arr
             | ZData.U32 i ->
                 Byte.write ops U32Data
                 >> ops.writeNumber4 i
@@ -490,11 +490,11 @@ module Serialization =
                 Byte.write ops StringData
                 >> String.write ops s
             | ZData.Hash hash ->
-                ops.writeByte HashData
-                >> ZHash.write ops hash
+                Byte.write ops HashData
+                >> Hash.write ops hash
             | ZData.Lock l ->
-                ops.writeByte LockData
-                >> ZLock.write ops l
+                Byte.write ops LockData
+                >> Lock.write ops l
             | ZData.Signature signature ->
                 Byte.write ops SignatureData
                 >> Signature.write ops signature
@@ -502,15 +502,15 @@ module Serialization =
                 Byte.write ops PublicKeyData
                 >> PublicKey.write ops publicKey
             | ZData.Collection (ZData.Array arr) ->
-                ops.writeByte CollectionArrayData
+                Byte.write ops CollectionArrayData
                 >> Array.write ops write arr
             | ZData.Collection (ZData.Dict (map, _)) ->
-                ops.writeByte CollectionDictData
+                Byte.write ops CollectionDictData
                 >> Map.write ops (fun ops (key, data)->
                     String.write ops key
                     >> write ops data) map
             | ZData.Collection (ZData.List l) ->
-                ops.writeByte CollectionListData
+                Byte.write ops CollectionListData
                 >> List.write ops write (ZFStar.fstToFsList l)
 
         let rec read = reader {
@@ -535,7 +535,8 @@ module Serialization =
                 let! s = String.read
                 return ZData.String s
             | HashData ->
-                yield! ZHash.read
+                let! hash = Hash.read
+                return ZData.Hash hash
             | LockData ->
                 let! lock = Lock.read
                 return ZData.Lock lock
