@@ -465,13 +465,9 @@ module Serialization =
                 let! seq = Seq.read readerFn
                 return Array.ofSeq seq
             }
-<<<<<<< eeee0d17f609143c40f60071a5eb3ab9d64f30c8
+
         module Hash =
             let write ops = Hash.Hash >> Hash.write ops
-=======
-        module ZHash =
-            let write ops = Hash.Hash >> ops.writeHash
->>>>>>> updates to zulib
             let read = reader {
                 let! hash = Hash.read
                 return hash |> Hash.bytes
