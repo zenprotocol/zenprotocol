@@ -13,33 +13,33 @@ module ZData = Zen.Types.Data
 #nowarn "40"   // Ignore recurssive objects warnings
 
 //TODO: move into FsNetMQ
-type ReaderBuilder() = 
+type ReaderBuilder() =
     member this.Bind (r,f) =
         fun (stream:Stream.T) ->
             let x, stream = r stream
             match x with
-            | None -> None, stream 
-            | Some x -> f x stream 
+            | None -> None, stream
+            | Some x -> f x stream
     member this.Return x = fun buffer -> Some x,buffer
     member this.Yield x = fun buffer -> Some x,buffer
     member this.YieldFrom (r:Reader<'a>) = fun (stream:Stream.T) -> r stream
-    member this.For (seq,body) = 
-        fun (stream:Stream.T) -> 
-            let xs,stream = Seq.fold (fun (list, stream) i -> 
-                                match list with 
+    member this.For (seq,body) =
+        fun (stream:Stream.T) ->
+            let xs,stream = Seq.fold (fun (list, stream) i ->
+                                match list with
                                 | None -> None, stream
-                                | Some list -> 
+                                | Some list ->
                                     let x,stream = body i stream
-                                    match x with 
+                                    match x with
                                     | None -> None,stream
-                                    | Some x -> Some (x :: list),stream                                                                                                     
+                                    | Some x -> Some (x :: list),stream
                             ) (Some [], stream) seq
-            match xs with 
+            match xs with
             | None -> None, stream
-            | Some xs -> Some (Seq.rev xs), stream 
+            | Some xs -> Some (Seq.rev xs), stream
     member this.Delay f = fun stream -> f () stream
-                                             
-let reader = new ReaderBuilder()        
+
+let reader = new ReaderBuilder()
 ///
 
 
@@ -106,26 +106,26 @@ module Serialization =
             | _ ->
                 yield! fail
         }
-        
+
     module VarInt =
         let write ops = fun (x:uint32) ->
             // https://github.com/bitcoin/bitcoin/blob/v0.13.2/src/serialize.h#L307L372
             let tmp = Array.zeroCreate 5
-    
+
             let rec loop n len =
                 tmp.[len] <- (byte (n &&& 0x7Ful)) ||| (if len <> 0 then 0x80uy else 0x00uy)
-    
+
                 if n <= 0x7Ful then
                     len
                 else
                     loop ((n >>> 7) - 1ul) (len + 1)
-    
+
             let len = loop x 0
             let bytes = Array.rev tmp.[0..len]
-            
+
             ops.writeBytes bytes (len + 1)
 
-        let read = 
+        let read =
             let rec loop n = reader {
                 let! data = readNumber1
 
@@ -137,8 +137,8 @@ module Serialization =
                     yield n
             }
 
-            loop 0ul        
-        
+            loop 0ul
+
     module Bytes =
         let write ops bytes =
             let len = Seq.length bytes
@@ -148,7 +148,7 @@ module Serialization =
             let! len = VarInt.read
             yield! readBytes (int len)
         }
-        
+
     module FixedSizeBytes =
         let writeChecked ops bytes len =
             let actualLen = Seq.length bytes
@@ -384,42 +384,35 @@ module Serialization =
         }
 
     module Data =
+        open Consensus
+        open System.Collections.ObjectModel
+
         [<Literal>]
         let private I64Data = 1uy
         [<Literal>]
-        let private I64ArrayData = 2uy
+        let private ByteData = 2uy
         [<Literal>]
-        let private ByteData = 3uy
+        let private ByteArrayData = 3uy
         [<Literal>]
-        let private ByteArrayData = 4uy
+        let private U32Data = 4uy
         [<Literal>]
-        let private U32Data = 5uy
+        let private U64Data = 5uy
         [<Literal>]
-        let private U32ArrayData = 6uy
+        let private StringData = 6uy
         [<Literal>]
-        let private U64Data = 7uy
+        let private HashData = 7uy
         [<Literal>]
-        let private U64ArrayData = 8uy
+        let private LockData = 8uy
         [<Literal>]
-        let private StringData = 9uy
+        let private SignatureData = 9uy
         [<Literal>]
-        let private StringArrayData = 10uy
+        let private PublicKeyData = 10uy
         [<Literal>]
-        let private HashData = 11uy
+        let private CollectionArrayData = 11uy
         [<Literal>]
-        let private HashArrayData = 12uy
+        let private CollectionDictData = 12uy
         [<Literal>]
-        let private LockData = 13uy
-        [<Literal>]
-        let private LockArrayData = 14uy
-        [<Literal>]
-        let private TupleData = 15uy
-        [<Literal>]
-        let private DictData = 16uy
-        [<Literal>]
-        let private SignatureData = 17uy
-        [<Literal>]
-        let private PublicKeyData = 18uy
+        let private CollectionListData = 13uy
 
         module Int64 =
             let write ops = uint64 >> ops.writeNumber8
@@ -428,12 +421,19 @@ module Serialization =
                 return int64 i
             }
 
-        module Array =
+        module List =
+            let write = Seq.write
             let read readerFn = reader {
-                let! arr = Array.read readerFn
-                return Prims.Mkdtuple2 (int64 (Array.length arr), arr)
+                let! seq = Seq.read readerFn
+                return List.ofSeq seq
             }
 
+        module Array =
+            let write = Seq.write
+            let read readerFn = reader {
+                let! seq = Seq.read readerFn
+                return Array.ofSeq seq
+            }
         module Hash =
             let write ops = Hash.Hash >> Hash.write ops
             let read = reader {
@@ -469,64 +469,49 @@ module Serialization =
                  return publicKey
             }
 
-        let rec write ops = function
+        let rec write (ops: Operations<'a>)
+                      : ZData.data -> 'a -> 'a = function
             | ZData.I64 i ->
                 Byte.write ops I64Data
                 >> Int64.write ops i
-            | ZData.I64Array (Prims.Mkdtuple2 (_, arr)) ->
-                Byte.write ops I64ArrayData
-                >> Seq.write ops Int64.write arr
             | ZData.Byte b ->
                 Byte.write ops ByteData
                 >> Byte.write ops b
-            | ZData.ByteArray (Prims.Mkdtuple2 (_, arr)) ->
+            | ZData.ByteArray arr ->
                 Byte.write ops ByteArrayData
                 >> Bytes.write ops arr
             | ZData.U32 i ->
                 Byte.write ops U32Data
                 >> ops.writeNumber4 i
-            | ZData.U32Array (Prims.Mkdtuple2 (_, arr)) ->
-                Byte.write ops U32ArrayData
-                >> Seq.write ops (fun ops -> ops.writeNumber4) arr
             | ZData.U64 i ->
                 Byte.write ops U64Data
                 >> ops.writeNumber8 i
-            | ZData.U64Array (Prims.Mkdtuple2 (_, arr)) ->
-                Byte.write ops U64ArrayData
-                >> Seq.write ops (fun ops -> ops.writeNumber8) arr
             | ZData.String s ->
                 Byte.write ops StringData
                 >> String.write ops s
-            | ZData.StringArray (Prims.Mkdtuple2 (_, arr)) ->
-                Byte.write ops StringArrayData
-                >> Seq.write ops String.write arr
             | ZData.Hash hash ->
                 Byte.write ops HashData
                 >> Hash.write ops hash
-            | ZData.HashArray (Prims.Mkdtuple2 (_, arr)) ->
-                Byte.write ops HashArrayData
-                >> Seq.write ops Hash.write arr
             | ZData.Lock l ->
                 Byte.write ops LockData
                 >> Lock.write ops l
-            | ZData.LockArray (Prims.Mkdtuple2 (_, arr)) ->
-                Byte.write ops LockArrayData
-                >> Seq.write ops Lock.write arr
-            | ZData.Tuple (a, b) ->
-                Byte.write ops TupleData
-                >> write ops a
-                >> write ops b
             | ZData.Signature signature ->
                 Byte.write ops SignatureData
                 >> Signature.write ops signature
             | ZData.PublicKey publicKey ->
                 Byte.write ops PublicKeyData
                 >> PublicKey.write ops publicKey
-            | ZData.Dict (ZData.DataDict (map, _)) ->
-                Byte.write ops DictData
+            | ZData.Collection (ZData.Array arr) ->
+                Byte.write ops CollectionArrayData
+                >> Array.write ops write arr
+            | ZData.Collection (ZData.Dict (map, _)) ->
+                Byte.write ops CollectionDictData
                 >> Map.write ops (fun ops (key, data)->
                     String.write ops key
                     >> write ops data) map
+            | ZData.Collection (ZData.List l) ->
+                Byte.write ops CollectionListData
+                >> List.write ops write (ZFStar.fstToFsList l)
 
         let rec read = reader {
             let! discriminator = Byte.read
@@ -534,9 +519,6 @@ module Serialization =
             | I64Data ->
                 let! i = Int64.read
                 return ZData.I64 i
-            | I64ArrayData ->
-                let! arr = Array.read Int64.read
-                return ZData.I64Array arr
             | ByteData ->
                 let! byte = Byte.read
                 return ZData.Byte byte
@@ -546,51 +528,38 @@ module Serialization =
             | U32Data ->
                 let! i = readNumber4
                 return ZData.U32 i
-            | U32ArrayData ->
-                let! arr = Array.read readNumber4
-                return ZData.U32Array arr
             | U64Data ->
                 let! i = readNumber8
                 return ZData.U64 i
-            | U64ArrayData ->
-                let! arr = Array.read readNumber8
-                return ZData.U64Array arr
             | StringData ->
                 let! s = String.read
                 return ZData.String s
-            | StringArrayData ->
-                let! arr = Array.read String.read
-                return ZData.StringArray arr
             | HashData ->
                 let! hash = Hash.read
                 return ZData.Hash hash
-            | HashArrayData ->
-                let! arr = Array.read Hash.read
-                return ZData.HashArray arr
             | LockData ->
                 let! lock = Lock.read
                 return ZData.Lock lock
-            | LockArrayData ->
-                let! arr = Array.read Lock.read
-                return ZData.LockArray arr
             | SignatureData ->
                 let! signature = Signature.read
                 return ZData.Signature signature
             | PublicKeyData ->
                 let! publicKey = PublicKey.read
                 return ZData.PublicKey publicKey
-            | TupleData ->
-                let! a = read
-                let! b = read
-                return ZData.Tuple (a,b)
-            | DictData ->
+            | CollectionArrayData ->
+                let! arr = Array.read read
+                return ZData.Collection (ZData.Array arr)
+            | CollectionDictData ->
                 let! map = Map.read <| reader {
                     let! key = String.read
-                    let! data = read
-                    return key, data
+                    let! value = read
+                    return key, value
                 }
-                return ZData.Dict (ZData.DataDict (map, Map.count map |> uint32))
-
+                return ZData.Collection (ZData.Dict (map, Map.count map |> uint32))
+            | CollectionListData ->
+                let! l = List.read read
+                let l = ZFStar.fsToFstList (List.ofSeq l)
+                return ZData.Collection (ZData.List l)
             | _ ->
                 yield! fail
         }
@@ -620,7 +589,7 @@ module Serialization =
                 >> VarInt.write ops cw.cost
             | HighVWitness (_, bytes) ->
                 FixedSizeBytes.write ops bytes
-                
+
         let write ops = fun witness ->
             let identifier =
                 match witness with

@@ -55,13 +55,10 @@ val updateString:
   t `cost` (6 * FStar.String.length s)
 
 val updateByteArray(#n:nat):
-  U8.t `A.t` n ->
+  U8.t `A.indexed` n ->
   t ->
   t `cost` (6 * n)
 
 val finalize:
   t ->
   hash `cost` 20
-
-
-

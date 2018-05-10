@@ -126,11 +126,11 @@ let private fsToFstInput (input: Input) : input =
     | Input.Mint spend ->
         Mint <| fsToFstSpend spend
 
-let rec private fsToFstList : list<'a> -> Prims.list<'a> = function
+let rec fsToFstList : list<'a> -> Prims.list<'a> = function
     | hd :: tl -> Prims.Cons (hd, (fsToFstList tl))
     | [] -> Prims.Nil
 
-let rec private fstToFsList : Prims.list<'a> -> list<'a> = function
+let rec fstToFsList : Prims.list<'a> -> list<'a> = function
     | Prims.Cons(hd, tl) -> hd::fstToFsList tl
     | Prims.Nil -> []
 
