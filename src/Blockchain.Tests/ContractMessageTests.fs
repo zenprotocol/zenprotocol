@@ -140,7 +140,7 @@ module D = Zen.Dictionary
 module RT = Zen.ResultT
 module Tx = Zen.TxSkeleton
 
-let main txSkeleton _  contractHash command sender data wallet =
+let main txSkeleton _ contractHash command sender data wallet =
     let! returnAddress =
         data >!= tryCollection
              >?= tryDict
