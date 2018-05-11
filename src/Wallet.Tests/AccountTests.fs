@@ -536,7 +536,7 @@ let ``Should get expected deltas``() =
     let tx3 = {version=Version0;inputs=[Outpoint { txHash = tx2Hash; index = 1ul } ];outputs=[output3A;output3B];witnesses=[];contract=None}
 
     let expected = [ (tx1Hash, Map.add Asset.Zen 10L Map.empty, 2u) ]
-    let expected = expected @ [ (tx2Hash, Map.add Asset.Zen -2L Map.empty, 2u) ]
+    let expected = (tx2Hash, Map.add Asset.Zen -2L Map.empty, 2u) :: expected
 
     should equal expected (Account.getHistory 0 10 account)
 
@@ -545,7 +545,7 @@ let ``Should get expected deltas``() =
     // add tx3 to mempool
     let account' = Account.addTransaction tx3Hash tx3 account
 
-    let expected = expected @ [ (tx3Hash, Map.add Asset.Zen -3L Map.empty, 0u) ]
+    let expected = (tx3Hash, Map.add Asset.Zen -3L Map.empty, 0u) :: expected
 
     should equal expected (Account.getHistory 0 10 account')
 

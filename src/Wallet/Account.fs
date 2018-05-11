@@ -284,6 +284,7 @@ let getHistory skip take account =
             ) Map.empty,
             match txDelta.blockNumber with | Some blockNumber -> blockNumber | None -> 0ul
         )
+        |> List.rev
 
     let list = List.skip (min skip (List.length list)) list
     List.take (min take (List.length list)) list
