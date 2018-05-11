@@ -2,9 +2,14 @@
 
 set -e
 
-mono packages/NUnit.ConsoleRunner/tools/nunit3-console.exe --labels=Before --stoponerror --workers=1 --inprocess --trace=Debug src/Infrastructure.Tests/bin/Debug/Infrastructure.Tests.dll
-mono packages/NUnit.ConsoleRunner/tools/nunit3-console.exe --labels=Before --stoponerror --workers=1 --inprocess --trace=Debug src/Consensus.Tests/bin/Debug/Consensus.Tests.dll
-mono packages/NUnit.ConsoleRunner/tools/nunit3-console.exe --labels=Before --stoponerror --workers=1 --inprocess --trace=Debug src/Consensus.Features.Tests/bin/Debug/Consensus.Features.Tests.dll
-mono packages/NUnit.ConsoleRunner/tools/nunit3-console.exe --labels=Before --stoponerror --workers=1 --inprocess --trace=Debug src/Blockchain.Tests/bin/Debug/Blockchain.Tests.dll
-mono packages/NUnit.ConsoleRunner/tools/nunit3-console.exe --labels=Before --stoponerror --workers=1 --inprocess --trace=Debug src/Wallet.Tests/bin/Debug/Wallet.Tests.dll
-mono packages/NUnit.ConsoleRunner/tools/nunit3-console.exe --labels=Before --stoponerror --workers=1 --inprocess --trace=Debug src/Network.Tests/bin/Debug/Network.Tests.dll
+function run {
+    mono packages/NUnit.ConsoleRunner/tools/nunit3-console.exe --labels=Before --stoponerror --workers=1 --inprocess --trace=Debug $1
+}
+
+run src/Zulib.Tests/bin/Debug/Zulib.Tests.dll
+run src/Infrastructure.Tests/bin/Debug/Infrastructure.Tests.dll
+run src/Consensus.Tests/bin/Debug/Consensus.Tests.dll
+run src/Consensus.Features.Tests/bin/Debug/Consensus.Features.Tests.dll
+run src/Blockchain.Tests/bin/Debug/Blockchain.Tests.dll
+run src/Wallet.Tests/bin/Debug/Wallet.Tests.dll
+run src/Network.Tests/bin/Debug/Network.Tests.dll

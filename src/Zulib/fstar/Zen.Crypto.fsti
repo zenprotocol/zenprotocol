@@ -11,4 +11,5 @@ val verify:
 
 val parsePublicKey:
   string ->
+  
   option publicKey `cost` 120

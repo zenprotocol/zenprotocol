@@ -1,4 +1,3 @@
-
 //#r @"../../packages/System.Reflection.Metadata/lib/portable-net45+win8/System.Reflection.Metadata.dll"
 #r @"../../packages/System.Reflection.Metadata/lib/netstandard1.1/System.Reflection.Metadata.dll"
 #r @"../../packages/FAKE/tools/FakeLib.dll"
@@ -149,6 +148,7 @@ Target "Build" (fun _ ->
       "fsharp/Extracted/Zen.Types.Data.fs";
       "fsharp/Realized/Zen.Types.Realized.fs";
       "fsharp/Realized/Zen.Util.fs";
+      "fsharp/Realized/Zen.ContractId.fs";
       "fsharp/Realized/Zen.Asset.fs";
       "fsharp/Extracted/Zen.Types.Main.fs";
       "fsharp/Realized/Zen.Wallet.fs";
