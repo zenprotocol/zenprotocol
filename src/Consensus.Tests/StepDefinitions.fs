@@ -15,8 +15,6 @@ module Binding =
     open Consensus.Types
     open FStar.UInt
 
-    type label = string
-
     type State = {
         keys : Map<string, KeyPair>
         txs : Map<string, Transaction>
@@ -66,24 +64,18 @@ module Binding =
 
         Map.find keyLabel state.keys
 
-    let getLock lockType keyLabel =
-        match lockType with
-        | "pk" ->
-            initKey keyLabel
-            |> snd
-            |> PublicKey.hash
-            |> Lock.PK
-        | other ->
-            failwithf "Undexpected lock type %A" other
+    let getLock keyLabel =
+        initKey keyLabel
+        |> snd
+        |> PublicKey.hash
+        |> Lock.PK
 
-    let getOutput amount asset lockType keyLabel = {
+    let getOutput amount asset keyLabel = {
         spend = { amount = amount; asset = getAsset asset }
-        lock = getLock lockType keyLabel
+        lock = getLock keyLabel
     }
 
-//    let [<BeforeScenario>] SetupScenario () =
-//        ()
-
+    // Init a utxoset
     let [<Given>] ``utxoset`` (table: Table) =
         let mutable txs = Map.empty
 
@@ -95,7 +87,7 @@ module Binding =
             let amount = row.GetInt64 "Amount" |> uint64
 
             let tx = initTx txLabel
-            let output = getOutput amount asset "pk" keyLabel
+            let output = getOutput amount asset keyLabel
             let tx = { tx with outputs = Infrastructure.List.add output tx.outputs }
                      |> updateTx txLabel
 
@@ -116,15 +108,16 @@ module Binding =
 
         state <- { state with utxoset = utxoset }
 
-    let [<When>] ``(.*) is added an output of (.*) (.*) locked to (.*) (.*)`` (txLabel:label) (amount: uint64) (asset: string) (lockType:string) (keyLabel:label) =
-        let output = getOutput amount asset lockType keyLabel
+    // Adding a single output
+    let [<Given>] ``(.*) locks (.*) (.*) to (.*)`` txLabel amount asset keyLabel =
+        let output = getOutput amount asset keyLabel
         let tx = initTx txLabel
         { tx with outputs = Infrastructure.List.add output tx.outputs }
         |> updateTx txLabel
-        |> ignore
-
-
-    let [<When>] ``(.*) is added an input pointing to (.*) with index (.*)`` (txLabel:label) (refTxLabel:label) (index:uint32) =
+        |> ignore        
+        
+    // Adds an outpoint to a tx
+    let [<Given>] ``(.*) has the input (.*) index (.*)`` txLabel refTxLabel index =
         let refTx = findTx refTxLabel
         let outpoint = Outpoint { txHash = Transaction.hash refTx; index = index }
         let tx = initTx txLabel
@@ -132,17 +125,19 @@ module Binding =
         |> updateTx txLabel
         |> ignore
 
-    let [<When>] ``(.*) is signed with (.*)`` (txLabel:label) (keyLabels:label) =
+    // Signes a tx
+    let [<When>] ``(.*) is signed with (.*)`` txLabel keyLabels =
         let tx = findTx txLabel
         let keyPairs =
-            keyLabels.Split [|','|]
+            (keyLabels:string).Split [|','|]
             |> Array.toList
             |> List.map findKey
         let tx = Transaction.sign keyPairs tx
         updateTx txLabel tx
         |> ignore
 
-    let [<Then>] ``(.*) should pass validation`` (txLabel:label) =
+    // Checks that tx passes in-context validation
+    let [<Then>] ``(.*) should pass validation`` txLabel =
         let tx = findTx txLabel
         let chainParams = Chain.getChainParameters Chain.Test
         let getUTXO outpoint =
