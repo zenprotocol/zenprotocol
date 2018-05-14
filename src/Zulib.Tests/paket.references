@@ -1,3 +1,4 @@
 ﻿NUnit
 FsUnit
 FsBech32
+FsCheck.NUnit

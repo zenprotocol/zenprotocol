@@ -96,7 +96,7 @@ let setUp = fun () ->
 
     let main txSkeleton _ contractHash command sender data wallet =
         let! result =
-            Tx.lockToPubKey zenAsset 10UL (hashFromBase64 "DYggLLPq6eXj1YxjiPQ5dSvb/YVqAVNf8Mjnpc9P9BI=") txSkeleton
+            Tx.lockToPubKey zenAsset 10UL zeroHash txSkeleton
             >>= Tx.fromWallet zenAsset 10UL contractHash wallet in
 
         let result' =
@@ -108,7 +108,7 @@ let setUp = fun () ->
 
     val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 12
         let cf _ _ _ _ _ wallet =
-            let res : nat = (64 + (W.size wallet * 128 + 192) + 0 + 21) in
+            let res : nat = (64 + (W.size wallet * 128 + 192) + 0 + 20) in
             ret res
     """ account session state
     |> function

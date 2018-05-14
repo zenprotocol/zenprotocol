@@ -181,7 +181,7 @@ let private handleInprocMessage socket inproc networkId msg (peers:Peers) =
 
 let private onError error =
     eventX "Unhandled exception from peer actor {error}"
-    >> setField "error" error
+    >> setField "error" (sprintf "%A" error)
     |> Log.info
     System.Environment.FailFast(sprintf "Unhandled exception peer actor" , error)
 

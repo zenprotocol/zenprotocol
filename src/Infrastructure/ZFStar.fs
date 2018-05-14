@@ -67,7 +67,7 @@ let private elaborate input_filepath output_target =
         Ok ()
     with _ as ex ->
         eventX "elaboration error: {ex}"
-        >> setField "ex" ex
+        >> setField "ex" (sprintf "%A" ex)
         |> Log.info
         Error "elaborate"
 

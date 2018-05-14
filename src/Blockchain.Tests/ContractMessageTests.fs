@@ -123,9 +123,7 @@ let cf _ _ _ _ _ _ = ret (64 + 64 + 0 + 25)
 let contract2Id = Contract.makeContractId Version0 contract2Code
 
 let contract1Code =
-    contract2Id
-    |> ContractId.toBytes
-    |> System.Convert.ToBase64String
+    (contract2Id.ToString())
     |> sprintf """
 // contract 1: this contract receives Zen tokens; mints and locks it's own tokens to the return-address, and passes a message to contract 2
 
@@ -139,6 +137,7 @@ open Zen.Data
 module D = Zen.Dictionary
 module RT = Zen.ResultT
 module Tx = Zen.TxSkeleton
+module ContractId = Zen.ContractId
 
 let main txSkeleton _ contractHash command sender data wallet =
     let! returnAddress =
@@ -149,24 +148,29 @@ let main txSkeleton _ contractHash command sender data wallet =
 
     match returnAddress with
     | Some returnAddress ->
-        let! tokens = Tx.getAvailableTokens zenAsset txSkeleton in
-        let! asset = Zen.Asset.getDefault contractHash in
-        let! txSkeleton =
-            Tx.mint tokens asset txSkeleton
-            >>= Tx.lockToAddress asset tokens returnAddress in
-
-        let message = {
-            contractId = contractIdFromBase64 "%s";
-            command = "contract2_test";
-            data
-        } in
-
-        RT.ok (txSkeleton, Some message)
+        begin
+            let! tokens = Tx.getAvailableTokens zenAsset txSkeleton in
+            let! asset = Zen.Asset.getDefault contractHash in
+            let! txSkeleton =
+                Tx.mint tokens asset txSkeleton
+                >>= Tx.lockToAddress asset tokens returnAddress in
+            let! contractId = ContractId.fromString "%s" in
+            match contractId with 
+            | Some contractId -> 
+                let message = {
+                    contractId = contractId;
+                    command = "contract2_test";
+                    data
+                } in
+                RT.ok (txSkeleton, Some message)
+            | None ->
+                RT.autoFailw "could not parse contractId from string" 
+        end
     | None ->
         RT.autoFailw "returnAddress is required"
 
-val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 19
-let cf _ _ _ _ _ _ = ret (2 + 2 + 64 + 2 + (64 + (64 + (64 + 64 + 0))) + 39)
+val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 21
+let cf _ _ _ _ _ _ = ret (2 + 2 + 64 + 2 + (64 + (64 + (64 + 64 + (64 + 0)))) + 44)
 """
 
 [<Test>]
