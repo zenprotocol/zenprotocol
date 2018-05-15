@@ -249,16 +249,26 @@ module Binding =
         let tx = initTx txLabel
         { tx with outputs = Infrastructure.List.add output tx.outputs }
         |> updateTx txLabel
-        |> ignore        
-
-    // Adds an outpoint to a tx
-    let [<Given>] ``(.*) has the input (.*) index (.*)`` txLabel refTxLabel index =
+        |> ignore
+        
+    let addInput txLabel refTxLabel index =
         let refTx = findTx refTxLabel
         let outpoint = Outpoint { txHash = Transaction.hash refTx; index = index }
         let tx = initTx txLabel
         { tx with inputs = Infrastructure.List.add outpoint tx.inputs }
         |> updateTx txLabel
         |> ignore
+
+    // Adds an outpoint to a tx
+    let [<Given>] ``(.*) has the input (.*) index (.*)`` txLabel refTxLabel index =
+        addInput txLabel refTxLabel index
+
+    // Adds outpoint(s) to a tx
+    let [<Given>] ``(.*) has inputs`` txLabel (table: Table) =
+        for row in table.Rows do
+            let refTxLabel = row.GetString "Tx"
+            let index = row.GetInt64 "Index" |> uint32
+            addInput txLabel refTxLabel index
 
     // Signes a tx
     let [<When>] ``(.*) is signed with (.*)`` txLabel keyLabels =
