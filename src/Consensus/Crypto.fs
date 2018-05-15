@@ -163,6 +163,7 @@ module SecretKey =
     let serialize (SecretKey secretKey) =
         secretKey
 
+#nowarn "51"
 module PublicKey =
     let serialize (PublicKey publicKey) =
         let bytes = Array.create SerializedPublicKeyLength 0uy

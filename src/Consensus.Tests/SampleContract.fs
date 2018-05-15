@@ -2,8 +2,6 @@ module Consensus.Tests.SampleContract
 
 open Consensus
 open Types
-open Hash
-open System.Text
 open TxSkeleton
 open Crypto
 

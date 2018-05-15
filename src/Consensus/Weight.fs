@@ -3,9 +3,7 @@ module Consensus.Weight
 open Consensus.Types
 open TxSkeleton
 open Infrastructure
-open FSharpx.Option
 open Infrastructure.Result
-open Infrastructure.ZFStar
 open Serialization
 
 let result = new ResultBuilder<string>()
@@ -68,15 +66,16 @@ let realWeights =
         
 let updateSkeleton (skeleton, currentSkeleton) nInputs nOutputs =
     if nInputs > List.length skeleton.pInputs || 
-       nOutputs > List.length skeleton.outputs then
-        Error "invalid contract witness" 
-    else match (List.splitAt nInputs skeleton.pInputs,
-                List.splitAt nOutputs skeleton.outputs) with
-    | (inputsDone, inputs), (outputsDone, outputs) ->
-        Ok ({pInputs = inputs; outputs = outputs},
-         {pInputs = List.append currentSkeleton.pInputs inputsDone;
-          outputs = List.append currentSkeleton.outputs outputsDone}
-        )
+       nOutputs > List.length skeleton.outputs
+    then
+       Error "invalid contract witness"
+    else
+        match (List.splitAt nInputs skeleton.pInputs,
+               List.splitAt nOutputs skeleton.outputs) with
+        | (inputsDone, inputs), (outputsDone, outputs) ->
+            Ok ({pInputs = inputs; outputs = outputs},
+             {pInputs = List.append currentSkeleton.pInputs inputsDone;
+              outputs = List.append currentSkeleton.outputs outputsDone})
 
 let accumulateWeights weights fixedSkeleton =
     let rec accumulateWeights skeletonPair total witnesses = result {
