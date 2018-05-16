@@ -27,4 +27,25 @@ Feature: Transaction validation with utxo-set context
     When tx2 is signed with key1
     Then tx2 should pass validation
     And tx2 should lock 1000 c1 to c1
-    
+
+  Scenario: Data is defined
+    Given str1 is a string of "string1"
+    And str2 is a string of string2
+    And strLst2 is a string list of str1,str2,"string3"
+    And num1 is an i64 of 100
+    And numArr is an i64 array of 98,99,num1
+    And dict1 is a dictionary of
+      | Key     | Type        | Value               |
+      | str1    | string      | a string            |
+      | str2    | string      | "a string"          |
+      | strList | string list | str1,str2,"string3" |
+    And dict2 is a dictionary of
+      | Key    | Type      | Value      |
+      | intArr | i64 array | 98,99,num1 |
+    And dict3 is a dictionary of
+      | Key   | Type | Value |
+      | dict1 | dict | dict1 |
+    And dict4 is a dictionary of
+      | Key    | Type       | Value       |
+      | dict1  | dict       | dict1       |
+      | dictArr| dict array | dict1,dict2 |

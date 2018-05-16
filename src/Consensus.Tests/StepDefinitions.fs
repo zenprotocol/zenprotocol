@@ -6,6 +6,8 @@ open TechTalk.SpecFlow.BindingSkeletons
 open TechTalk.SpecFlow.Assist
 open Consensus.Crypto
 open Infrastructure.Result
+open Consensus.ZFStar
+open System.Text.RegularExpressions
 
 let private result = new ResultBuilder<string>()
 
@@ -22,12 +24,14 @@ module Binding =
     open Consensus.Crypto
     open Consensus.Types
     open FStar.UInt
+    open System
 
     type State = {
         keys : Map<string, KeyPair>
         txs : Map<string, Transaction>
         utxoset: UtxoSet.T
         contracts : Map<string, Contract.T>
+        data : Map<string, Zen.Types.Data.data>
     }
 
     let mutable state = {
@@ -35,7 +39,17 @@ module Binding =
         txs = Map.empty
         utxoset = Map.empty
         contracts = Map.empty
+        data = Map.empty
     }
+    
+    let split (value:string) =
+        value.Split [|','|]
+        |> Array.toList
+
+    let (|Regex|_|) pattern input =
+        let m = Regex.Match(input, pattern)
+        if m.Success then Some(List.tail [ for g in m.Groups -> g.Value ])
+        else None
 
     let updateTx txLabel tx =
         state <- { state with txs = Map.add txLabel tx state.txs }
@@ -117,6 +131,37 @@ module Binding =
 
         Map.find keyLabel state.keys
 
+
+    let initData dataLabel data =
+        if not <| Map.containsKey dataLabel state.data then
+            state <- { state with data = Map.add dataLabel data state.data }
+
+    let tryFindData dataLabel = Map.tryFind dataLabel state.data
+
+    let getData dataType (value : string) =
+        match dataType with
+        | "string" ->
+            value.Trim('"')
+            |> fsToFstString  
+            |> Zen.Types.Data.String 
+        | "i64" ->
+            Int64.Parse value
+            |> Zen.Types.Data.I64
+        | _ ->
+            failwithf "Unrecognized data type: %A" dataType
+
+    let getDataCollection collectionType dataType =
+        split
+        >> List.map (fun value -> 
+            match tryFindData value with
+            | Some data -> data
+            | None -> getData dataType value)
+        >> match collectionType with
+            | "list" -> fsToFstList >> Zen.Types.Data.List
+            | "array" -> Array.ofList >> Zen.Types.Data.Array
+            | _ -> failwithf "Unrecognized data collection type: %A" dataType
+        >> Zen.Types.Data.Collection
+
     let getLock label =
         match tryFindContract label with 
         | Some contract ->
@@ -144,6 +189,7 @@ module Binding =
             txs = Map.empty
             utxoset = Map.empty
             contracts = Map.empty
+            data = Map.empty
         }
 
     // Init a utxoset
@@ -270,12 +316,46 @@ module Binding =
             let index = row.GetInt64 "Index" |> uint32
             addInput txLabel refTxLabel index
 
+    let constructData dataType value =
+        match dataType with
+        | Regex @"(.+) (.+)" [ dataType; collectionType ] ->
+            getDataCollection collectionType dataType value
+        | _ ->
+            getData dataType value
+
+    // Defines a data
+    let [<Given>] ``(.*) is (?:a|an) (.*) of (.*)`` dataLabel dataType value =
+        constructData dataType value
+        |> initData dataLabel
+        
+    // Defines a data dictionaty
+    let [<Given>] ``(.*) is a dictionary of`` dataLabel (table: Table) =
+        let mutable map = Map.empty
+
+        for row in table.Rows do
+            let key = row.GetString "Key"
+            let dataType = row.GetString "Type"
+            let value = row.GetString "Value"
+            let data =
+                if dataType = "dict" then
+                    match tryFindData key with
+                    | Some data -> data
+                    | None -> failwithf "missing dictionary data %A" key
+                else
+                    constructData dataType value
+            map <- Map.add (fsToFstString key) data map
+
+        (map, Map.count map |> uint32)
+        |> Zen.Types.Data.Dict 
+        |> Zen.Types.Data.Collection
+        |> initData dataLabel 
+
     // Signes a tx
     let [<When>] ``(.*) is signed with (.*)`` txLabel keyLabels =
         let tx = findTx txLabel
         let keyPairs =
-            (keyLabels:string).Split [|','|]
-            |> Array.toList
+            keyLabels
+            |> split
             |> List.map findKey
         let tx = Transaction.sign keyPairs tx
         updateTx txLabel tx
