@@ -49,3 +49,23 @@ Feature: Transaction validation with utxo-set context
       | Key    | Type       | Value       |
       | dict1  | dict       | dict1       |
       | dictArr| dict array | dict1,dict2 |
+
+  Scenario: A contract is executed with additional arguments
+            and the result is validated, result is Ok
+    Given utxoset
+      | Tx   | Key  | Asset | Amount |
+      | tx-1 | key1 | Zen   | 100    |
+    And tx1 locks 100 Zen to key3
+    And tx1 has the input tx-1 index 0
+    And data is a dictionary of
+      | Key     | Type | Value |
+      | amount  | u64  | 1200  |
+    When c2 executes on tx1 returning tx2 with
+      | Argument      | Value            |
+      | Command       | mint             |
+      | Sender        | anonymous        |
+      | Data          | data             |
+      | ReturnAddress | returnAddressKey |
+    When tx2 is signed with key1
+    Then tx2 should pass validation
+    And tx2 should lock 1200 c2 to returnAddressKey

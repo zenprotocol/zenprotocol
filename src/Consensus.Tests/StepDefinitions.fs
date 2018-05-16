@@ -25,20 +25,27 @@ module Binding =
     open Consensus.Types
     open FStar.UInt
     open System
+    open Wallet
+
+    type Cache = {
+        contracts : Map<string, Contract.T>
+    }
 
     type State = {
         keys : Map<string, KeyPair>
         txs : Map<string, Transaction>
         utxoset: UtxoSet.T
-        contracts : Map<string, Contract.T>
         data : Map<string, Zen.Types.Data.data>
     }
 
+    let mutable cache = {
+        contracts = Map.empty
+    }
+    
     let mutable state = {
         keys = Map.empty
         txs = Map.empty
         utxoset = Map.empty
-        contracts = Map.empty
         data = Map.empty
     }
     
@@ -57,7 +64,7 @@ module Binding =
 
     let tryFindTx txLabel = Map.tryFind txLabel state.txs
 
-    let tryFindContract contractLabel = Map.tryFind contractLabel state.contracts
+    let tryFindContract contractLabel = Map.tryFind contractLabel cache.contracts
 
     let getAsset value =
         if value = "Zen" then Asset.Zen
@@ -121,7 +128,7 @@ module Binding =
                 |> Infrastructure.Result.get
         
             let contract = activateContract contractLabel
-            state <- { state with contracts = Map.add contractLabel contract state.contracts }
+            cache <- { cache with contracts = Map.add contractLabel contract cache.contracts }
             contract
 
     let initKey keyLabel =
@@ -147,6 +154,12 @@ module Binding =
         | "i64" ->
             Int64.Parse value
             |> Zen.Types.Data.I64
+        | "u32" ->
+            UInt32.Parse value
+            |> Zen.Types.Data.U32
+        | "u64" ->
+            UInt64.Parse value
+            |> Zen.Types.Data.U64
         | _ ->
             failwithf "Unrecognized data type: %A" dataType
 
@@ -178,17 +191,24 @@ module Binding =
         lock = getLock keyLabel
     }
 
-    let getSender senderType address =
-        match senderType with 
-        | "anonymous" -> Zen.Types.Main.Anonymous
-        | other -> failwithf "Undexpected sender type %A" other
+    let getSender sender =
+        if sender = "anonymous" then 
+            Zen.Types.Main.Anonymous
+        else
+            match tryFindContract sender with
+            | Some contract -> 
+                Contract.makeContractId Version0 contract.code
+                |> Consensus.Types.ContractSender
+            | None ->
+                initKey sender
+                |> snd
+                |> Consensus.Types.PKSender
 
     let [<BeforeScenario>] SetupScenario () = 
         state <- {
             keys = Map.empty
             txs = Map.empty
             utxoset = Map.empty
-            contracts = Map.empty
             data = Map.empty
         }
 
@@ -225,8 +245,7 @@ module Binding =
 
         state <- { state with utxoset = utxoset }
 
-    // Executes a contract
-    let [<When>] ``(.*) executes on (.*) returning (.*)`` contractLabel inputTxLabel outputTxLabel (*command senderType senderAddress returnAddess*) =
+    let executeContract contractLabel inputTxLabel outputTxLabel command sender data =
         let contract = initContract contractLabel
         let tx = initTx inputTxLabel
         let outputs = 
@@ -234,8 +253,6 @@ module Binding =
             |> UtxoSet.tryGetOutputs (state.utxoset.TryFind >> Option.get) state.utxoset
             |> Option.get
         let inputTx = TxSkeleton.fromTransaction tx outputs
-        let command = ""
-        let sender = getSender "anonymous" "" //senderAddress
 
         //copied from TransactionHandler
         let rec run (txSkeleton:TxSkeleton.T) (contractId:ContractId) command sender data witnesses totalCost =
@@ -281,7 +298,7 @@ module Binding =
 
         let contractId = Contract.makeContractId Version0 contract.code
         
-        run inputTx contractId command sender None [] 0L
+        run inputTx contractId command sender data [] 0L
         |> Result.mapError failwith
         <@> (fun (finalTxSkeleton, witnesses) -> 
             Transaction.fromTxSkeleton finalTxSkeleton
@@ -289,6 +306,33 @@ module Binding =
         <@> updateTx outputTxLabel
         |> ignore
 
+    // Executes a contract
+    let [<When>] ``(.*) executes on (.*) returning (.*)`` contractLabel inputTxLabel outputTxLabel =
+        executeContract contractLabel inputTxLabel outputTxLabel "" Zen.Types.Main.Anonymous None
+
+    // Executes a contract with additional arguments
+    let [<When>] ``(.*) executes on (.*) returning (.*) with`` contractLabel inputTxLabel outputTxLabel (table: Table) =
+        let mutable command = String.Empty
+        let mutable data = None
+        let mutable sender = Zen.Types.Main.Anonymous
+        
+        for row in table.Rows do
+            let value = row.Item(1)
+            match row.Item(0) with
+            | "Command" -> command <- value
+            | "Sender" -> sender <- getSender value
+            | "Data" -> data <- match tryFindData value with
+                                | Some data -> Some data
+                                | _ -> failwithf "cannot resolve data: %A" value
+            | "ReturnAddress" ->
+                let _, publicKey = initKey value
+                match Account.addReturnAddressToData publicKey data with
+                | Ok data' -> data <- data'
+                | Error error -> failwithf "error initializing data with return address: %A" error
+            | other -> failwithf "unexpected execute option %A" other
+
+        executeContract contractLabel inputTxLabel outputTxLabel command sender data
+        
     // Adding a single output
     let [<Given>] ``(.*) locks (.*) (.*) to (.*)`` txLabel amount asset keyLabel =
         let output = getOutput amount asset keyLabel
@@ -374,7 +418,7 @@ module Binding =
             Map.fold (fun acs _ (contract:Contract.T) -> 
                 let contractId = Contract.makeContractId Version0 contract.code
                 ActiveContractSet.add contractId contract acs
-            ) ActiveContractSet.empty state.contracts
+            ) ActiveContractSet.empty cache.contracts
 
         match TransactionValidation.validateInContext
             chainParams
@@ -395,8 +439,8 @@ module Binding =
         let tx = findTx txLabel
         let asset = getAsset asset
 
-        Assert.AreEqual (List.fold (fun state { lock = lock; spend = spend } -> 
+        Assert.AreEqual (amount, List.fold (fun state { lock = lock; spend = spend } -> 
             if lock = getLock keyLabel && spend.asset = asset then
                 state + spend.amount
             else
-                state) 0UL tx.outputs, amount)
+                state) 0UL tx.outputs)
