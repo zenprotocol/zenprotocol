@@ -11,9 +11,9 @@ Zen Protocol
 
 ```
 ./paket restore
-chmod +x packages/zen_z3_linux/output/z3 
+chmod +x packages/zen_z3_linux/output/z3-linux 
 pushd src/Zulib
-./build.fsx
+./build.sh
 popd
 msbuild src
 ```
@@ -26,9 +26,9 @@ msbuild src
 
 ```
 ./paket restore
-chmod +x packages/zen_z3_osx/output/z3 
+chmod +x packages/zen_z3_osx/output/z3-osx 
 pushd src/Zulib
-./build.fsx
+./build.sh
 popd
 msbuild src
 ```
