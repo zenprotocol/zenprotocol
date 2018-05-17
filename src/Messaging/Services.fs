@@ -15,7 +15,7 @@ module Blockchain =
         expiry:uint32
     }
 
-    type BlochChainInfo = {
+    type BlockchainInfo = {
         chain:string
         blocks:uint32
         headers:uint32
@@ -109,7 +109,7 @@ module Blockchain =
         Request.send<Request,ActiveContract list> client serviceName GetActiveContracts
 
     let getBlockChainInfo client =
-        Request.send<Request,BlochChainInfo> client serviceName GetBlockChainInfo
+        Request.send<Request,BlockchainInfo> client serviceName GetBlockChainInfo
 
     let requestHeaders client peerId startBlockHash endBlockHash=
         RequestHeaders (peerId,startBlockHash,endBlockHash) |> Command.send client serviceName

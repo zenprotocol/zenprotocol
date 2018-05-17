@@ -151,3 +151,52 @@ type TransactionsRequestJson = JsonProvider<"""
     "take": 1000
 }
 """>
+
+type BlockHeaderJson = JsonProvider<"""
+{
+    "version": 2,
+    "parent": "0000ab12ab120123ab12ab120123ab12ab120123ab12ab120123ab12ab120123",
+    "blockNumber": 4,
+    "commitments": "0abc...0000",
+    "timestamp": 1234567890000,
+    "difficulty": 1234567890,
+    "nonce": [1234567890000,1234567890000]
+}
+""">
+
+type LockJson = JsonProvider<"""
+[
+    {
+        "PK": {"hash": "12..34"}
+    },
+    {
+        "Contract": {"id":"c234234"}
+    },
+    {
+        "Coinbase": {"blockNumber":100, "pkHash":"12..34"}
+    },
+    "Fee",
+    "ActivationSacrifice",
+    {
+        "ExtensionSacrifice": {"id":"c234234"}
+    },
+    "Destroy",
+    {
+        "HighVLock": {"identifier":56, "data":"12..45"}
+    }
+]
+""", SampleIsList=true>
+
+type SpendJson = JsonProvider<"""
+{
+    "asset": "c234",
+    "amount": 1234567890000
+}
+""">
+
+type OutpointJson = JsonProvider<"""
+{
+    "txHash": "12..34",
+    "index": 1234
+}
+""">
