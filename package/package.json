@@ -6,5 +6,6 @@
   "bin": {
     "zen-node":"zen-node.js",
     "zen-cli":"zen-cli.js"
-  }
+  },
+  "homepage": "https://gitlab.com/zenprotocol/zenprotocol/tree/master/package"
 }
