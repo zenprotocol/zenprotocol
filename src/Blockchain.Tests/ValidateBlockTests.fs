@@ -54,7 +54,7 @@ let rootAccountData = createTestAccount()
 let rootAccount, _ = rootAccountData
 
 let createTransaction account =
-    Result.get <| Account.createTransaction (publicKeyHash account) {asset=Asset.Zen;amount=100000000UL} (account, snd rootAccountData)
+    Result.get <| Account.createTransaction (publicKeyHash account) {asset=Asset.Zen;amount=rootAmount} (account, snd rootAccountData)
 
 
 // Default initial state of mempool and utxoset
@@ -520,6 +520,8 @@ let ``2 orphan chains, two longer than main, longest is invalid, should pick sec
     let events, state = validateChain session orphanChain state
 
     let tip = List.last sideChain2
+
+    printfn "%A" events
 
     events |> should haveLength 7
     events.[0] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock mainChain.[1])))
