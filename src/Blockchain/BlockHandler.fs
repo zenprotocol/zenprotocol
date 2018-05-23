@@ -436,7 +436,7 @@ let requestOrphanChainRoot session timestamp get (tip:ExtendedBlockHeader.T) (st
     let root = findRoot tip
 
     effectsWriter {
-        eventX "Request root of orphan chain from network block {blockNumber} {hash}"
+        eventX "Request root of orphan chain from network block {blockNumber} {parent}"
         >> setField "blockNumber" (root.header.blockNumber - 1ul)
         >> setField "parent" (Hash.toString root.header.parent)
         |> Log.info

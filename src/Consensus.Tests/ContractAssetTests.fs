@@ -76,8 +76,8 @@ let ``Should generate assets from a string and from an int``() =
 
             if S.length str < 29 then
             begin
-                let! assetString = Zen.Asset.fromString contractHash str in
-                let! assetInt = Zen.Asset.fromInt contractHash 9999999ul in
+                let! assetString = Zen.Asset.fromSubtypeString contractHash str in
+                let! assetInt = Zen.Asset.fromSubtypeInt contractHash 9999999ul in
                 let! txSkeleton =
                     Tx.mint 10UL assetInt txSkeleton
                     >>= Tx.mint 20UL assetString

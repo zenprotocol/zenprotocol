@@ -80,18 +80,16 @@ let setup = fun () ->
     let contract2Id = Contract.makeContractId Version0 contract2Code
 
     let contract1Code =
-        contract2Id
-        |> ContractId.toBytes
-        |> System.Convert.ToBase64String
+        (contract2Id.ToString())
         |> sprintf """
             open Zen.Types
-            open Zen.Util
             open Zen.Base
             open Zen.Cost
 
             module RT = Zen.ResultT
             module Tx = Zen.TxSkeleton
-
+            module ContractId = Zen.ContractId
+            
             let main txSkeleton _ contractHash command sender data wallet =
                 if command = "contract1_test" then
                 begin
@@ -99,18 +97,23 @@ let setup = fun () ->
                     let! txSkeleton =
                         Tx.mint 25UL asset txSkeleton
                         >>= Tx.lockToContract asset 25UL contractHash in
-                    let message = {
-                        contractId = contractIdFromBase64 "%s";
-                        command = "contract2_test";
-                        data = data
-                    } in
-                    RT.ok (txSkeleton, Some message)
+                    let! contractId = ContractId.fromString "%s" in
+                    match contractId with 
+                    | Some contractId -> 
+                        let message = {
+                            contractId = contractId;
+                            command = "contract2_test";
+                            data = data
+                        } in
+                        RT.ok (txSkeleton, Some message)
+                    | None ->
+                        RT.autoFailw "could not parse contractId from string" 
                 end
                 else
                     RT.autoFailw "unsupported command"
 
-            val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 9
-            let cf _ _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 26)
+            val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 11
+            let cf _ _ _ _ _ _ = ret (64 + (64 + 64 + (64 + 0)) + 31)
         """
 
     contracts <- result {

@@ -183,7 +183,7 @@ module Serialization =
                 //stream
                 let aux stream item = writerFn ops item stream
                 seq |> Seq.fold aux stream
-                
+
             write writerFn
         let write ops writerFn seq =
             VarInt.write ops (Seq.length seq |> uint32)
@@ -391,6 +391,9 @@ module Serialization =
         }
 
     module Data =
+        open Consensus
+        open System.Collections.ObjectModel
+
         [<Literal>]
         let private I64Data = 1uy
         [<Literal>]
@@ -425,6 +428,19 @@ module Serialization =
                 return int64 i
             }
 
+        module List =
+            let write = Seq.write
+            let read readerFn = reader {
+                let! seq = Seq.read readerFn
+                return List.ofSeq seq
+            }
+
+        module Array =
+            let write = Seq.write
+            let read readerFn = reader {
+                let! seq = Seq.read readerFn
+                return Array.ofSeq seq
+            }
         module Hash =
             let write ops = Hash.Hash >> Hash.write ops
             let read = reader {

@@ -1,7 +1,14 @@
 #!/usr/bin/env node
 const start = require('./index.js');
 
-const node = start(process.argv.slice(2));
+const args = process.argv.slice(2);
+
+if (args.includes('--version')) {
+  logVersion();
+  process.exit(0);
+}
+
+const node = start(args);
 
 node.stdout.pipe(process.stdout);
 node.stderr.pipe(process.stderr);
@@ -15,3 +22,8 @@ process.on('SIGINT', function () {
     console.log('Ctrl+C pressed');
     node.kill('SIGINT');
 });
+
+function logVersion() {
+  const packageJson = require('./package.json')
+  console.log('zen-node version: ', packageJson.version)
+}

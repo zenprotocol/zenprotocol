@@ -70,9 +70,6 @@ let ``block with one invalid transaction fail validation``(header) (NonEmptyTran
 
     let expected = Error (sprintf "transaction %A failed validation due to General \"structurally invalid input(s)\"" (Transaction.hash invalidTx))
 
-    if Block.validate chain block <> expected then
-        printfn "%A" (Block.validate chain block)
-
     Block.validate chain block = expected
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]

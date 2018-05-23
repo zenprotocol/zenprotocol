@@ -54,7 +54,7 @@ let rootTx =
     {
         version = Version0
         inputs=[];
-        outputs=[{lock = PK rootPKHash; spend= {asset = Asset.Zen;amount=100000000UL}}];
+        outputs=[{lock = PK rootPKHash; spend= {asset = Asset.Zen;amount=100_000_000_000UL}}];
         witnesses=[]
         contract=None
     }
