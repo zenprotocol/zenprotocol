@@ -1,5 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\..\packages\NUnit\build\NUnit.props" Condition="Exists('..\..\packages\NUnit\build\NUnit.props')" Label="Paket" />
   <Import Project="..\..\packages\FSharp.Compiler.Tools\build\FSharp.Compiler.Tools.props" Condition="Exists('..\..\packages\FSharp.Compiler.Tools\build\FSharp.Compiler.Tools.props')" Label="Paket" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
@@ -79,8 +78,9 @@
     <Compile Include="TransactionOverflowTests.fs" />
     <Compile Include="WitnessValidationTests.fs" />
     <Compile Include="EMATests.fs" />
-    <Content Include="paket.references" />
     <Compile Include="WeightTests.fs" />
+    <Compile Include="HashTests.fs" />
+    <Content Include="paket.references" />
     <ProjectReference Include="..\Consensus\Consensus.fsproj">
       <Project>{5ec4457b-615a-4bbd-b3d5-d0e311b9d5e9}</Project>
       <Name>Consensus</Name>

@@ -253,7 +253,7 @@ let ``Should execute contract chain and get a valid transaction``() =
             TransactionHandler.validateTransaction chain session dataPath blockNumber timestamp tx state.memoryState
             |> Writer.unwrap
 
-        //exptect the transaction to be invalid
+        //expect the transaction to be invalid
         events |> should not' (contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (txHash,tx))))
         MemPool.containsTransaction txHash memoryState.mempool |> should equal false
     }

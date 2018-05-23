@@ -26,7 +26,7 @@ let rlimit = 2723280u
 
 let getUTXO _ = UtxoSet.NoOutput
 
-let compile code = result {
+let compile code = lazy (result {
     let! hints = Contract.recordHints code
     let! queries = Infrastructure.ZFStar.totalQueries hints
 
@@ -40,20 +40,22 @@ let compile code = result {
     return!
         Contract.compile contractPath contract
         |> Result.bind (Contract.load contractPath 100ul code)
-}
+})
 
 let context = { blockNumber=100u; timestamp = 1_000_000UL}
 
+let compiledSampleContract = compile sampleContractCode
+
 [<Test>]
 let ``Should compile``() =
-    compile sampleContractCode
+    (compiledSampleContract.Force ())
     |> Result.mapError failwith
     |> ignore
 
 [<Test>]
 [<ParallelizableAttribute>]
 let ``Should get 'elaborate' error for invalid code``() =
-    (compile (sampleContractCode + "###")
+    ((compile (sampleContractCode + "###")).Force ()
     , (Error "elaborate" : Result<Contract.T, string>))
     |> shouldEqual
 
@@ -70,8 +72,8 @@ let validateBasic tx  =
     TransactionValidation.validateBasic tx
     |> Result.mapError mapError
 
-let compileRunAndValidate inputTx utxoSet code =
-    compile code
+let runAndValidate inputTx utxoSet (lazyCompiled : Lazy<_>) =
+    lazyCompiled.Force ()
     |> Result.bind (fun contract ->
         Contract.run contract inputTx context "" Anonymous None List.empty
         |> Result.bind (fun (tx, _) ->
@@ -87,19 +89,24 @@ let compileRunAndValidate inputTx utxoSet code =
             |> Result.bind (validateInputs contract utxoSet))
             |> Result.map (fun (tx, _, _) -> tx)
     )
+
+let compileRunAndValidate inputTx utxoSet code =
+    let lazyCompiled = compile code
+    runAndValidate inputTx utxoSet lazyCompiled
+
 let utxoSet =
     getSampleUtxoset (UtxoSet.asDatabase)
 
 [<Test>]
 let ``Contract generated transaction should be valid``() =
-    (compileRunAndValidate sampleInputTx utxoSet sampleContractCode
+    (runAndValidate sampleInputTx utxoSet compiledSampleContract
     , (Ok sampleExpectedResult : Result<Transaction, string>))
     |> shouldEqual
 
 [<Test>]
 [<ParallelizableAttribute>]
 let ``Should get expected contract cost``() =
-    (compile sampleContractCode
+    (compiledSampleContract.Force ()
      |> Result.map (fun contract ->
         Contract.getCost contract sampleInputTx context "" Anonymous None List.empty)
     , (Ok 212L : Result<int64, string>))
@@ -209,7 +216,7 @@ let ``Contract should not be able to create tokens other than its own``() =
 [<Test>]
 [<ParallelizableAttribute>]
 let ``Contract should be able to destroy its own tokens locked to it``() =
-    let sampleContractCode = """
+    let contract = """
     open Zen.Types
     open Zen.Base
     open Zen.Cost
@@ -227,11 +234,11 @@ let ``Contract should be able to destroy its own tokens locked to it``() =
 
     """
 
-    let sampleContractId = Contract.makeContractId Version0 sampleContractCode
+    let contractId = Contract.makeContractId Version0 contract
 
     let outputToDestroy = {
         lock = PK (PublicKey.hash samplePublicKey)
-        spend = { asset = Asset.defaultOf sampleContractId; amount = 1000UL }
+        spend = { asset = Asset.defaultOf contractId; amount = 1000UL }
     }
 
     let sampleInput = {
@@ -263,14 +270,14 @@ let ``Contract should be able to destroy its own tokens locked to it``() =
         { txSkeleton with outputs = outputs' }
 
     let sampleOutputTx =
-        sampleContractTester sampleInputTx sampleContractId
+        sampleContractTester sampleInputTx contractId
 
     let sampleExpectedResult =
         Transaction.fromTxSkeleton sampleOutputTx
-        |> Transaction.addWitnesses [ ContractWitness <| TxSkeleton.getContractWitness sampleContractId "" None sampleInputTx sampleOutputTx 139L]
+        |> Transaction.addWitnesses [ ContractWitness <| TxSkeleton.getContractWitness contractId "" None sampleInputTx sampleOutputTx 139L]
         |> Transaction.sign [ sampleKeyPair ]
 
-    (compileRunAndValidate sampleInputTx utxoSet sampleContractCode
+    (compileRunAndValidate sampleInputTx utxoSet contract
     , (Ok sampleExpectedResult : Result<Transaction, string>))
     |> shouldEqual
 

@@ -610,9 +610,9 @@ let ``block with a contract activation is added to chain``() =
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session
 
-    let contractId = Contract.makeContractId Version0 sampleContractCode
+    let contractId = sampleContractId
     let tx =
-        Account.createActivateContractTransaction chain sampleContractCode 1000ul rootAccountData
+        Account.createActivationTransactionFromContract chain (Result.get contractWithId) 1000ul rootAccountData
         |>  function
             | Ok tx -> tx
             | Error error -> failwith error

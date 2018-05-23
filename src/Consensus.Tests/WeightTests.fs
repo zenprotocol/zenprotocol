@@ -183,11 +183,11 @@ let ``Transaction with too few witnesses should fail``() =
 
 [<Test>]
 let ``Contract activation weight should be positive``() =
-    let code = SampleContract.sampleContractCode
+    let (Ok contractWithId) = SampleContract.contractWithId
     let rootAccount = createTestAccount()
     let tx =
-        Wallet.Account.createActivateContractTransaction
-                            (Chain.getChainParameters (Chain.Local)) code 1ul rootAccount
+        Wallet.Account.createActivationTransactionFromContract
+                            (Chain.getChainParameters (Chain.Local)) contractWithId 1ul rootAccount
     let actWeight = Result.map (fun {Transaction.contract=Some contract} -> activationWeight contract) tx
 
     actWeight |> should be ok

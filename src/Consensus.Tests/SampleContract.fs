@@ -4,6 +4,7 @@ open Consensus
 open Types
 open TxSkeleton
 open Crypto
+open Wallet
 
 let sampleContractCode = """
 open Zen.Types
@@ -29,6 +30,8 @@ let cf _ _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 20)
 """
 
 let sampleContractId = Contract.makeContractId Version0 sampleContractCode
+
+let contractWithId = Account.createContractRecord sampleContractCode
 
 let private sampleContractTester txSkeleton contractId =
     let spend = {
