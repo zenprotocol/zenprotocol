@@ -175,13 +175,16 @@ module Serialization =
         }
 
     module Seq =
-        let private writeBody ops writerFn seq =
-            let write seq writerFn stream = //TODO: use fold?
-                let mutable stream = stream //TODO: this is not 'stream' if ops are Counters
-                for item in seq do
-                    stream <- writerFn ops item stream
-                stream
-            write seq writerFn
+        let private writeBody ops writerFn =
+            let write writerFn seq stream =
+                //let mutable stream = stream //TODO: this is not 'stream' if ops are Counters
+                //for item in seq do
+                //    stream <- writerFn ops item stream
+                //stream
+                let aux stream item = writerFn ops item stream
+                seq |> Seq.fold aux stream
+
+            write writerFn
         let write ops writerFn seq =
             VarInt.write ops (Seq.length seq |> uint32)
             >> writeBody ops writerFn seq
@@ -192,12 +195,16 @@ module Serialization =
         }
 
     module List =
+        let write ops writerFn (ls: list<'B>) =
+            Seq.write ops writerFn ls
         let read readerFn = reader {
             let! seq = Seq.read readerFn
             return List.ofSeq seq
         }
 
     module Array =
+        let write ops writerFn (arr: array<'B>) =
+            Seq.write ops writerFn arr
         let read readerFn = reader {
             let! seq = Seq.read readerFn
             return Array.ofSeq seq

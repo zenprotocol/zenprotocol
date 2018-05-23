@@ -155,8 +155,8 @@ let main txSkeleton _ contractHash command sender data wallet =
                 Tx.mint tokens asset txSkeleton
                 >>= Tx.lockToAddress asset tokens returnAddress in
             let! contractId = ContractId.fromString "%s" in
-            match contractId with 
-            | Some contractId -> 
+            match contractId with
+            | Some contractId ->
                 let message = {
                     contractId = contractId;
                     command = "contract2_test";
@@ -164,7 +164,7 @@ let main txSkeleton _ contractHash command sender data wallet =
                 } in
                 RT.ok (txSkeleton, Some message)
             | None ->
-                RT.autoFailw "could not parse contractId from string" 
+                RT.autoFailw "could not parse contractId from string"
         end
     | None ->
         RT.autoFailw "returnAddress is required"
