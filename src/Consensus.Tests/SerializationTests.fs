@@ -23,9 +23,14 @@ let setup = fun () ->
 
 [<Property(EndSize=10000)>]
 let ``Transaction serialization round trip produces same result`` (tx:Transaction) =
-    tx
-    |> Transaction.serialize Full
-    |> Transaction.deserialize Full = Some tx
+    try
+        tx
+        |> Transaction.serialize Full
+        |> Transaction.deserialize Full = Some tx
+    with
+    | :? System.NullReferenceException ->
+        printf "null exception caught in tx round trip"
+        false
 
 [<Property(EndSize=10000)>]
 let ``Different transactions don't produce same serialization result``(mode:TransactionSerializationMode) (tx1:Transaction) (tx2:Transaction) =
