@@ -307,10 +307,12 @@ let ``Valid contract should be added to ActiveContractSet``() =
 
     use session = DatabaseContext.createSession databaseContext
     let rootAccount = createTestAccount()
-    let contractId = Contract.makeContractId Version0 sampleContractCode
+    let contractId = sampleContractId
 
     let tx =
-        match Account.createActivateContractTransaction chain sampleContractCode 1ul rootAccount with
+        let txResult = Result.bind (fun cWithId ->
+            Account.createActivationTransactionFromContract chain cWithId 1ul rootAccount) contractWithId
+        match txResult with
             | Result.Ok tx ->
                 tx
             | _ ->
@@ -377,13 +379,15 @@ let ``contract activation arrived, running orphan transaction``() =
         | Ok r -> r
         | Error error -> failwithf "%A" error
 
+    let contractWithId = getResult contractWithId
+
     use databaseContext = DatabaseContext.createTemporary "test"
 
     use session = DatabaseContext.createSession databaseContext
     let account = createTestAccount()
 
     let activationTransaction =
-        Account.createActivateContractTransaction chain sampleContractCode 1ul account
+        Account.createActivationTransactionFromContract chain contractWithId 1ul account
         |> getResult
     let activationTxHash = Transaction.hash activationTransaction
 

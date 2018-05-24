@@ -7,7 +7,6 @@ open Messaging.Services
 open Messaging.Events
 open Consensus
 open Blockchain
-open Blockchain
 open Blockchain.EffectsWriter
 open Consensus.Types
 open State

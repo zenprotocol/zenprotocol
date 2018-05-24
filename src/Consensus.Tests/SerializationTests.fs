@@ -23,24 +23,23 @@ let setup = fun () ->
 
 [<Property(EndSize=10000)>]
 let ``Transaction serialization round trip produces same result`` (tx:Transaction) =
-    tx
-    |> Transaction.serialize Full
-    |> Transaction.deserialize Full = Some tx
+    try
+        tx
+        |> Transaction.serialize Full
+        |> Transaction.deserialize Full = Some tx
+    with
+    | :? System.NullReferenceException ->
+        printf "null exception caught in tx round trip"
+        false
 
 [<Property(EndSize=10000)>]
 let ``Different transactions don't produce same serialization result``(mode:TransactionSerializationMode) (tx1:Transaction) (tx2:Transaction) =
     (txInMode mode tx1 <> txInMode mode tx2) ==> lazy (Transaction.serialize mode tx1 <> Transaction.serialize mode tx2)
 
-[<Property(EndSize=10000)>]
-let ``Transaction hash size should be 32``(tx:Transaction) =
-    let (Hash bytes) = Transaction.hash tx
-    Array.length bytes = 32
-
-[<Property(EndSize=10000)>]
-let ``Different transactions don't produce same hashing result``(tx1:Transaction) (tx2:Transaction) =
-    (txInMode WithoutWitness tx1 <> txInMode WithoutWitness tx2) ==> lazy (
-        Transaction.hash tx1 <> Transaction.hash tx2
-    )
+// If serialization is hard to collide, and hashes are hard to collide, then
+// hashes of serializations are hard to collide.
+// Therefore, it's not necessary to test tx1 <> tx2 ==> hash tx1 <> hash tx2.
+// The same applies to hashes of blocks.
 
 [<Property(EndSize=10000)>]
 let ``Block-header serialization round trip produces same result`` (h:BlockHeader) =
@@ -61,17 +60,6 @@ let ``Block serialization round trip produces same result`` (bk:Block) =
 [<Property(EndSize=10000)>]
 let ``Different blocks don't produce same serialization result`` (bk1:Block) (bk2:Block) =
     (bk1 <> bk2) ==> lazy (Block.serialize bk1 <> Block.serialize bk2)
-
-[<Property(EndSize=10000)>]
-let ``Block hash size should be 32``(tx:Transaction) =
-    let (Hash bytes) = Transaction.hash tx
-    Array.length bytes = 32
-
-[<Property(EndSize=10000)>]
-let ``Different blocks don't produce same hashing result``(bk1:Block) (bk2:Block) =
-    (bk1 <> bk2) ==> lazy (
-        Block.hash bk1.header <> Block.hash bk2.header
-    )
 
 open Consensus.Tests
 open Zen.Types.Data

@@ -36,21 +36,20 @@ let totalQueries =
     Infrastructure.ZFStar.totalQueries
     >> unwrap
 
+let (sampleContractId, sampleContractRecord) as sampleContractWithId =
+    unwrap SampleContract.contractWithId
+
 [<Test>]
 [<ParallelizableAttribute>]
 let ``Contract activation without contract sacrifice should fail``() =
-    let code = SampleContract.sampleContractCode
 
     let rootAccount = createTestAccount() |> fst
 
     let outpoint = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
     let output = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
 
-    let hints = recordHints code
-    let totalQueries = totalQueries hints
-
     let tx =
-        {version = Version0; contract = Some (V0 { code=code;hints=hints;rlimit=0u;queries=totalQueries }); inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
+        {version = Version0; contract = Some (V0 sampleContractRecord); inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
         |> Transaction.sign [rootKeyPair]
     let txHash = Transaction.hash tx
 
@@ -62,7 +61,6 @@ let ``Contract activation without contract sacrifice should fail``() =
 [<Test>]
 [<ParallelizableAttribute>]
 let ``Contract activation with too low contract activation sacrifice``() =
-    let code = SampleContract.sampleContractCode
 
     let rootAccount = createTestAccount() |> fst
 
@@ -75,11 +73,8 @@ let ``Contract activation with too low contract activation sacrifice``() =
             {output with spend={output.spend with amount = output.spend.amount - 1UL}}
         ]
 
-    let hints = recordHints code
-    let totalQueries = totalQueries hints
-
     let tx =
-        {version = Version0; contract = Some (V0 { code=code;hints=hints;rlimit=0u;queries=totalQueries }); inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
+        {version = Version0; contract = Some (V0 sampleContractRecord); inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
         |> Transaction.sign [rootKeyPair]
     let txHash = Transaction.hash tx
 
@@ -91,12 +86,10 @@ let ``Contract activation with too low contract activation sacrifice``() =
 [<Test>]
 [<ParallelizableAttribute>]
 let ``Contract extension with too low contract extension sacrifice``() =
-    let code = SampleContract.sampleContractCode
-    let contractId=Contract.makeContractId Version0 code
     let rootAccount = createTestAccount()
 
     let tx =
-        Account.createActivateContractTransaction localParams code 1ul rootAccount
+        Account.createActivationTransactionFromContract localParams sampleContractWithId 1ul rootAccount
         |> unwrap
 
     let _, acs, _ =
@@ -108,7 +101,7 @@ let ``Contract extension with too low contract extension sacrifice``() =
         let output = Account.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> snd
 
         [
-            {lock=ExtensionSacrifice contractId;spend={amount=1UL;asset=Asset.Zen}}
+            {lock=ExtensionSacrifice sampleContractId;spend={amount=1UL;asset=Asset.Zen}}
             {output with spend={output.spend with amount = output.spend.amount - 1UL}}
         ]
 
@@ -148,7 +141,6 @@ let ``Contract extension of a non active contract should fail``() =
 [<Test>]
 [<ParallelizableAttribute>]
 let ``Contract activation with asset other than zen should fail``() =
-    let code = SampleContract.sampleContractCode
 
     let asset = Asset (ContractId (Version0, Hash.compute "1"B),Hash.zero)
 
@@ -166,11 +158,8 @@ let ``Contract activation with asset other than zen should fail``() =
     let outpoint = {txHash=originTxHash;index=0ul}
     let output = {lock=ActivationSacrifice;spend={amount=1UL;asset=asset}}
 
-    let hints = recordHints code
-    let totalQueries = totalQueries hints
-
     let tx =
-        {version=Version0; contract = Some (V0 { code=code;hints=hints;rlimit=0u;queries=totalQueries }); inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
+        {version=Version0; contract = Some (V0 sampleContractRecord); inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
         |> Transaction.sign [rootKeyPair]
     let txHash = Transaction.hash tx
 
@@ -212,8 +201,7 @@ let ``Contract extension with asset other than zen should fail``() =
 [<Test>]
 [<ParallelizableAttribute>]
 let ``Contract activation with exact amount``() =
-    let code = SampleContract.sampleContractCode
-    let contractId=Contract.makeContractId Version0 code
+    let contractId=SampleContract.sampleContractId
 
     let rootAccount = createTestAccount()
 
@@ -222,7 +210,7 @@ let ``Contract activation with exact amount``() =
     let blocks = 123ul
 
     let tx =
-        Account.createActivateContractTransaction localParams code blocks rootAccount
+        Account.createActivationTransactionFromContract localParams sampleContractWithId blocks rootAccount
         |> unwrap
 
     let _, acs, _ =
@@ -238,7 +226,7 @@ let ``Contract activation with exact amount``() =
 [<ParallelizableAttribute>]
 let ``Contract extension with exact amount``() =
     let code = SampleContract.sampleContractCode
-    let contractId=Contract.makeContractId Version0 code
+    let contractId = SampleContract.sampleContractId
 
     let rootAccount = createTestAccount()
 
@@ -249,7 +237,7 @@ let ``Contract extension with exact amount``() =
     let extensionSacrifice = localParams.sacrificePerByteBlock * (String.length code |> uint64) * (uint64 extendBlocks)
 
     let tx =
-        Account.createActivateContractTransaction localParams code activateBlocks rootAccount
+        Account.createActivationTransactionFromContract localParams sampleContractWithId activateBlocks rootAccount
         |> unwrap
 
     let _, acs, _ =
@@ -287,7 +275,7 @@ let ``Contract extension with exact amount``() =
 [<ParallelizableAttribute>]
 let ``Contract extension with more than one output``() =
     let code = SampleContract.sampleContractCode
-    let contractId=Contract.makeContractId Version0 code
+    let contractId = SampleContract.sampleContractId
 
     let rootAccount = createTestAccount()
 
@@ -300,7 +288,7 @@ let ``Contract extension with more than one output``() =
     let extensionSacrifice2 = localParams.sacrificePerByteBlock * (String.length code |> uint64) * (uint64 extendBlocks2)
 
     let tx =
-        Account.createActivateContractTransaction localParams code activateBlocks rootAccount
+        Account.createActivationTransactionFromContract localParams sampleContractWithId activateBlocks rootAccount
         |> unwrap
 
     let _, acs, _ =
@@ -363,7 +351,6 @@ let ``Contract activation without hints should fail``() =
 
 [<Test>]
 let ``Contract activation with invalid queries should fail``() =
-    let code = SampleContract.sampleContractCode
 
     let rootAccount = createTestAccount() |> fst
 
@@ -377,11 +364,10 @@ let ``Contract activation with invalid queries should fail``() =
             {output with spend={output.spend with amount = output.spend.amount - activationSacrificeAmount}}
         ]
 
-    let hints = recordHints code
-    let totalQueries = totalQueries hints
+    let {queries=totalQueries} = sampleContractRecord
 
     let tx =
-        {version = Version0; contract = Some (V0 { code=code;hints=hints;rlimit=0u;queries=(totalQueries - 1u) }); inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
+        {version = Version0; contract = Some (V0 { sampleContractRecord with queries=(totalQueries - 1u)}); inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
         |> Transaction.sign [rootKeyPair]
 
 
