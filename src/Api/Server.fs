@@ -110,11 +110,26 @@ let handleRequest chain client (request,reply) =
             match Wallet.getPublicKey client path password with
             | Ok key ->
                 PublicKey.toString key
-                |> TextContent
+                |> JsonValue.String
+                |> JsonContent
                 |> reply StatusCode.OK
             | Error error ->
                 TextContent error
                 |> reply StatusCode.BadRequest
+    | Post ("/wallet/sign", Some body) ->
+        match parseSignJson body with
+        | Error error -> replyError error
+        | Ok (message, path, password) ->
+            match Wallet.sign client message path password with
+            | Ok signature ->
+                Signature.toString signature
+                |> JsonValue.String
+                |> JsonContent
+                |> reply StatusCode.OK
+            | Error error ->
+                TextContent error
+                |> reply StatusCode.BadRequest
+
     | Get ("/wallet/balance", _) ->
         match Wallet.getBalance client with
         | Ok balances ->
@@ -245,8 +260,12 @@ let handleRequest chain client (request,reply) =
         Wallet.resyncAccount client
         reply StatusCode.OK NoContent
     | Post ("/blockchain/publishblock", Some body) ->
+        printfn "hello-----------------------------"
+
         match parsePublishBlockJson body with
-        | Error error -> replyError error
+        | Error error ->
+            printfn "error deserializing block"
+            replyError error
         | Ok block ->
             Blockchain.validateMinedBlock client block
             reply StatusCode.OK NoContent
