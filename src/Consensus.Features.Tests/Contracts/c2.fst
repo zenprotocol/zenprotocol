@@ -16,13 +16,11 @@ let main txSkeleton _ contractHash command sender data wallet =
             RT.autoFailw "unexpected sender: PK"
         | Anonymous ->
             begin
-                let! returnAddress = data >!= tryCollection
-                                          >?= tryDict
+                let! returnAddress = data >!= tryDict
                                           >?= D.tryFind "returnAddress"
                                           >?= tryLock in
 
-                let! amount = data >!= tryCollection
-                                   >?= tryDict
+                let! amount = data >!= tryDict
                                    >?= D.tryFind "amount"
                                    >?= tryU64 in
 
@@ -31,7 +29,7 @@ let main txSkeleton _ contractHash command sender data wallet =
                     let! asset = Zen.Asset.getDefault contractHash in
                     let spend = { asset=asset; amount=amount } in
                     let pInput = Mint spend in
-                    
+
                     let! txSkeleton =
                         Tx.addInput pInput txSkeleton
                         >>= Tx.lockToAddress spend.asset spend.amount returnAddress in
@@ -41,5 +39,5 @@ let main txSkeleton _ contractHash command sender data wallet =
     else
         RT.autoFailw "unsupported command"
 
-val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 25
-let cf _ _ _ _ _ _ = ret (2 + 2 + 64 + 2 + (2 + 2 + 64 + 2 + (64 + (64 + 64 + 0))) + 59)
+val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 21
+let cf _ _ _ _ _ _ = ret (4 + 64 + 2 + (4 + 64 + 2 + (64 + (64 + 64 + 0))) + 55)

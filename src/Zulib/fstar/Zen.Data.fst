@@ -14,6 +14,23 @@ module U64 = FStar.UInt64
 module OT = Zen.OptionT
 module Dict = Zen.Dictionary
 
+val (>?=)(#a #b:Type)(#m #n:nat):
+  cost (option a) m
+  -> (a -> cost (option b) n)
+  -> cost (option b) (m+n)
+let (>?=) = OT.bind
+
+val (>?>)(#a #b #c:Type)(#m #n:nat):
+  f:(a -> cost (option b) m)
+  -> g:(b -> cost (option c) n)
+  -> a -> cost (option c) (m+n)
+let (>?>) = let open OT in (>=>)
+
+val (>!=)(#a #b:Type)(#n:nat):
+  (option a) -> (a -> cost (option b) n) -> cost (option b) n
+let (>!=) #_ #_ #_ = OT.liftOpt >> OT.bind
+
+
 val tryI64 : data -> option I64.t `cost` 2
 let tryI64 = function | I64 x -> OT.incSome 2 x
                       | _ -> OT.incNone 2
@@ -58,31 +75,14 @@ val tryCollection: data -> option dataCollection `cost` 2
 let tryCollection = function | Collection c -> OT.incSome 2 c
                              | _ -> OT.incNone 2
 
-val tryArray: dataCollection -> option (A.t data) `cost` 2
-let tryArray = function | Array a -> OT.incSome 2 a
-                        | _ -> OT.incNone 2
+val tryArray: data -> option (A.t data) `cost` 4
+let tryArray = tryCollection >?> (function  | Array a -> OT.incSome 2 a
+                                            | _ -> OT.incNone 2)
 
-val tryDict: dataCollection -> option (Dict.t data) `cost` 2
-let tryDict = function | Dict d -> OT.incSome 2 d
-                       | _ -> OT.incNone 2
+val tryDict: data -> option (Dict.t data) `cost` 4
+let tryDict = tryCollection >?> (function | Dict d -> OT.incSome 2 d
+                                          | _ -> OT.incNone 2)
 
-val tryList: dataCollection -> option (list data) `cost` 2
-let tryList = function | List l -> OT.incSome 2 l
-                       | _ -> OT.incNone 2
-
-
-val (>?=)(#a #b:Type)(#m #n:nat):
-  cost (option a) m
-  -> (a -> cost (option b) n)
-  -> cost (option b) (m+n)
-let (>?=) = OT.bind
-
-val (>?>)(#a #b #c:Type)(#m #n:nat):
-  f:(a -> cost (option b) m)
-  -> g:(b -> cost (option c) n)
-  -> a -> cost (option c) (m+n)
-let (>?>) = let open OT in (>=>)
-
-val (>!=)(#a #b:Type)(#n:nat):
-  (option a) -> (a -> cost (option b) n) -> cost (option b) n
-let (>!=) #_ #_ #_ = OT.liftOpt >> OT.bind
+val tryList: data -> option (list data) `cost` 4
+let tryList = tryCollection >?> (function | List l -> OT.incSome 2 l
+                                          | _ -> OT.incNone 2)
