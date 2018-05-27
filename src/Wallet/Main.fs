@@ -13,6 +13,7 @@ open Messaging.Services.Wallet
 open Result
 open System
 open Logary.Message
+open Wallet
 
 let eventHandler event dataAccess session account =
     account
@@ -163,6 +164,16 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
         >>= (snd >> ExtendedKey.derivePath path)
         >>= ExtendedKey.getPublicKey
         |> reply<PublicKey> requestId
+        account
+    | Sign (message, path, password) ->
+        let sign privateKey = Crypto.sign privateKey message
+
+        unlockAccount password
+        >>= (snd >> ExtendedKey.derivePath path)
+        >>= ExtendedKey.getPrivateKey
+        <@> sign
+        |> reply<Crypto.Signature> requestId
+
         account
     | CheckPassword password ->
         match unlockAccount password with

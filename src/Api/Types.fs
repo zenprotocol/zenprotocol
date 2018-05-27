@@ -131,6 +131,14 @@ type GetPublicKeyJson = JsonProvider<"""
 }
 """>
 
+type SignJson = JsonProvider<"""
+{
+    "message": "txhash",
+    "path": "path",
+    "password": "secret"
+}
+""">
+
 type CheckPasswordJson = JsonProvider<"""
 {
     "password": "secret"

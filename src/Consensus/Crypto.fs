@@ -185,7 +185,7 @@ module PublicKey =
     let toString = serialize >> FsBech32.Base16.encode
 
     let hash = serialize >> Hash.compute
-    
+
 module Signature =
     let serialize (Signature signature) =
         let bytes = Array.create SerializedSignatureLength 0uy
@@ -199,6 +199,10 @@ module Signature =
         match Native.secp256k1_ecdsa_signature_parse_compact (context, signature, bytes) with
         | Native.Result.Ok -> Some (Signature signature)
         | _ -> None
+
+    let toString = serialize >> FsBech32.Base16.encode
+
+    let fromString b16 = FsBech32.Base16.decode b16 |> Option.bind deserialize
 
 module KeyPair =
     let fromSecretKey secretKey =
