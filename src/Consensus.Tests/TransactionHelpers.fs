@@ -12,7 +12,9 @@ let getSignedTx tx keys =
     let txHash = Transaction.hash signedTx
     signedTx, txHash
 
-let private contractPath = "./test"
+let contractPath =
+    System.IO.Path.Combine
+        [| System.IO.Path.GetTempPath(); System.IO.Path.GetRandomFileName() |]
 
 let private inputsValidation blockNumber timestamp acs utxos signedTx txHash =
     let getUTXO _ = UtxoSet.NoOutput
