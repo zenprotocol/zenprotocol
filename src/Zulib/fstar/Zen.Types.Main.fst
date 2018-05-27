@@ -12,9 +12,9 @@ val maxCost: nat
 let maxCost = 200
 
 type message =
-    { contractId: contractId;
+    { recipient: contractId;
       command: string;
-      data: option data }
+      body: option data }
 
 type sender =
     | PK of publicKey
@@ -25,15 +25,17 @@ type context =
     { blockNumber: U32.t;
       timestamp: timestamp }
 
-(*
-type contractArgs = {
-    cHash: hash;
-    command: string;
-    data: data;
-}
-*)
+type stateUpdate =
+    | Delete
+    | NoChange
+    | Update of data
 
-type contractResult = result (txSkeleton ** option message)
+type contractReturn =
+    { tx: txSkeleton;
+      message: option message;
+      state: stateUpdate }
+
+type contractResult = result contractReturn
 
 noeq type costFunction =
     | CostFunc:
@@ -42,21 +44,23 @@ noeq type costFunction =
               -> context:context
               -> command:string
               -> sender
-              -> data:option data
+              -> messageBody:option data
               -> wallet
+              -> state:option data
               -> nat `cost` n)
         -> costFunction
 
 noeq type mainFunction =
     | MainFunc:
         cf:costFunction
-        -> mf:( txSkel:txSkeleton
+        -> mf:(txSkel:txSkeleton
                 -> context:context
                 -> contractId
                 -> command:string
                 -> sender:sender
-                -> data:option data
+                -> messageBody:option data
                 -> wallet:wallet
-                -> contractResult `cost` force ((CostFunc?.f cf) txSkel context command sender data wallet)
+                -> state:option data
+                -> contractResult `cost` force ((CostFunc?.f cf) txSkel context command sender messageBody wallet state)
               )
         -> mainFunction

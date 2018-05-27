@@ -106,9 +106,6 @@ Target "Extract" (fun _ ->
        "--extract_module";"Zen.Types.Main";
        "--codegen-lib";"Zen.Types";
        "--extract_module";"Zen.Data";
-       "--extract_module";"Zen.ContractResult.Base";
-       "--extract_module";"Zen.ContractResult.NoMessage";
-       "--codegen-lib";"Zen.ContractResult"
        //"--extract_module"; "Zen.Wallet"
        "--odir";extractedDir |]
 
@@ -155,8 +152,6 @@ Target "Build" (fun _ ->
       //"fsharp/Extracted/Zen.Wallet.fs";
       "fsharp/Realized/Zen.TxSkeleton.fs";
       "fsharp/Extracted/Zen.Data.fs";
-      "fsharp/Extracted/Zen.ContractResult.Base.fs";
-      "fsharp/Extracted/Zen.ContractResult.NoMessage.fs";
       "fsharp/Realized/Zen.Hash.Sha3.fs";
       "fsharp/Realized/Zen.Crypto.fs";
       "fsharp/Realized/Zen.Bitcoin.fs";
