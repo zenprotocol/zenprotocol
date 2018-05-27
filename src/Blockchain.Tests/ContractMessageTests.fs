@@ -141,8 +141,7 @@ module ContractId = Zen.ContractId
 
 let main txSkeleton _ contractHash command sender data wallet =
     let! returnAddress =
-        data >!= tryCollection
-             >?= tryDict
+        data >!= tryDict
              >?= D.tryFind "returnAddress"
              >?= tryLock in
 
@@ -169,8 +168,8 @@ let main txSkeleton _ contractHash command sender data wallet =
     | None ->
         RT.autoFailw "returnAddress is required"
 
-val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 21
-let cf _ _ _ _ _ _ = ret (2 + 2 + 64 + 2 + (64 + (64 + (64 + 64 + (64 + 0)))) + 44)
+val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 19
+let cf _ _ _ _ _ _ = ret (4 + 64 + 2 + (64 + (64 + (64 + 64 + (64 + 0)))) + 42)
 """
 
 [<Test>]
