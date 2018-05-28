@@ -168,7 +168,8 @@ let sumBy #_ f ls =
     let sum (ls':list int{length ls' == length ls})
             : int `cost` (length ls * 4 + 4) = sum ls' in
     force_map_length f ls;
-    map f ls
+    let values = map f ls <: cost (list int) (length ls * 2 + 2) in
+    values
     |> refine_in (fun ls' -> length ls' == length ls)
     >>= sum
     |> cast (int `cost` (length ls * 6 + 6))
@@ -198,7 +199,8 @@ let any #_ f ls =
             : bool `cost` (length ls * 4 + 4) =
         or_ bools in
     force_map_length f ls;
-    map f ls
+    let values = map f ls <: cost (list bool) (length ls * 2 + 2) in
+    values
     |> refine_in (fun ls' -> length ls' == length ls)
     >>= or_
     |> cast (bool `cost` (length ls * 6 + 6))
@@ -229,7 +231,8 @@ let all #_ f ls =
             : bool `cost` (length ls * 4 + 4) =
         and_ bools in
     force_map_length f ls;
-    map f ls
+    let values = map f ls <: cost (list bool) (length ls * 2 + 2) in
+    values
     |> refine_in (fun ls' -> length ls' == length ls)
     >>= and_
     |> cast (bool `cost` (length ls * 6 + 6))

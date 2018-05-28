@@ -11,6 +11,13 @@ let refine_in #a #n p mx =
     force_prop p;
     retype (cost (x:a{p x}) n) mx
 
+val refine_in_id(#a:Type)(#n:nat):
+    p:(a -> prop)
+    -> mx:cost a n{p (force mx)}
+    -> Lemma ( refine_in p mx === mx)
+       [SMTPat (refine_in p mx)]
+let refine_in_id #_ #_ _ _ = ()
+
 val refine_out(#a:Type)(#n:nat):
     p:(a -> prop)
     -> cost (x:a{p x}) n
@@ -18,6 +25,13 @@ val refine_out(#a:Type)(#n:nat):
 let refine_out #a #n p mx =
     force_prop p;
     retype (mx:cost a n{p (force mx)}) mx
+
+val refine_out_id(#a:Type)(#n:nat):
+    p:(a -> prop)
+    -> mx: cost (x:a{p x}) n
+    -> Lemma ( refine_out p mx === mx)
+       [SMTPat (refine_out p mx)]
+let refine_out_id #_ #_ _ _ = ()
 
 val refine_eq_in(#a:Type)(#n:nat):
     mx:cost a n

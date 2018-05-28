@@ -9,8 +9,18 @@ let const_ #_ #_ x _ = x
 val cast: a:Type -> a -> a
 let cast a x = x
 
+val cast_id: a:Type -> x:a
+    -> Lemma (cast a x == x)
+       [SMTPat (cast a x)]
+let cast_id _ _ = ()
+
 val retype(#a:Type): b:Type{b==a} -> a -> b
 let retype #_ _ x = x
+
+val retype_id(#a:Type): b:Type{b==a} -> x:a
+    -> Lemma (retype b x == x)
+       [SMTPat (retype b x)]
+let retype_id #_ _ _ = ()
 
 val refine(#a:Type):
     p:(a -> prop)

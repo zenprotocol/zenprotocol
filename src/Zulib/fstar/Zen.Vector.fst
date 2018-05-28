@@ -48,7 +48,8 @@ val append(#a:Type)(#l1 #l2:nat):
 let rec append #a #l1 #l2 v1 v2 =
   begin match v1 with
   | VCons hd tl ->
-      VCons hd <$> append tl v2 <: cost (vector a (l1+l2)) (4*l1)
+      (let! tl = append tl v2 in
+      ret (VCons hd tl)) <: cost (vector a (l1+l2)) (4*l1)
   | VNil -> ret v2
   end
   |> inc 4

@@ -90,9 +90,8 @@ NUGET
       System.Reactive.Linq (>= 3.1.1)
     System.Reactive.Windows.Threading (3.1.1)
       System.Reactive.Core (>= 3.1.1)
-    System.Reflection.Metadata (1.5)
-      NETStandard.Library (>= 1.6.1)
-      System.Collections.Immutable (>= 1.4)
+    System.Reflection.Metadata (1.4.2)
+      System.Collections.Immutable (>= 1.3.1)
     System.Runtime (4.3)
     System.Security.Cryptography.Algorithms (4.3.1)
       System.IO (>= 4.3)
@@ -109,7 +108,7 @@ NUGET
       System.Collections.Immutable (>= 1.3.1)
       System.Reflection.Metadata (>= 1.4.2)
     ZFS-Tools (0.0.20)
-    ZFStar (0.0.19)
+    ZFStar (0.0.20)
   remote: https://www.myget.org/F/nunit/api/v3/index.json
     NUnit.ConsoleRunner (3.9.0-dev-04001)
   remote: https://www.myget.org/F/zenprotocol/api/v2
