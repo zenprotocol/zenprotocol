@@ -1,7 +1,5 @@
 module Api.Server
 
-open System.Security.Cryptography.X509Certificates
-open System.Windows.Input
 open FSharp.Data
 open Consensus
 open Infrastructure
@@ -15,6 +13,7 @@ open Result
 open Zen.Crypto
 open Consensus.Crypto
 open Logary.Message
+open Api.Helpers
 
 type T =
     {
@@ -287,6 +286,23 @@ let handleRequest chain client (request,reply) =
         | FSharp.Core.Error _ ->
             TextContent (sprintf "invalid address %A" query)
             |> reply StatusCode.BadRequest
+    | Get ("blockchain/block", query) ->
+        match Map.tryFind "hash" query with
+        | None ->
+              TextContent (sprintf "hash is missing")
+              |> reply StatusCode.BadRequest
+        | Some h ->
+            match Hash.fromString h with
+            | Error _ ->
+                TextContent (sprintf "couldn't decode hash")
+                |> reply StatusCode.BadRequest
+            | Ok hash ->
+                match Blockchain.getBlock client hash with
+                | None ->
+                    TextContent (sprintf "block not found")
+                    |> reply StatusCode.NotFound
+                | Some block ->
+                    reply StatusCode.OK (JsonContent <| blockEncoder block)
     | _ ->
         reply StatusCode.NotFound NoContent
 
