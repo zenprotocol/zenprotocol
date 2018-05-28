@@ -39,16 +39,15 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
-    <Reference Include="System.ValueTuple">
-      <HintPath>..\packages\System.ValueTuple.4.3.0\lib\netstandard1.0\System.ValueTuple.dll</HintPath>
-    </Reference>
-    <Reference Include="Zulib, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null">
+    <Reference Include="Zulib">
       <HintPath>..\Zulib\bin\Zulib.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="Helper.fs" />
     <Compile Include="AssetTests.fs" />
+    <Compile Include="BitcoinTests.fs" />
     <Content Include="paket.references" />
   </ItemGroup>
   <ItemGroup>

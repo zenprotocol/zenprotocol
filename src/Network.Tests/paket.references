@@ -4,5 +4,6 @@ FsUnit
 FsNetMQ
 FSharp.Control.Reactive
 System.Reactive.Linq
+System.Reactive.Core
 FSharp.Compiler.Tools
 Logary
