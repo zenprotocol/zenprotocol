@@ -5,14 +5,10 @@ open System.Text
 open FsUnit
 open Infrastructure
 open FsBech32
-open FsBech32
 open FsCheck
 open FsCheck.NUnit
 open FStar.Pervasives.Native
-
-module Cost = Zen.Cost.Realized
-
-let unCost (Cost.C inj:Zen.Cost.Realized.cost<'Aa, 'An>) : 'Aa = inj.Force()
+open Helper
 
 module Arbitrary =
     //TODO: redundant - remove wrapping types
