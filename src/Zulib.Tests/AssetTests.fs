@@ -1,14 +1,12 @@
 ﻿module Zulib.Tests.AssetTests
 
+open Helper
 open NUnit.Framework
-open System.Text
 open FsUnit
 open Infrastructure
-open FsBech32
 open FsCheck
 open FsCheck.NUnit
 open FStar.Pervasives.Native
-open Helper
 
 module Arbitrary =
     //TODO: redundant - remove wrapping types
