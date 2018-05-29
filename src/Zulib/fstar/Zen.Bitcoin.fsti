@@ -42,6 +42,7 @@ val calculateNextWorkRequired:
 
 val checkInclusion(#l:nat) :
     auditPath : hash `A.indexed` l
+    -> index : U32.t
     -> txHash: hash
     -> header:bitcoinHeader
     -> bool `cost` ((l + 1) * 550 + 50)

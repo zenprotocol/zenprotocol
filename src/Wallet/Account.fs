@@ -345,9 +345,7 @@ let createTransactionFromLock lk spend (account, extendedKey) = result {
 let createTransaction pkHash spend accoundData =
     createTransactionFromLock (PK pkHash) spend accoundData
 
-let createActivateContractTransaction chain code (numberOfBlocks:uint32) (account, extendedKey) =
-    let codeLength = String.length code |> uint64
-
+let createContractRecord code =
     result {
         let contractId = Contract.makeContractId Version0 code
 
@@ -355,6 +353,19 @@ let createActivateContractTransaction chain code (numberOfBlocks:uint32) (accoun
                         (sprintf "recording hints for contract %A" contractId)
                         (lazy(Contract.recordHints code))
         let! queries = ZFStar.totalQueries hints
+
+        return
+            (contractId,
+                {   code = code
+                    hints = hints
+                    rlimit = rlimit
+                    queries = queries })
+    }
+
+let createActivationTransactionFromContract chain (contractId, ({queries=queries;code=code} as contractV0)) (numberOfBlocks:uint32) (account, extendedKey) =
+
+    result {
+        let codeLength = String.length code |> uint64
 
         let activationFee = queries * rlimit |> uint64
         let activationSacrifice = chain.sacrificePerByteBlock * codeLength * (uint64 numberOfBlocks)
@@ -379,11 +390,15 @@ let createActivateContractTransaction chain code (numberOfBlocks:uint32) (accoun
                 inputs = inputPoints
                 outputs = outputs
                 witnesses = []
-                contract = Some (V0 { code = code
-                                      hints = hints
-                                      rlimit = rlimit
-                                      queries = queries })
+                contract = Some (V0 contractV0)
             }
+    }
+
+let createActivateContractTransaction chain code (numberOfBlocks:uint32) (account, extendedKey) =
+    result {
+        let! contractWithId = createContractRecord code
+        return! createActivationTransactionFromContract chain contractWithId numberOfBlocks (account, extendedKey)
+
     }
 
 let createExtendContractTransaction client chainParams (contractId:ContractId) (numberOfBlocks:uint32) (account, extendedKey) =

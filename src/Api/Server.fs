@@ -1,7 +1,5 @@
 module Api.Server
 
-open System.Security.Cryptography.X509Certificates
-open System.Windows.Input
 open FSharp.Data
 open Consensus
 open Infrastructure
@@ -15,6 +13,7 @@ open Result
 open Zen.Crypto
 open Consensus.Crypto
 open Logary.Message
+open Api.Helpers
 
 type T =
     {
@@ -110,11 +109,26 @@ let handleRequest chain client (request,reply) =
             match Wallet.getPublicKey client path password with
             | Ok key ->
                 PublicKey.toString key
-                |> TextContent
+                |> JsonValue.String
+                |> JsonContent
                 |> reply StatusCode.OK
             | Error error ->
                 TextContent error
                 |> reply StatusCode.BadRequest
+    | Post ("/wallet/sign", Some body) ->
+        match parseSignJson body with
+        | Error error -> replyError error
+        | Ok (message, path, password) ->
+            match Wallet.sign client message path password with
+            | Ok signature ->
+                Signature.toString signature
+                |> JsonValue.String
+                |> JsonContent
+                |> reply StatusCode.OK
+            | Error error ->
+                TextContent error
+                |> reply StatusCode.BadRequest
+
     | Get ("/wallet/balance", _) ->
         match Wallet.getBalance client with
         | Ok balances ->
@@ -245,8 +259,12 @@ let handleRequest chain client (request,reply) =
         Wallet.resyncAccount client
         reply StatusCode.OK NoContent
     | Post ("/blockchain/publishblock", Some body) ->
+        printfn "hello-----------------------------"
+
         match parsePublishBlockJson body with
-        | Error error -> replyError error
+        | Error error ->
+            printfn "error deserializing block"
+            replyError error
         | Ok block ->
             Blockchain.validateMinedBlock client block
             reply StatusCode.OK NoContent
@@ -268,6 +286,23 @@ let handleRequest chain client (request,reply) =
         | FSharp.Core.Error _ ->
             TextContent (sprintf "invalid address %A" query)
             |> reply StatusCode.BadRequest
+    | Get ("blockchain/block", query) ->
+        match Map.tryFind "hash" query with
+        | None ->
+              TextContent (sprintf "hash is missing")
+              |> reply StatusCode.BadRequest
+        | Some h ->
+            match Hash.fromString h with
+            | Error _ ->
+                TextContent (sprintf "couldn't decode hash")
+                |> reply StatusCode.BadRequest
+            | Ok hash ->
+                match Blockchain.getBlock client hash with
+                | None ->
+                    TextContent (sprintf "block not found")
+                    |> reply StatusCode.NotFound
+                | Some block ->
+                    reply StatusCode.OK (JsonContent <| blockEncoder block)
     | _ ->
         reply StatusCode.NotFound NoContent
 

@@ -117,8 +117,7 @@ let setUp = fun () ->
 
     let main txSkeleton _ contractHash command sender data wallet =
       let! returnAddress =
-        data >!= tryCollection
-             >?= tryDict
+        data >!= tryDict
              >?= D.tryFind "returnAddress"
              >?= tryLock
       in
@@ -136,7 +135,7 @@ let setUp = fun () ->
 
     val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 28
     let cf _ _ _ _ _ wallet =
-        ret (2 + 2 + 64 + 2 + (64 + (64 + (64 + 64 + (Zen.Wallet.size wallet * 128 + 192) + 0)) + 31) + 33)
+        ret (2 + 2 + 64 + 2 + (64 + (64 + (64 + 64 + (Zen.Wallet.size wallet * 128 + 192) + 0)) + 31) + 31)
     """ account session state
     |> function
     | Ok (state', cHash') ->

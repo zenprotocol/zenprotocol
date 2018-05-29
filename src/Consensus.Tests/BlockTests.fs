@@ -22,13 +22,14 @@ let chain = getChainParameters Chain.Local
 let contractsPath = System.IO.Path.Combine
                         [| System.IO.Path.GetTempPath(); System.IO.Path.GetRandomFileName() |]
 
-let goodHints = match Contract.recordHints sampleContractCode with
-                | Ok hints -> hints
-                | _ -> failwith "Couldn't make hints"
+let goodHints,goodTotalQueries =
+                        match contractWithId with
+                        | Ok (_,{hints=hints;queries=queries}) -> hints,queries
+                        | _ -> failwith "Couldn't make hints or queries"
 
-let goodTotalQueries = match Infrastructure.ZFStar.totalQueries goodHints with
-                       | Ok totalQueries -> totalQueries
-                       | _ -> failwith "Couldn't get total queries"
+let sampleContractWithId = match contractWithId with
+                           | Ok c -> c
+                           | _ -> failwith "Broken sample contract"
 
 let getUTXO _ = UtxoSet.NoOutput
 let getWallet _ = Map.empty
@@ -258,12 +259,12 @@ let ``can connect block with coinbase only``() =
 let ``can connect block with a contract``() =
     let rootAccount = createTestAccount()
     let tx =
-        Account.createActivateContractTransaction chain SampleContract.sampleContractCode 1000ul rootAccount
+        Account.createActivationTransactionFromContract chain sampleContractWithId 1000ul rootAccount
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
 
     let contract : Contract.T =
         {
-            contractId=Contract.makeContractId Version0 SampleContract.sampleContractCode
+            contractId=SampleContract.sampleContractId
             mainFn = fun tx _ _ _ _ _ _ -> Ok (tx,None)
             costFn = fun _ _ _ _ _ _ -> 0L
             expiry=1001ul
@@ -670,7 +671,7 @@ let ``block spending unmature transaction is invalid``() =
 let ``contract get removed when expiring arrive``() =
     let contract : Contract.T =
         {
-            contractId=Contract.makeContractId Version0 SampleContract.sampleContractCode
+            contractId=SampleContract.sampleContractId
             mainFn= fun tx _ _ _ _ _ _ -> Ok (tx,None)
             costFn = fun _ _ _ _ _ _ -> 0L
             expiry=1ul

@@ -54,7 +54,7 @@ let rootAccountData = createTestAccount()
 let rootAccount, _ = rootAccountData
 
 let createTransaction account =
-    Result.get <| Account.createTransaction (publicKeyHash account) {asset=Asset.Zen;amount=100000000UL} (account, snd rootAccountData)
+    Result.get <| Account.createTransaction (publicKeyHash account) {asset=Asset.Zen;amount=rootAmount} (account, snd rootAccountData)
 
 
 // Default initial state of mempool and utxoset
@@ -521,6 +521,8 @@ let ``2 orphan chains, two longer than main, longest is invalid, should pick sec
 
     let tip = List.last sideChain2
 
+    printfn "%A" events
+
     events |> should haveLength 7
     events.[0] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock mainChain.[1])))
     events.[1] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock mainChain.[0])))
@@ -610,9 +612,9 @@ let ``block with a contract activation is added to chain``() =
     use session = DatabaseContext.createSession databaseContext
     let state = getGenesisState session
 
-    let contractId = Contract.makeContractId Version0 sampleContractCode
+    let contractId = sampleContractId
     let tx =
-        Account.createActivateContractTransaction chain sampleContractCode 1000ul rootAccountData
+        Account.createActivationTransactionFromContract chain (Result.get contractWithId) 1000ul rootAccountData
         |>  function
             | Ok tx -> tx
             | Error error -> failwith error

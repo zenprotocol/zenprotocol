@@ -7,11 +7,9 @@ open Wallet.Account
 open Infrastructure
 open Consensus.Types
 
-let rootSeed = [|189uy; 140uy; 82uy; 12uy; 79uy; 140uy; 35uy; 59uy; 11uy; 41uy; 199uy;
-                           58uy; 23uy; 63uy; 112uy; 239uy; 45uy; 147uy; 51uy; 246uy; 34uy; 16uy;
-                           156uy; 2uy; 111uy; 184uy; 140uy; 218uy; 136uy; 240uy; 57uy; 24uy |]
+let rootMnemonicPhrase = "feel muffin volcano click mercy abuse bachelor ginger limb tomorrow okay input spend athlete boring security document exclude liar dune usage camera ranch thought"
 
-let rootExtendedKey = ExtendedKey.create rootSeed |> Result.get
+let rootExtendedKey = ExtendedKey.fromMnemonicPhrase rootMnemonicPhrase |> Result.get
 
 let rootPublicKey = Account.deriveZenKey rootExtendedKey |> Result.get |> ExtendedKey.getPublicKey |> Result.get
 
@@ -50,11 +48,13 @@ let addTransaction txHash tx accountData =
     let account = addTransaction txHash tx (fst accountData)
     account, snd accountData
 
+let rootAmount = 100_000_000_000UL
+
 let rootTx =
     {
         version = Version0
         inputs=[];
-        outputs=[{lock = PK rootPKHash; spend= {asset = Asset.Zen;amount=100_000_000_000UL}}];
+        outputs=[{lock = PK rootPKHash; spend= {asset = Asset.Zen;amount=rootAmount}}];
         witnesses=[]
         contract=None
     }

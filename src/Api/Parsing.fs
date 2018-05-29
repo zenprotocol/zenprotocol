@@ -146,6 +146,22 @@ let parseGetPublicKeyJson json =
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
 
+let parseSignJson json =
+    try
+        let json = SignJson.Parse json
+
+        if String.length json.Path = 0 then
+            Error "Path is empty"
+        else if String.length json.Password = 0 then
+            Error "Password is empty"
+        else
+            match Hash.fromString json.Message with
+            | Ok message ->
+                Ok (message, json.Path, json.Password)
+            | _ -> Error "invalid message"
+    with _ as ex ->
+        Error ("Json is invalid: " + ex.Message)
+
 let parseCheckPasswordJson json =
     try
         let json = CheckPasswordJson.Parse json
