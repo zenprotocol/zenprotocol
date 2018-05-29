@@ -88,5 +88,4 @@ let ``Real bitcoin headers give correct next target``() =
         unCost
         <| Zen.Bitcoin.calculateNextWorkRequired firstHeaderBytes lastHeaderBytes
     // Block # 533160 has bits = 390158921 == 0x17415a49
-    printf "%A" nextNBits
     nextNBits |> should equal [| 0x49uy; 0x5auy; 0x41uy; 0x17uy |]
