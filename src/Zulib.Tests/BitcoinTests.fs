@@ -27,7 +27,7 @@ let ``Real bitcoin header should have correct parent``() =
     let headerOpt = unCost <| Zen.Bitcoin.parseHeader headerBase16Bytes
     let firstBytes =
         match headerOpt with
-        | Some bs -> Zen.Bitcoin.parent bs |> Array.take 5
+        | Some bs -> Zen.Bitcoin.parent bs |> unCost |> Array.take 5
         | None -> [||]
     firstBytes |> should equal [| 0xb6uy; 0xffuy; 0x0buy; 0x1buy; 0x16uy |]
 
@@ -36,7 +36,7 @@ let ``Real bitcoin header should have correct nbits``() =
     let headerOpt = unCost <| Zen.Bitcoin.parseHeader headerBase16Bytes
     let nbits =
         match headerOpt with
-        | Some bs -> Zen.Bitcoin.nbits bs
+        | Some bs -> unCost <| Zen.Bitcoin.nbits bs
         | None -> [||]
     nbits |> should equal [| 0x30uy; 0xc3uy; 0x1buy; 0x18uy |]
 
@@ -62,7 +62,7 @@ let ``Real bitcoin header should pass difficulty target``() =
         | None -> Array.create 32 0xffuy
     let nbits =
         match headerOpt with
-        | Some bs -> Zen.Bitcoin.nbits bs
+        | Some bs -> unCost <| Zen.Bitcoin.nbits bs
         | None -> [||]
     (unCost <| Zen.Bitcoin.checkProofOfWork headerHash nbits)
     |> should equal true
@@ -74,6 +74,19 @@ let ``High hash should not be LTE target``() =
     (unCost <| Zen.Bitcoin.checkProofOfWork highHash nbits)
     |> should equal false
 
-//[<Test>]
-//let ``Real bitcoin headers give correct next target``() =
-    //let firstHeaderBytes =
+[<Test>]
+let ``Real bitcoin headers give correct next target``() =
+    // Block #524159
+    let lastHeaderBytes =
+        "0000002084a4ee3e216e9f5fe75067dd9679711268c178caffa441000000000000000000d04085631585f83736dbbc7ef7f9f27ea6b0765d2c79aa2cd25c2d1c659014a2e1b9065ba9ec431726f37cc3"
+        |> Base16.decode |> Option.get
+    // Block #522144
+    let firstHeaderBytes =
+        "00000020d66bd48556c8a7cede3821a0344817132cab9b364dec18000000000000000000ab5ccc0455785c744c08990740c6ef8006013553638a1856cc030d14efe94c68c7f7f45aa9ec4317410c2249"
+        |> Base16.decode |> Option.get
+    let nextNBits =
+        unCost
+        <| Zen.Bitcoin.calculateNextWorkRequired firstHeaderBytes lastHeaderBytes
+    // Block # 533160 has bits = 390158921 == 0x17415a49
+    printf "%A" nextNBits
+    nextNBits |> should equal [| 0x49uy; 0x5auy; 0x41uy; 0x17uy |]

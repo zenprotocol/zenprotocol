@@ -16,11 +16,11 @@ val difficultyAdjustmentInterval : U32.t
 
 val parent:
     bitcoinHeader
-    -> hash
+    -> hash `cost` 4
 
 val nbits:
     bitcoinHeader
-    -> target
+    -> target `cost` 4
 
 val parseHeader:
     string
