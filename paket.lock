@@ -107,8 +107,8 @@ NUGET
     Zen.FSharp.Compiler.Service (17.0.2)
       System.Collections.Immutable (>= 1.3.1)
       System.Reflection.Metadata (>= 1.4.2)
-    ZFS-Tools (0.0.20)
-    ZFStar (0.0.20)
+    ZFS-Tools (0.0.23)
+    ZFStar (0.0.25)
   remote: https://www.myget.org/F/nunit/api/v3/index.json
     NUnit.ConsoleRunner (3.9.0-dev-04001)
   remote: https://www.myget.org/F/zenprotocol/api/v2
