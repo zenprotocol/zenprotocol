@@ -16,7 +16,9 @@ let private (?=) expected actual = Assert.AreEqual (expected, actual)
 [<Literal>]
 let rlimit = 2723280u
 
-let private contractPath = "./test"
+let contractPath =
+    System.IO.Path.Combine
+        [| System.IO.Path.GetTempPath(); System.IO.Path.GetRandomFileName() |]
 
 [<Binding>] 
 module Binding =
@@ -423,7 +425,7 @@ module Binding =
         match TransactionValidation.validateInContext
             chainParams
             getUTXO
-            "./test"
+            contractPath
             1ul
             1_000_000UL
             acs

@@ -13,7 +13,8 @@ nuget FSharpx.Collections
 nuget FsNetMQ >= 0.2.7.0
 nuget FsPickler
 nuget FSharp.Control.Reactive
-nuget System.Reactive.Linq
+nuget System.Reactive.Compatibility
+//nuget System.Reactive.Linq
 nuget BouncyCastle
 nuget FSharp.Configuration
 nuget Argu

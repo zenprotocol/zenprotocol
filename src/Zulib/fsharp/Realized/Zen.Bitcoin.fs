@@ -11,12 +11,16 @@ type target = byte array
 
 let difficultyAdjustmentInterval = 2016ul
 
-let private targetTimespan = 0L
+let private targetTimespan = 14L * 24L * 60L * 60L
 let private powLimit = 2I**224 - 1I
 
-let parent (header:bitcoinHeader) : hash = header.[4..35]
+let parent (header:bitcoinHeader) : Cost.t<hash,unit> =
+    lazy(header.[4..35]) |> Cost.C
 
-let nbits (header:bitcoinHeader) : target = header.[72..75]
+let private getTarget (header:bitcoinHeader) : target = header.[72..75]
+
+let nbits (header:bitcoinHeader) : Cost.t<target,unit> =
+    Cost.C <| lazy (getTarget header)
 
 let parseHeader (b16:byte array) : Cost.t<FStar.Pervasives.Native.option<bitcoinHeader>, unit> =
     lazy(
@@ -72,7 +76,12 @@ let checkProofOfWork
         (hashToBigint h) <= (uncompressNbits target)
     ) |> Cost.C
 
-let private timestamp (header:bitcoinHeader) : int64 = 0L
+let private timestamp (header:bitcoinHeader) : int64 =
+    let bs = header.[68..71]
+    16777216L * int64 bs.[3]
+    + 65536L * int64 bs.[2]
+    + 256L * int64 bs.[1]
+    + int64 bs.[0]
 
 let calculateNextWorkRequired
     (first:bitcoinHeader)
@@ -85,7 +94,7 @@ let calculateNextWorkRequired
                         (targetTimespan * 4L))
                     (targetTimespan / 4L)
             let bTimespan = bigint timespan
-            let bCurrent = uncompressNbits <| nbits first
+            let bCurrent = uncompressNbits <| getTarget first
             let bNext = min
                             ((bCurrent * bTimespan) / (bigint targetTimespan))
                             powLimit
