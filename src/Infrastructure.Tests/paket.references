@@ -3,8 +3,7 @@ NUnit
 FsUnit
 FsNetMQ
 FSharp.Control.Reactive
-System.Reactive.Linq
-System.Reactive.Interfaces
+System.Reactive.Compatibility
 FSharp.Data
 FSharp.Compiler.Tools
 zen_z3_linux

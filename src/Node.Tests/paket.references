@@ -1,6 +1,6 @@
 ﻿FsNetMQ
 FSharp.Core
-System.Reactive.Linq
+System.Reactive.Compatibility
 zen_secp256k1_linux
 zen_z3_linux
 zen_secp256k1_osx
