@@ -811,7 +811,7 @@ module Header =
 
 module Block =
     let serialize bk =
-        Block.write counters bk 0ulfstar/Zen.Array.Extracted.fst.checked
+        Block.write counters bk 0ul
 
         |> int32
         |> create
