@@ -556,7 +556,7 @@ let ``wallet spend coinbase when come from block``() =
             nonce = 0UL,0UL
         }
 
-    let block = {header=header;transactions=[origin];commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero;}
+    let block = {header=header;transactions=[origin];commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero}
 
     Account.addBlock dataAccess session (Block.hash block.header) block
 
@@ -654,7 +654,8 @@ let ``sign contract wintess``() =
                                         ContractWitness {
                                             contractId = ContractId (Version0,Hash.zero)
                                             command = ""
-                                            data=None
+                                            messageBody = None
+                                            stateCommitment = NotCommitted
                                             beginInputs=1ul
                                             beginOutputs = 0ul
                                             inputsLength = 0ul

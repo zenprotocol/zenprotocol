@@ -12,6 +12,7 @@ open Consensus.Tests.Helper
 open Wallet
 open Infrastructure
 open TestsInfrastructure.Constraints
+open TestsInfrastructure.Nunit
 
 
 let chain = Chain.getChainParameters Chain.Local
@@ -25,7 +26,7 @@ let publicKey = ExtendedKey.getPublicKey (snd account) |> Result.get
 
 let serializePK = PublicKey.toString publicKey
 
-type TxResult = Result<Transaction*ActiveContractSet.T*ContractCache.T,ValidationError>
+type TxResult = Result<Transaction * ActiveContractSet.T * ContractCache.T * ContractStates.T,ValidationError>
 
 let code = sprintf
             """
@@ -37,29 +38,30 @@ let code = sprintf
             module RT = Zen.ResultT
             module Tx = Zen.TxSkeleton
             module Crypto = Zen.Crypto
-            module CR = Zen.ContractResult.NoMessage
+            module C = Zen.Cost
 
-            let main txSkeleton _ contractHash command sender data wallet =
+            let main txSkeleton _ contractId command sender messageBody wallet state =
                 let! pk = Crypto.parsePublicKey "%s" in
 
                 match sender with
                 | PK pk' ->
                     if (Some pk') = pk then
                     begin
-                        let! contractAsset = getDefault contractHash in
+                        let! contractAsset = getDefault contractId in
 
                         let! txSkeleton =
                             Tx.mint 1UL contractAsset txSkeleton
-                            >>=Tx.lockToContract contractAsset 1UL contractHash in
+                            >>=Tx.lockToContract contractAsset 1UL contractId in
 
-
-                        CR.ret txSkeleton
+                        RT.ok @ { tx = txSkeleton; message = None; state = NoChange}
                     end
-                    else RT.autoFailw "expected different pk"
+                        else RT.autoFailw "expected different pk"
                 | _ -> RT.autoFailw "expected pk"
 
-            //val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 1
-            let cf _ _ _ _ _ _ = ret (338 <: nat)
+            let cf _ _ _ _ _ _ _ =
+                120 + (64 + (64 + 64 + 0)) + 30
+                |> cast nat
+                |> C.ret
             """ serializePK
 
 let contractId = Contract.makeContractId Version0 code
@@ -102,17 +104,18 @@ let ``contract witness with valid signature``() =
     let contractWintess = ContractWitness {
                                               contractId=contractId;
                                               command="";
-                                              data=None;
+                                              messageBody=None;
+                                              stateCommitment = NotCommitted;
                                               beginInputs = 0ul;
                                               beginOutputs = 0ul;
                                               inputsLength=1ul;
                                               outputsLength=1ul;
                                               signature=Some (publicKey,signature)
-                                              cost = 338ul
+                                              cost = 342ul
                                           }
     let tx = {tx with witnesses= [contractWintess]}
 
-    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty txHash tx
+    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty ContractStates.asDatabase txHash tx
 
     result |> should be ok
 
@@ -136,7 +139,8 @@ let ``contract witness with invalid publickey``() =
     let contractWintess = ContractWitness {
                                               contractId=contractId;
                                               command="";
-                                              data=None;
+                                              messageBody=None;
+                                              stateCommitment = NotCommitted;
                                               beginInputs = 0ul;
                                               beginOutputs = 0ul;
                                               inputsLength=1ul;
@@ -146,12 +150,13 @@ let ``contract witness with invalid publickey``() =
                                           }
     let tx = {tx with witnesses= [contractWintess]}
 
-    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty txHash tx
+    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty ContractStates.asDatabase txHash tx
 
     let expected:TxResult = Error (General "invalid contract witness signature")
 
-    result |> should equal expected
-
+    (result, expected)
+    |> shouldEqual
+    
 [<Test>]
 let ``contract witness with no signature``() =
     let spend = {asset=Asset.defaultOf contractId;amount=1UL}
@@ -170,22 +175,23 @@ let ``contract witness with no signature``() =
     let contractWintess = ContractWitness {
                                               contractId=contractId;
                                               command="";
-                                              data=None;
+                                              messageBody=None;
+                                              stateCommitment = NotCommitted;
                                               beginInputs = 0ul;
                                               beginOutputs = 0ul;
                                               inputsLength=1ul;
                                               outputsLength=1ul;
                                               signature=None
-                                              cost = 338ul
+                                              cost = 342ul
                                           }
     let tx = {tx with witnesses= [contractWintess]}
 
-    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty txHash tx
+    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty ContractStates.asDatabase txHash tx
 
     let expected:TxResult = Error (General "expected pk")
 
-    result |> should equal expected
-
+    (result, expected)
+    |> shouldEqual
 
 [<Test>]
 let ``contract witness with unexpcected public key``() =
@@ -209,18 +215,57 @@ let ``contract witness with unexpcected public key``() =
     let contractWintess = ContractWitness {
                                               contractId=contractId;
                                               command="";
-                                              data=None;
+                                              messageBody=None;
+                                              stateCommitment = NotCommitted;
                                               beginInputs = 0ul;
                                               beginOutputs = 0ul;
                                               inputsLength=1ul;
                                               outputsLength=1ul;
                                               signature=Some (publicKey,signature)
-                                              cost = 338ul
+                                              cost = 342ul
                                           }
     let tx = {tx with witnesses= [contractWintess]}
 
-    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty txHash tx
+    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty ContractStates.asDatabase txHash tx
 
     let expected:TxResult = Error (General "expected different pk")
 
-    result |> should equal expected
+    (result, expected)
+    |> shouldEqual
+
+[<Test>]
+let ``contract witness with invalid execution cost``() =
+    let spend = {asset=Asset.defaultOf contractId;amount=1UL}
+    let tx =
+        {
+            version = Version0
+            inputs=[Mint spend]
+            outputs=[{lock=Contract contractId;spend=spend}]
+            witnesses=[]
+            contract=None
+        }
+
+    let txHash = Transaction.hash tx
+
+    let signature = ExtendedKey.sign txHash (snd account) |> Result.get
+
+    let contractWintess = ContractWitness {
+                                              contractId=contractId;
+                                              command="";
+                                              messageBody=None;
+                                              stateCommitment = NotCommitted;
+                                              beginInputs = 0ul;
+                                              beginOutputs = 0ul;
+                                              inputsLength=1ul;
+                                              outputsLength=1ul;
+                                              signature=Some (publicKey,signature)
+                                              cost = 1000ul
+                                          }
+    let tx = {tx with witnesses= [contractWintess]}
+
+    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty ContractStates.asDatabase txHash tx
+
+    let expected:TxResult = Error (General "execution cost commitment mismatch")
+
+    (result, expected)
+    |> shouldEqual

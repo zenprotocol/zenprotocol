@@ -56,6 +56,7 @@ let state = {
             orphanPool = orphanPool
             activeContractSet = acs
             contractCache = ContractCache.empty
+            contractStates = ContractStates.asDatabase
         }
     tipState =
         {
@@ -301,7 +302,7 @@ let ``two orphan transaction spending same input``() =
     OrphanPool.containsTransaction tx2Hash state''.memoryState.orphanPool |> should equal false
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Valid contract should be added to ActiveContractSet``() =
     use databaseContext = DatabaseContext.createTemporary "test"
 
@@ -339,7 +340,7 @@ let ``Valid contract should be added to ActiveContractSet``() =
     OrphanPool.containsTransaction txHash state'.memoryState.orphanPool |> should equal false
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Invalid contract should not be added to ActiveContractSet or mempool``() =
     use databaseContext = DatabaseContext.createTemporary "test"
 
@@ -373,7 +374,7 @@ let ``Invalid contract should not be added to ActiveContractSet or mempool``() =
     OrphanPool.containsTransaction txHash state'.memoryState.orphanPool |> should equal false
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``contract activation arrived, running orphan transaction``() =
     let getResult = function
         | Ok r -> r
@@ -399,7 +400,7 @@ let ``contract activation arrived, running orphan transaction``() =
 
     let txHash,tx =
         let tx =
-            TransactionHandler.executeContract session sampleInputTx 1ul 1_000_000UL sampleContractId "" None None stateWithContract.memoryState
+            TransactionHandler.executeContract session sampleInputTx 1_000_000UL sampleContractId "" None None stateWithContract false
             |> getResult
         let txHash = Transaction.hash tx
         let pkWitness =

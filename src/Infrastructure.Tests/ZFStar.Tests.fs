@@ -1,4 +1,4 @@
-module Infrastructure.ZFStar.Tests
+module Infrastructure.Tests.ZFStar
 
 open NUnit.Framework
 open Infrastructure
@@ -63,39 +63,12 @@ let getModuleName (code : string) =
     |> Base16.encode
     |> (+) "Test"
 
-let compileAndInvoke fstCode args =
+let compile fstCode =
     let moduleName = getModuleName fstCode
     ZFStar.recordHints fstCode moduleName
     |> Result.map (fun hints -> (fstCode, hints))
     |> Result.bind (fun (code, hints) -> ZFStar.compile assemblyDirectory code hints rlimit moduleName)
     |> Result.bind (fun _ -> ZFStar.load assemblyDirectory moduleName)
-    |> Result.bind (fun assembly ->
-        try
-            Ok (assembly
-            .GetModules().[0]
-            .GetTypes().[0]
-            .GetMethod("main"))
-        with _ as ex ->
-            Exception.toError "could not find method" ex)
-    |> Result.bind (fun methodInfo ->
-        try
-            Ok (methodInfo.Invoke(null, args))
-        with _ as ex ->
-            Exception.toError "unable to invoke method" ex)
-    |> Result.bind (fun result ->
-        try
-            Ok (result :?> cost<result<txSkeleton * message Native.option>, unit>)
-        with _ as ex ->
-            Exception.toError "unexpected result" ex)
-    |> Result.map (
-        fun (Zen.Cost.Realized.C inj:cost<result<txSkeleton * message Native.option>, unit>) ->
-            inj.Force()
-    )
-    |> Result.bind (function
-        | OK value -> Ok value
-        | ERR err -> Error (System.Text.Encoding.ASCII.GetString err)
-        | EX err -> Error err.Message //TODO: remove EX
-    )
 
 let fstCode = """
     open Zen.Types
@@ -103,46 +76,30 @@ let fstCode = """
     open Zen.Cost
     open Zen.ResultT
 
-    val main: txSkeleton -> context -> contractId -> string -> sender -> option data -> wallet
-        -> result (txSkeleton ** option message) `cost` 4
-    let main tx ctext chash command sender data _ =
-        ok @ (tx, None)
+    module C = Zen.Cost
+    
+    let main tx _ _ _ _ _ _ _ =
+        ok @ { tx = tx; message = None; state = NoChange }
 
-    val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 1
-    let cf _ _ _ _ _ _ = Zen.Cost.ret 4
+    let cf _ _ _ _ _ _ _ = 
+        0 + 5
+        |> cast nat
+        |> C.ret
     """
 
-[<Test>]
+[<Test>][<Parallelizable>]
 let ``Should record hints``() =
     ZFStar.recordHints fstCode (getModuleName fstCode)
     |> Result.map (fun _ -> ())
     |> shouldBeOk ()
 
-[<Test>]
-let ``Should invoke compiled``() =
-    compileAndInvoke fstCode [| input; null; 0ul;null; null; null; null; null |]
-    |> shouldBeOk (input, Native.option<message>.None)
+[<Test>][<Parallelizable>]
+let ``Should compile``() =
+    compile fstCode
+    |> Result.map (fun _ -> ())
+    |> shouldBeOk ()
 
-[<Test>]
-[<ParallelizableAttribute>]
-let ``Should throw with command's value``() =
-    compileAndInvoke """
-        open Zen.Types
-        open Zen.Base
-        open Zen.Cost
-        open Zen.ResultT
-
-        val main: txSkeleton -> context -> contractId -> string -> sender -> option data -> wallet
-            -> result (txSkeleton ** option message) `cost` 1
-        let main tx ctext chash command sender data _ =
-            failw command
-
-        val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 1
-        let cf _ _ _ _ _ _ = Zen.Cost.ret 1
-        """ [| null; null; 0ul; null; "test command"B; null; null; null |]
-    |> shouldBeError "test command"
-
-[<Test>]
+[<Test>][<Parallelizable>]
 let ``Should get some metrics from hints module``() =
     ZFStar.recordHints fstCode (getModuleName fstCode)
     |> Result.bind (ZFStar.calculateMetrics)

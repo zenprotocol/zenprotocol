@@ -4,20 +4,27 @@ open Zen.Cost
 
 module RT = Zen.ResultT
 module Tx = Zen.TxSkeleton
+module C = Zen.Cost
 
-let main txSkeleton _ contractHash command sender data wallet =
-  let! asset = Zen.Asset.getDefault contractHash in
+let main txSkeleton _ contractId command sender messageBody wallet state =
+  let! asset = Zen.Asset.getDefault contractId in
   let spend = { asset=asset; amount=1000UL } in
-  let lock = ContractLock contractHash in
+  let lock = ContractLock contractId in
 
   let output = { lock=lock; spend=spend } in
   let pInput = Mint spend in
 
   let! txSkeleton =
     Tx.addInput pInput txSkeleton
-    >>= Tx.lockToContract spend.asset spend.amount contractHash in
+    >>= Tx.lockToContract spend.asset spend.amount contractId in
 
-  RT.ok (txSkeleton, None)
+  RT.ok @ {
+    tx = txSkeleton;
+    message = None;
+    state = NoChange;
+  }
 
-val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 9
-let cf _ _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 23)
+let cf _ _ _ _ _ _ _ = 
+    64 + (64 + 64 + 0) + 25
+    |> cast nat
+    |> C.ret

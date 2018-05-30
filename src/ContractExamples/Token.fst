@@ -8,7 +8,6 @@ open Zen.Dictionary
 module RT = Zen.ResultT
 module OT = Zen.OptionT
 module Tx = Zen.TxSkeleton
-module CR = Zen.ContractResult.NoMessage
 
 let buy txSkeleton contractId returnAddress =
   let! tokens = Tx.getAvailableTokens zenAsset txSkeleton in
@@ -33,14 +32,14 @@ let redeem txSkeleton contractId returnAddress wallet =
 
   CR.ofOption "contract doesn't have enough zens to pay you" txSkeleton
 
-let main txSkeleton context contractId command sender data wallet =
+let main txSkeleton context contractId command sender data wallet state =
   let! returnAddress = data >!= tryDict >?= tryFind "returnAddress" >?= tryLock in
 
   match returnAddress with
   | Some returnAddress ->
       if command = "redeem" then
         redeem txSkeleton contractId returnAddress wallet
-      else if command = "" || command = "buy" then
+      else if -command = "" || command = "buy" then
         buy txSkeleton contractId returnAddress
         |> autoInc
       else

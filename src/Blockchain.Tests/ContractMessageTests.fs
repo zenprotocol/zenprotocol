@@ -35,6 +35,7 @@ let mutable state = {
             orphanPool = orphanPool
             activeContractSet = acs
             contractCache = ContractCache.empty
+            contractStates = ContractStates.asDatabase
         }
     tipState =
         {
@@ -99,11 +100,12 @@ open Zen.Asset
 
 module RT = Zen.ResultT
 module Tx = Zen.TxSkeleton
+module C = Zen.Cost
 
-let main txSkeleton _ contractHash command sender data wallet =
+let main txSkeleton _ contractId command sender messageBody wallet state =
     let isFromContract =
         match sender with
-        | Contract contractHash' -> contractHash' <> contractHash
+        | Contract contractId' -> contractId' <> contractId
         | _ -> false in
 
     if isFromContract && command = "contract2_test" then
@@ -111,14 +113,16 @@ let main txSkeleton _ contractHash command sender data wallet =
         let! tokens = Tx.getAvailableTokens zenAsset txSkeleton in
 
         let! txSkeleton =
-            Tx.lockToContract zenAsset tokens contractHash txSkeleton in
-        RT.ok (txSkeleton, None)
+            Tx.lockToContract zenAsset tokens contractId txSkeleton in
+        RT.ok @ { tx = txSkeleton; message = None; state = NoChange}
     end
     else
         RT.autoFailw "unsupported command"
 
-val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 7
-let cf _ _ _ _ _ _ = ret (64 + 64 + 0 + 25)
+let cf _ _ _ _ _ _ _ =
+    64 + (64 + 0) + 27
+    |> cast nat
+    |> C.ret
 """
 let contract2Id = Contract.makeContractId Version0 contract2Code
 
@@ -138,18 +142,19 @@ module D = Zen.Dictionary
 module RT = Zen.ResultT
 module Tx = Zen.TxSkeleton
 module ContractId = Zen.ContractId
+module C = Zen.Cost
 
-let main txSkeleton _ contractHash command sender data wallet =
+let main txSkeleton _ contractId command sender messageBody wallet state =
     let! returnAddress =
-        data >!= tryDict
-             >?= D.tryFind "returnAddress"
-             >?= tryLock in
+        messageBody >!= tryDict
+                    >?= D.tryFind "returnAddress"
+                    >?= tryLock in
 
     match returnAddress with
     | Some returnAddress ->
         begin
             let! tokens = Tx.getAvailableTokens zenAsset txSkeleton in
-            let! asset = Zen.Asset.getDefault contractHash in
+            let! asset = Zen.Asset.getDefault contractId in
             let! txSkeleton =
                 Tx.mint tokens asset txSkeleton
                 >>= Tx.lockToAddress asset tokens returnAddress in
@@ -157,23 +162,25 @@ let main txSkeleton _ contractHash command sender data wallet =
             match contractId with
             | Some contractId ->
                 let message = {
-                    contractId = contractId;
+                    recipient = contractId;
                     command = "contract2_test";
-                    data
+                    body = messageBody;
                 } in
-                RT.ok (txSkeleton, Some message)
+                RT.ok @ { tx = txSkeleton; message = Some message; state = NoChange}
             | None ->
                 RT.autoFailw "could not parse contractId from string"
         end
     | None ->
         RT.autoFailw "returnAddress is required"
 
-val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 19
-let cf _ _ _ _ _ _ = ret (4 + 64 + 2 + (64 + (64 + (64 + 64 + (64 + 0)))) + 42)
+let cf _ _ _ _ _ _ _ =
+    4 + 64 + 2 + (64 + (64 + (64 + 64 + (64 + 0)))) + 44
+    |> cast nat
+    |> C.ret
 """
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Should execute contract chain and get a valid transaction``() =
     let sampleKeyPair = KeyPair.create()
     let _, samplePublicKey = sampleKeyPair
@@ -225,7 +232,7 @@ let ``Should execute contract chain and get a valid transaction``() =
             |> Types.Data.Collection
             |> Some
 
-        let! tx = TransactionHandler.executeContract session inputTx blockNumber timestamp contractId1 "" None data state.memoryState
+        let! tx = TransactionHandler.executeContract session inputTx timestamp contractId1 "" None data state false
 
         let tx = Transaction.sign [ sampleKeyPair ] tx
         let txHash = Transaction.hash tx

@@ -71,17 +71,18 @@ let hashBlock b = Block.hash b.header, b
 let state = {
     memoryState =
         {
-            utxoSet=utxoSet
-            mempool=mempool
-            orphanPool=orphanPool
-            activeContractSet=acs
-            contractCache=ContractCache.empty
+            utxoSet = utxoSet
+            mempool = mempool
+            orphanPool = orphanPool
+            activeContractSet = acs
+            contractCache = ContractCache.empty
+            contractStates = ContractStates.asDatabase
         }
     tipState =
         {
            tip = ExtendedBlockHeader.empty
-           activeContractSet=acs
-           ema=ema
+           activeContractSet = acs
+           ema = ema
         }
     initialBlockDownload = InitialBlockDownload.Inactive
     headers=0ul
@@ -621,8 +622,8 @@ let ``block with a contract activation is added to chain``() =
 
     let contract = {
         contractId=contractId
-        mainFn = fun tx _ _ _ _ _ _  -> Ok (tx,None)
-        costFn = fun _ _ _ _ _ _ -> 1L
+        mainFn = fun tx _ _ _ _ _ _ _ -> Ok (tx,None,Zen.Types.Main.stateUpdate.NoChange)
+        costFn = fun _ _ _ _ _ _ _ -> 1L
         expiry=1002ul
         code = sampleContractCode
     }
@@ -900,3 +901,43 @@ let ``Out of order dependent transactions are rearranged``() =
 
     List.length validatedTransactions |> should equal 2
     validatedTransactions |> should equal validatedTransactions_
+
+[<Test>]
+let ``block with a contract activation is added to chain 1111``() =
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
+    use session = DatabaseContext.createSession databaseContext
+    let state = getGenesisState session
+
+    let contractId = sampleContractId
+    let tx =
+        Account.createActivationTransactionFromContract chain (Result.get contractWithId) 1000ul rootAccountData
+        |>  function
+            | Ok tx -> tx
+            | Error error -> failwith error
+
+    let contract = {
+        contractId=contractId
+        mainFn = fun tx _ _ _ _ _ _ _ -> Ok (tx,None,Zen.Types.Main.stateUpdate.NoChange)
+        costFn = fun _ _ _ _ _ _ _ -> 1L
+        expiry=1002ul
+        code = sampleContractCode
+    }
+
+    let acs = ActiveContractSet.add contractId contract state.tipState.activeContractSet
+
+    let block = Block.createTemplate chain genesisBlock.header timestamp state.tipState.ema acs [tx] Hash.zero
+
+    let events, state' =
+            BlockHandler.validateBlock chain session.context.contractPath session timestamp None block false state
+            |> Writer.unwrap
+
+    events |> should haveLength 3
+    events |> should contain (EffectsWriter.EventEffect (BlockAdded (hashBlock block)))
+
+    let tip = BlockRepository.tryGetTip session
+
+    tip |> should be some
+
+    let _,acs,_ = (Option.get tip)
+
+    SparseMerkleTree.root acs |> should equal (SparseMerkleTree.root state'.tipState.activeContractSet)

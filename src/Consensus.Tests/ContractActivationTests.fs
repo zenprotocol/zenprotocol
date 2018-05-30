@@ -8,6 +8,7 @@ open Wallet
 open NUnit.Framework
 open FsUnit
 open TestsInfrastructure.Constraints
+open TestsInfrastructure.Nunit
 open Helper
 
 let chain = Chain.Local
@@ -21,7 +22,7 @@ let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO rootTxHash
 
 let validateInContext = validateInContext localParams getUTXO contractPath
 
-type TxResult = Result<Transaction*ActiveContractSet.T*ContractCache.T,ValidationError>
+type TxResult = Result<Transaction * ActiveContractSet.T * ContractCache.T * ContractStates.T,ValidationError>
 
 let unwrap =
     function
@@ -40,7 +41,7 @@ let (sampleContractId, sampleContractRecord) as sampleContractWithId =
     unwrap SampleContract.contractWithId
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Contract activation without contract sacrifice should fail``() =
 
     let rootAccount = createTestAccount() |> fst
@@ -55,11 +56,11 @@ let ``Contract activation without contract sacrifice should fail``() =
 
     let expected:TxResult = General "Contract activation must include activation sacrifice" |> Error
 
-    validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet txHash tx
-    |> should equal expected
+    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet ContractStates.asDatabase txHash tx, expected)
+    |> shouldEqual
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Contract activation with too low contract activation sacrifice``() =
 
     let rootAccount = createTestAccount() |> fst
@@ -80,11 +81,11 @@ let ``Contract activation with too low contract activation sacrifice``() =
 
     let expected:TxResult = General "Contract must be activated for at least one block" |> Error
 
-    validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet txHash tx
-    |> should equal expected
+    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet ContractStates.asDatabase txHash tx, expected)
+    |> shouldEqual
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Contract extension with too low contract extension sacrifice``() =
     let rootAccount = createTestAccount()
 
@@ -92,8 +93,8 @@ let ``Contract extension with too low contract extension sacrifice``() =
         TestWallet.createActivationTransactionFromContract localParams sampleContractWithId 1ul rootAccount
         |> unwrap
 
-    let _, acs, _ =
-        validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet (Transaction.hash tx) tx
+    let _, acs, _, _ =
+        validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet ContractStates.asDatabase (Transaction.hash tx) tx
         |> unwrap
 
     let outpoint = TestWallet.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> fst
@@ -111,11 +112,11 @@ let ``Contract extension with too low contract extension sacrifice``() =
 
     let expected:TxResult = General "Contract must be activated for at least one block" |> Error
 
-    validateInContext 1ul 1_000_000UL acs ContractCache.empty utxoSet (Transaction.hash tx) tx
-    |> should equal expected
+    (validateInContext 1ul 1_000_000UL acs ContractCache.empty utxoSet ContractStates.asDatabase (Transaction.hash tx) tx, expected)
+    |> shouldEqual
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Contract extension of a non active contract should fail``() =
     let contractId = Contract.makeContractId Version0 "1"
     let rootAccount = createTestAccount()
@@ -135,11 +136,11 @@ let ``Contract extension of a non active contract should fail``() =
 
     let expected:TxResult = General "Contract(s) must be active" |> Error
 
-    validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet (Transaction.hash tx) tx
-    |> should equal expected
+    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet ContractStates.asDatabase (Transaction.hash tx) tx, expected)
+    |> shouldEqual
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Contract activation with asset other than zen should fail``() =
 
     let asset = Asset (ContractId (Version0, Hash.compute "1"B),Hash.zero)
@@ -165,11 +166,11 @@ let ``Contract activation with asset other than zen should fail``() =
 
     let expected:TxResult = General "Sacrifice must be paid in Zen" |> Error
 
-    validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet txHash tx
-    |> should equal expected
+    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet ContractStates.asDatabase txHash tx, expected)
+    |> shouldEqual
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Contract extension with asset other than zen should fail``() =
     let asset = Asset (ContractId (Version0, Hash.compute "1"B),Hash.zero)
 
@@ -195,11 +196,11 @@ let ``Contract extension with asset other than zen should fail``() =
 
     let expected:TxResult = General "Sacrifice must be paid in Zen" |> Error
 
-    validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet txHash tx
-    |> should equal expected
+    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet ContractStates.asDatabase txHash tx, expected)
+    |> shouldEqual
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Contract activation with exact amount``() =
     let contractId=SampleContract.sampleContractId
 
@@ -213,8 +214,8 @@ let ``Contract activation with exact amount``() =
         TestWallet.createActivationTransactionFromContract localParams sampleContractWithId blocks rootAccount
         |> unwrap
 
-    let _, acs, _ =
-        validateInContext initialBlock initialTime ActiveContractSet.empty ContractCache.empty utxoSet (Transaction.hash tx) tx
+    let _, acs, _, _ =
+        validateInContext initialBlock initialTime ActiveContractSet.empty ContractCache.empty utxoSet ContractStates.asDatabase (Transaction.hash tx) tx
         |> unwrap
 
     match ActiveContractSet.tryFind contractId acs with
@@ -223,7 +224,7 @@ let ``Contract activation with exact amount``() =
     | _ -> failwith "contract is not active"
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Contract extension with exact amount``() =
     let code = SampleContract.sampleContractCode
     let contractId = SampleContract.sampleContractId
@@ -240,8 +241,8 @@ let ``Contract extension with exact amount``() =
         TestWallet.createActivationTransactionFromContract localParams sampleContractWithId activateBlocks rootAccount
         |> unwrap
 
-    let _, acs, _ =
-        validateInContext initialBlock initialTime ActiveContractSet.empty ContractCache.empty utxoSet (Transaction.hash tx) tx
+    let _, acs, _, _ =
+        validateInContext initialBlock initialTime ActiveContractSet.empty ContractCache.empty utxoSet ContractStates.asDatabase (Transaction.hash tx) tx
         |> unwrap
 
     match ActiveContractSet.tryFind contractId acs with
@@ -262,8 +263,8 @@ let ``Contract extension with exact amount``() =
         {version = Version0; contract=None; inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
         |> Transaction.sign [rootKeyPair]
 
-    let _, acs, _ =
-        validateInContext initialBlock initialTime acs ContractCache.empty utxoSet (Transaction.hash tx) tx
+    let _, acs, _, _ =
+        validateInContext initialBlock initialTime acs ContractCache.empty utxoSet ContractStates.asDatabase (Transaction.hash tx) tx
         |> unwrap
 
     match ActiveContractSet.tryFind contractId acs with
@@ -272,7 +273,7 @@ let ``Contract extension with exact amount``() =
     | _ -> failwith "contract is not active"
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Contract extension with more than one output``() =
     let code = SampleContract.sampleContractCode
     let contractId = SampleContract.sampleContractId
@@ -291,8 +292,8 @@ let ``Contract extension with more than one output``() =
         TestWallet.createActivationTransactionFromContract localParams sampleContractWithId activateBlocks rootAccount
         |> unwrap
 
-    let _, acs, _ =
-        validateInContext initialBlock initialTime ActiveContractSet.empty ContractCache.empty utxoSet (Transaction.hash tx) tx
+    let _, acs, _, _ =
+        validateInContext initialBlock initialTime ActiveContractSet.empty ContractCache.empty utxoSet ContractStates.asDatabase (Transaction.hash tx) tx
         |> unwrap
 
     match ActiveContractSet.tryFind contractId acs with
@@ -314,8 +315,8 @@ let ``Contract extension with more than one output``() =
         {version = Version0; contract=None; inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
         |> Transaction.sign [rootKeyPair]
 
-    let _, acs, _ =
-        validateInContext initialBlock initialTime acs ContractCache.empty utxoSet (Transaction.hash tx) tx
+    let _, acs, _, _ =
+        validateInContext initialBlock initialTime acs ContractCache.empty utxoSet ContractStates.asDatabase (Transaction.hash tx) tx
         |> unwrap
 
     match ActiveContractSet.tryFind contractId acs with
@@ -346,8 +347,8 @@ let ``Contract activation without hints should fail``() =
 
     let expected:TxResult = General "total queries: invalid hints" |> Error
 
-    validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet (Transaction.hash tx) tx
-    |> should equal expected
+    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet ContractStates.asDatabase (Transaction.hash tx) tx, expected)
+    |> shouldEqual
 
 [<Test>]
 let ``Contract activation with invalid queries should fail``() =
@@ -373,8 +374,8 @@ let ``Contract activation with invalid queries should fail``() =
 
     let expected:TxResult = General "Total queries mismatch" |> Error
 
-    validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet (Transaction.hash tx) tx
-    |> should equal expected
+    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet ContractStates.asDatabase (Transaction.hash tx) tx, expected)
+    |> shouldEqual
 
 [<Test>]
 let ``Contract with activation sacrifice but without a contract should fail``() =
@@ -396,5 +397,5 @@ let ``Contract with activation sacrifice but without a contract should fail``() 
 
     let expected:Result<Transaction,ValidationError> = General "tx with an activation sacrifice must include a contract" |> Error
 
-    validateBasic tx
-    |> should equal expected
+    (validateBasic tx, expected)
+    |> shouldEqual

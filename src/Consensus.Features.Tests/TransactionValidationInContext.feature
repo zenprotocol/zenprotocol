@@ -64,7 +64,7 @@ Feature: Transaction validation with utxo-set context
       | Argument      | Value            |
       | Command       | mint             |
       | Sender        | anonymous        |
-      | Data          | data             |
+      | MessageBody   | data             |
       | ReturnAddress | returnAddressKey |
     When tx2 is signed with key1
     Then tx2 should pass validation

@@ -13,20 +13,23 @@ open Zen.Cost
 
 module RT = Zen.ResultT
 module Tx = Zen.TxSkeleton
+module C = Zen.Cost
 
-let main txSkeleton _ contractHash command sender data wallet =
-  let! asset = Zen.Asset.getDefault contractHash in
+let main txSkeleton _ contractId command sender messageBody wallet state =
+  let! asset = Zen.Asset.getDefault contractId in
   let spend = { asset=asset; amount=1000UL } in
   let pInput = Mint spend in
 
   let! txSkeleton =
     Tx.addInput pInput txSkeleton
-    >>= Tx.lockToContract spend.asset spend.amount contractHash in
+    >>= Tx.lockToContract spend.asset spend.amount contractId in
 
-  RT.ok (txSkeleton, None)
+  RT.ok @ { tx = txSkeleton; message = None; state = NoChange}
 
-val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 9
-let cf _ _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 20)
+let cf _ _ _ _ _ _ _ = 
+    64 + (64 + 64 + 0) + 22
+    |> cast nat
+    |> C.ret
 """
 
 let sampleContractId = Contract.makeContractId Version0 sampleContractCode
@@ -74,7 +77,7 @@ let sampleOutputTx, _ =
 
 let sampleExpectedResult =
     Transaction.fromTxSkeleton sampleOutputTx
-    |> Transaction.addWitnesses [ ContractWitness <| TxSkeleton.getContractWitness sampleContractId "" None sampleInputTx sampleOutputTx 212L ]
+    |> Transaction.addWitnesses [ ContractWitness <| TxSkeleton.getContractWitness sampleContractId "" None NotCommitted sampleInputTx sampleOutputTx 214L ]
     |> Transaction.sign [ sampleKeyPair ]
 
 let getSampleUtxoset utxos =

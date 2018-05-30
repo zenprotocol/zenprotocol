@@ -4,10 +4,19 @@ open TechTalk.SpecFlow
 open NUnit.Framework
 open TechTalk.SpecFlow.BindingSkeletons
 open TechTalk.SpecFlow.Assist
-open Consensus.Crypto
+open Infrastructure.Platform
 open Infrastructure.Result
-open Consensus.ZFStar
 open System.Text.RegularExpressions
+open Zen.Types.Main
+open Blockchain
+open Consensus
+open ZFStar
+open Crypto
+open Types
+open FStar.UInt
+open System
+open Wallet
+open Blockchain.State
 
 let private result = new ResultBuilder<string>()
 
@@ -16,18 +25,21 @@ let private (?=) expected actual = Assert.AreEqual (expected, actual)
 [<Literal>]
 let rlimit = 2723280u
 
-let contractPath =
+let tempDir () =
     System.IO.Path.Combine
         [| System.IO.Path.GetTempPath(); System.IO.Path.GetRandomFileName() |]
 
+let contractPath = tempDir()
+let dataPath = tempDir()
+let databaseContext = DatabaseContext.createEmpty dataPath
+let session = DatabaseContext.createSession databaseContext
+
+let clean() =
+    cleanDirectory dataPath
+    cleanDirectory contractPath
+
 [<Binding>]
 module Binding =
-    open Consensus
-    open Consensus.Crypto
-    open Consensus.Types
-    open FStar.UInt
-    open System
-    open Wallet
 
     type Cache = {
         contracts : Map<string, Contract.T>
@@ -50,6 +62,38 @@ module Binding =
         utxoset = Map.empty
         data = Map.empty
     }
+
+    let getState() =
+        let ema : EMA.T = {
+            difficulty = 0ul
+            delayed = []
+        }
+
+        let tipState : TipState = {
+            tip = ExtendedBlockHeader.empty
+            activeContractSet = ActiveContractSet.empty
+            ema = ema
+        }
+
+        let memoryState : MemoryState = {
+            utxoSet = state.utxoset
+            activeContractSet =
+                cache.contracts
+                |> Map.fold (fun acs _ contract -> ActiveContractSet.add contract.contractId contract acs) ActiveContractSet.empty
+            orphanPool = OrphanPool.create()
+            mempool = MemPool.empty
+            contractCache = ContractCache.empty
+            contractStates = ContractStates.asDatabase
+        }
+
+        let state : Blockchain.State.State = {
+            tipState = tipState
+            memoryState = memoryState
+            initialBlockDownload = InitialBlockDownload.Inactive
+            headers = 0ul
+        }
+
+        state
 
     let split (value:string) =
         value.Split [|','|]
@@ -214,6 +258,9 @@ module Binding =
             data = Map.empty
         }
 
+    let [<AfterScenario>] TeardownScenario () =
+        clean()
+
     // Init a utxoset
     let [<Given>] ``utxoset`` (table: Table) =
         let mutable txs = Map.empty
@@ -247,7 +294,7 @@ module Binding =
 
         state <- { state with utxoset = utxoset }
 
-    let executeContract contractLabel inputTxLabel outputTxLabel command sender data =
+    let executeContract contractLabel inputTxLabel outputTxLabel command sender messageBody =
         let contract = initContract contractLabel
         let tx = initTx inputTxLabel
         let outputs =
@@ -256,84 +303,38 @@ module Binding =
             |> Option.get
         let inputTx = TxSkeleton.fromTransaction tx outputs
 
-        //copied from TransactionHandler
-        let rec run (txSkeleton:TxSkeleton.T) (contractId:ContractId) command sender data witnesses totalCost =
-            match tryFindContract contractLabel with
-            | Some contract ->
-                let contractWallet =
-                    txSkeleton.pInputs
-                    |> List.choose (fun input ->
-                        match input with
-                        | TxSkeleton.PointedOutput (outpoint,output) when output.lock = Consensus.Types.Contract contractId ->
-                            Some (outpoint,output)
-                        | _ -> None
-                    )
-
-                let contractContext =
-                    { blockNumber=1u; timestamp=1UL }
-
-                Contract.run contract txSkeleton contractContext command sender data contractWallet
-                |> Result.bind (fun (tx, message) ->
-
-                    TxSkeleton.checkPrefix txSkeleton tx
-                    |> Result.bind (fun finalTxSkeleton ->
-                        let witness = TxSkeleton.getContractWitness contract.contractId command data txSkeleton finalTxSkeleton 0L
-
-                        // To commit to the cost we need the real contract wallet
-                        let contractWallet = Contract.getContractWallet tx witness
-                        let cost = Contract.getCost contract txSkeleton contractContext command sender data contractWallet
-                        let totalCost = cost + totalCost
-
-                        // We can now commit to the cost, so lets alter it with the real cost
-                        let witness = {witness with cost = uint32 cost}
-
-                        let witnesses = Infrastructure.List.add (ContractWitness witness) witnesses
-
-                        match message with
-                        | Some {contractId=contractId; command=command; data=data} ->
-                            run finalTxSkeleton contractId command (ContractSender contract.contractId) data witnesses totalCost
-                        | None ->
-                            Ok (finalTxSkeleton, witnesses)
-                    )
-                )
-            | _ -> Error "Contract not active"
-
-        let contractId = Contract.makeContractId Version0 contract.code
-
-        run inputTx contractId command sender data [] 0L
-        |> Result.mapError failwith
-        <@> (fun (finalTxSkeleton, witnesses) ->
-            Transaction.fromTxSkeleton finalTxSkeleton
-            |> Transaction.addWitnesses witnesses)
-        <@> updateTx outputTxLabel
-        |> ignore
+        match TransactionHandler.executeContract session inputTx 0UL contract.contractId command sender messageBody (getState()) false with
+        | Ok tx -> updateTx outputTxLabel tx
+        | Error error -> failwith error
 
     // Executes a contract
     let [<When>] ``(.*) executes on (.*) returning (.*)`` contractLabel inputTxLabel outputTxLabel =
-        executeContract contractLabel inputTxLabel outputTxLabel "" Zen.Types.Main.Anonymous None
+        executeContract contractLabel inputTxLabel outputTxLabel "" None None
 
     // Executes a contract with additional arguments
     let [<When>] ``(.*) executes on (.*) returning (.*) with`` contractLabel inputTxLabel outputTxLabel (table: Table) =
         let mutable command = String.Empty
-        let mutable data = None
-        let mutable sender = Zen.Types.Main.Anonymous
+        let mutable messageBody = None
+        let mutable sender = None
 
         for row in table.Rows do
             let value = row.Item(1)
             match row.Item(0) with
             | "Command" -> command <- value
             | "Sender" -> sender <- getSender value
-            | "Data" -> data <- match tryFindData value with
-                                | Some data -> Some data
-                                | _ -> failwithf "cannot resolve data: %A" value
+            | "MessageBody" ->
+                messageBody <-
+                    match tryFindData value with
+                    | Some data -> Some data
+                    | _ -> failwithf "cannot resolve data: %A" value
             | "ReturnAddress" ->
                 let _, publicKey = initKey value
-                match TestWallet.addReturnAddressToData publicKey data with
-                | Ok data' -> data <- data'
+                match TestWallet.addReturnAddressToData publicKey messageBody with
+                | Ok messageBody' -> messageBody <- messageBody'
                 | Error error -> failwithf "error initializing data with return address: %A" error
             | other -> failwithf "unexpected execute option %A" other
 
-        executeContract contractLabel inputTxLabel outputTxLabel command sender data
+        executeContract contractLabel inputTxLabel outputTxLabel command sender messageBody
 
     // Adding a single output
     let [<Given>] ``(.*) locks (.*) (.*) to (.*)`` txLabel amount asset keyLabel =
@@ -431,6 +432,7 @@ module Binding =
             acs
             Map.empty
             state.utxoset
+            ContractStates.asDatabase
             (Transaction.hash tx)
             tx with
         | Ok _ -> ()

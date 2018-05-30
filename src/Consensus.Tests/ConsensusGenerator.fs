@@ -312,7 +312,8 @@ type ConsensusGenerator =
                 return ContractWitness {
                     contractId = ContractId (Version0, Hash.Hash cHash)
                     command = command
-                    data = data
+                    messageBody = data
+                    stateCommitment = NotCommitted;
                     beginInputs = beginInputs
                     beginOutputs = beginOutputs
                     inputsLength = inputsLength

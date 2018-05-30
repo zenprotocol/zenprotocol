@@ -19,8 +19,8 @@ let contractPath =
 let private inputsValidation blockNumber timestamp acs utxos signedTx txHash =
     let getUTXO _ = UtxoSet.NoOutput
 
-    validateInContext Chain.localParameters getUTXO contractPath blockNumber timestamp acs Map.empty utxos txHash signedTx
-    |> Result.map (fun (tx, _, _) -> tx)
+    validateInContext Chain.localParameters getUTXO contractPath blockNumber timestamp acs Map.empty utxos ContractStates.asDatabase txHash signedTx
+    |> Result.map (fun (tx, _, _, _) -> tx)
 
 let inputsValidationMsg msg blockNumber timestamp acs utxos tx keys =
     let signedTx, txHash = getSignedTx tx keys
