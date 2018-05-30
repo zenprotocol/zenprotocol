@@ -2,6 +2,7 @@ FsNetMQ
 FSharp.Control.Reactive
 System.Reactive.Linq
 System.Reactive.Core
+System.Reactive.Interfaces
 FSharp.Configuration
 Argu
 FSharp.Core
