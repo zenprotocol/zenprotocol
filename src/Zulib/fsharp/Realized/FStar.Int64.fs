@@ -2,15 +2,24 @@ module FStar.Int64
 
 type int64 = System.Int64
 type uint8 = int
-type t = int64
-type t' = t
 
 let n = Prims.parse_int "64"
-let v (x:int64) : FStar.UInt.uint_t<'a> = FStar.UInt.UInt (Prims.parse_int (x.ToString()))
+type t = int64
+let v (x:int64): Prims.int = Prims.parse_int (x.ToString())
+
+let int_to_t (x: FStar.Int.int_t<'A>): int64 =
+    x.ToString()
+    |> System.Int64.Parse
+
+let uv_inv (x : t) : Prims.unit = ()
+
+let vu_inv (x : FStar.Int.int_t<'A>) : Prims.unit = ()
+
+let v_inj (x1: t) (x2: t) : Prims.unit = ()
 
 let zero = 0L
 let one = 1L
-let ones = int64.MaxValue
+let ones = -1L
 
 let add (a:int64) (b:int64) : int64 = a + b
 let add_mod a b = add a b
@@ -60,5 +69,10 @@ let op_Less_Hat = lt
 let op_Less_Equals_Hat = lte
 
 
-let to_string s = s.ToString()
-let of_string s : int64 = int64.Parse s
+let to_string (x: t): Prims.string =
+    x.ToString().ToCharArray()
+    |> Array.map byte
+let of_string (s: Prims.string): t =
+    s |> Array.map char
+      |> System.String
+      |> System.Int64.Parse

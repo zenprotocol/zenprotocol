@@ -51,48 +51,48 @@ let min_int : Prims.pos  ->  Prims.int = (fun ( n  :  Prims.pos ) -> (- ((Prims.
 let fits : Prims.int  ->  Prims.pos  ->  Prims.bool = (fun ( x  :  Prims.int ) ( n  :  Prims.pos ) -> (((min_int n) <= x) && (x <= (max_int n))))
 
 
-type ('Ax, 'An) size = | S of Prims.unit
+type ('Ax, 'An) size = Prims.unit
 
-type 'An int_t = | Int of Prims.int
-
-
-let add : Prims.pos  ->  Prims.unit int_t  ->  Prims.unit int_t  ->  Prims.unit int_t = (fun ( uu___11_281  :  Prims.pos ) ( Int a  :  Prims.unit int_t ) ( Int b  :  Prims.unit int_t ) -> Int (a + b))
+type 'An int_t = Prims.int
 
 
-let add_mod : Prims.pos  ->  Prims.unit int_t  ->  Prims.unit int_t  ->  Prims.unit int_t = (fun ( n  :  Prims.pos ) ( Int a  :  Prims.unit int_t ) ( Int b  :  Prims.unit int_t ) -> Int (op_At_Percent (a + b) (Prims.pow2 n)))
+let add : Prims.pos  ->  Prims.unit int_t  ->  Prims.unit int_t  ->  Prims.unit int_t = (fun ( uu___11_281  :  Prims.pos ) (  a  :  Prims.unit int_t ) (  b  :  Prims.unit int_t ) ->  (a + b))
 
 
-let sub : Prims.pos  ->  Prims.unit int_t  ->  Prims.unit int_t  ->  Prims.unit int_t = (fun ( uu___12_544  :  Prims.pos ) (Int a  :  Prims.unit int_t ) ( Int b  :  Prims.unit int_t ) -> Int (a - b))
+let add_mod : Prims.pos  ->  Prims.unit int_t  ->  Prims.unit int_t  ->  Prims.unit int_t = (fun ( n  :  Prims.pos ) (  a  :  Prims.unit int_t ) (  b  :  Prims.unit int_t ) ->  (op_At_Percent (a + b) (Prims.pow2 n)))
 
 
-let sub_mod : Prims.pos  ->  Prims.unit int_t  ->  Prims.unit int_t  ->  Prims.unit int_t = (fun ( n  :  Prims.pos ) (Int a  :  Prims.unit int_t ) (Int b  :  Prims.unit int_t ) ->Int (op_At_Percent (a - b) (Prims.pow2 n)))
+let sub : Prims.pos  ->  Prims.unit int_t  ->  Prims.unit int_t  ->  Prims.unit int_t = (fun ( uu___12_544  :  Prims.pos ) ( a  :  Prims.unit int_t ) (  b  :  Prims.unit int_t ) ->  (a - b))
 
 
-let mul : Prims.pos  ->  Prims.unit int_t  ->  Prims.unit int_t  ->  Prims.unit int_t = (fun ( uu___13_807  :  Prims.pos ) (Int a  :  Prims.unit int_t ) (Int b  :  Prims.unit int_t ) -> Int (a * b))
+let sub_mod : Prims.pos  ->  Prims.unit int_t  ->  Prims.unit int_t  ->  Prims.unit int_t = (fun ( n  :  Prims.pos ) ( a  :  Prims.unit int_t ) ( b  :  Prims.unit int_t ) -> (op_At_Percent (a - b) (Prims.pow2 n)))
 
 
-let mul_mod : Prims.pos  ->  Prims.unit int_t  ->  Prims.unit int_t  ->  Prims.unit int_t = (fun ( n  :  Prims.pos ) (Int a  :  Prims.unit int_t ) ( Int b  :  Prims.unit int_t ) -> Int (op_At_Percent (a * b) (Prims.pow2 n)))
+let mul : Prims.pos  ->  Prims.unit int_t  ->  Prims.unit int_t  ->  Prims.unit int_t = (fun ( uu___13_807  :  Prims.pos ) ( a  :  Prims.unit int_t ) ( b  :  Prims.unit int_t ) ->  (a * b))
 
 
-let div : Prims.pos  ->  Prims.unit int_t  ->  Prims.unit int_t  ->  Prims.unit int_t = (fun ( uu___14_1073  :  Prims.pos ) (Int a  :  Prims.unit int_t ) (Int b  :  Prims.unit int_t ) -> Int (op_Slash a b))
+let mul_mod : Prims.pos  ->  Prims.unit int_t  ->  Prims.unit int_t  ->  Prims.unit int_t = (fun ( n  :  Prims.pos ) ( a  :  Prims.unit int_t ) (  b  :  Prims.unit int_t ) ->  (op_At_Percent (a * b) (Prims.pow2 n)))
 
 
-let mod_ : Prims.pos  ->  Prims.unit int_t  ->  Prims.unit int_t  ->  Prims.unit int_t = (fun ( uu___15_1205  :  Prims.pos ) (Int a  :  Prims.unit int_t ) (Int b  :  Prims.unit int_t ) -> Int (a - ((op_Slash a b) * b)))
+let div : Prims.pos  ->  Prims.unit int_t  ->  Prims.unit int_t  ->  Prims.unit int_t = (fun ( uu___14_1073  :  Prims.pos ) ( a  :  Prims.unit int_t ) ( b  :  Prims.unit int_t ) ->  (op_Slash a b))
 
 
-let eq : Prims.pos  ->  Prims.unit int_t  ->  Prims.unit int_t  ->  Prims.bool = (fun ( uu___16_1350  :  Prims.pos ) (Int a  :  Prims.unit int_t ) (Int b  :  Prims.unit int_t ) -> (a = b))
+let mod_ : Prims.pos  ->  Prims.unit int_t  ->  Prims.unit int_t  ->  Prims.unit int_t = (fun ( uu___15_1205  :  Prims.pos ) ( a  :  Prims.unit int_t ) ( b  :  Prims.unit int_t ) ->  (a - ((op_Slash a b) * b)))
 
 
-let gt : Prims.pos  ->  Prims.unit int_t  ->  Prims.unit int_t  ->  Prims.bool = (fun ( uu___17_1452  :  Prims.pos ) (Int a  :  Prims.unit int_t ) (Int b  :  Prims.unit int_t ) -> (a > b))
+let eq : Prims.pos  ->  Prims.unit int_t  ->  Prims.unit int_t  ->  Prims.bool = (fun ( uu___16_1350  :  Prims.pos ) ( a  :  Prims.unit int_t ) ( b  :  Prims.unit int_t ) -> (a = b))
 
 
-let gte : Prims.pos  ->  Prims.unit int_t  ->  Prims.unit int_t  ->  Prims.bool = (fun ( uu___18_1560  :  Prims.pos ) (Int a  :  Prims.unit int_t ) (Int b  :  Prims.unit int_t ) -> (a >= b))
+let gt : Prims.pos  ->  Prims.unit int_t  ->  Prims.unit int_t  ->  Prims.bool = (fun ( uu___17_1452  :  Prims.pos ) ( a  :  Prims.unit int_t ) ( b  :  Prims.unit int_t ) -> (a > b))
 
 
-let lt : Prims.pos  ->  Prims.unit int_t  ->  Prims.unit int_t  ->  Prims.bool = (fun ( uu___19_1668  :  Prims.pos ) (Int a  :  Prims.unit int_t ) (Int b  :  Prims.unit int_t ) -> (a < b))
+let gte : Prims.pos  ->  Prims.unit int_t  ->  Prims.unit int_t  ->  Prims.bool = (fun ( uu___18_1560  :  Prims.pos ) ( a  :  Prims.unit int_t ) ( b  :  Prims.unit int_t ) -> (a >= b))
 
 
-let lte : Prims.pos  ->  Prims.unit int_t  ->  Prims.unit int_t  ->  Prims.bool = (fun ( uu___20_1776  :  Prims.pos ) (Int a  :  Prims.unit int_t ) (Int b  :  Prims.unit int_t ) -> (a <= b))
+let lt : Prims.pos  ->  Prims.unit int_t  ->  Prims.unit int_t  ->  Prims.bool = (fun ( uu___19_1668  :  Prims.pos ) ( a  :  Prims.unit int_t ) ( b  :  Prims.unit int_t ) -> (a < b))
 
 
-let to_int_t : Prims.pos  ->  Prims.int  ->  Prims.unit int_t = (fun ( m  :  Prims.pos ) (a  :  Prims.int ) -> Int (op_At_Percent a (Prims.pow2 m)))
+let lte : Prims.pos  ->  Prims.unit int_t  ->  Prims.unit int_t  ->  Prims.bool = (fun ( uu___20_1776  :  Prims.pos ) ( a  :  Prims.unit int_t ) ( b  :  Prims.unit int_t ) -> (a <= b))
+
+
+let to_int_t : Prims.pos  ->  Prims.int  ->  Prims.unit int_t = (fun ( m  :  Prims.pos ) (a  :  Prims.int ) ->  (op_At_Percent a (Prims.pow2 m)))
