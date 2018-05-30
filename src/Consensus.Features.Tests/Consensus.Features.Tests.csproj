@@ -54,6 +54,9 @@
     <Content Include="Contracts\c2.fst">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <Content Include="Contracts\c3.fst">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="TransactionValidationInContext.feature" />
     <Content Include="paket.references" />
   </ItemGroup>

@@ -69,3 +69,14 @@ Feature: Transaction validation with utxo-set context
     When tx2 is signed with key1
     Then tx2 should pass validation
     And tx2 should lock 1200 c2 to returnAddressKey
+
+  Scenario: A contract records it's state
+    Given tx1 locks 100 Zen to key1
+    And tx2 has the input tx1 index 0
+    And tx2 locks 100 Zen to key2
+    And genesis has tx1
+    And data is a u32 of 1
+    When c3 executes on tx2 returning tx3
+    And tx3 is signed with key1
+    And tx3 is put in a block
+    Then c3 state is u32 of 1
