@@ -70,16 +70,22 @@ type Output = {
 type PointedOutput = Outpoint * Output
 
 type Message = {
-    contractId: ContractId
+    recipient: ContractId
     command: string
-    data: data option
+    body: data option
 }
+
+type StateCommitment = 
+    | NoState
+    | State of Hash.Hash
+    | NotCommitted
 
 type ContractWitness =
     {
         contractId: ContractId
         command: string
-        data: data option
+        messageBody: data option
+        stateCommitment: StateCommitment
         beginInputs: uint32
         beginOutputs: uint32
         inputsLength: uint32

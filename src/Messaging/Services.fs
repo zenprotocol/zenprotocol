@@ -67,8 +67,8 @@ module Blockchain =
     let handleMemPool client peerId txHashes =
         Command.send client serviceName (HandleMemPool (peerId,txHashes))
 
-    let executeContract client contractId command sender data txSkeleton =
-        ExecuteContract (contractId,command, sender, data, txSkeleton)
+    let executeContract client contractId command sender messageBody txSkeleton =
+        ExecuteContract (contractId,command, sender, messageBody, txSkeleton)
         |> Request.send<Request, Result<Transaction,string>> client serviceName
 
     let validateBlock client peerId block =
@@ -221,8 +221,8 @@ module Wallet =
     let extendContract client address numberOfBlocks password =
         send<Transaction> client serviceName (ExtendContract (address, numberOfBlocks, password))
 
-    let executeContract client address command data provideReturnAddress sign spends password =
-        send<Transaction> client serviceName (ExecuteContract (address, command, data, provideReturnAddress, sign, spends, password))
+    let executeContract client address command messageBody provideReturnAddress sign spends password =
+        send<Transaction> client serviceName (ExecuteContract (address, command, messageBody, provideReturnAddress, sign, spends, password))
 
     let importSeed client words password =
         send<unit> client serviceName (ImportSeed (words, password))

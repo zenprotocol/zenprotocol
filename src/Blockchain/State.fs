@@ -1,13 +1,13 @@
 module Blockchain.State
 
 open Consensus
-
+open Types
 
 type TipState =
     {
         tip: ExtendedBlockHeader.T
         activeContractSet: ActiveContractSet.T
-        ema:EMA.T
+        ema: EMA.T
     }
 
 type MemoryState =
@@ -17,6 +17,7 @@ type MemoryState =
         orphanPool: OrphanPool.T
         mempool: MemPool.T
         contractCache: ContractCache.T
+        contractStates: ContractStates.T
     }
 
 type State =

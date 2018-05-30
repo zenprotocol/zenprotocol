@@ -23,6 +23,7 @@ type private zfstarMainFn =
         -> sender
         -> Native.option<data>
         -> wallet
+        -> Native.option<data>
         -> cost<contractResult, Prims.unit>
 
 type private zfstarCostFn =
@@ -32,6 +33,7 @@ type private zfstarCostFn =
         -> sender
         -> Native.option<data>
         -> wallet
+        -> Native.option<data>
         -> cost<Prims.nat, Prims.unit>
 
 type ContractWallet = PointedOutput list
@@ -44,7 +46,8 @@ type ContractMainFn =
         -> sender
         -> data option
         -> ContractWallet
-        -> Result<(TxSkeleton.T * Message Option),string>
+        -> data option
+        -> Result<(TxSkeleton.T * Message Option * stateUpdate),string>
 
 type ContractCostFn =
     TxSkeleton.T
@@ -53,14 +56,15 @@ type ContractCostFn =
         -> sender
         -> data option
         -> ContractWallet
+        -> data option
         -> int64
 
 type Contract = {
-    contractId:ContractId
+    contractId: ContractId
     mainFn: ContractMainFn
     costFn: ContractCostFn
     expiry: uint32
-    code:string
+    code: string
 }
 with
     member x.version =
@@ -87,25 +91,27 @@ let private getMainFunction assembly =
         Exception.toError "get contract mainFunc" ex
 
 let private wrapMainFn (mainFn : zfstarMainFn) : ContractMainFn =
-    fun txSkeleton (context:ContractContext) (ContractId (version, Hash.Hash cHash)) command sender data contractWallet ->
+    fun txSkeleton (context:ContractContext) (ContractId (version, Hash.Hash cHash)) command sender messageBody contractWallet contractState ->
         let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
         let command' = ZFStar.fsToFstString command
-        let data' = ZFStar.fsToFstOption data
-        let contractWallet' = ZFStar.convertWallet contractWallet
+        let messageBody' = ZFStar.fsToFstOption messageBody
+        let contractWallet' = ZFStar.fsToFstWallet contractWallet
         let context' = ZFStar.convertContext context
-        mainFn txSkeleton' context' (version,cHash) command' sender data' contractWallet'
+        let contractState' = ZFStar.fsToFstOption contractState
+        mainFn txSkeleton' context' (version,cHash) command' sender messageBody' contractWallet' contractState'
         |> ZFStar.unCost
         |> ZFStar.toResult
         |> Result.map ZFStar.convertResult
 
 let private wrapCostFn (costFn: zfstarCostFn) : ContractCostFn =
-    fun txSkeleton context command sender data contractWallet ->
+    fun txSkeleton context command sender messageBody contractWallet contractState ->
         let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
         let command' = ZFStar.fsToFstString command
-        let data' = ZFStar.fsToFstOption data
-        let contractWallet' = ZFStar.convertWallet contractWallet
+        let data' = ZFStar.fsToFstOption messageBody
+        let contractWallet' = ZFStar.fsToFstWallet contractWallet
         let context' = ZFStar.convertContext context
-        costFn txSkeleton' context' command' sender data' contractWallet'
+        let contractState' = ZFStar.fsToFstOption contractState
+        costFn txSkeleton' context' command' sender data' contractWallet' contractState'
         |> ZFStar.unCost
 
 let private getModuleName : Hash -> string =
@@ -128,7 +134,7 @@ let load contractsPath expiry code (ContractId (version,hash)) =
     |> Result.bind getMainFunction
     |> Result.map (fun (MainFunc (CostFunc (_, costFn), mainFn) : mainFunction) ->
         {
-            contractId=ContractId (version,hash)
+            contractId = ContractId (version,hash)
             mainFn = wrapMainFn mainFn
             costFn = wrapCostFn costFn
             expiry = expiry
@@ -158,9 +164,9 @@ let recordHints (code:string) : Result<string, string> =
 
 let getCost contract = contract.costFn
 
-let run contract txSkeleton context command sender data wallet =
-    contract.mainFn txSkeleton context contract.contractId command sender data wallet
-
+let run contract txSkeleton context command sender messageBody wallet state =
+    contract.mainFn txSkeleton context contract.contractId command sender messageBody wallet state
+        
 let getContractWallet (txSkeleton:TxSkeleton.T) (w:ContractWitness) =
     txSkeleton.pInputs.[int w.beginInputs .. int w.endInputs]
     |> List.choose (fun input ->

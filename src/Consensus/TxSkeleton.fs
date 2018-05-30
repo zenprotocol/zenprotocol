@@ -104,13 +104,13 @@ let isSkeletonOf txSkeleton tx outputs =
     && outputs = outputsFromSkeleton
     && tx.outputs = txSkeleton.outputs
 
-let getContractWitness contractId command data initialTxSkelton finalTxSkeleton (cost:int64)  =
+let getContractWitness contractId command messageBody stateCommitment initialTxSkelton finalTxSkeleton (cost:int64)  =
     let length list = List.length list |> uint32
-
     {
         contractId = contractId
         command = command
-        data = data
+        messageBody = messageBody
+        stateCommitment = stateCommitment
         beginInputs = length initialTxSkelton.pInputs
         beginOutputs = length initialTxSkelton.outputs
         inputsLength = length finalTxSkeleton.pInputs - length initialTxSkelton.pInputs

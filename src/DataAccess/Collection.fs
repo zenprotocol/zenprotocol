@@ -117,13 +117,15 @@ let delete collection session key =
     let mutable keyData = byteArrayToData pinnedKey
     let mutable valueData = Data.empty
 
-    mdb_del(session.tx, collection.database, &keyData, &valueData)
-    |> checkErrorCode
-
-    //TODO: at the moment delete is not supported with indices, so
-    // we throw when collection has indices
-    if not <| List.isEmpty collection.indices then
-        failwith "delete doesn't work with indices"
+    let result = mdb_del(session.tx, collection.database, &keyData, &valueData)
+    
+    if result = 0 || result = MDB_NOTFOUND then
+        //TODO: at the moment delete is not supported with indices, so
+        // we throw when collection has indices
+        if not <| List.isEmpty collection.indices then
+            failwith "delete doesn't work with indices"
+    else
+        errorToString result |> failwith
 
 let truncate (collection:Collection<'a,'b>) session =
     mdb_drop(session.tx, collection.database,0)

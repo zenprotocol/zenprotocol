@@ -25,7 +25,7 @@ let getFullBlock session (block:ExtendedBlockHeader.T) =
         Collection.get session.context.blockTransactions session.session block.hash
         |> Seq.map (Collection.get session.context.transactions session.session)
         |> Seq.toList
-
+        
     {
         header=block.header
         txMerkleRoot=block.txMerkleRoot
@@ -53,7 +53,7 @@ let saveFullBlock session blockHash (block:Block) =
     List.iter (fun (_,txHash) ->
         MultiCollection.put session.context.transactionBlocks session.session txHash blockHash) transactions
 
-let saveBlockState session blockHash (acs:ActiveContractSet.T) ema =
+let saveBlockState session blockHash (acs:ActiveContractSet.T) ema contractStatesUndoData =
     let blockState =
         {
             ema = ema
@@ -64,28 +64,13 @@ let saveBlockState session blockHash (acs:ActiveContractSet.T) ema =
                                                 expiry=contract.expiry
                                                 code=contract.code})
                 |> List.ofSeq
+            contractStatesUndoData = contractStatesUndoData            
         }
-
+        
     Collection.put session.context.blockState session.session blockHash blockState
 
 let getBlockState session blockHash =
-    let blockState = Collection.get session.context.blockState session.session blockHash
-
-    let getOk (contractId,result) =
-        match result with
-        | Ok x -> contractId,x
-        | Error error -> failwithf "cannot load contract from db due to %A" error
-
-    let acs =
-        blockState.activeContractSet
-        |> List.map (fun contractState ->
-            ContractId. contractHash contractState.contractId,
-            Contract.load session.context.contractPath contractState.expiry contractState.code contractState.contractId)
-        |> List.map getOk
-        |> List.toArray
-        |> SparseMerkleTree.addMultiple ActiveContractSet.empty
-
-    acs,blockState.ema
+    Collection.get session.context.blockState session.session blockHash
 
 let getBlockChildren session (block:ExtendedBlockHeader.T) =
     Index.getAll session.context.blockChildrenIndex session.session block.hash
@@ -94,9 +79,10 @@ let tryGetTip session =
     match SingleValue.tryGet session.context.tip session.session with
     | Some blockHash ->
         let header = getHeader session blockHash
-        let acs,ema = getBlockState session blockHash
+        let blockState = getBlockState session blockHash
+        let acs = BlockState.initAcs blockState.activeContractSet session.context.contractPath
 
-        Some (header,acs,ema)
+        Some (header,acs,blockState.ema)
     | None -> None
 
 let updateTip session blockHash =

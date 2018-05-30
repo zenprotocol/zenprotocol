@@ -52,11 +52,11 @@ let parseContractExecuteJson chain json =
                     |> ignore
 
                 if List.isEmpty errors then
-                    let data =
-                        if System.String.IsNullOrEmpty json.Data then
+                    let messageBody =
+                        if System.String.IsNullOrEmpty json.MessageBody then
                             None
                         else
-                            match Base16.decode json.Data with
+                            match Base16.decode json.MessageBody with
                             | Some data ->
                                 match Serialization.Data.deserialize data with
                                 | Some data -> Some data
@@ -69,7 +69,7 @@ let parseContractExecuteJson chain json =
                         else
                             Some json.Options.Sign
 
-                    Ok (contractId, json.Command, data, json.Options.ReturnAddress, sign, spends, json.Password)
+                    Ok (contractId, json.Command, messageBody, json.Options.ReturnAddress, sign, spends, json.Password)
                 else
                     errors
                     |> String.concat " "

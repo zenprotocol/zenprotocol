@@ -8,8 +8,8 @@ open State
 
 module PublicKey = Crypto.PublicKey
 
-let validate blockNumber txHash witnesses pkHash coinbaseBlockNumber inputs =
+let validate blockNumber contractState txHash witnesses pkHash coinbaseBlockNumber inputs =
     if blockNumber - coinbaseBlockNumber < CoinbaseMaturity then
         Invalid <| General "Coinbase not mature enough"
     else
-        PK.validate txHash witnesses pkHash inputs
+        PK.validate contractState txHash witnesses pkHash inputs
