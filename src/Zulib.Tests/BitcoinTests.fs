@@ -89,3 +89,19 @@ let ``Real bitcoin headers give correct next target``() =
         <| Zen.Bitcoin.calculateNextWorkRequired firstHeaderBytes lastHeaderBytes
     // Block # 533160 has bits = 390158921 == 0x17415a49
     nextNBits |> should equal [| 0x49uy; 0x5auy; 0x41uy; 0x17uy |]
+
+[<Test>]
+let ``Bitcoin audit path should validate``() =
+    let index = 5u
+    let txid = txidBytes.[int index]
+    let auditPath = createAuditPath index exampleMerkleTree
+    (unCost <| Zen.Bitcoin.checkInclusion (Array.length auditPath) auditPath index txid exampleBitcoinHeader)
+    |> should equal true
+
+[<Test>]
+let ``Incorrect bitcoin audit path should not validate``() =
+    let index = 5u
+    let txid = txidBytes.[0]
+    let auditPath = createAuditPath index exampleMerkleTree
+    (unCost <| Zen.Bitcoin.checkInclusion (Array.length auditPath) auditPath index txid exampleBitcoinHeader)
+    |> should equal false
