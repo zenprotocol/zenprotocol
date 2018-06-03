@@ -271,7 +271,7 @@ let private rollForwardChain chainParams contractPath timestamp state session bl
             return {state with tipState=tipState;memoryState=memoryState}
         | None ->
             let tipState = {activeContractSet=acs;ema=ema;tip=persistentBlock}
-            let! memoryState = getMemoryState chainParams session contractPath persistentBlock.header.blockNumber timestamp mempool state.memoryState.orphanPool acs state.memoryState.contractCache state.memoryState.contractStates
+            let! memoryState = getMemoryState chainParams session contractPath persistentBlock.header.blockNumber timestamp mempool state.memoryState.orphanPool acs state.memoryState.contractCache contractStates
 
             eventX "BlockHandler: New tip #{blockNumber} {tip}"
             >> setField "blockNumber" tipState.tip.header.blockNumber
@@ -299,6 +299,7 @@ let private handleGenesisBlock chainParams contractPath session timestamp (state
 
             return {state with initialBlockDownload = ibd}
         | Ok (block,utxoSet,acs,contractCache,ema,contractStates) ->
+        
             eventX "BlockHandler: Genesis block received"
             |> Log.info
 
