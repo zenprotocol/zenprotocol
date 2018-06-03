@@ -27,7 +27,7 @@ let main txSkeleton _ contractId _ _ _ _ state =
         match counter with
         | Some counter -> counter +%^ 1ul
         | None -> 10ul in
-        
+
     RT.ok @ { tx = txSkeleton; message = None; state = Update (U32 updatedCounter) }
 
 let cf _ _ _ _ _ _ _ =

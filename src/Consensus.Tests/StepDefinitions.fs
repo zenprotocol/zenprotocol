@@ -46,11 +46,8 @@ let clean() =
 
 [<Binding>]
 module Binding =
-    open Blockchain.BlockState
-
     type TestingState = {
         blocks : Map<string, BlockHeader>
-        acs: Map<BlockHeader, ActiveContractSet.T>
         contracts : Map<string, ContractId * ContractV0>
         keys : Map<string, KeyPair>
         txs : Map<string, Transaction>
@@ -59,25 +56,24 @@ module Binding =
 
     let mutable testingState = {
         blocks = Map.empty
-        acs = Map.empty
         contracts = Map.empty
         keys = Map.empty
         txs = Map.empty
         data = Map.empty
     }
-    
+
     let getEmptyState() =
         let ema : EMA.T = {
             difficulty = 0ul
             delayed = []
         }
-    
+
         let tipState : TipState = {
             tip = ExtendedBlockHeader.empty
             activeContractSet = ActiveContractSet.empty
             ema = ema
         }
-    
+
         let memoryState : MemoryState = {
             utxoSet = UtxoSet.asDatabase
             activeContractSet = ActiveContractSet.empty
@@ -119,13 +115,8 @@ module Binding =
 
     let tryFindContract contractLabel = Map.tryFind contractLabel testingState.contracts
 
-    let findContract contractLabel =
-        match tryFindContract contractLabel with
-        | Some contract -> contract
-        | _ -> failwithf "cannot resolve contract: %A" contractLabel
-        
     let findBlock blockLabel = Map.find blockLabel testingState.blocks
-        
+
     let getAsset value =
         if value = "Zen" then Asset.Zen
         else
@@ -140,7 +131,7 @@ module Binding =
             amount * 100_000_000UL
         else
             amount
-             
+
     let findTx txLabel =
         match tryFindTx txLabel with
         | Some tx -> tx
@@ -161,7 +152,7 @@ module Binding =
             { inputs = []; witnesses = []; outputs = []; version = Version0; contract = None }
             |> updateTx txLabel
 
-    let getContractRecord contractLabel = 
+    let getContractRecord contractLabel =
         match Map.tryFind contractLabel testingState.contracts with
         | Some value -> value
         | None ->
@@ -169,17 +160,15 @@ module Binding =
             let path = Path.Combine (path, "Contracts")
             let contract = Path.ChangeExtension (contractLabel,".fst")
             let code = Path.Combine (path, contract) |> File.ReadAllText
-            
-            let hints = 
-                match Contract.recordHints code with
-                | Ok hints -> hints
-                | Error error -> failwith error
-                       
-            let queries = 
-                match Infrastructure.ZFStar.totalQueries hints with
-                | Ok queries -> queries
-                | Error error -> failwith error
-                       
+
+            let hints = match Contract.recordHints code with
+                       | Ok hints -> hints
+                       | Error error -> failwith error
+
+            let queries = match Infrastructure.ZFStar.totalQueries hints with
+                       | Ok queries -> queries
+                       | Error error -> failwith error
+
             let contractId = Contract.makeContractId Version0 code
             let contract = {
                code = code
@@ -187,22 +176,39 @@ module Binding =
                rlimit = rlimit
                queries = queries
             }
-           
+
             testingState <-
                 { testingState with contracts = Map.add contractLabel (contractId, contract) testingState.contracts }
-       
+
             contractId, contract
 
-    let initKey keyLabel =
-        let context = Native.secp256k1_context_create (Native.SECP256K1_CONTEXT_SIGN ||| Native.SECP256K1_CONTEXT_VERIFY)
-
-        let secretKey = 
-            (keyLabel:string)
-            |> System.Text.Encoding.ASCII.GetBytes
-            |> Hash.compute
-            |> Hash.bytes 
-
-        let publicKey = Array.create 64 0uy
+//    let initContract contractLabel =
+//        match tryFindContract contractLabel with
+//        | Some contractId ->
+//            ActiveContractSet.tryFind contractId state.memoryState.activeContractSet
+//            |> Option.get
+//        | None ->
+//
+//            let contract =
+//                getContractCode contractLabel
+//                |> compile
+//                |> Infrastructure.Result.get
+//
+//            testingState <-
+//                { testingState with contracts = Map.add contractLabel contract.contractId testingState.contracts }
+//
+//            let contractsCache =
+//                state.memoryState.contractCache
+//                |> ContractCache.add contract
+//
+//            let activeContractSet =
+//                state.memoryState.activeContractSet
+//                |> ActiveContractSet.add contract.contractId contract
+//
+//            state <- { state with memoryState = { state.memoryState with contractCache = contractsCache; activeContractSet = activeContractSet }
+//                                  tipState = { state.tipState with activeContractSet = activeContractSet } }
+//
+//            contract
 
         let keyPair =
             match Native.secp256k1_ec_pubkey_create (context, publicKey, secretKey) with
@@ -277,7 +283,7 @@ module Binding =
             initKey sender
             |> snd
             |> Some
-            
+
     let [<BeforeScenario>] SetupScenario () =
         clean()
         databaseContext <- DatabaseContext.createEmpty dataPath
@@ -285,7 +291,6 @@ module Binding =
 
         testingState <- {
             blocks = Map.empty
-            acs = Map.empty
             contracts = testingState.contracts
             keys = Map.empty
             txs = Map.empty
@@ -332,24 +337,24 @@ module Binding =
         state <- { state with memoryState = { state.memoryState with utxoSet = utxoSet } }
 
     let executeContract contractLabel inputTxLabel outputTxLabel command sender messageBody =
-        let contractId, contract = 
+        let contractId, contract =
             getContractRecord contractLabel
         let contract =
             Contract.compile contractPath contract
             |> Result.bind (fun _ -> Contract.load contractPath 1ul contract.code contractId)
             |> Infrastructure.Result.get
-    
+
         let tx = initTx inputTxLabel
         let outputs =
             match UtxoSet.tryGetOutputs (getUTXO session) state.memoryState.utxoSet tx.inputs with
             | Some outputs -> outputs
-            | None -> failwithf "unable to get utxos for tx %A" inputTxLabel
-            
+            | None -> failwithf "111unable to get utxos for tx %A" inputTxLabel
+
         let inputTx = TxSkeleton.fromTransaction tx outputs
 
         contractExecutionCache <- Map.add contractId contract contractExecutionCache
         let state' = { state with memoryState = { state.memoryState with activeContractSet = ActiveContractSet.add contractId contract state.memoryState.activeContractSet } }
-        
+
         match TransactionHandler.executeContract session inputTx 0UL contract.contractId command sender messageBody state' false with
         | Ok tx -> updateTx outputTxLabel tx
         | Error error -> failwith error
@@ -387,40 +392,36 @@ module Binding =
     // or adding a change output for an asset
     let [<Given>] ``(.*) locks (.*) (.*) to (.*)`` txLabel amount asset keyLabel =
         let tx = initTx txLabel
-        
+
         let amount =
             if amount = "change" then
-                let foldOutputs = 
-                    List.fold (fun amount (output:Output) -> 
+                let foldOutputs =
+                    List.fold (fun amount (output:Output) ->
                         amount +
-                        if output.spend.asset = getAsset asset then 
-                            output.spend.amount 
-                        else 
-                            0UL) 0UL
+                        if output.spend.asset = getAsset asset then
+                            output.spend.amount
+                        else
+                            0UL)
                 let inputsTotal =
                     match UtxoSet.tryGetOutputs (getUTXO session) state.memoryState.utxoSet tx.inputs with
-                    | Some outputs -> outputs
-                    | None -> 
-                        failwithf "calculating change, unable to get utxos for tx %A %A" txLabel tx
-                    |> foldOutputs
-                let outputsTotal = 
-                    tx.outputs
-                    |> foldOutputs
+                    | Some outputs -> foldOutputs 0UL outputs
+                    | None -> failwithf "unable to get utxos for tx %A" txLabel
+                let outputsTotal = foldOutputs 0UL tx.outputs
                 inputsTotal - outputsTotal
             else
                 getAmount asset (UInt64.Parse amount)
-            
+
         let output = getOutput amount asset keyLabel
         { tx with outputs = Infrastructure.List.add output tx.outputs }
         |> updateTx txLabel
         |> ignore
 
     // Adding contract activation outputs (ActivationSacrifice and Fee)
-    let [<Given>] ``(.*) activates (.*) for (.*) block(?:|s)`` txLabel contractLabel blocks =
+    let [<Given>] ``(.*) activates (.*) for (.*) blocks`` txLabel contractLabel blocks =
         let tx = initTx txLabel
 
         let _, contract = getContractRecord contractLabel
-        let codeLength = String.length contract.code |> uint64    
+        let codeLength = String.length contract.code |> uint64
         let activationFee = contract.queries * rlimit |> uint64
         let activationSacrifice = chain.sacrificePerByteBlock * codeLength * (uint64 blocks)
 
@@ -516,11 +517,11 @@ module Binding =
 
         let genesisBlock = Block.createGenesis chain rootTxs (0UL,0UL)
         let genesisHash = Block.hash genesisBlock.header
-        
+
         testingState <- { testingState with blocks = Map.add "genesis" genesisBlock.header testingState.blocks }
-        
+
         let chain = { chain with genesisHash = genesisHash }
-        let state' = { state with tipState = { state.tipState with ema = EMA.create chain }} 
+        let state' = { state with tipState = { state.tipState with ema = EMA.create chain }}
 
         let events, state' =
             BlockHandler.validateBlock chain session.context.contractPath session timestamp None genesisBlock false state'
@@ -531,49 +532,104 @@ module Binding =
 
         state <- state'
 
+//        printfn "%A" state
+//    // Initializes a chain with a genesis block
+//    let [<Given>] ``genesis has (.*) and uses (.*) index (.*) with key (.*) to activate (.*) for (.*) blocks`` rootTxLabels refTxLabel index key contractLabel blocks =
+//        let rootTxs =
+//            rootTxLabels
+//            |> split
+//            |> List.map findTx
+//
+//        let createContractRecord code =
+//            result {
+//                let! hints = Contract.recordHints code
+//                let! queries = Infrastructure.ZFStar.totalQueries hints
+//
+//                return
+//                    (Contract.makeContractId Version0 code,
+//                        {   code = code
+//                            hints = hints
+//                            rlimit = rlimit
+//                            queries = queries })
+//            }
+
+//        let getContractActivatingTx contract numberOfBlocks =
+//            let refTx = findTx refTxLabel
+//            let outpoint = { txHash = Transaction.hash refTx; index = index }
+//
+//            let output =
+//                match UtxoSet.tryGetOutput (getUTXO session) state.memoryState.utxoSet outpoint with
+//                | Some output -> output
+//                | None -> failwithf "unable to get utxos for activating contract %A" contractLabel
+//
+//            let codeLength = String.length contract.code |> uint64
+//            let activationFee = contract.queries * rlimit |> uint64
+//            let activationSacrifice = chain.sacrificePerByteBlock * codeLength * (uint64 numberOfBlocks)
+//
+//            let changeAddress = PK Hash.zero
+//            let outputs =
+//                [
+//                    { spend = { amount = activationSacrifice;
+//                      asset = Asset.Zen }
+//                      lock = ActivationSacrifice }
+//                    { spend = { amount = activationFee;
+//                      asset = Asset.Zen }
+//                      lock = Fee }
+//                    { spend = { amount = output.spend.amount - activationSacrifice - activationFee;
+//                      asset = Asset.Zen }
+//                      lock = changeAddress }
+//                ]
+//
+//            Transaction.sign
+//                [ findKey key ]
+//                {
+//                    version = Version0
+//                    inputs = [ Outpoint outpoint ]
+//                    outputs = outputs
+//                    witnesses = []
+//                    contract = Some (V0 contract)
+//                }
+//
+//        let contract = createContractRecord "" |> Infrastructure.Result.get
+//
+//        let contractActivatingTx = getContractActivatingTx contract blocks
+//
+//        let genesisBlock = Block.createGenesis chain (rootTxs (* @ contractActivatingTx *) ) (0UL,0UL)
+//        let genesisHash = Block.hash genesisBlock.header
+//
+//        testingState <- { testingState with blocks = Map.add "genesis" genesisBlock.header testingState.blocks }
+//
+//        let chain = { chain with genesisHash = genesisHash }
+//        let state' = { state with tipState = { state.tipState with ema = EMA.create chain }}
+//
+//        let events, state' =
+//            BlockHandler.validateBlock chain session.context.contractPath session timestamp None genesisBlock false state'
+//            |> Infrastructure.Writer.unwrap
+//
+//        events |> should contain (EffectsWriter.EventEffect (BlockAdded (genesisHash, genesisBlock)))
+//        events |> should contain (EffectsWriter.EventEffect (TipChanged (genesisBlock.header)))
+//
+//        state <- state'
+
     let extendChain newBlockLabel txLabels parentBlockLabel =
-        let createBlock state =
-            let txs =
-                txLabels
-                |> split
-                |> List.map findTx
+        let txs =
+            txLabels
+            |> split
+            |> List.map findTx
 
-            let parent =
-                if parentBlockLabel = "tip" then
-                    state.tipState.tip.header
-                else
-                    match Map.tryFind parentBlockLabel testingState.blocks with
-                    | Some block -> block
-                    | None -> failwithf "could not resolve parent block %A" parentBlockLabel
+        let parent =
+            if parentBlockLabel = "tip" then
+                state.tipState.tip.header
+            else
+                match Map.tryFind parentBlockLabel testingState.blocks with
+                | Some block -> block
+                | None -> failwithf "could not resolve parent block %A" parentBlockLabel
 
-            let parentAcs =
-                match Map.tryFind parent testingState.acs with
-                | Some acs -> acs
-                | None -> ActiveContractSet.empty
+        let mempool = List.fold (fun mempool tx -> MemPool.add (Transaction.hash tx) tx mempool) MemPool.empty txs
+        let state' = { state with memoryState = { state.memoryState with mempool = mempool } }
+        let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList chain session state' timestamp
+        let block = Block.createTemplate chain parent timestamp state.tipState.ema memState.activeContractSet validatedTransactions Hash.zero
 
-            let newAcs =
-                List.fold (fun acs tx -> 
-                    match TransactionValidation.validateInContext chain (fun outpoint -> 
-                        let outputStatus = getUTXO session outpoint
-                        match outputStatus with 
-                        | UtxoSet.OutputStatus.NoOutput -> failwithf "no output: constracting block %A" newBlockLabel
-                        | UtxoSet.OutputStatus.Spent output ->  UtxoSet.OutputStatus.Unspent output
-                        | UtxoSet.OutputStatus.Unspent output ->  UtxoSet.OutputStatus.Unspent output) contractPath (parent.blockNumber + 1ul) timestamp 
-                        acs state.memoryState.contractCache Map.empty (getContractState session) ContractStates.asDatabase (Transaction.hash tx) tx with
-                    | Ok (_,acs,_,_) -> acs
-                    | Error err -> failwithf "Tx failed validation: %A %A constracting block %A" (Transaction.hash tx) err newBlockLabel
-                                
-                ) parentAcs txs
-
-            let block = Block.createTemplate chain parent timestamp state.tipState.ema newAcs txs Hash.zero
-
-            // Save the ACS, so that when extending a chain using a parent - the right amount of sacrifice in the coinbase would be calculated
-            testingState <- { testingState with acs = Map.add block.header newAcs testingState.acs }
-
-            block
-            
-        let block = createBlock state
-        
         match newBlockLabel with
         | Some label ->
             testingState <- { testingState with blocks = Map.add label block.header testingState.blocks }
@@ -582,32 +638,40 @@ module Binding =
         let events, state' =
             BlockHandler.validateBlock chain session.context.contractPath session timestamp None block false state
             |> Infrastructure.Writer.unwrap
-            
+
       //  events |> should contain (EffectsWriter.EventEffect (BlockAdded (Block.hash block.header, block)))
+
+      //  events |> should contain (EffectsWriter.EventEffect (BlockAdded (Block.hash block.header, block)))
+
+//        if parentBlockLabel = "tip" then
+//            try
+//                events |> should contain (EffectsWriter.EventEffect (TipChanged (block.header)))
+//            with _ ->
+//                printfn "failed to validate %A" newBlockLabel
 
         state <- state'
         block
 
     // Extend a chain
     let [<When>] ``validating a block containing (.*) extending (.*)`` txLabels parentBlockLabel =
-        extendChain None txLabels parentBlockLabel 
-        
+        extendChain None txLabels parentBlockLabel
+
     // Extend a chain (using block label)
     let [<When>] ``validating block (.*) containing (.*) extending (.*)`` newBlockLabel txLabels parentBlockLabel =
-        extendChain (Some newBlockLabel) txLabels parentBlockLabel 
+        extendChain (Some newBlockLabel) txLabels parentBlockLabel
 
     // Extend a chain (using block lable, empty block)
     let [<When>] ``validating an empty block (.*) extending (.*)`` newBlockLabel parentBlockLabel =
-        extendChain (Some newBlockLabel) "" parentBlockLabel 
-        
+        extendChain (Some newBlockLabel) "" parentBlockLabel
+
     // Checks that tx passes in-context validation
     let [<Then>] ``(.*) should pass validation`` txLabel =
         let tx = findTx txLabel
         let chainParams = Chain.getChainParameters Chain.Test
 
-        let acs = 
+        let acs =
             Map.fold (fun acs contractId contract -> ActiveContractSet.add contractId contract acs) ActiveContractSet.empty contractExecutionCache
-        
+
         match TransactionValidation.validateInContext
             chainParams
             (getUTXO session)
@@ -628,65 +692,53 @@ module Binding =
     let [<Then>] ``(.*) should lock (.*) (.*) to (.*)`` txLabel (expected:uint64) asset keyLabel =
         let tx = findTx txLabel
         let asset = getAsset asset
-        
-        let stepDown asset amount = 
+
+        let stepDown asset amount =
             if asset = Asset.Zen then
                 amount / 100_000_000UL
             else
                 amount
 
-        expected ?= 
+        expected ?=
             List.fold (fun state { lock = lock; spend = spend } ->
                 if lock = getLock keyLabel && spend.asset = asset then
                     state + (stepDown spend.asset spend.amount)
                 else
                     state) 0UL tx.outputs
 
-    let checkContractState contractLabel expected =
-        match tryFindContract contractLabel with
-        | Some (contractId, _) ->
-            let actual = ContractStates.tryGetState (getContractState session) contractId ContractStates.asDatabase // state.memoryState.contractStates
-            expected ?= actual
-        | None -> failwith "contract not resolved"
-                    
     // Checks a contract's state
     let [<Then>] ``state of (.*) should be (.*) of (.*)`` contractLabel dataType value =
-        constructData dataType value
-        |> Some
-        |> checkContractState contractLabel
-        
-    // Checks that a contract's state is none
-    let [<Then>] ``state of (.*) should be none`` contractLabel =
-        checkContractState contractLabel None
-        
+        let expected =
+            constructData dataType value
+            |> Some
+
+        match tryFindContract contractLabel with
+        | Some (contractId, _) ->
+            match ActiveContractSet.tryFind contractId state.memoryState.activeContractSet with
+            | Some contract ->
+                let actual = ContractStates.tryFind contract state.memoryState.contractStates
+                expected ?= actual
+            | None -> failwithf "contract %A not found in ACS" contractLabel
+        | None -> failwith "contract not resolved"
+
     // Checks the tip
     let [<Then>] ``tip should be (.*)`` blockLabel =
         let expected = findBlock blockLabel
-        
+
         let actual = state.tipState.tip.header
-        
+
         expected ?= actual
 
     // Asserts that a contract is active
-    let [<Then>] ``(.*) should be active for (.*) block(?:|s)`` contractLabel (blocks:uint32) =
-        let contractId, _  = findContract contractLabel
+    let [<Then>] ``(.*) should be active for (.*) blocks`` contractLabel (blocks:uint32) =
+        let contractId, _  = tryFindContract contractLabel |> Option.get
         match ActiveContractSet.tryFind contractId state.tipState.activeContractSet with
-        | Some contract -> 
-            blocks ?= contract.expiry - state.tipState.tip.header.blockNumber
+        | Some contract -> blocks ?= contract.expiry - state.tipState.tip.header.blockNumber
         | None -> failwithf "expected contract to be activated"
 
     // Asserts that a contract is not active
     let [<Then>] ``(.*) should not be active`` contractLabel =
-        let contractId, _  = findContract contractLabel
+        let contractId, _  = tryFindContract contractLabel |> Option.get
         match ActiveContractSet.tryFind contractId state.tipState.activeContractSet with
-        | Some contract -> 
-            failwithf "expected contract to not be activated but is active for %A " (contract.expiry - state.tipState.tip.header.blockNumber)
-        | None -> ()
-
-    // Prints the number of blocks a contract active for
-    let [<Then>] ``(.*) should be active for\?`` contractLabel =
-        let contractId, _  = findContract contractLabel
-        match ActiveContractSet.tryFind contractId state.tipState.activeContractSet with
-        | Some contract -> 
-            printfn "%A is active for %A blocks" contractLabel (contract.expiry - state.tipState.tip.header.blockNumber)
+        | Some _ -> failwithf "expected contract to not be activated"
         | None -> ()
