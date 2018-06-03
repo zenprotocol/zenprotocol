@@ -321,9 +321,9 @@ let validateInContext chainParams getUTXO contractPath blockNumber timestamp acs
     let txSkel = TxSkeleton.fromTransaction tx outputs
 
     do! checkAmounts txSkel
-    let! contractState = InputValidation.StateMachine.validate blockNumber timestamp acs outputs contractState txHash tx txSkel
+    let! contractStates = InputValidation.StateMachine.validate blockNumber timestamp acs outputs contractState txHash tx txSkel
 
     let! acs, contractCache = activateContract chainParams contractPath blockNumber acs contractCache tx
     let! acs = extendContracts chainParams acs tx
-    return tx, acs, contractCache, contractState
+    return tx, acs, contractCache, contractStates
 }
