@@ -2,6 +2,6 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
 
   <Target Name="CopySecp256k1DependenciesToOutput" AfterTargets="Compile">
-    <Copy SourceFiles="$(SolutionDir)\..\packages\secp256k1_vc141\build\native\bin\secp256k1-x64-v141-mt-0_1_0_16.dll" DestinationFiles="$(OutDir)\secp256k1.dll" />    
+    <Copy SourceFiles="$(SolutionDir)\..\packages\secp256k1-vc140\build\native\bin\secp256k1-x64-v140-mt-0_1_0_16.dll" DestinationFiles="$(OutDir)\secp256k1.dll" />
   </Target>
 </Project>
