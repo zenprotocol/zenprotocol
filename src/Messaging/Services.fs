@@ -44,6 +44,7 @@ module Blockchain =
         | GetBlockTemplate of pkHash:Hash
         | GetTip
         | GetBlock of Hash
+        | GetBlockByNumber of uint32
         | GetBlockHeader of Hash
         | GetActiveContracts
         | GetBlockChainInfo
@@ -101,6 +102,9 @@ module Blockchain =
 
     let getBlock client blockHash =
         Request.send<Request,Block option> client serviceName (GetBlock blockHash)
+
+    let getBlockByNumber client blockNumber =
+            Request.send<Request,Block option> client serviceName (GetBlockByNumber blockNumber)
 
     let getTip client =
         Request.send<Request,(Hash*BlockHeader) option> client serviceName GetTip

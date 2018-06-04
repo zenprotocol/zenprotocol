@@ -7,6 +7,9 @@ open Messaging.Services
 open Messaging.Events
 open Consensus
 open Blockchain
+open Blockchain
+open Blockchain
+open Blockchain
 open Blockchain.EffectsWriter
 open Consensus.Types
 open State
@@ -119,6 +122,21 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
             |> Some
             |> requestId.reply<Types.Block option>
         | None -> requestId.reply<Types.Block option> None
+    | GetBlockByNumber blockNumber ->
+        if blockNumber > state.tipState.tip.header.blockNumber || blockNumber = 0ul then
+            requestId.reply<Types.Block option> None
+        else
+            let rec findBlock (header:ExtendedBlockHeader.T) =
+                if header.header.blockNumber = blockNumber then
+                    BlockRepository.getFullBlock session header
+                else
+                    BlockRepository.getHeader session header.header.parent
+                    |> findBlock
+
+            findBlock state.tipState.tip
+            |> Some
+            |> requestId.reply<Types.Block option>
+
     | GetBlockHeader blockHash ->
         match BlockRepository.tryGetHeader session blockHash with
         | Some header ->

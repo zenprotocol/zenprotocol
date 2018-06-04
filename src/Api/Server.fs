@@ -9,7 +9,7 @@ open Api.Types
 open Parsing
 open Messaging.Services
 open Messaging.Services.Wallet
-open Result
+open Infrastructure.Result
 open Zen.Crypto
 open Consensus.Crypto
 open Logary.Message
@@ -285,11 +285,26 @@ let handleRequest chain client (request,reply) =
         | FSharp.Core.Error _ ->
             TextContent (sprintf "invalid address %A" query)
             |> reply StatusCode.BadRequest
-    | Get ("blockchain/block", query) ->
+    | Get ("/blockchain/block", query) ->
         match Map.tryFind "hash" query with
         | None ->
-              TextContent (sprintf "hash is missing")
-              |> reply StatusCode.BadRequest
+              match Map.tryFind "blockNumber" query with
+              | Some blockNumber ->
+                  match System.UInt32.TryParse blockNumber with
+                  | false,_ ->
+                      TextContent (sprintf "couldn't decode hash")
+                      |> reply StatusCode.BadRequest
+                  | true, blockNumber ->
+                      match Blockchain.getBlockByNumber client blockNumber with
+                      | None ->
+                          TextContent (sprintf "block not found")
+                          |> reply StatusCode.NotFound
+                      | Some block ->
+                          reply StatusCode.OK (JsonContent <| blockEncoder block)
+              | None ->
+                  TextContent (sprintf "hash or blockNumber are missing")
+                  |> reply StatusCode.BadRequest
+
         | Some h ->
             match Hash.fromString h with
             | Error _ ->
