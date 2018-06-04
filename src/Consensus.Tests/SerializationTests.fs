@@ -85,3 +85,112 @@ let ``serialize and deserialize varint yield the same number``(num:uint32)  =
     let num' = Serialization.Serialization.VarInt.read stream |> fst |> Option.get
 
     num = num'
+
+let serialize x =
+    Serialization.Amount.write Serialization.counters x 0ul
+    |> int32
+    |> FsNetMQ.Stream.create
+    |> Serialization.Amount.write Serialization.serializers x
+    |> FsNetMQ.Stream.getBuffer
+let deserialize bytes =
+    FsNetMQ.Stream.Stream (bytes, 0)
+    |> FsNetMQ.Stream.Reader.run Serialization.Amount.read
+
+[<Property(MaxTest=1000)>]
+let ``Amount serialization round trip produces same result``() =
+    Arb.generate<DoNotSize<uint64>>
+    |> Gen.map (fun (DoNotSize x) -> x)
+    |> Arb.fromGen
+    |> Prop.forAll <| fun amt ->
+        amt |> serialize |> deserialize |> Option.get = amt
+
+[<Test>]
+let ``Amount values less than 1E4 round trip``() =
+    seq {0UL .. 10000UL}
+    |> Seq.forall (fun amt ->
+        amt |> serialize |> deserialize |> Option.get = amt)
+    |> should be True
+
+[<Test>]
+let ``Amount values close to powers of two round trip``() =
+    let s = [0..63] |> List.map (fun x -> pown 2UL x)
+    let l = s |> List.map (fun x -> x - 1UL)
+    let u = s |> List.map (fun x -> x + 1UL)
+    List.concat [s;l;u]
+    |> Seq.forall (fun amt ->
+        amt |> serialize |> deserialize |> Option.get = amt)
+    |> should be True
+
+[<Test>]
+let ``Amounts with at most 3 significant figures round trip``() =
+    let s = seq {
+         for sf in 0UL .. 999UL do
+             for e in 0 .. 16 do
+                yield sf * pown 10UL e
+                }
+    let bigs = seq {
+            for sf in 0UL .. 184UL do
+                yield sf * pown 10UL 17
+            }
+
+    let s' = Seq.concat [s; bigs]
+    s'
+    |> Seq.forall (fun amt ->
+        amt |> serialize |> deserialize |> Option.get = amt)
+    |> should be True
+
+[<Test>]
+let ``Amounts with at most 3 significant figures have size 2 bytes``() =
+    let s = seq {
+         for sf in 0UL .. 999UL do
+             for e in 0 .. 16 do
+                yield sf * pown 10UL e
+                }
+    let bigs = seq {
+            for sf in 0UL .. 184UL do
+                yield sf * pown 10UL 17
+            }
+
+    let s' = Seq.concat [s; bigs]
+    s'
+    |> Seq.forall (fun amt ->
+        amt |> serialize |> Array.length = 2)
+    |> should be True
+
+[<Test>]
+let ``Amounts with between 4 and 8 significant figures round trip``() =
+    let s = seq {
+        for r in 3 .. 8 do
+            for e in 0 .. (19 - r) do
+                if r < 8 then yield (pown 10UL r + 1UL) * (pown 10UL e)
+                if r > 3 then yield (pown 10UL r - 1UL) * (pown 10UL e)
+    }
+    s
+    |> Seq.forall (fun amt ->
+        amt |> serialize |> deserialize |> Option.get = amt)
+    |> should be True
+
+[<Test>]
+let ``Amounts with between 4 and 8 significant figures have size 4 bytes``() =
+    let s = seq {
+        for r in 3 .. 8 do
+            for e in 0 .. (19 - r) do
+                if r < 8 then yield (pown 10UL r + 1UL) * (pown 10UL e)
+                if r > 3 then yield (pown 10UL r - 1UL) * (pown 10UL e)
+    }
+    s
+    |> Seq.forall (fun amt ->
+        amt |> serialize |> Array.length = 4)
+    |> should be True
+
+[<Test>]
+let ``Amounts with more than 8 significant figures have size 8 or 9 bytes``() =
+    let s = seq {
+        for r in 8 .. 19 do
+            for e in 0 .. (19 - r) do
+                yield (pown 10UL r + 1UL) * (pown 10UL e)
+    }
+    s
+    |> Seq.forall (fun amt ->
+        amt |> serialize |> Array.length = (if amt < pown 2UL 56 then 8 else 9))
+    |> should be True

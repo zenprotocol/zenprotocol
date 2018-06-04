@@ -260,8 +260,6 @@ let handleRequest chain client (request,reply) =
         Wallet.resyncAccount client
         reply StatusCode.OK NoContent
     | Post ("/blockchain/publishblock", Some body) ->
-        printfn "hello-----------------------------"
-
         match parsePublishBlockJson body with
         | Error error ->
             printfn "error deserializing block"

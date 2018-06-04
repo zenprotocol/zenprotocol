@@ -56,6 +56,7 @@ module Serialization =
     type Operations<'a> = {
         writeBytes: Byte[] -> int32 -> 'a -> 'a
         writeNumber1: uint8 -> 'a -> 'a
+        writeNumber2: uint16 -> 'a -> 'a
         writeNumber4: uint32 -> 'a -> 'a
         writeNumber8: uint64 -> 'a -> 'a
     }
@@ -63,6 +64,7 @@ module Serialization =
     let serializers: Operations<Stream.T> = {
         writeBytes = writeBytes
         writeNumber1 = writeNumber1
+        writeNumber2 = writeNumber2
         writeNumber4 = writeNumber4
         writeNumber8 = writeNumber8
     }
@@ -70,6 +72,7 @@ module Serialization =
     let counters: Operations<uint32> = {
         writeBytes = fun _ len count -> count + (uint32 len)
         writeNumber1 = fun _ count -> count + 1u
+        writeNumber2 = fun _ count -> count + 2u
         writeNumber4 = fun _ count -> count + 4u
         writeNumber8 = fun _ count -> count + 8u
     }
@@ -241,13 +244,124 @@ module Serialization =
             return Asset (contractId, subType)
         }
 
+    module Amount =
+        let private factor (x:uint64) =
+            let rec inner (s,e) =
+                if s % 10UL <> 0UL
+                then (s,e)
+                else
+                    inner (s/10UL,e+1)
+            inner (x,0)
+        let private figures s =
+            let rec inner (s,f) =
+                if s = 0UL then f
+                else
+                    inner (s/10UL,f+1)
+            inner (s,0)
+        let private parse x =
+            if x = 0UL then (0UL, 0, 0)
+            else
+                let s,e = factor x
+                let f = figures s
+                (s,e,f)
+        let private write16 ops = fun (s,e) ->
+            let res =
+                s ||| (e <<< 10)
+            ops.writeNumber2 res
+        [<Literal>]
+        let cutoff = 0x04000000u
+        let private write32 ops = fun (s,e) ->
+            if s < cutoff
+            then
+                let shifted = (0x20u ||| e) <<< 26
+                ops.writeNumber4 (s ||| shifted)
+            else
+                let shifted = (0x60u ||| e) <<< 25
+                ops.writeNumber4 ((s - cutoff) ||| shifted)
+        let private write64 ops = fun s ->
+            let res = ((0x7EUL <<< 56) ||| s)
+            ops.writeNumber8 res
+        let private write72 ops = fun s ->
+            ops.writeNumber1 0xFEuy
+            >> ops.writeNumber8 s 
+        let write ops = fun amount ->
+            let s,e,f = parse amount
+            if f <= 3
+            then
+                write16 ops (uint16 s, uint16 e)
+            elif f <= 8
+            then
+                if e <= 12
+                then
+                    write32 ops (uint32 s, uint32 e)
+                else
+                    write32 ops (uint32 s * pown 10u (e-12),12u)
+            elif amount < pown 2UL 56
+            then
+                write64 ops amount
+            else
+                write72 ops amount
+        let read = reader {
+            let! first = readNumber1
+            if
+                (first &&& 0x7Euy) = 0x7Cuy                //qNaN
+                || (first &&& 0x7Cuy) = 0x78uy             //Infinity
+            then
+                yield! fail
+            elif (first &&& 0x7Euy) = 0x7Euy
+            then
+                if first >= 0x80uy                          //72 bit
+                then
+                    let! amount = readNumber8
+                    return amount
+                else                                        //64 bit
+                    let! second = readNumber1
+                    let! third = readNumber2
+                    let! fourth = readNumber4
+                    return
+                        (uint64 fourth)
+                        + ((uint64 third) <<< 32)
+                        + ((uint64 second) <<< 48)
+            elif first < 0x80uy                             //16 bit
+            then
+                let! second = readNumber1
+                if (first &&& 0x60uy) = 0x60uy              //non-canonical
+                then
+                    let e = int (first &&& 0x1Fuy)
+                    let s = (uint64 second) + 0x400UL
+                    return s * pown 10UL e
+                else                                        //canonical
+                    let e = int ((first &&& 0x7Cuy) >>> 2)
+                    let s = (uint64 second) + ((uint64 (first &&& 0x03uy)) <<< 8)
+                    return s * pown 10UL e
+            else                                            //32 bit
+                let! second = readNumber1
+                let! lower = readNumber2
+                if (first &&& 0x40uy) = 0uy
+                then
+                    let e = int ((first &&& 0x3Cuy) >>> 2)
+                    let s =
+                        (uint64 lower)
+                        + ((uint64 second) <<< 16)
+                        + ((uint64 (first &&& 0x03uy)) <<< 24)
+                    return s * pown 10UL e
+                else
+                    let e = int ((first &&& 0x1Euy) >>> 1)
+                    let s =
+                        (uint64 lower)
+                        + ((uint64 second) <<< 16)
+                        + ((uint64 (first &&& 0x01uy)) <<< 24)
+                        + 0x4000000UL
+                    return s * pown 10UL e
+        }
+
     module Spend =
         let write ops = fun { asset = asset; amount = amount } ->
             Asset.write ops asset
-            >> ops.writeNumber8 amount
+            >> Amount.write ops amount
         let read = reader {
             let! asset = Asset.read
-            let! amount = readNumber8
+            let! amount = Amount.read
             return { asset = asset; amount = amount }
         }
 
