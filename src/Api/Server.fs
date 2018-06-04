@@ -333,6 +333,17 @@ let handleRequest chain client (request,reply) =
             |> ignore
         | None ->
             reply StatusCode.BadRequest NoContent
+    | Post ("/blockchain/publishtransaction", Some tx) ->
+        match JsonValue.TryParse tx with
+        | Some (JsonValue.String tx) ->
+            match Transaction.fromHex tx with
+            | Some tx ->
+                Blockchain.validateTransaction client tx
+                reply StatusCode.OK NoContent
+            | None ->
+                reply StatusCode.BadRequest NoContent
+        | _ ->
+            reply StatusCode.BadRequest NoContent
     | _ ->
         reply StatusCode.NotFound NoContent
 
