@@ -317,6 +317,22 @@ let handleRequest chain client (request,reply) =
                     |> reply StatusCode.NotFound
                 | Some block ->
                     reply StatusCode.OK (JsonContent <| blockEncoder block)
+
+    | Get ("/blockchain/transaction", query) ->
+        match Map.tryFind "hash" query with
+        | Some hash ->
+            Hash.fromString hash
+            |> Result.bind (Blockchain.getTransaction client >> ofOption "transaction not found")
+            |> Result.map (fun (tx,confirmations) ->
+                let tx = Transaction.toHex tx
+
+                (new TransactionResultJson.Root(tx, confirmations |> int)).JsonValue
+                |> JsonContent
+                |> reply StatusCode.OK)
+            |> Result.mapError (TextContent >> reply StatusCode.NotFound)
+            |> ignore
+        | None ->
+            reply StatusCode.BadRequest NoContent
     | _ ->
         reply StatusCode.NotFound NoContent
 

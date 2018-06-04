@@ -50,6 +50,7 @@ module Blockchain =
         | GetBlockChainInfo
         | GetHeaders
         | GetMempool
+        | GetTransaction of Hash
 
     type Response = unit
 
@@ -102,6 +103,9 @@ module Blockchain =
 
     let getBlock client blockHash =
         Request.send<Request,Block option> client serviceName (GetBlock blockHash)
+
+    let getTransaction client txHash =
+        Request.send<Request,(Transaction*uint32) option> client serviceName (GetTransaction txHash)
 
     let getBlockByNumber client blockNumber =
             Request.send<Request,Block option> client serviceName (GetBlockByNumber blockNumber)

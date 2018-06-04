@@ -8,6 +8,9 @@ open Serialization
 let hash =
     Transaction.serialize WithoutWitness >> Hash.compute
 
+let toHex =
+    Transaction.serialize Full >> FsBech32.Base16.encode
+
 let witnessHash =
     //TODO: only serialize witness
     Transaction.serialize Full >> Hash.compute
