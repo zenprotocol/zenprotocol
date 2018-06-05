@@ -46,7 +46,7 @@ let undoBlock block mempool =
         List.fold (fun (mempool, max) (txHash,tx) -> Map.add txHash (max + 1ul, tx) mempool, max + 1ul) (mempool,max) txs
 
     // insert all transactions in the block to the mempool
-    let mempool',max = List.map (fun tx -> Transaction.hash tx, tx) block.transactions |> addTransactions empty 0ul
+    let mempool',max = List.map (fun tx -> Transaction.hash tx, tx) block.transactions |> List.tail |> addTransactions empty 0ul
 
     let mempool,_ =
         toList mempool
