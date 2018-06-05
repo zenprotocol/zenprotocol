@@ -16,12 +16,12 @@ let private validateCost contract initialTx context sender contractWallet (w:Con
     else
         Ok ()
 
-let private validateState contract witness contractStates =
+let private validateState (contract:Contract.T) witness contractStates =
     let computeCommitment =
         Serialization.Data.serialize
         >> Hash.compute
         
-    match witness.stateCommitment, ContractStates.tryFind contract contractStates with
+    match witness.stateCommitment, ContractStates.tryFind contract.contractId contractStates with
     | NoState, None ->
         Ok None
     | State commitment, Some given when commitment = computeCommitment given ->
@@ -82,11 +82,11 @@ let private validateWitness context acs (contractStates:ContractStates.T) txHash
         let contractStates = 
             match updatedState with
             | stateUpdate.Delete -> 
-                ContractStates.delete contract contractStates
+                ContractStates.delete contract.contractId contractStates
             | stateUpdate.NoChange ->
                 contractStates
             | stateUpdate.Update data ->
-                ContractStates.update contract data contractStates
+                ContractStates.update contract.contractId data contractStates
 
         // check that the output tx is subset of the final tx
         // TODO: once refactoring is completed we can make checkPrefix return unit instead of tx and then use do! instead of let!

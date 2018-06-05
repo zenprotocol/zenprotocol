@@ -17,23 +17,23 @@ let private get getState contract states =
         | Some x -> x
         | None -> getState contract
 
-let tryGetState getState states contract =
-    get getState contract.contractId states
+let tryGetState getState states contractId =
+    get getState contractId states
 
-let tryFind contract states =
-    match Map.tryFind contract.contractId states with
+let tryFind contractId states =
+    match Map.tryFind contractId states with
     | Some value -> value
     | None -> None
 
-let update contract data states =
-    Map.add contract.contractId (Some data) states
+let update contractId data states =
+    Map.add contractId (Some data) states
    
 let undoBlock undoData states =
     List.fold (fun states (contractId, state) ->
         Map.add contractId state states) states undoData
 
-let delete contract states =
-    Map.add contract.contractId None states
+let delete contractId states =
+    Map.add contractId None states
 
 let getUndoData getState afterState beforeState = 
     let get contractId =

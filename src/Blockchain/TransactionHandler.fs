@@ -173,7 +173,7 @@ let executeContract session txSkeleton timestamp contractId command sender messa
                 }
 
             let contractState =
-                ContractStates.tryGetState (getContractState session) contractStates contract
+                ContractStates.tryGetState (getContractState session) contractStates contract.contractId
 
             let stateCommitment = 
                 if commitToState then
@@ -195,11 +195,11 @@ let executeContract session txSkeleton timestamp contractId command sender messa
                     let contractStates, contractState = 
                         match updatedState with
                         | stateUpdate.Delete -> 
-                            ContractStates.delete contract contractStates, None
+                            ContractStates.delete contract.contractId contractStates, None
                         | stateUpdate.NoChange ->
-                            contractStates, ContractStates.tryFind contract contractStates
+                            contractStates, ContractStates.tryFind contract.contractId contractStates
                         | stateUpdate.Update data ->
-                            ContractStates.update contract data contractStates, Some data
+                            ContractStates.update contract.contractId data contractStates, Some data
 
                     let witness = TxSkeleton.getContractWitness contract.contractId command messageBody stateCommitment txSkeleton finalTxSkeleton 0L
                                         
