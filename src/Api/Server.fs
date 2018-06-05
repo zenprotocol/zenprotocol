@@ -14,6 +14,8 @@ open Zen.Crypto
 open Consensus.Crypto
 open Logary.Message
 open Api.Helpers
+open FSharp.Data
+open Hopac.Extensions.Seq
 
 type T =
     {
@@ -321,14 +323,28 @@ let handleRequest chain client (request,reply) =
     | Get ("/blockchain/transaction", query) ->
         match Map.tryFind "hash" query with
         | Some hash ->
+            let hex = (Map.tryFind "hex" query |> Option.defaultValue "false") = "true"
+
             Hash.fromString hash
             |> Result.bind (Blockchain.getTransaction client >> ofOption "transaction not found")
             |> Result.map (fun (tx,confirmations) ->
-                let tx = Transaction.toHex tx
+                let confirmations = "confirmations", (confirmations |> decimal |> JsonValue.Number)
 
-                (new TransactionResultJson.Root(tx, confirmations |> int)).JsonValue
-                |> JsonContent
-                |> reply StatusCode.OK)
+                if hex then
+                    let tx = Transaction.toHex tx
+
+                    [| "tx", JsonValue.String tx; confirmations |]
+                    |> JsonValue.Record
+                    |> JsonContent
+                    |> reply StatusCode.OK
+                else
+                    let tx = transactionEncoder tx
+
+                    [| "tx", tx; confirmations |]
+                    |> JsonValue.Record
+                    |> JsonContent
+                    |> reply StatusCode.OK)
+
             |> Result.mapError (TextContent >> reply StatusCode.NotFound)
             |> ignore
         | None ->
