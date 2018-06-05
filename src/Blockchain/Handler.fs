@@ -7,6 +7,13 @@ open Messaging.Services
 open Messaging.Events
 open Consensus
 open Blockchain
+open Blockchain
+open Blockchain
+open Blockchain
+open Blockchain
+open Blockchain
+open Blockchain
+open Blockchain
 open Blockchain.EffectsWriter
 open Consensus.Types
 open State
@@ -119,6 +126,21 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
             |> Some
             |> requestId.reply<Types.Block option>
         | None -> requestId.reply<Types.Block option> None
+    | GetBlockByNumber blockNumber ->
+        if blockNumber > state.tipState.tip.header.blockNumber || blockNumber = 0ul then
+            requestId.reply<Types.Block option> None
+        else
+            let rec findBlock (header:ExtendedBlockHeader.T) =
+                if header.header.blockNumber = blockNumber then
+                    BlockRepository.getFullBlock session header
+                else
+                    BlockRepository.getHeader session header.header.parent
+                    |> findBlock
+
+            findBlock state.tipState.tip
+            |> Some
+            |> requestId.reply<Types.Block option>
+
     | GetBlockHeader blockHash ->
         match BlockRepository.tryGetHeader session blockHash with
         | Some header ->
@@ -193,6 +215,25 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
             initialBlockDownload = syncing
         }
         |> requestId.reply
+
+    | GetTransaction txHash ->
+        match MemPool.getTransaction txHash state.memoryState.mempool with
+        | Some tx ->
+            Some (tx,0ul)
+            |> requestId.reply<(Transaction*uint32) option>
+        | None ->
+            TransactionRepository.tryGetTransaction session txHash
+            |> Option.bind (fun tx ->
+                TransactionRepository.tryGetTransactionBlock session txHash
+                |> Option.map (fun block -> tx,block))
+            |> function
+            | Some (tx,block) ->
+                let confirmations = (state.tipState.tip.header.blockNumber - block.header.blockNumber) + 1ul
+
+                Some (tx,confirmations)
+                |> requestId.reply<(Transaction*uint32) option>
+            | None ->
+                requestId.reply<(Transaction*uint32) option> None
 
     ret state
 

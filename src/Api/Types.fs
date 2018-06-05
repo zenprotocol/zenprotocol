@@ -201,3 +201,10 @@ type OutpointJson = JsonProvider<"""
     "index": 1234
 }
 """>
+
+type TransactionResultJson = JsonProvider<"""
+{
+    "tx": "abdef",
+    "confirmations": 1
+}
+""">
