@@ -108,7 +108,7 @@ module Blockchain =
         Request.send<Request,(Transaction*uint32) option> client serviceName (GetTransaction txHash)
 
     let getBlockByNumber client blockNumber =
-            Request.send<Request,Block option> client serviceName (GetBlockByNumber blockNumber)
+        Request.send<Request,Block option> client serviceName (GetBlockByNumber blockNumber)
 
     let getTip client =
         Request.send<Request,(Hash*BlockHeader) option> client serviceName GetTip
