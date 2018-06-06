@@ -338,18 +338,15 @@ module Serialization =
             | cHash, subtype when
                 cHash = Hash.zero && subtype = Hash.zero
                 && ((not isAbsentCHash) || (not isAbsentSubtype)) ->
-                printfn "failing: non-canonical zero/zero"
                 yield! fail
             | _, subtype when
                 subtype = Hash.zero
                 && (not isAbsentSubtype) ->
-                printfn "failing: non-canonical zero subtype"
                 yield! fail
             | cHash, (Hash sb as subtype) when
                 cHash <> Hash.zero && subtype <> Hash.zero &&
                 sb.[Hash.Length-2] = 0uy && sb.[Hash.Length-1] = 0uy
                 && (not isCompressedSubtype) ->
-                printfn "failing: non-canonical small subtype %A" sb
                 yield! fail
             | _ ->
                 return Asset (ContractId (version, cHash), subtype)
