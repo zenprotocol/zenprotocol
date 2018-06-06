@@ -41,7 +41,7 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Message.fs" />
-    <Compile Include="MininingActor.fs" />
+    <Compile Include="MiningActor.fs" />
     <Compile Include="Main.fs" />
     <Content Include="Message.xml" />
     <Content Include="paket.references" />

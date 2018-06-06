@@ -1,4 +1,4 @@
-module FSharp.MininingActor
+module Miner.MiningActor
 
 open Consensus
 open Infrastructure
