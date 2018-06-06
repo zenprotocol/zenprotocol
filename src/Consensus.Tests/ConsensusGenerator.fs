@@ -15,6 +15,23 @@ type LeadingZerosHash = LeadingZerosHash of Hash.Hash
 type NonEmptyTransactions = NonEmptyTransactions of list<Transaction> with
     static member op_Explicit(NonEmptyTransactions txs) = txs
 
+type CompressibleSubtype = CompressibleSubtype of Hash.Hash with
+    static member op_Explicit(CompressibleSubtype subtype) = subtype
+
+type SmallVersion = SmallVersion of uint32 with
+    static member op_Explicit(SmallVersion v) = v
+
+type OneByteVersion = OneByteVersion of uint32 with
+    static member op_Explicit(OneByteVersion v) = v
+
+type TwoByteVersion = TwoByteVersion of uint32 with
+    static member op_Explicit(TwoByteVersion v) = v
+
+type ThreeByteVersion = ThreeByteVersion of uint32 with
+    static member op_Explicit(ThreeByteVersion v) = v
+
+type FourByteVersion = FourByteVersion of uint32 with
+    static member op_Explicit(FourByteVersion v) = v
 
 type ConsensusGenerator =
     static member BytesGenerator() =
@@ -186,15 +203,15 @@ type ConsensusGenerator =
                 return Zen.Types.Data.data.Lock a
             }
         Arb.fromGen (Gen.oneof
-        [
-            i64Gen;
-            byteGen; byteArrayGen;
-            u32Gen;
-            u64Gen;
-            stringGen;
-            hashGen;
-            lockGen;
-        ])
+            [
+                i64Gen;
+                byteGen; byteArrayGen;
+                u32Gen;
+                u64Gen;
+                stringGen;
+                hashGen;
+                lockGen;
+            ])
 
     static member Transaction() =
         let outpointGenerator =
@@ -343,72 +360,72 @@ type ConsensusGenerator =
 
 
             return {version = Version0;inputs=inputs;outputs=List.append outputs activationSacrificeOutputs;contract=contract;witnesses=witnesses}
-        })
+            })
 
         static member TxSkeleton() =
-            let pointedOutputGenerator =
-                gen {
-                    let! bytes = Gen.arrayOfLength Hash.Length Arb.generate<byte>
-                    let txHash = Hash.Hash bytes
-                    let! index = Gen.choose (0,10)
-                    let index = uint32 index
+                let pointedOutputGenerator =
+                    gen {
+                        let! bytes = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+                        let txHash = Hash.Hash bytes
+                        let! index = Gen.choose (0,10)
+                        let index = uint32 index
 
-                    let outpoint = {txHash = txHash;index=index;}
+                        let outpoint = {txHash = txHash;index=index;}
 
-                    let notCoinbaseLock =
-                        function
-                        | Coinbase _ -> false
-                        | _ -> true
+                        let notCoinbaseLock =
+                            function
+                            | Coinbase _ -> false
+                            | _ -> true
 
-                    let! lock =
-                        Arb.generate<Lock>
-                        |> Gen.filter notCoinbaseLock
-                        |> Gen.filter (function
-                        | HighVLock (identifier, _) -> identifier > 7u // last reserved identifier
-                        | _ -> true)
-                    let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
-                    let asset = Asset (ContractId (Version0,Hash.Hash asset), Hash.zero)
-                    let! amount = Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
+                        let! lock =
+                            Arb.generate<Lock>
+                            |> Gen.filter notCoinbaseLock
+                            |> Gen.filter (function
+                            | HighVLock (identifier, _) -> identifier > 7u // last reserved identifier
+                            | _ -> true)
+                        let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+                        let asset = Asset (ContractId (Version0,Hash.Hash asset), Hash.zero)
+                        let! amount = Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
 
-                    let output = {lock=lock;spend={asset=asset;amount=amount}}
+                        let output = {lock=lock;spend={asset=asset;amount=amount}}
 
-                    return TxSkeleton.Input.PointedOutput (outpoint, output)
-                }
+                        return TxSkeleton.Input.PointedOutput (outpoint, output)
+                    }
 
-            let mintGenerator =
-                gen {
-                    let! bytes1 = Gen.arrayOfLength Hash.Length Arb.generate<byte>
-                    let! bytes2 = Gen.arrayOfLength Hash.Length Arb.generate<byte>
-                    let asset = Asset (ContractId (Version0,Hash.Hash bytes1), Hash.Hash bytes2)
-                    let! amount = Arb.generate<uint32> |> Gen.filter ((<>) 0ul)
-                    let amount = uint64 amount
+                let mintGenerator =
+                    gen {
+                        let! bytes1 = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+                        let! bytes2 = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+                        let asset = Asset (ContractId (Version0,Hash.Hash bytes1), Hash.Hash bytes2)
+                        let! amount = Arb.generate<uint32> |> Gen.filter ((<>) 0ul)
+                        let amount = uint64 amount
 
-                    return TxSkeleton.Input.Mint { asset=asset; amount=amount }
-                }
+                        return TxSkeleton.Input.Mint { asset=asset; amount=amount }
+                    }
 
-            let outputGenerator =
-                gen {
-                    let! lock =
-                        Arb.generate<Lock>
-                        |> Gen.filter (function
-                        | HighVLock (identifier, _) -> identifier > 7u // last reserved identifier
-                        | _ -> true)
-                    let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
-                    let asset = Asset (ContractId (Version0, Hash.Hash asset), Hash.zero)
-                    let! amount = Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
+                let outputGenerator =
+                    gen {
+                        let! lock =
+                            Arb.generate<Lock>
+                            |> Gen.filter (function
+                            | HighVLock (identifier, _) -> identifier > 7u // last reserved identifier
+                            | _ -> true)
+                        let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+                        let asset = Asset (ContractId (Version0, Hash.Hash asset), Hash.zero)
+                        let! amount = Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
 
-                    return {lock=lock;spend={asset=asset;amount=amount}}
-                }
+                        return {lock=lock;spend={asset=asset;amount=amount}}
+                    }
 
-            let inputGenerator =
-                Gen.oneof [ pointedOutputGenerator; mintGenerator ]
+                let inputGenerator =
+                    Gen.oneof [ pointedOutputGenerator; mintGenerator ]
 
-            Arb.fromGen (gen {
-                let! inputs = Gen.nonEmptyListOf inputGenerator
-                let! outputs = Gen.nonEmptyListOf outputGenerator
+                Arb.fromGen (gen {
+                    let! inputs = Gen.nonEmptyListOf inputGenerator
+                    let! outputs = Gen.nonEmptyListOf outputGenerator
 
-                return ({pInputs=inputs;outputs=outputs} : TxSkeleton.T)
-            })
+                    return ({pInputs=inputs;outputs=outputs} : TxSkeleton.T)
+                })
 
     static member Output() =
         Arb.fromGen (
@@ -443,3 +460,42 @@ type ConsensusGenerator =
                 return (outpoint, output)
             }
         )
+
+    static member CompressibleSubtype() =
+        Gen.resize 29 (Gen.arrayOf Arb.generate<byte>)
+        |> Gen.filter (fun bs -> Array.exists (fun b -> b <> 0uy) bs)
+        |> Gen.map
+            (fun bs ->
+                let res = Array.zeroCreate<byte> 32
+                Array.blit bs 0 res 0 (Array.length bs)
+                CompressibleSubtype (Hash.Hash res))
+        |> Arb.fromGen
+
+    static member SmallVersion() =
+        let shrink n = if n = 0u then Seq.empty else seq {n - 1u .. 0u}
+        Arb.fromGenShrink (Gen.choose(0,31) |> Gen.map uint32, shrink)
+        |> Arb.convert SmallVersion uint32
+
+    static member OneByteVersion() =
+        let shrink n = if n <=32u then Seq.empty else seq {n - 1u .. 32u}
+        Arb.fromGenShrink (Gen.choose(32,(1<<<12)-1) |> Gen.map uint32, shrink)
+        |> Arb.convert OneByteVersion uint32
+
+    static member TwoByteVersion() =
+        let shrink n = if n <=(1u<<<12) then Seq.empty else seq {n - 1u .. 1u<<<12}
+        Arb.fromGenShrink (Gen.choose(1<<<12,(1<<<19)-1) |> Gen.map uint32, shrink)
+        |> Arb.convert TwoByteVersion uint32
+
+    static member ThreeByteVersion() =
+        let shrink n = if n <=(1u<<<19) then Seq.empty else seq {n - 1u .. 1u<<<19}
+        Arb.fromGenShrink (Gen.choose(1<<<19,(1<<<26)-1) |> Gen.map uint32, shrink)
+        |> Arb.convert ThreeByteVersion uint32
+
+    static member FourByteVersion() =
+        let shrink n = if n <=(1u<<<26) then Seq.empty else seq {n - 1u .. 1u<<<26}
+        let generator =
+            Arb.generate<DoNotSize<uint32>>
+            |> Gen.map (fun (DoNotSize i) -> i)
+            |> Gen.filter (fun i -> i >= (1u<<<26))
+        Arb.fromGenShrink (generator, shrink)
+        |> Arb.convert FourByteVersion uint32

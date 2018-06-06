@@ -234,14 +234,125 @@ module Serialization =
         }
 
     module Asset =
-        let write ops = fun (Asset (contractId,subType)) ->
-            ContractId.write ops contractId
-            >> Hash.write ops subType
+        let private writeSubtype ops l = fun sb ->
+            Byte.write ops (byte l)
+            >> FixedSizeBytes.write ops sb
+        let private versionBytes (v:uint32) =
+            if v &&& 0xFFFFFFE0u = 0u
+            then [| byte v |]
+            elif v &&& 0xFFFFF000u = 0u
+            then [| 0x20uy ||| byte (v >>> 7);
+                    0x7Fuy &&& byte v |]
+            elif v &&& 0xFFF80000u = 0u
+            then [| 0x20uy ||| byte (v >>> 14);
+                    0x80uy ||| byte (v >>> 7);
+                    0x7Fuy &&& byte v |]
+            elif v &&& 0xFC000000u = 0u
+            then [| 0x20uy ||| byte (v >>> 21);
+                    0x80uy ||| byte (v >>> 14);
+                    0x80uy ||| byte (v >>> 7);
+                    0x7Fuy &&& byte v |]
+            else [| 0x20uy ||| byte (v >>> 28);
+                    0x80uy ||| byte (v >>> 21);
+                    0x80uy ||| byte (v >>> 14);
+                    0x80uy ||| byte (v >>> 7);
+                    0x7Fuy &&& byte v |]
+
+        let write ops = fun (Asset (ContractId (version, cHash),(Hash sb as subtype))) ->
+            let vbs = versionBytes version
+            if cHash = Hash.zero && subtype = Hash.zero
+            then
+                FixedSizeBytes.write ops vbs
+            else
+                match Array.tryFindIndexBack (fun b -> b <> 0uy) sb with
+                | None ->                               // subtype = Hash.zero
+                    vbs.[0] <- 0x80uy ||| vbs.[0]
+                    FixedSizeBytes.write ops vbs
+                    >> Hash.write ops cHash
+                | Some n when n < 30 ->
+                    vbs.[0] <- 0x40uy ||| vbs.[0]
+                    FixedSizeBytes.write ops vbs
+                    >> Hash.write ops cHash
+                    >> Byte.write ops (byte (n + 1))
+                    >> FixedSizeBytes.write ops sb.[..n]
+                | Some _ ->
+                    vbs.[0] <- 0xC0uy ||| vbs.[0]
+                    FixedSizeBytes.write ops vbs
+                    >> Hash.write ops cHash
+                    >> Hash.write ops subtype
+
+        let rec private readVersion v counter = reader {
+            if counter > 3 || (counter <> 0 && v = 0u) then yield! fail else
+            let! b = Byte.read
+            let nextV = v + (uint32 (b &&& 0x7Fuy))
+            if b &&& 0x80uy = 0uy
+            then return nextV
+            elif nextV >= pown 2u 25 then yield! fail     //will be > 2^32
+            else
+                let! res = readVersion (nextV * 128u) (counter + 1)
+                return res
+        }
+
+        let private readSubtype = reader {
+            let! len = Byte.read
+            if len = 0x00uy then return Hash.zero else
+            let! subtype = FixedSizeBytes.read (int len)
+            let res = Array.zeroCreate<byte> Hash.Length
+            Array.blit subtype 0 res 0 (int len)
+            return Hash res
+        }
 
         let read = reader {
-            let! contractId = ContractId.read
-            let! subType = Hash.read
-            return Asset (contractId, subType)
+            let! first = Byte.read
+            let! version =
+                let v = (uint32 (first &&& 0x1Fuy))
+                if (first &&& 0x20uy) = 0uy
+                then
+                    reader { return v }
+                else
+                    readVersion (v*128u) 0
+            let! cHash, isAbsentCHash =
+                if (first &&& 0xC0uy) = 0uy
+                then
+                    reader { return (Hash.zero, true) }
+                else
+                    reader {
+                        let! h = Hash.read
+                        return (h,false)
+                    }
+            let! subtype, isAbsentSubtype, isCompressedSubtype =
+                match (first &&& 0xC0uy) with
+                | 0x0uy | 0x80uy ->
+                    reader { return Hash.zero, true, false }
+                | 0xC0uy ->
+                    reader {
+                        let! h = Hash.read
+                        return (h,false,false)
+                    }
+                | _ ->
+                    reader {
+                        let! h = readSubtype
+                        return (h,false,true)
+                    }
+            match cHash, subtype with
+            | cHash, subtype when
+                cHash = Hash.zero && subtype = Hash.zero
+                && ((not isAbsentCHash) || (not isAbsentSubtype)) ->
+                printfn "failing: non-canonical zero/zero"
+                yield! fail
+            | _, subtype when
+                subtype = Hash.zero
+                && (not isAbsentSubtype) ->
+                printfn "failing: non-canonical zero subtype"
+                yield! fail
+            | cHash, (Hash sb as subtype) when
+                cHash <> Hash.zero && subtype <> Hash.zero &&
+                sb.[Hash.Length-2] = 0uy && sb.[Hash.Length-1] = 0uy
+                && (not isCompressedSubtype) ->
+                printfn "failing: non-canonical small subtype %A" sb
+                yield! fail
+            | _ ->
+                return Asset (ContractId (version, cHash), subtype)
         }
 
     module Amount =
