@@ -50,7 +50,6 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="ContractAssetTests.fs" />
-    <Compile Include="TestWallet.fs" />
     <Compile Include="Helper.fs" />
     <Compile Include="SignedWitnessTests.fs" />
     <Compile Include="StepDefinitions.fs" />

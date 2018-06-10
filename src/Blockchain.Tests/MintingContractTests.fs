@@ -52,7 +52,7 @@ let shouldBeErrorMessage message =
     | Error err -> err |> should equal message
 
 let activateContract code account session state =
-    TestWallet.createActivateContractTransaction chain code 1ul account
+    Account.createActivateContractTransaction chain code 1ul account
     |> Result.map (fun tx ->
         let events, state =
             Handler.handleCommand chain (ValidateTransaction tx) session 1UL state

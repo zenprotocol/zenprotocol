@@ -163,7 +163,7 @@ let ``block timestamp too early``() =
     let rootAccount = createTestAccount()
     let account1, _ = create()
     let tx =
-        TestWallet.createTransaction (publicKeyHash account1) {asset=Asset.Zen;amount=1UL} rootAccount
+        Account.createTransaction (publicKeyHash account1) {asset=Asset.Zen;amount=1UL} rootAccount
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
 
     let acs = ActiveContractSet.empty
@@ -186,7 +186,7 @@ let ``block timestamp in the future``() =
     let rootAccount = createTestAccount()
     let account1, _ = create()
     let tx =
-        TestWallet.createTransaction (publicKeyHash account1) {asset=Asset.Zen;amount=1UL} rootAccount
+        Account.createTransaction (publicKeyHash account1) {asset=Asset.Zen;amount=1UL} rootAccount
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
 
     let acs = ActiveContractSet.empty
@@ -205,7 +205,7 @@ let ``block with mismatch commitments fail connecting``() =
     let rootAccount = createTestAccount()
     let account1, _ = create()
     let tx =
-        TestWallet.createTransaction (publicKeyHash account1) { asset = Asset.Zen; amount = 1UL } rootAccount
+        Account.createTransaction (publicKeyHash account1) { asset = Asset.Zen; amount = 1UL } rootAccount
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
 
     let acs = ActiveContractSet.empty
@@ -226,7 +226,7 @@ let ``can connect valid block``() =
     let rootAccount = createTestAccount()
     let account1, _ = create()
     let tx =
-        TestWallet.createTransaction (publicKeyHash account1) { asset = Asset.Zen; amount = 1UL } rootAccount
+        Account.createTransaction (publicKeyHash account1) { asset = Asset.Zen; amount = 1UL } rootAccount
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
 
     let acs = ActiveContractSet.empty
@@ -259,7 +259,7 @@ let ``can connect block with coinbase only``() =
 let ``can connect block with a contract``() =
     let rootAccount = createTestAccount()
     let tx =
-        TestWallet.createActivationTransactionFromContract chain sampleContractWithId 1000ul rootAccount
+        Account.createActivationTransactionFromContract chain sampleContractWithId 1000ul rootAccount
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
 
     let contract : Contract.T =
@@ -285,9 +285,9 @@ let ``can connect block with a contract``() =
 let ``block with invalid contract failed connecting``() =
     let rootAccount = createTestAccount() |> fst
 
-    let outpoint = TestWallet.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
+    let outpoint = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
     let output =
-        let output = TestWallet.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
+        let output = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
         {output with lock=ActivationSacrifice}
 
     let tx =
@@ -614,10 +614,10 @@ let ``block spending mature transaction is valid``() =
         }
     let originHash = Transaction.hash origin
 
-    let rootAccount = TestWallet.addTransaction originHash origin rootAccount
+    let rootAccount = Account.addTransaction originHash origin rootAccount
 
     let tx =
-        TestWallet.createTransaction (publicKeyHash account1) { asset = Asset.Zen; amount = 1UL } (rootAccount, rootExtendedKey)
+        Account.createTransaction (publicKeyHash account1) { asset = Asset.Zen; amount = 1UL } (rootAccount, rootExtendedKey)
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
 
 
@@ -647,10 +647,10 @@ let ``block spending unmature transaction is invalid``() =
         }
     let originHash = Transaction.hash origin
 
-    let rootAccount = TestWallet.addTransaction originHash origin rootAccount
+    let rootAccount = Account.addTransaction originHash origin rootAccount
 
     let tx =
-        TestWallet.createTransaction (publicKeyHash account1) { asset = Asset.Zen; amount = 1UL } (rootAccount, rootExtendedKey)
+        Account.createTransaction (publicKeyHash account1) { asset = Asset.Zen; amount = 1UL } (rootAccount, rootExtendedKey)
         |> (fun x -> match x with | Ok x -> x | _ -> failwith "failed transaction generation")
 
 
@@ -704,7 +704,7 @@ let ``Overweight block should be rejected``() =
         cost = System.UInt32.MaxValue       // Weight >>> max block weight
         }
     let tx1 =
-        TestWallet.createTransactionFromLock cLock { asset = Asset.Zen; amount = 1UL } rootAccount
+        Account.createTransactionFromLock cLock { asset = Asset.Zen; amount = 1UL } rootAccount
         |> (function | Ok x -> x | _ -> failwith "failed transaction generation")
 
     // find the exact output

@@ -101,9 +101,13 @@ type TransactionsResponseJson = JsonProvider<"""
 [
     {
         "txHash": "hash",
-        "asset":"asset",
-        "amount":2147483453648,
-        "confirmations": 0
+        "deltas": [
+            {
+                "asset": "asset",
+                "amount": -2147483453648
+            }
+        ],
+        "blockNumber": 342347423
     }
 ]
 """>
@@ -139,6 +143,13 @@ type SignJson = JsonProvider<"""
 type CheckPasswordJson = JsonProvider<"""
 {
     "password": "secret"
+}
+""">
+
+type TransactionsRequestJson = JsonProvider<"""
+{
+    "skip": 1000,
+    "take": 1000
 }
 """>
 
@@ -191,29 +202,9 @@ type OutpointJson = JsonProvider<"""
 }
 """>
 
-type ImportAddressResultJson = JsonProvider<"""
+type TransactionResultJson = JsonProvider<"""
 {
-    "address":"address",
-    "index":1234
-}""">
-
-type ReceivedByAddressJson = JsonProvider<"""
-{
-    "address":"address",
-    "asset":"asset",
-    "amount":1234567890000
-}
-""">
-
-type AddressOutputJson = JsonProvider<"""
-{
-    "outpoint":{
-        "txHash":"abbbb",
-        "index": 0
-    },
-    "asset":"abcd",
-    "amount":1234567890000,
-    "confirmations":0,
-    "spent":true
+    "tx": "abdef",
+    "confirmations": 1
 }
 """>

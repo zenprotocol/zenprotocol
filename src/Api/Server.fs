@@ -14,8 +14,6 @@ open Zen.Crypto
 open Consensus.Crypto
 open Logary.Message
 open Api.Helpers
-open FSharp.Data
-open Hopac.Extensions.Seq
 
 type T =
     {
@@ -27,15 +25,6 @@ type T =
         member x.Dispose() =
             (x.client :> System.IDisposable).Dispose()
             (x.agent :> System.IDisposable).Dispose()
-
-let parseConfirmations query reply get =
-    match Map.tryFind "confirmations" query with
-    | None -> get 0ul
-    | Some confirmations ->
-        match System.UInt32.TryParse confirmations with
-        | true, confirmations -> get confirmations
-        | _ -> reply StatusCode.BadRequest (TextContent "invalid confirmations")
-
 
 let handleRequest chain client (request,reply) =
     let replyError error =
@@ -214,18 +203,21 @@ let handleRequest chain client (request,reply) =
             |> validateTx
         | Error error ->
             replyError error
-    | Get ("/wallet/transactions", query) ->
-        match parseTransactionsRequestJson query with
+    | Post ("/wallet/transactions", Some body) ->
+        match parseTransactionsRequestJson body with
         | Ok (skip, take) ->
             match Wallet.getTransactions client skip take with
             | Ok txs ->
                 let json =
                     txs
-                    |> List.map (fun (txHash,direction, spend, confirmations) ->
-                        let amount = if direction = TransactionDirection.In then spend.amount |> int64 else spend.amount |> int64 |> (*) -1L
-
-                        (new TransactionsResponseJson.Root(Hash.toString txHash, Asset.toString spend.asset, amount, int confirmations)).JsonValue)
                     |> List.toArray
+                    |> Array.map (fun (txHash, amounts, blockNumer) ->
+                        let deltas =
+                            amounts
+                            |> Map.toArray
+                            |> Array.map (fun (asset, amount) ->
+                                new TransactionsResponseJson.Delta(Asset.toString asset, amount))
+                        (new TransactionsResponseJson.Root(Hash.toString txHash, deltas, int blockNumer)).JsonValue)
                     |> JsonValue.Array
                 (new TransactionsResponseJson.Root(json)).JsonValue
                 |> JsonContent
@@ -329,28 +321,14 @@ let handleRequest chain client (request,reply) =
     | Get ("/blockchain/transaction", query) ->
         match Map.tryFind "hash" query with
         | Some hash ->
-            let hex = (Map.tryFind "hex" query |> Option.defaultValue "false") = "true"
-
             Hash.fromString hash
             |> Result.bind (Blockchain.getTransaction client >> ofOption "transaction not found")
             |> Result.map (fun (tx,confirmations) ->
-                let confirmations = "confirmations", (confirmations |> decimal |> JsonValue.Number)
+                let tx = Transaction.toHex tx
 
-                if hex then
-                    let tx = Transaction.toHex tx
-
-                    [| "tx", JsonValue.String tx; confirmations |]
-                    |> JsonValue.Record
-                    |> JsonContent
-                    |> reply StatusCode.OK
-                else
-                    let tx = transactionEncoder tx
-
-                    [| "tx", tx; confirmations |]
-                    |> JsonValue.Record
-                    |> JsonContent
-                    |> reply StatusCode.OK)
-
+                (new TransactionResultJson.Root(tx, confirmations |> int)).JsonValue
+                |> JsonContent
+                |> reply StatusCode.OK)
             |> Result.mapError (TextContent >> reply StatusCode.NotFound)
             |> ignore
         | None ->
@@ -366,69 +344,6 @@ let handleRequest chain client (request,reply) =
                 reply StatusCode.BadRequest NoContent
         | _ ->
             reply StatusCode.BadRequest NoContent
-    | Post ("/wallet/importwatchonlyaddress", Some address) ->
-        match JsonValue.TryParse address with
-        | Some (JsonValue.String address) ->
-            match Wallet.importWatchOnlyAddress client address with
-            | Ok () -> reply StatusCode.OK NoContent
-            | Error error -> reply StatusCode.BadRequest (TextContent error)
-        | _ -> reply StatusCode.BadRequest NoContent
-    | Post ("/wallet/getnewaddress", _) ->
-        match Wallet.getNewAddress client with
-        | Ok (address,index) ->
-            (new ImportAddressResultJson.Root(address,index)).JsonValue
-            |> JsonContent
-            |> reply StatusCode.OK
-        | Error error -> reply StatusCode.BadRequest (TextContent error)
-    | Get ("/wallet/receivedbyaddress", query) ->
-        let get confirmations =
-            match Wallet.getReceivedByAddress client confirmations with
-            | Ok received ->
-                Map.toSeq received
-                |> Seq.map (fun ((address,asset),amount) -> (new ReceivedByAddressJson.Root(address, Asset.toString asset, int64 amount)).JsonValue)
-                |> Seq.toArray
-                |> JsonValue.Array
-                |> JsonContent
-                |> reply StatusCode.OK
-            | Error error -> reply StatusCode.BadRequest (TextContent error)
-
-        parseConfirmations query reply get
-
-    | Get ("/wallet/addressoutputs",query) ->
-        match Map.tryFind "address" query with
-        | Some address ->
-            match Wallet.getAddressOutputs client address with
-            | Ok outputs ->
-                outputs
-                |> List.map (fun ((outpoint:Types.Outpoint),(spend:Types.Spend),confirmations,spent) ->
-                    new AddressOutputJson.Root(new AddressOutputJson.Outpoint(Hash.toString outpoint.txHash, outpoint.index |> int32),
-                        Asset.toString spend.asset, spend.amount |> int64, int confirmations,spent))
-                |> List.map (fun json -> json.JsonValue)
-                |> List.toArray
-                |> JsonValue.Array
-                |> JsonContent
-                |> reply StatusCode.OK
-            | Error error -> reply StatusCode.BadRequest (TextContent error)
-        | _ -> reply StatusCode.BadRequest (TextContent "address is missing")
-    | Get("/wallet/addressbalance", query) ->
-        let get confirmations =
-            match Map.tryFind "address" query with
-            | Some address ->
-                match Wallet.getAddressBalance client address confirmations with
-                | Ok balances ->
-                    balances
-                    |> Map.toSeq
-                    |> Seq.map (fun (asset,amount) -> new SpendJson.Root(Asset.toString asset, int64 amount))
-                    |> Seq.map (fun json -> json.JsonValue)
-                    |> Seq.toArray
-                    |> JsonValue.Array
-                    |> JsonContent
-                    |> reply StatusCode.OK
-                | Error error -> reply StatusCode.BadRequest (TextContent error)
-            | _ -> reply StatusCode.BadRequest (TextContent "address is missing")
-
-
-        parseConfirmations query reply get
     | _ ->
         reply StatusCode.NotFound NoContent
 

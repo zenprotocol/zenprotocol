@@ -3,7 +3,7 @@ module Consensus.Tests.Helper
 open Consensus
 open Crypto
 open Wallet
-open TestWallet
+open Wallet.Account
 open Infrastructure
 open Consensus.Types
 
@@ -11,7 +11,7 @@ let rootMnemonicPhrase = "feel muffin volcano click mercy abuse bachelor ginger 
 
 let rootExtendedKey = ExtendedKey.fromMnemonicPhrase rootMnemonicPhrase |> Result.get
 
-let rootPublicKey = TestWallet.deriveZenKey rootExtendedKey |> Result.get |> ExtendedKey.getPublicKey |> Result.get
+let rootPublicKey = Account.deriveZenKey rootExtendedKey |> Result.get |> ExtendedKey.getPublicKey |> Result.get
 
 let rootPKHash = PublicKey.hash rootPublicKey
 
@@ -23,7 +23,7 @@ let create() =
     rng.GetBytes (seed)
 
     let extendedKey = ExtendedKey.create seed |> Result.get
-    let zenKey = TestWallet.deriveZenKey extendedKey |> Result.get
+    let zenKey = Account.deriveZenKey extendedKey |> Result.get
 
     {
         deltas = List.empty
@@ -71,8 +71,8 @@ let createTestAccount () =
 let publicKeyHash account =
     PublicKey.hash account.publicKey
 
-let getSecretKey extendedKey = TestWallet.deriveZenKey extendedKey |> Result.get |> ExtendedKey.getPrivateKey |> Result.get
+let getSecretKey extendedKey = Account.deriveZenKey extendedKey |> Result.get |> ExtendedKey.getPrivateKey |> Result.get
 
 let rootKeyPair =
-    (TestWallet.deriveZenKey rootExtendedKey |> Result.get |> ExtendedKey.getPrivateKey |> Result.get, rootPublicKey)
+    (Account.deriveZenKey rootExtendedKey |> Result.get |> ExtendedKey.getPrivateKey |> Result.get, rootPublicKey)
 

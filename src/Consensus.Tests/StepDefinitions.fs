@@ -20,7 +20,7 @@ let contractPath =
     System.IO.Path.Combine
         [| System.IO.Path.GetTempPath(); System.IO.Path.GetRandomFileName() |]
 
-[<Binding>]
+[<Binding>] 
 module Binding =
     open Consensus
     open Consensus.Crypto
@@ -43,14 +43,14 @@ module Binding =
     let mutable cache = {
         contracts = Map.empty
     }
-
+    
     let mutable state = {
         keys = Map.empty
         txs = Map.empty
         utxoset = Map.empty
         data = Map.empty
     }
-
+    
     let split (value:string) =
         value.Split [|','|]
         |> Array.toList
@@ -70,7 +70,7 @@ module Binding =
 
     let getAsset value =
         if value = "Zen" then Asset.Zen
-        else
+        else 
             match tryFindContract value with
             | Some contract ->
                 let contractId = Contract.makeContractId Version0 contract.code
@@ -103,32 +103,32 @@ module Binding =
         | Some contract ->
             contract
         | None ->
-            let activateContract contract =
+            let activateContract contract = 
                 let compile code = result {
                     let! hints = Contract.recordHints code
                     let! queries = Infrastructure.ZFStar.totalQueries hints
-
+                
                     let contract = {
                         code = code
                         hints = hints
                         rlimit = rlimit
                         queries = queries
                     }
-
-                    return!
+                
+                    return! 
                         Contract.compile contractPath contract
                         |> Result.bind (Contract.load contractPath 100ul code)
                 }
-
+        
                 let path = System.IO.Path.GetDirectoryName (System.Reflection.Assembly.GetExecutingAssembly().Location)
                 let path = System.IO.Path.Combine (path, "Contracts")
                 let contract = System.IO.Path.ChangeExtension (contract,".fst")
-
+                
                 System.IO.Path.Combine (path, contract)
                 |> System.IO.File.ReadAllText
                 |> compile
                 |> Infrastructure.Result.get
-
+        
             let contract = activateContract contractLabel
             cache <- { cache with contracts = Map.add contractLabel contract cache.contracts }
             contract
@@ -151,8 +151,8 @@ module Binding =
         match dataType with
         | "string" ->
             value.Trim('"')
-            |> fsToFstString
-            |> Zen.Types.Data.String
+            |> fsToFstString  
+            |> Zen.Types.Data.String 
         | "i64" ->
             Int64.Parse value
             |> Zen.Types.Data.I64
@@ -167,7 +167,7 @@ module Binding =
 
     let getDataCollection collectionType dataType =
         split
-        >> List.map (fun value ->
+        >> List.map (fun value -> 
             match tryFindData value with
             | Some data -> data
             | None -> getData dataType value)
@@ -178,10 +178,10 @@ module Binding =
         >> Zen.Types.Data.Collection
 
     let getLock label =
-        match tryFindContract label with
+        match tryFindContract label with 
         | Some contract ->
             Contract.makeContractId Version0 contract.code
-            |> Lock.Contract
+            |> Lock.Contract 
         | None ->
             initKey label
             |> snd
@@ -194,11 +194,11 @@ module Binding =
     }
 
     let getSender sender =
-        if sender = "anonymous" then
+        if sender = "anonymous" then 
             Zen.Types.Main.Anonymous
         else
             match tryFindContract sender with
-            | Some contract ->
+            | Some contract -> 
                 Contract.makeContractId Version0 contract.code
                 |> Consensus.Types.ContractSender
             | None ->
@@ -206,7 +206,7 @@ module Binding =
                 |> snd
                 |> Consensus.Types.PKSender
 
-    let [<BeforeScenario>] SetupScenario () =
+    let [<BeforeScenario>] SetupScenario () = 
         state <- {
             keys = Map.empty
             txs = Map.empty
@@ -250,7 +250,7 @@ module Binding =
     let executeContract contractLabel inputTxLabel outputTxLabel command sender data =
         let contract = initContract contractLabel
         let tx = initTx inputTxLabel
-        let outputs =
+        let outputs = 
             tx.inputs
             |> UtxoSet.tryGetOutputs (state.utxoset.TryFind >> Option.get) state.utxoset
             |> Option.get
@@ -269,7 +269,7 @@ module Binding =
                         | _ -> None
                     )
 
-                let contractContext =
+                let contractContext = 
                     { blockNumber=1u; timestamp=1UL }
 
                 Contract.run contract txSkeleton contractContext command sender data contractWallet
@@ -278,17 +278,17 @@ module Binding =
                     TxSkeleton.checkPrefix txSkeleton tx
                     |> Result.bind (fun finalTxSkeleton ->
                         let witness = TxSkeleton.getContractWitness contract.contractId command data txSkeleton finalTxSkeleton 0L
-
+    
                         // To commit to the cost we need the real contract wallet
                         let contractWallet = Contract.getContractWallet tx witness
                         let cost = Contract.getCost contract txSkeleton contractContext command sender data contractWallet
                         let totalCost = cost + totalCost
-
+    
                         // We can now commit to the cost, so lets alter it with the real cost
                         let witness = {witness with cost = uint32 cost}
-
+    
                         let witnesses = Infrastructure.List.add (ContractWitness witness) witnesses
-
+    
                         match message with
                         | Some {contractId=contractId; command=command; data=data} ->
                             run finalTxSkeleton contractId command (ContractSender contract.contractId) data witnesses totalCost
@@ -299,10 +299,10 @@ module Binding =
             | _ -> Error "Contract not active"
 
         let contractId = Contract.makeContractId Version0 contract.code
-
+        
         run inputTx contractId command sender data [] 0L
         |> Result.mapError failwith
-        <@> (fun (finalTxSkeleton, witnesses) ->
+        <@> (fun (finalTxSkeleton, witnesses) -> 
             Transaction.fromTxSkeleton finalTxSkeleton
             |> Transaction.addWitnesses witnesses)
         <@> updateTx outputTxLabel
@@ -317,7 +317,7 @@ module Binding =
         let mutable command = String.Empty
         let mutable data = None
         let mutable sender = Zen.Types.Main.Anonymous
-
+        
         for row in table.Rows do
             let value = row.Item(1)
             match row.Item(0) with
@@ -328,13 +328,13 @@ module Binding =
                                 | _ -> failwithf "cannot resolve data: %A" value
             | "ReturnAddress" ->
                 let _, publicKey = initKey value
-                match TestWallet.addReturnAddressToData publicKey data with
+                match Account.addReturnAddressToData publicKey data with
                 | Ok data' -> data <- data'
                 | Error error -> failwithf "error initializing data with return address: %A" error
             | other -> failwithf "unexpected execute option %A" other
 
         executeContract contractLabel inputTxLabel outputTxLabel command sender data
-
+        
     // Adding a single output
     let [<Given>] ``(.*) locks (.*) (.*) to (.*)`` txLabel amount asset keyLabel =
         let output = getOutput amount asset keyLabel
@@ -342,7 +342,7 @@ module Binding =
         { tx with outputs = Infrastructure.List.add output tx.outputs }
         |> updateTx txLabel
         |> ignore
-
+        
     let addInput txLabel refTxLabel index =
         let refTx = findTx refTxLabel
         let outpoint = Outpoint { txHash = Transaction.hash refTx; index = index }
@@ -373,7 +373,7 @@ module Binding =
     let [<Given>] ``(.*) is (?:a|an) (.*) of (.*)`` dataLabel dataType value =
         constructData dataType value
         |> initData dataLabel
-
+        
     // Defines a data dictionaty
     let [<Given>] ``(.*) is a dictionary of`` dataLabel (table: Table) =
         let mutable map = Map.empty
@@ -392,9 +392,9 @@ module Binding =
             map <- Map.add (fsToFstString key) data map
 
         (map, Map.count map |> uint32)
-        |> Zen.Types.Data.Dict
+        |> Zen.Types.Data.Dict 
         |> Zen.Types.Data.Collection
-        |> initData dataLabel
+        |> initData dataLabel 
 
     // Signes a tx
     let [<When>] ``(.*) is signed with (.*)`` txLabel keyLabels =
@@ -416,8 +416,8 @@ module Binding =
             | Some output -> output
             | None -> failwithf "Missing UTXO: %A" outpoint
 
-        let acs =
-            Map.fold (fun acs _ (contract:Contract.T) ->
+        let acs = 
+            Map.fold (fun acs _ (contract:Contract.T) -> 
                 let contractId = Contract.makeContractId Version0 contract.code
                 ActiveContractSet.add contractId contract acs
             ) ActiveContractSet.empty cache.contracts
@@ -435,13 +435,13 @@ module Binding =
             tx with
         | Ok _ -> ()
         | Error e -> failwithf "Validation result: %A" e
-
+        
     //Checks that a tx is locking an asset to an address or a contract
     let [<Then>] ``(.*) should lock (.*) (.*) to (.*)`` txLabel (amount:uint64) asset keyLabel =
         let tx = findTx txLabel
         let asset = getAsset asset
 
-        Assert.AreEqual (amount, List.fold (fun state { lock = lock; spend = spend } ->
+        Assert.AreEqual (amount, List.fold (fun state { lock = lock; spend = spend } -> 
             if lock = getLock keyLabel && spend.asset = asset then
                 state + spend.amount
             else

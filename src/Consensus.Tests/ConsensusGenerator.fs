@@ -338,8 +338,8 @@ type ConsensusGenerator =
             }
 
         Arb.fromGen (gen {
-            let checkMintsOnly =
-                List.forall (function | Mint _ -> true | _ -> false)
+            let checkMintsOnly = 
+                List.forall (function | Mint _ -> true | _ -> false) 
                 >> not
 
             let! inputs = Gen.nonEmptyListOf inputGenerator |> Gen.filter checkMintsOnly

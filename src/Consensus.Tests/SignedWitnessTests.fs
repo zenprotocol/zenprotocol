@@ -73,7 +73,7 @@ let setup () =
         {
             code=code;
             hints=hints;
-            rlimit = TestWallet.rlimit;
+            rlimit = Account.rlimit;
             queries = ZFStar.totalQueries hints |> Result.get
         }
     let contract =

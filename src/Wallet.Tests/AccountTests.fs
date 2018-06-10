@@ -3,46 +3,18 @@
 open NUnit.Framework
 open FsUnit
 open Consensus
-open Consensus.Types
 open Chain
-
+open Types
 open Wallet
 open TestsInfrastructure.Constraints
 open Consensus.Tests.Helper
 open Infrastructure
-open Messaging.Services.Wallet
 
 let chain = Chain.Local
 let chainParams = Chain.localParameters
 
-let ema = EMA.create chainParams
-
-let databaseContext = DataAccess.createContext "test"
-let dataAccess = DataAccess.init databaseContext
-let password = "1234"
-
-let mnemonicPhrase = ["one";"one";"one";"one";"one";"one";"one";"one";"one";"one";"one";"one"]
-
-let privateKey =
-    (String.concat " " mnemonicPhrase)
-    |> ExtendedKey.fromMnemonicPhrase
-    |> Result.get
-
-// Initialize the wallet and get the public key
-let accountPKHash =
-    use session = DataAccess.DatabaseContext.createSession databaseContext
-
-    Account.import dataAccess session ["one";"one";"one";"one";"one";"one";"one";"one";"one";"one";"one";"one"] password Hash.zero 0ul
-    |> Result.get
-
-    let pkHash = Account.getPKHash dataAccess session
-
-    DataAccess.Session.commit session
-
-    pkHash
-
-let balanceShouldBe session asset expected view =
-    let balance = Account.getBalance dataAccess session view 0ul
+let balanceShouldBe asset expected account =
+    let balance = Account.getBalance account
 
     let actual =
         match Map.tryFind asset balance with
@@ -53,83 +25,50 @@ let balanceShouldBe session asset expected view =
 
 let anotherAsset = Asset (ContractId (Version0,Hash.compute "anotherasset"B), Hash.compute "anotherasset"B)
 
-let fundAccount session =
-    let output = {lock = PK accountPKHash; spend={asset=Asset.Zen;amount=10000000UL}}
-
-    let tx = {version=Version0;inputs=[];outputs=[output];witnesses=[];contract=None}
-    View.addMempoolTransaction dataAccess session (Transaction.hash tx) tx View.empty
-
 [<Test>]
-let ``received tokens - mempool``() =
-    use session = DataAccess.DatabaseContext.createSession databaseContext
+let ``received tokens``() =
+    let account, _ = create()
 
-    let output = {lock = PK accountPKHash; spend={asset=Asset.Zen;amount=10UL}}
+    let output = {lock = PK (publicKeyHash account); spend={asset=Asset.Zen;amount=10UL}}
 
     let tx = {version=Version0;inputs=[];outputs=[output];witnesses=[];contract=None}
 
-    let view' = View.addMempoolTransaction dataAccess session (Transaction.hash tx) tx View.empty
+    let account' = Account.addTransaction (Transaction.hash tx) tx account
 
-    view' |> balanceShouldBe session Asset.Zen 10UL
-
-[<Test>]
-let ``received tokens - block``() =
-    use session = DataAccess.DatabaseContext.createSession databaseContext
-
-    let output = {lock = PK accountPKHash; spend={asset=Asset.Zen;amount=10UL}}
-
-    let tx = {version=Version0;inputs=[];outputs=[output];witnesses=[];contract=None}
-
-    let block = Block.createTemplate chainParams Block.genesisParent 1UL ema ActiveContractSet.empty [tx] Hash.zero
-
-    Account.addBlock dataAccess session (Block.hash block.header) block
-
-    balanceShouldBe session Asset.Zen 10UL View.empty
+    account' |> balanceShouldBe Asset.Zen 10UL
 
 [<Test>]
-let ``tokens spent - mempool``() =
-    use session = DataAccess.DatabaseContext.createSession databaseContext
+let ``tokens spent``() =
+    let account, _ = create()
 
-    let output = {lock = PK accountPKHash; spend={asset=Asset.Zen;amount=10UL}}
-
-    let tx = {version=Version0;inputs=[];outputs=[output;output];witnesses=[];contract=None}
-    let txHash = (Transaction.hash tx)
-
-    let view = View.addMempoolTransaction dataAccess session txHash tx View.empty
-
-    let tx' = {version=Version0;inputs=[ Outpoint {txHash=txHash; index=0ul}];outputs=[];witnesses=[];contract=None}
-
-    let view' = View.addMempoolTransaction dataAccess session  (Transaction.hash tx') tx' view
-
-    balanceShouldBe session Asset.Zen 10UL view'
-
-[<Test>]
-let ``tokens spent - block``() =
-    use session = DataAccess.DatabaseContext.createSession databaseContext
-
-    let output = {lock = PK accountPKHash; spend={asset=Asset.Zen;amount=10UL}}
+    let output = {lock = PK (publicKeyHash account); spend={asset=Asset.Zen;amount=10UL}}
 
     let tx = {version=Version0;inputs=[];outputs=[output;output];witnesses=[];contract=None}
     let txHash = (Transaction.hash tx)
 
     let tx' = {version=Version0;inputs=[ Outpoint {txHash=txHash; index=0ul}];outputs=[];witnesses=[];contract=None}
 
-    let block = Block.createTemplate chainParams Block.genesisParent 1UL ema ActiveContractSet.empty [tx;tx'] Hash.zero
-    Account.addBlock dataAccess session (Block.hash block.header) block
+    let account' =
+        Account.addTransaction txHash tx account
 
-    balanceShouldBe session Asset.Zen 10UL View.empty
+    let account'' =
+        Account.addTransaction (Transaction.hash tx') tx' account'
 
+    account' |> balanceShouldBe Asset.Zen 20UL
+    account'' |> balanceShouldBe Asset.Zen 10UL
 
 [<Test>]
 let ``creating, not enough tokens``() =
-    use session = DataAccess.DatabaseContext.createSession databaseContext
+    let accountData = create()
+    let account, _ = accountData
 
-    let output = {lock = PK accountPKHash; spend={asset=Asset.Zen;amount=10UL}}
+    let output = {lock = PK (publicKeyHash account); spend={asset=Asset.Zen;amount=10UL}}
 
     let tx = {version=Version0;inputs=[];outputs=[output];witnesses=[];contract=None}
 
-    let view = View.addMempoolTransaction dataAccess session (Transaction.hash tx) tx View.empty
+    let account' = Account.addTransaction (Transaction.hash tx) tx account
 
-    let result = TransactionCreator.createTransaction dataAccess session view password (PK Hash.zero) { asset = Asset.Zen; amount = 11UL }
+    let result = Account.createTransaction (publicKeyHash account) { asset = Asset.Zen; amount = 11UL } accountData
 
     let expected:Result<Transaction,string> = Error "Not enough tokens"
 
@@ -137,108 +76,107 @@ let ``creating, not enough tokens``() =
 
 [<Test>]
 let ``creating, no change``() =
-    use session = DataAccess.DatabaseContext.createSession databaseContext
-
-    let lockToBob = Account.getNewPKHash dataAccess session |> Result.get |> fst |> PK
-    let lockToAlice = Hash.zero  |> PK
+    let bob, bobKey = create()
+    let alice, _ = create()
 
     // giving some money to bob
-    let output = {lock = lockToBob; spend={asset=Asset.Zen;amount=10UL}}
+    let output = {lock = PK (publicKeyHash bob); spend={asset=Asset.Zen;amount=10UL}}
     let tx = {version=Version0;inputs=[];outputs=[output];witnesses=[];contract=None}
-    let bob = View.addMempoolTransaction dataAccess session (Transaction.hash tx) tx View.empty
+    let bob' = Account.addTransaction (Transaction.hash tx) tx bob
 
     // sending money to alice
-    let result = TransactionCreator.createTransaction dataAccess session bob password lockToAlice { asset = Asset.Zen; amount = 10UL }
+    let result = Account.createTransaction (publicKeyHash alice) { asset = Asset.Zen; amount = 10UL } (bob', bobKey)
 
     match result with
     | Error x -> failwithf "expected transaction %s" x
     | Ok tx ->
-        let bob = View.addMempoolTransaction dataAccess session (Transaction.hash tx) tx bob
+        let alice' = Account.addTransaction (Transaction.hash tx) tx alice
+        let bob'' = Account.addTransaction (Transaction.hash tx) tx bob
 
-        bob |> balanceShouldBe session Asset.Zen 0UL
+        alice' |> balanceShouldBe Asset.Zen 10UL
+        bob'' |> balanceShouldBe Asset.Zen 0UL
 
 [<Test>]
 let ``creating, with change``() =
-    use session = DataAccess.DatabaseContext.createSession databaseContext
-
-    let lockToBob = Account.getNewPKHash dataAccess session |> Result.get |> fst |> PK
-    let lockToAlice = Hash.zero  |> PK
+    let bob, bobKey = create()
+    let alice, _ = create()
 
     // giving some money to bob
-    let output = {lock = lockToBob; spend={asset=Asset.Zen;amount=10UL}}
+    let output = {lock = PK (publicKeyHash bob); spend={asset=Asset.Zen;amount=10UL}}
     let tx = {version=Version0;inputs=[];outputs=[output];witnesses=[];contract=None}
-    let bob = View.addMempoolTransaction dataAccess session (Transaction.hash tx) tx View.empty
+    let bob' = Account.addTransaction (Transaction.hash tx) tx bob
 
     // sending money to alice
-    let result = TransactionCreator.createTransaction dataAccess session bob password lockToAlice { asset = Asset.Zen; amount = 7UL }
+    let result = Account.createTransaction (publicKeyHash alice) { asset = Asset.Zen; amount = 7UL } (bob', bobKey)
 
     match result with
     | Error x -> failwithf "expected transaction %s" x
     | Ok tx ->
-        let bob = View.addMempoolTransaction dataAccess session (Transaction.hash tx) tx bob
+        let alice' = Account.addTransaction (Transaction.hash tx) tx alice
+        let bob'' = Account.addTransaction (Transaction.hash tx) tx bob
 
-        bob |> balanceShouldBe session Asset.Zen 3UL
+        alice' |> balanceShouldBe Asset.Zen 7UL
+        bob'' |> balanceShouldBe Asset.Zen 3UL
 
 [<Test>]
 let ``picking the correct asset``() =
-    use session = DataAccess.DatabaseContext.createSession databaseContext
-
-    let lockToBob = Account.getNewPKHash dataAccess session |> Result.get |> fst |> PK
-    let lockToAlice = Hash.zero  |> PK
+    let bob, bobKey = create()
+    let alice, _ = create()
 
     // giving some money to bob
-    let output = {lock = lockToBob; spend={asset=anotherAsset;amount=10UL}}
-    let output2 = {lock = lockToBob; spend={asset=Asset.Zen;amount=10UL}}
+    let output = {lock = PK (publicKeyHash bob); spend={asset=anotherAsset;amount=10UL}}
+    let output2 = {lock = PK (publicKeyHash bob); spend={asset=Asset.Zen;amount=10UL}}
 
     let tx = {version=Version0;inputs=[];outputs=[output; output2];witnesses=[];contract=None}
-    let bob = View.addMempoolTransaction dataAccess session (Transaction.hash tx) tx View.empty
+    let bob' = Account.addTransaction (Transaction.hash tx) tx bob
 
-    bob |> balanceShouldBe session anotherAsset 10UL
-    bob |> balanceShouldBe session Asset.Zen 10UL
+    Account.getUnspentOutputs bob' |> fst |> should haveCount 2
+    bob' |> balanceShouldBe anotherAsset 10UL
 
     // sending money to alice
-    let result = TransactionCreator.createTransaction dataAccess session bob password lockToAlice { asset = Asset.Zen; amount = 7UL }
+    let result = Account.createTransaction (publicKeyHash alice) { asset = Asset.Zen; amount = 7UL } (bob', bobKey)
 
     match result with
     | Error x -> failwithf "expected transaction %s" x
     | Ok tx ->
         List.length tx.inputs |> should equal 1
 
-        let bob = View.addMempoolTransaction dataAccess session (Transaction.hash tx) tx bob
+        let alice' = Account.addTransaction (Transaction.hash tx) tx alice
+        let bob'' = Account.addTransaction (Transaction.hash tx) tx bob'
 
-        bob |> balanceShouldBe session Asset.Zen 3UL
-        bob |> balanceShouldBe session anotherAsset 10UL
+        alice' |> balanceShouldBe Asset.Zen 7UL
+        bob'' |> balanceShouldBe Asset.Zen 3UL
+
+        alice' |> balanceShouldBe anotherAsset 0UL
+        bob'' |> balanceShouldBe anotherAsset 10UL
 
 [<Test>]
 let ``picking from multiple inputs``() =
-    use session = DataAccess.DatabaseContext.createSession databaseContext
-
-    let lockToBob = Account.getNewPKHash dataAccess session |> Result.get |> fst |> PK
-    let lockToAlice = Hash.zero  |> PK
+    let bob, bobKey = create()
+    let alice, _ = create()
 
     // giving some money to bob
-    let output = {lock = lockToBob; spend={asset=Asset.Zen;amount=5UL}}
-    let output2 = {lock = lockToBob; spend={asset=Asset.Zen;amount=7UL}}
+    let output = {lock = PK (publicKeyHash bob); spend={asset=Asset.Zen;amount=5UL}}
+    let output2 = {lock = PK (publicKeyHash bob); spend={asset=Asset.Zen;amount=7UL}}
 
     let tx = {version=Version0;inputs=[];outputs=[output; output2];witnesses=[];contract=None}
-    let bob = View.addMempoolTransaction dataAccess session (Transaction.hash tx) tx View.empty
+    let bob' = Account.addTransaction (Transaction.hash tx) tx bob
 
     // sending money to alice
-    let result = TransactionCreator.createTransaction dataAccess session bob password lockToAlice { asset = Asset.Zen; amount = 10UL }
+    let result = Account.createTransaction (publicKeyHash alice) { asset = Asset.Zen; amount = 10UL } (bob', bobKey)
 
     match result with
-        | Error x -> failwithf "expected transaction %s" x
-        | Ok tx ->
-            List.length tx.inputs |> should equal 2
+    | Error x -> failwithf "expected transaction %s" x
+    | Ok tx ->
+        let alice' = Account.addTransaction (Transaction.hash tx) tx alice
+        let bob'' = Account.addTransaction (Transaction.hash tx) tx bob'
 
-            let bob = View.addMempoolTransaction dataAccess session (Transaction.hash tx) tx bob
-
-            bob |> balanceShouldBe session Asset.Zen 2UL
+        alice' |> balanceShouldBe Asset.Zen 10UL
+        bob'' |> balanceShouldBe Asset.Zen 2UL
 
 [<Test>]
 let ``create execute contract transaction``() =
-    use session = DataAccess.DatabaseContext.createSession databaseContext
-    let view = fundAccount session
+    let account = createTestAccount ()
 
     let executeContract _ _ _ _ txSkeleton =
         let tx =
@@ -250,18 +188,20 @@ let ``create execute contract transaction``() =
 
     let spends = Map.add Asset.Zen 1UL Map.empty
 
-    let result = TransactionCreator.createExecuteContractTransaction dataAccess session view executeContract password (ContractId (Version0,Hash.zero)) "" None true None spends
+    let result = Account.createExecuteContractTransaction executeContract (ContractId (Version0,Hash.zero)) "" None true None spends account
 
     result |> should be ok
 
-    let tx = Result.get result
+    let tx =
+        match result with
+        | Ok tx -> tx
+        | Error error -> failwith error
 
     tx.inputs |> should haveLength 1
 
 [<Test>]
 let ``create execute contract transaction without explicitly spending any Zen should allocate fee``() =
-    use session = DataAccess.DatabaseContext.createSession databaseContext
-    let view = fundAccount session
+    let account = createTestAccount ()
 
     let executeContract _ _ _ _ txSkeleton =
         let tx =
@@ -273,12 +213,12 @@ let ``create execute contract transaction without explicitly spending any Zen sh
 
     let spends = Map.empty
 
-    let result = TransactionCreator.createExecuteContractTransaction dataAccess session view executeContract password (ContractId (Version0,Hash.zero)) "" None true None spends
+    let result = Account.createExecuteContractTransaction executeContract (ContractId (Version0,Hash.zero)) "" None true None spends account
 
     result |> should be ok
 
     let tx = Result.get result
-
+    
     tx.outputs
     |> List.exists (fun output -> output.lock = Fee && output.spend = { asset = Asset.Zen; amount = 1UL })
     |> should equal true
@@ -293,8 +233,6 @@ let ``create execute contract transaction without explicitly spending any Zen sh
 
 [<Test>]
 let ``account sync up``() =
-    use session = DataAccess.DatabaseContext.createSession databaseContext
-
     let startBlockHeader = {
         version = 0ul
         parent = chainParams.genesisHash
@@ -305,13 +243,17 @@ let ``account sync up``() =
         nonce = 0UL,0UL
     }
 
-    let account = DataAccess.Account.get dataAccess session
+    let accountData = create()
+    let account =
+        { (fst accountData)  with tip = Block.hash startBlockHeader}
 
-    {account with blockHash = Block.hash startBlockHeader;blockNumber = startBlockHeader.blockNumber}
-    |> DataAccess.Account.put dataAccess session
-
-    let output = {lock = PK accountPKHash; spend={asset=Asset.Zen;amount=10UL}}
+    let output = {lock = PK (publicKeyHash account); spend={asset=Asset.Zen;amount=10UL}}
     let tx = {version=Version0;inputs=[];outputs=[output];witnesses=[];contract=None}
+    let txHash = Transaction.hash tx
+
+    let account = Account.addTransaction txHash tx account
+
+    List.exists (fst >> (=) txHash) account.mempool |> should equal true
 
     let header = {
         version = 0ul
@@ -334,18 +276,16 @@ let ``account sync up``() =
 
     let blockHash = Block.hash block.header
 
-    Account.sync dataAccess session blockHash block.header (fun _ -> startBlockHeader) (fun _ -> block)
+    let account' = Account.sync blockHash (fun _ -> startBlockHeader) (fun _ -> block) account
 
-    let account = DataAccess.Account.get dataAccess session
-
-    account.blockHash |> should equal blockHash
-    account.blockNumber |> should equal block.header.blockNumber
+    account'.tip |> should equal blockHash
+    account'.mempool |> should haveLength 0
 
 [<Test>]
 let ``sync up from empty wallet``() =
-    use session = DataAccess.DatabaseContext.createSession databaseContext
+    let account, _ = create()
 
-    let output = {lock = PK accountPKHash; spend={asset=Asset.Zen;amount=10UL}}
+    let output = {lock = PK (publicKeyHash account); spend={asset=Asset.Zen;amount=10UL}}
     let tx = {version=Version0;inputs=[];outputs=[output];witnesses=[];contract=None}
 
     let header = {
@@ -382,19 +322,14 @@ let ``sync up from empty wallet``() =
     | h when h = blockHash -> block
     | h -> failwithf "unexpected block hash %A" h
 
-    Account.sync dataAccess session blockHash header getHeader getBlock
+    let account = Account.sync blockHash getHeader getBlock account
 
-    let account = DataAccess.Account.get dataAccess session
-
-    account.blockHash |> should equal blockHash
-    account.blockNumber |> should equal block.header.blockNumber
-
-    Account.getUnspentOutputs dataAccess session View.empty 0ul |> should haveLength 1
+    account.tip |> should equal blockHash
+    account.mempool |> should haveLength 0
+    Account.getUnspentOutputs account |> fst |> should haveCount 1
 
 [<Test>]
 let ``account reorg``() =
-    use session = DataAccess.DatabaseContext.createSession databaseContext
-
     let startBlockHeader = {
         version = 0ul
         parent = (Chain.getChainParameters chain).genesisHash
@@ -406,15 +341,14 @@ let ``account reorg``() =
     }
 
     let startHash = Block.hash startBlockHeader
+    let account =
+        {(create() |> fst) with tip = startHash}
 
-    let account = DataAccess.Account.get dataAccess session
-
-    {account with blockHash = startHash;blockNumber = startBlockHeader.blockNumber}
-    |> DataAccess.Account.put dataAccess session
-
-    let output = {lock = PK accountPKHash; spend={asset=Asset.Zen;amount=10UL}}
+    let output = {lock = PK (publicKeyHash account); spend={asset=Asset.Zen;amount=10UL}}
     let tx = {version=Version0;inputs=[];outputs=[output];witnesses=[];contract=None}
     let txHash = Transaction.hash tx
+
+    let account = Account.addTransaction txHash tx account
 
     let header = {
         version = 0ul
@@ -470,77 +404,63 @@ let ``account reorg``() =
     | h when h = blockHash2 -> block2
     | bh -> failwithf "unexpected %A" bh
 
-    Account.sync dataAccess session blockHash header getHeader getBlock
-    let account = DataAccess.Account.get dataAccess session
+    let account = Account.sync blockHash getHeader getBlock account
+    account.tip |> should equal blockHash
 
-    account.blockHash |> should equal blockHash
-    account.blockNumber |> should equal header.blockNumber
+    let account = Account.sync blockHash2 getHeader getBlock account
 
-    Account.sync dataAccess session blockHash2 header2 getHeader getBlock
-    let account = DataAccess.Account.get dataAccess session
-
-    account.blockHash |> should equal blockHash2
-    account.blockNumber |> should equal header2.blockNumber
+    account.tip |> should equal blockHash2
+    account.mempool |> should haveLength 1
+    List.exists (fst >> (=) txHash) account.mempool |> should equal true
 
 [<Test>]
 let ``wallet won't spend coinbase if not mature enough``() =
-    use session = DataAccess.DatabaseContext.createSession databaseContext
-
-    let account = DataAccess.Account.get dataAccess session
-
-    {account with blockNumber = 99ul}
-    |> DataAccess.Account.put dataAccess session
-
-    let origin =
-        {
-            version=Version0
-            inputs=[]
-            outputs=[{lock =  Coinbase (1ul, accountPKHash); spend= {asset = Asset.Zen;amount=100000000UL}}]
-            witnesses=[]
-            contract=None
-        }
-    let originHash = Transaction.hash origin
-
-    let view = View.addMempoolTransaction dataAccess session originHash origin View.empty
-
-    let expected: Result<Transaction,string>= Error "Not enough tokens"
-
-    TransactionCreator.createTransaction dataAccess session view password (PK accountPKHash) { asset = Asset.Zen; amount = 1UL }
-    |> should equal expected
-
-[<Test>]
-let ``wallet spend coinbase with coinbase mature enough``() =
-    use session = DataAccess.DatabaseContext.createSession databaseContext
-
-    let account = DataAccess.Account.get dataAccess session
-
-    {account with blockNumber = 100ul}
-    |> DataAccess.Account.put dataAccess session
-
-    let origin =
-        {
-            version=Version0
-            inputs=[]
-            outputs=[{lock =  Coinbase (1ul, accountPKHash); spend= {asset = Asset.Zen;amount=100000000UL}}]
-            witnesses=[]
-            contract=None
-        }
-
-    let originHash = Transaction.hash origin
-
-    let view = View.addMempoolTransaction dataAccess session originHash origin View.empty
-
-    TransactionCreator.createTransaction dataAccess session view password (PK accountPKHash) { asset = Asset.Zen; amount = 1UL }
-    |> should be ok
-
-[<Test>]
-let ``wallet spend coinbase when come from block``() =
-    use session = DataAccess.DatabaseContext.createSession databaseContext
+    let rootAccount, rootSecretKey = rootAccountData
+    let rootAccount = {rootAccount with blockNumber=99ul}
     let origin =
             {
                 version=Version0
                 inputs=[]
-                outputs=[{lock =  Coinbase (1ul, accountPKHash); spend= {asset = Asset.Zen;amount=100000000UL}}]
+                outputs=[{lock =  Coinbase (1ul, publicKeyHash rootAccount); spend= {asset = Asset.Zen;amount=100000000UL}}]
+                witnesses=[]
+                contract=None
+            }
+    let originHash = Transaction.hash origin
+
+    let rootAccount = Account.addTransaction originHash origin rootAccount
+
+    let expected: Result<Transaction,string>= Error "Not enough tokens"
+
+    Account.createTransaction (publicKeyHash rootAccount) { asset = Asset.Zen; amount = 1UL } rootAccountData
+    |> should equal expected
+
+[<Test>]
+let ``wallet spend coinbase with coinbase mature enough``() =
+    let rootAccount, rootSecretKey = rootAccountData
+    let rootAccount = {rootAccount with blockNumber=100ul}
+    let origin =
+            {
+                version=Version0
+                inputs=[]
+                outputs=[{lock =  Coinbase (1ul, publicKeyHash rootAccount); spend= {asset = Asset.Zen;amount=100000000UL}}]
+                witnesses=[]
+                contract=None
+            }
+    let originHash = Transaction.hash origin
+
+    let rootAccount = Account.addTransaction originHash origin rootAccount
+
+    Account.createTransaction (publicKeyHash rootAccount) { asset = Asset.Zen; amount = 1UL } (rootAccount, rootSecretKey)
+    |> should be ok
+
+[<Test>]
+let ``wallet spend coinbase when come from block``() =
+    let rootAccount, rootSecretKey = rootAccountData
+    let origin =
+            {
+                version=Version0
+                inputs=[]
+                outputs=[{lock =  Coinbase (1ul, publicKeyHash rootAccount); spend= {asset = Asset.Zen;amount=100000000UL}}]
                 witnesses=[]
                 contract=None
             }
@@ -558,20 +478,20 @@ let ``wallet spend coinbase when come from block``() =
 
     let block = {header=header;transactions=[origin];commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero;}
 
-    Account.addBlock dataAccess session (Block.hash block.header) block
+    let rootAccount = Account.handleBlock (Block.hash block.header) block rootAccount
 
-    TransactionCreator.createTransaction dataAccess session View.empty password (PK accountPKHash) { asset = Asset.Zen; amount = 1UL }
+    Account.createTransaction (publicKeyHash rootAccount) { asset = Asset.Zen; amount = 1UL } (rootAccount, rootSecretKey)
     |> should be ok
 
 [<Test>]
-let ``Should get expected history``() =
-    use session = DataAccess.DatabaseContext.createSession databaseContext
+let ``Should get expected deltas``() =
+    let account, _ = create()
 
-    let output1 = {lock = PK accountPKHash; spend={asset=Asset.Zen;amount=10UL}}
+    let output1 = {lock = PK (publicKeyHash account); spend={asset=Asset.Zen;amount=10UL}}
     let tx1 = {version=Version0;inputs=[];outputs=[output1];witnesses=[];contract=None}
     let tx1Hash = Transaction.hash tx1
     let output2A = {lock = PK Hash.zero; spend={asset=Asset.Zen;amount=2UL}}
-    let output2B = {lock = PK accountPKHash; spend={asset=Asset.Zen;amount=8UL}}
+    let output2B = {lock = PK (publicKeyHash account); spend={asset=Asset.Zen;amount=8UL}}
     let tx2 = {version=Version0;inputs=[Outpoint { txHash = tx1Hash; index = 0ul } ];outputs=[output2A;output2B];witnesses=[];contract=None}
 
     let header = {
@@ -608,41 +528,30 @@ let ``Should get expected history``() =
     | h when h = blockHash -> block
     | h -> failwithf "unexpected block hash %A" h
 
-    Account.sync dataAccess session blockHash header getHeader getBlock
+    let account = Account.sync blockHash getHeader getBlock account
 
     let tx2Hash = Transaction.hash tx2
     let output3A = {lock = PK Hash.zero; spend={asset=Asset.Zen;amount=3UL}}
-    let output3B = {lock = PK accountPKHash; spend={asset=Asset.Zen;amount=5UL}}
+    let output3B = {lock = PK (publicKeyHash account); spend={asset=Asset.Zen;amount=5UL}}
     let tx3 = {version=Version0;inputs=[Outpoint { txHash = tx2Hash; index = 1ul } ];outputs=[output3A;output3B];witnesses=[];contract=None}
 
-    let expected = [
-        (tx2Hash, TransactionDirection.Out, {asset=Asset.Zen;amount= 2UL}, 1u);
-        (tx1Hash, TransactionDirection.In,{asset=Asset.Zen;amount= 10UL}, 1u) ]
+    let expected = [ (tx1Hash, Map.add Asset.Zen 10L Map.empty, 2u) ]
+    let expected = (tx2Hash, Map.add Asset.Zen -2L Map.empty, 2u) :: expected
 
-    let result = Account.getHistory dataAccess session View.empty 0 10
-
-    result |> should equal expected
+    should equal expected (Account.getHistory 0 10 account)
 
     let tx3Hash = Transaction.hash tx3
 
     // add tx3 to mempool
-    let view = View.addMempoolTransaction dataAccess session tx3Hash tx3 View.empty
+    let account' = Account.addTransaction tx3Hash tx3 account
 
-    let expected = (tx3Hash, TransactionDirection.Out, {asset=Asset.Zen;amount= 3UL}, 0u) :: expected
-    let result = Account.getHistory dataAccess session view 0 10
+    let expected = (tx3Hash, Map.add Asset.Zen -3L Map.empty, 0u) :: expected
 
-    printfn "%A" result
-
-    result |> should equal expected
-
-
-
-//    should equal expected (Account.getHistory 0 10 account')
+    should equal expected (Account.getHistory 0 10 account')
 
 [<Test>]
 let ``sign contract wintess``() =
-    use session = DataAccess.DatabaseContext.createSession databaseContext
-    let view = fundAccount session
+    let account = createTestAccount ()
 
     let executeContract _ _ _ _ txSkeleton =
         let tx =
@@ -668,7 +577,7 @@ let ``sign contract wintess``() =
 
     let spends = Map.add Asset.Zen 1UL Map.empty
 
-    let result = TransactionCreator.createExecuteContractTransaction dataAccess session view executeContract password (ContractId (Version0,Hash.zero)) "" None true (Some "m/0'") spends
+    let result = Account.createExecuteContractTransaction executeContract (ContractId (Version0,Hash.zero)) "" None true (Some "m/0'") spends account
 
     result |> should be ok
 
@@ -676,9 +585,7 @@ let ``sign contract wintess``() =
 
     let txHash = Transaction.hash tx
 
-    let publicKey = ExtendedKey.derivePath "m/0'" privateKey |> Result.get |> ExtendedKey.getPublicKey |> Result.get
-
-    let (Crypto.PublicKey pk) = publicKey
+    let publicKey = ExtendedKey.derivePath "m/0'" (snd account) |> Result.get |> ExtendedKey.getPublicKey |> Result.get
 
     match tx.witnesses.[1] with
     | ContractWitness cw ->
