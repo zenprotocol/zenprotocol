@@ -186,7 +186,7 @@ let ``Contract activation weight should be positive``() =
     let (Ok contractWithId) = SampleContract.contractWithId
     let rootAccount = createTestAccount()
     let tx =
-        Wallet.Account.createActivationTransactionFromContract
+        TestWallet.createActivationTransactionFromContract
                             (Chain.getChainParameters (Chain.Local)) contractWithId 1ul rootAccount
     let actWeight = Result.map (fun {Transaction.contract=Some contract} -> activationWeight contract) tx
 

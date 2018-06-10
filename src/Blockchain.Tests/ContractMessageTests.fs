@@ -54,11 +54,11 @@ let shouldBeErrorMessage message =
     | Error err -> err |> should equal message
 
 let activateContract code account session state =
-    let (account:Account.T), secretKey = account
+    let (account:TestWallet.T), secretKey = account
     let account = { account with mempool = MemPool.toList state.memoryState.mempool }
 
     let accountData = account, secretKey
-    Account.createActivateContractTransaction chain code 1ul accountData
+    TestWallet.createActivateContractTransaction chain code 1ul accountData
     |> Result.map (fun tx ->
         let events, state =
             Handler.handleCommand chain (ValidateTransaction tx) session 1UL state

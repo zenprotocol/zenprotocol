@@ -45,8 +45,8 @@ let ``Contract activation without contract sacrifice should fail``() =
 
     let rootAccount = createTestAccount() |> fst
 
-    let outpoint = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
-    let output = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
+    let outpoint = TestWallet.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
+    let output = TestWallet.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
 
     let tx =
         {version = Version0; contract = Some (V0 sampleContractRecord); inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
@@ -64,9 +64,9 @@ let ``Contract activation with too low contract activation sacrifice``() =
 
     let rootAccount = createTestAccount() |> fst
 
-    let outpoint = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
+    let outpoint = TestWallet.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
     let outputs =
-        let output = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
+        let output = TestWallet.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
 
         [
             {lock=ActivationSacrifice;spend={amount=1UL;asset=Asset.Zen}}
@@ -89,16 +89,16 @@ let ``Contract extension with too low contract extension sacrifice``() =
     let rootAccount = createTestAccount()
 
     let tx =
-        Account.createActivationTransactionFromContract localParams sampleContractWithId 1ul rootAccount
+        TestWallet.createActivationTransactionFromContract localParams sampleContractWithId 1ul rootAccount
         |> unwrap
 
     let _, acs, _ =
         validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet (Transaction.hash tx) tx
         |> unwrap
 
-    let outpoint = Account.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> fst
+    let outpoint = TestWallet.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> fst
     let outputs =
-        let output = Account.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> snd
+        let output = TestWallet.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> snd
 
         [
             {lock=ExtensionSacrifice sampleContractId;spend={amount=1UL;asset=Asset.Zen}}
@@ -120,9 +120,9 @@ let ``Contract extension of a non active contract should fail``() =
     let contractId = Contract.makeContractId Version0 "1"
     let rootAccount = createTestAccount()
 
-    let outpoint = Account.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> fst
+    let outpoint = TestWallet.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> fst
     let outputs =
-        let output = Account.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> snd
+        let output = TestWallet.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> snd
 
         [
             {lock=ExtensionSacrifice contractId;spend={amount=1UL;asset=Asset.Zen}}
@@ -210,7 +210,7 @@ let ``Contract activation with exact amount``() =
     let blocks = 123ul
 
     let tx =
-        Account.createActivationTransactionFromContract localParams sampleContractWithId blocks rootAccount
+        TestWallet.createActivationTransactionFromContract localParams sampleContractWithId blocks rootAccount
         |> unwrap
 
     let _, acs, _ =
@@ -237,7 +237,7 @@ let ``Contract extension with exact amount``() =
     let extensionSacrifice = localParams.sacrificePerByteBlock * (String.length code |> uint64) * (uint64 extendBlocks)
 
     let tx =
-        Account.createActivationTransactionFromContract localParams sampleContractWithId activateBlocks rootAccount
+        TestWallet.createActivationTransactionFromContract localParams sampleContractWithId activateBlocks rootAccount
         |> unwrap
 
     let _, acs, _ =
@@ -249,9 +249,9 @@ let ``Contract extension with exact amount``() =
         contract.expiry |> should equal (activateBlocks + initialBlock)
     | _ -> failwith "contract is not active"
 
-    let outpoint = Account.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> fst
+    let outpoint = TestWallet.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> fst
     let outputs =
-        let output = Account.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> snd
+        let output = TestWallet.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> snd
 
         [
             {lock=ExtensionSacrifice contractId;spend={amount=extensionSacrifice;asset=Asset.Zen}}
@@ -288,7 +288,7 @@ let ``Contract extension with more than one output``() =
     let extensionSacrifice2 = localParams.sacrificePerByteBlock * (String.length code |> uint64) * (uint64 extendBlocks2)
 
     let tx =
-        Account.createActivationTransactionFromContract localParams sampleContractWithId activateBlocks rootAccount
+        TestWallet.createActivationTransactionFromContract localParams sampleContractWithId activateBlocks rootAccount
         |> unwrap
 
     let _, acs, _ =
@@ -300,9 +300,9 @@ let ``Contract extension with more than one output``() =
         contract.expiry |> should equal (activateBlocks + initialBlock)
     | _ -> failwith "contract is not active"
 
-    let outpoint = Account.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> fst
+    let outpoint = TestWallet.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> fst
     let outputs =
-        let output = Account.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> snd
+        let output = TestWallet.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> snd
 
         [
             {lock=ExtensionSacrifice contractId;spend={amount=extensionSacrifice1;asset=Asset.Zen}}
@@ -330,9 +330,9 @@ let ``Contract activation without hints should fail``() =
     let rootAccount = createTestAccount() |> fst
 
     let activationSacrificeAmount = 1000UL
-    let outpoint = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
+    let outpoint = TestWallet.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
     let outputs =
-        let output = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
+        let output = TestWallet.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
 
         [
             {lock=ActivationSacrifice;spend={amount=activationSacrificeAmount;asset=Asset.Zen}}
@@ -355,9 +355,9 @@ let ``Contract activation with invalid queries should fail``() =
     let rootAccount = createTestAccount() |> fst
 
     let activationSacrificeAmount = 1000UL
-    let outpoint = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
+    let outpoint = TestWallet.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
     let outputs =
-        let output = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
+        let output = TestWallet.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
 
         [
             {lock=ActivationSacrifice;spend={amount=activationSacrificeAmount;asset=Asset.Zen}}
@@ -381,9 +381,9 @@ let ``Contract with activation sacrifice but without a contract should fail``() 
     let rootAccount = createTestAccount() |> fst
 
     let activationSacrificeAmount = 1000UL
-    let outpoint = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
+    let outpoint = TestWallet.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
     let outputs =
-        let output = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
+        let output = TestWallet.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
         [
             {lock=ActivationSacrifice;spend={amount=activationSacrificeAmount;asset=Asset.Zen}}
             {output with spend={output.spend with amount = output.spend.amount - activationSacrificeAmount}}

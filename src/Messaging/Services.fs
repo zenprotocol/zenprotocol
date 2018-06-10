@@ -47,6 +47,7 @@ module Blockchain =
         | GetBlockByNumber of uint32
         | GetBlockHeader of Hash
         | GetActiveContracts
+        | GetActiveContract of ContractId
         | GetBlockChainInfo
         | GetHeaders
         | GetMempool
@@ -108,13 +109,16 @@ module Blockchain =
         Request.send<Request,(Transaction*uint32) option> client serviceName (GetTransaction txHash)
 
     let getBlockByNumber client blockNumber =
-            Request.send<Request,Block option> client serviceName (GetBlockByNumber blockNumber)
+        Request.send<Request,Block option> client serviceName (GetBlockByNumber blockNumber)
 
     let getTip client =
         Request.send<Request,(Hash*BlockHeader) option> client serviceName GetTip
 
     let getActiveContracts client =
         Request.send<Request,ActiveContract list> client serviceName GetActiveContracts
+
+    let getActiveContract client contractId =
+        Request.send<Request,ActiveContract option> client serviceName (GetActiveContract contractId)
 
     let getBlockChainInfo client =
         Request.send<Request,BlockchainInfo> client serviceName GetBlockChainInfo
@@ -162,7 +166,12 @@ module Network =
 
 module Wallet =
     type BalanceResponse = Map<Asset,uint64>
-    type TransactionsResponse = List<Hash*Map<Asset,int64>*uint32>
+
+    type TransactionDirection =
+        | In
+        | Out
+
+    type TransactionsResponse = List<Hash*TransactionDirection*Spend*uint32>
     type ActivateContractResponse = Transaction * ContractId
 
     type Command =
@@ -183,6 +192,11 @@ module Wallet =
         | GetPublicKey of path:string * password:string
         | GetMnemonicPhrase of password:string
         | Sign of Hash * path:string * password:string
+        | ImportWatchOnlyAddress of string
+        | GetNewAddress
+        | GetReceivedByAddress of confirmations:uint32
+        | GetAddressOutputs of address:string
+        | GetAddressBalance of address:string * confirmations:uint32
 
     let serviceName = "wallet"
 
@@ -233,3 +247,18 @@ module Wallet =
 
     let getMnemonicPhrase client password =
         Request.send<Request, Result<string, string>> client serviceName (GetMnemonicPhrase password)
+
+    let importWatchOnlyAddress client address =
+        Request.send<Request, Result<unit,string>> client serviceName (ImportWatchOnlyAddress address)
+
+    let getNewAddress client =
+        Request.send<Request, Result<string * int,string>> client serviceName GetNewAddress
+
+    let getReceivedByAddress client confirmations =
+        Request.send<Request, Result<Map<(string*Asset), uint64>,string>> client serviceName (GetReceivedByAddress confirmations)
+
+    let getAddressOutputs client address =
+        Request.send<Request, Result<List<(Outpoint*Spend*uint32*bool)>,string>> client serviceName (GetAddressOutputs address)
+
+    let getAddressBalance client address confirmations =
+        Request.send<Request, Result<Map<Asset, uint64>,string>> client serviceName (GetAddressBalance (address,confirmations))
