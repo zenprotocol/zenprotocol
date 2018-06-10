@@ -32,7 +32,8 @@ let add chain header ema =
     let newDelayed = push header ema.delayed
     if List.length ema.delayed < 11 then {ema with delayed = newDelayed} else // First 11 blocks don't alter difficulty
     let alpha = chain.smoothingFactor
-    let currentInterval = float <| newDelayed.[10]-newDelayed.[9]
+    let currentInterval = float <| (bigint newDelayed.[10]) - (bigint newDelayed.[9])
+
     let currentTarget = Hash.toBigInt <| Difficulty.uncompress ema.difficulty
     let estimate = float currentTarget * ((1.0-alpha) + (alpha * currentInterval) / (float chain.blockInterval * adjustment))
     let nextTarget = clamp  (Hash.toBigInt <| Difficulty.maximum)   // maximum difficulty => low target
