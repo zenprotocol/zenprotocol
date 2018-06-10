@@ -14,6 +14,7 @@ open Infrastructure
 open TestsInfrastructure.Constraints
 open TestsInfrastructure.Nunit
 
+let getContractState _ = None
 
 let chain = Chain.getChainParameters Chain.Local
 let contractPath =
@@ -111,11 +112,11 @@ let ``contract witness with valid signature``() =
                                               inputsLength=1ul;
                                               outputsLength=1ul;
                                               signature=Some (publicKey,signature)
-                                              cost = 342ul
+                                              cost = 342UL
                                           }
     let tx = {tx with witnesses= [contractWintess]}
 
-    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty ContractStates.asDatabase txHash tx
+    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty getContractState ContractStates.asDatabase txHash tx
 
     result |> should be ok
 
@@ -146,11 +147,11 @@ let ``contract witness with invalid publickey``() =
                                               inputsLength=1ul;
                                               outputsLength=1ul;
                                               signature=Some (publicKey,signature)
-                                              cost = 338u
+                                              cost = 338UL
                                           }
     let tx = {tx with witnesses= [contractWintess]}
 
-    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty ContractStates.asDatabase txHash tx
+    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty getContractState ContractStates.asDatabase txHash tx
 
     let expected:TxResult = Error (General "invalid contract witness signature")
 
@@ -182,11 +183,11 @@ let ``contract witness with no signature``() =
                                               inputsLength=1ul;
                                               outputsLength=1ul;
                                               signature=None
-                                              cost = 342ul
+                                              cost = 342UL
                                           }
     let tx = {tx with witnesses= [contractWintess]}
 
-    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty ContractStates.asDatabase txHash tx
+    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty getContractState ContractStates.asDatabase txHash tx
 
     let expected:TxResult = Error (General "expected pk")
 
@@ -222,11 +223,11 @@ let ``contract witness with unexpcected public key``() =
                                               inputsLength=1ul;
                                               outputsLength=1ul;
                                               signature=Some (publicKey,signature)
-                                              cost = 342ul
+                                              cost = 342UL
                                           }
     let tx = {tx with witnesses= [contractWintess]}
 
-    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty ContractStates.asDatabase txHash tx
+    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty getContractState ContractStates.asDatabase txHash tx
 
     let expected:TxResult = Error (General "expected different pk")
 
@@ -259,11 +260,11 @@ let ``contract witness with invalid execution cost``() =
                                               inputsLength=1ul;
                                               outputsLength=1ul;
                                               signature=Some (publicKey,signature)
-                                              cost = 1000ul
+                                              cost = 1000UL
                                           }
     let tx = {tx with witnesses= [contractWintess]}
 
-    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty ContractStates.asDatabase txHash tx
+    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty getContractState ContractStates.asDatabase txHash tx
 
     let expected:TxResult = Error (General "execution cost commitment mismatch")
 

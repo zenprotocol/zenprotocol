@@ -88,7 +88,7 @@ let ``Contract validated transaction should have the right cost``() =
         inputsLength = 11u;     //
         outputsLength = 3u;     //
         signature = None;
-        cost = 200u;
+        cost = 200UL;
     }
     let tx = {
         version = Version0
@@ -128,7 +128,7 @@ let ``Two contracts in sequence should have the right cost``() =
         inputsLength = 5u;
         outputsLength = 2u;
         signature = None;
-        cost = 200u;
+        cost = 200UL;
     }
     let cWitness2 = {
         cWitness1 with
@@ -137,7 +137,7 @@ let ``Two contracts in sequence should have the right cost``() =
             beginOutputs = 2u;
             inputsLength = 5u;
             outputsLength = 1u;
-            cost = 50u;
+            cost = 50UL;
     }
     let tx = {
         version = Version0

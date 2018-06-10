@@ -237,7 +237,7 @@ let ``Should buy``() =
             match tx.witnesses.[0] with
             | ContractWitness {cost=cost} as wit ->
                 wit, cost
-            | _ as wit -> wit, 0u
+            | _ as wit -> wit, 0UL
 
         let cw = ContractWitness {
              contractId = contractId
@@ -318,7 +318,7 @@ let ``Should redeem``() =
             match tx.witnesses.[0] with
             | ContractWitness {cost=cost} as wit ->
                 wit, cost
-            | _ as wit -> wit, 0u
+            | _ as wit -> wit, 0UL
 
         let cw = ContractWitness {
              contractId = contractId

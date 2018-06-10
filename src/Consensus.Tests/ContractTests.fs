@@ -25,6 +25,7 @@ let contractPath =
 let rlimit = 2723280u
 
 let getUTXO _ = UtxoSet.NoOutput
+let getContractState _ = None
 
 let compile code = lazy (result {
     let! hints = Contract.recordHints code
@@ -65,7 +66,7 @@ let mapError = function
 
 let validateInputs (contract:Contract.T) utxos tx  =
     let acs = ActiveContractSet.add contract.contractId contract ActiveContractSet.empty
-    TransactionValidation.validateInContext Chain.localParameters getUTXO contractPath 1ul 1_000_000UL acs Map.empty utxos ContractStates.asDatabase (Transaction.hash tx) tx
+    TransactionValidation.validateInContext Chain.localParameters getUTXO contractPath 1ul 1_000_000UL acs Map.empty utxos getContractState ContractStates.asDatabase (Transaction.hash tx) tx
     |> Result.mapError mapError
 
 let validateBasic tx  =

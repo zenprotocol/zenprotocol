@@ -661,7 +661,7 @@ let ``sign contract wintess``() =
                                             inputsLength = 0ul
                                             outputsLength = 1ul
                                             signature = None
-                                            cost = 8ul
+                                            cost = 8UL
                                         }]
         }
 

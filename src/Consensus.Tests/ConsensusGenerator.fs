@@ -294,7 +294,7 @@ type ConsensusGenerator =
                 let! beginOutputs = Arb.generate<uint32> |> Gen.filter (fun i -> i < nOutputs)
                 let! inputsLength = Arb.generate<uint32> |> Gen.filter ((<>) 0ul) |> Gen.filter (fun i -> i <= nInputs - beginInputs)
                 let! outputsLength = Arb.generate<uint32> |> Gen.filter (fun i -> i <= nOutputs - beginOutputs)
-                let! cost = Arb.generate<uint32> |> Gen.filter ((<>) 0ul)
+                let! cost = Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
                 let! data = Arb.generate<Option<data>>
 
                 let! hasSignature = Arb.generate<bool>
