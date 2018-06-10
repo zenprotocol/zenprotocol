@@ -36,7 +36,7 @@ let encode chain address =
     let data = Array.append [|AddressVersion|] words
     Bech32.encode hrp data
 
-let decode chain address =
+let private decode chain address =
     match Bech32.decode address with
     | None ->
         Error "could not decode address"

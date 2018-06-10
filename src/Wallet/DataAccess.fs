@@ -1,40 +1,50 @@
 module Wallet.DataAccess
 
-open System.Text
+open Account
 open Infrastructure
 open DataAccess
-open Consensus
-open Consensus.Types
-open Consensus.Hash
-open Wallet.Types
-open Wallet.Serialization
-open Wallet.Serialization
+open System.Text
+
+open Serialization
 
 let private getBytes str = Encoding.UTF8.GetBytes (str : string)
 
 [<Literal>]
-let DbVersion = 1
+let private MainAccountName = "MAIN"
+
+[<Literal>]
+let private SecuredName = "SECURED"
+
+[<Literal>]
+let DbVersion = 0
+
+type Collection<'a> = Collection<string, 'a>
 
 type T = {
-    outputs: Collection<Outpoint, Output>
-    addresses: Collection<Hash,Address>
-    addressOutputs: MultiCollection<Hash,Outpoint>
-    account: SingleValue<Account>
+    accountCollection: Collection<Account.T>
+    securedCollection: Collection<Secured.T>
     dbVersion: SingleValue<int>
 }
 
+let private createCollection session serializer deserializer name =
+    Collection.create session name
+        getBytes
+        serializer
+        deserializer
+
 let createContext dataPath =
-    Platform.combine dataPath "payment"
+    Platform.combine dataPath "wallet"
     |> DatabaseContext.create
 
 let init databaseContext =
     use session = DatabaseContext.createSession databaseContext
-    let outputs = Collection.create session "outputs" Outpoint.serialize Output.serialize Output.deserialize
-    let addresses = Collection.create session "addresses" Hash.bytes Address.serialize Address.deserialize
-    let addressOutputs = MultiCollection.create session "addressOutputs" Hash.bytes Outpoint.serialize Outpoint.deserialize
-    let account = SingleValue.create databaseContext "account" Account.serialize Account.deserialize
+    let accountCollection = createCollection session Wallet.serialize Wallet.deserialize "accounts"
+    let securedCollection = createCollection session Secured.serialize Secured.deserialize "secured"
 
-    let dbVersion = SingleValue.create databaseContext "dbVersion" Version.serialize Version.deserialize
+    let dbVersion =
+        SingleValue.create databaseContext "dbVersion"
+            Version.serialize
+            Version.deserialize
 
     match SingleValue.tryGet dbVersion session with
     | Some version when version <> DbVersion ->
@@ -44,10 +54,8 @@ let init databaseContext =
     | _ -> () // TODO: in the future we should have here db upgrade script
 
     let t = {
-        outputs = outputs
-        addresses = addresses
-        addressOutputs = addressOutputs
-        account = account
+        accountCollection = accountCollection
+        securedCollection = securedCollection
         dbVersion = dbVersion
     }
 
@@ -55,35 +63,23 @@ let init databaseContext =
     t
 
 let dispose t =
-    Disposables.dispose t.outputs
-    Disposables.dispose t.addresses
+    Disposables.dispose t.accountCollection
+    Disposables.dispose t.securedCollection
 
 module Account =
-    let put t = SingleValue.put t.account
-    let tryGet t = SingleValue.tryGet t.account
-    let get t session = tryGet t session |> Option.get
+    open Collection
 
-module Addresses =
-    let contains t = Collection.containsKey t.addresses
-    let getAll t = Collection.getAll t.addresses
-    let get t = Collection.get t.addresses
-    let put t  = Collection.put t.addresses
+    let put t session =
+        put t.accountCollection session MainAccountName
 
-module Outputs =
-    let getAll t = Collection.getAll t.outputs
+    let tryGet t session =
+        tryGet t.accountCollection session MainAccountName
 
-    let tryGet t = Collection.tryGet t.outputs
-    let put t = Collection.put t.outputs
+module Secured =
+    open Collection
 
-    let delete t = Collection.delete t.outputs
-    let truncate t = Collection.truncate t.outputs
+    let put t session =
+        put t.securedCollection session SecuredName
 
-    let contains t = Collection.containsKey t.outputs
-
-module AddressOutputs =
-    let put t = MultiCollection.put t.addressOutputs
-    let delete t = MultiCollection.delete t.addressOutputs
-    let get t session key =
-        MultiCollection.get t.addressOutputs session key
-        |> List.map (Collection.get t.outputs session)
-    let truncate t = MultiCollection.truncate t.addressOutputs
+    let tryGet t session =
+        tryGet t.securedCollection session SecuredName

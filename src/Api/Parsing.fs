@@ -173,15 +173,13 @@ let parseCheckPasswordJson json =
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
 
-let parseTransactionsRequestJson query =
-    match Map.tryFind "take" query, Map.tryFind "skip" query with
-    | Some take, Some skip ->
-        match System.Int32.TryParse take, System.Int32.TryParse skip with
-        | (true,take),(true,skip) ->
-            if skip < 0 || take < 0 then
-                Error "Invalid values"
-            else
-                Ok (skip,take)
-        | _ ->
+let parseTransactionsRequestJson json =
+    try
+        let json = TransactionsRequestJson.Parse json
+
+        if json.Skip < 0 || json.Take < 0 then
             Error "Invalid values"
-    | _ -> Error "Invalid values"
+        else
+            Ok (json.Skip, json.Take)
+    with _ as ex ->
+        Error ("Json is invalid: " + ex.Message)
