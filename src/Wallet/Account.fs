@@ -1,189 +1,310 @@
 module Wallet.Account
 
 open Consensus
-open Chain
-open Hash
-open Crypto
-open Types
-open Infrastructure
-open Result
-open Messaging.Services
-open Result
-open Zen.Hash
+open Consensus.Crypto
+open Consensus.Types
+open Consensus.Hash
+open Wallet
+open Infrastructure.Result
+open Wallet
+open Wallet.DataAccess
+open Wallet.Types
+open Messaging.Services.Wallet
 
-module ZData = Zen.Types.Data
-module Cost = Zen.Cost.Realized
+// TODO: handle history
 
 let result = new ResultBuilder<string>()
 
-[<Literal>]
-let passphrase = ""
+let zenKeyPath = "m/44'/258'/0'/"
 
-[<Literal>]
-let rlimit = 2723280u
+let deriveNewAddress index key =
+    ExtendedKey.derive 2 key
+    >>= ExtendedKey.derive index
 
-type Status<'a> =
-    | Spent of 'a
-    | Unspent of 'a
+let deriveChange index key =
+    ExtendedKey.derive 1 key
+    >>= ExtendedKey.derive index
 
-type OutputStatus = Status<Output>
-type SpendStatus = Status<Spend>
+let deriveExternal index key =
+    ExtendedKey.derive 0 key
+    >>= ExtendedKey.derive index
 
-type TxDelta = {
-    txHash: Hash
-    deltas: List<SpendStatus>
-    blockNumber: Option<uint32>
-}
+let import dataAccess session mnemonicPhrase password tipHash tipBlockNumber = result {
+    let mnemonicPhrase = (String.concat " " mnemonicPhrase)
 
-type T = {
-    deltas: List<TxDelta>
-    outputs: Map<Outpoint, OutputStatus>
-    mempool: (Hash*Transaction) list
-    tip: Hash
-    blockNumber: uint32
-    publicKey: PublicKey
-}
+    let! publicKey =
+        ExtendedKey.fromMnemonicPhrase mnemonicPhrase
+        >>= ExtendedKey.derivePath zenKeyPath
+        >>= ExtendedKey.neuter
 
-let private zenCoinType = ExtendedKey.Hardened 258
-let private purpose = ExtendedKey.Hardened 44
+    let! externalPKHash =
+        deriveExternal 0 publicKey
+        >>= ExtendedKey.getPublicKey
+        <@> PublicKey.hash
 
-let deriveZenKey = ExtendedKey.derivePath "m/44'/258'/0'/0/0"
+    {pkHash=externalPKHash; addressType=External 0}
+    |> DataAccess.Addresses.put dataAccess session externalPKHash
 
-let private create mnemonicPhrase password tipHash tipBlockNumber = result {
-    let! extendedPrivateKey = ExtendedKey.fromMnemonicPhrase mnemonicPhrase
+    let! changePKHash =
+        deriveChange 0 publicKey
+        >>= ExtendedKey.getPublicKey
+        <@> PublicKey.hash
 
-    let! zenPrivateKey = deriveZenKey extendedPrivateKey
-    let! publicKey =ExtendedKey.getPublicKey zenPrivateKey
+    {pkHash=changePKHash; addressType=Change 0}
+    |> DataAccess.Addresses.put dataAccess session changePKHash
 
-    let secured = Secured.create password mnemonicPhrase
+    let secure = Secured.create password mnemonicPhrase
 
-    return {
-        deltas = List.empty
-        outputs = Map.empty
-        mempool = List.empty
-        tip = tipHash
+    let account = {
+        blockHash = tipHash
         blockNumber = tipBlockNumber
+        counter = 0
         publicKey = publicKey
-    }, secured
+        secureMnemonicPhrase = secure
+        changePKHash = changePKHash
+        externalPKHash = externalPKHash
+    }
+
+    DataAccess.Account.put dataAccess session account
+
+    return ()
 }
 
-let import mnemonicPhrase =
-    let mnemonicPhrase = String.concat " " mnemonicPhrase
+let getAddress dataAccess session chain =
+    let account = DataAccess.Account.get dataAccess session
+    Address.encode chain (Address.PK account.externalPKHash)
 
-    create mnemonicPhrase
+let getPKHash dataAccess session =
+    let account = DataAccess.Account.get dataAccess session
+    account.externalPKHash
 
-let private isKeyMatch account address =
-    PublicKey.hash account.publicKey = address
+let getNewPKHash dataAccess session =
+    let account = DataAccess.Account.get dataAccess session
+    let index = account.counter
+    let account = { account with counter = account.counter + 1 }
 
-// update the outputs with transaction
-let private handleTransaction txHash (tx:Transaction) account outputs txDeltas blockNumber =
-    let handleOutput (outputs,deltas) (index,output) =
-        let add = (
-            Map.add { txHash = txHash; index = index } (Unspent output) outputs,
-            List.add (Unspent output.spend) deltas)
-        match output.lock with
-        | Coinbase (_,pkHash) when isKeyMatch account pkHash -> add
-        | PK pkHash when isKeyMatch account pkHash -> add
-        | _ -> (outputs, deltas)
+    deriveNewAddress index account.publicKey
+    |> Result.bind ExtendedKey.getPublicKey
+    |> Result.map (fun key ->
+        let pkHash = PublicKey.hash key
 
-    let handleInput (outputs,deltas) outpoint =
-        match Map.tryFind outpoint outputs with
-        | Some (Unspent output) ->
-            (Map.add outpoint (Spent output) outputs,
-             List.add (Spent output.spend) deltas)
-        | _ ->
-            (outputs, deltas)
+        let address = {
+            pkHash = pkHash
+            addressType = Payment index
+        }
+        DataAccess.Addresses.put dataAccess session pkHash address
 
-    let outputs, deltas =
-        tx.inputs
-        |> List.choose (function | Outpoint outpoint -> Some outpoint | Mint _ -> None)
-        |> List.fold handleInput (outputs, List.empty)
+        DataAccess.Account.put dataAccess session account
 
-    let outputsWithIndex = List.mapi (fun i output -> (uint32 i,output)) tx.outputs
-    let outputs, deltas = List.fold handleOutput (outputs, deltas) outputsWithIndex
+        pkHash, index)
 
-    if List.length deltas > 0 then
-        outputs, List.add { txHash = txHash; deltas = deltas; blockNumber = blockNumber } txDeltas
-    else
-        outputs, txDeltas
+let getNewAddress dataAccess session chain =
+    getNewPKHash dataAccess session
+    |> Result.map (fun (pkHash, index) -> Address.encode chain (Address.PK pkHash),index)
 
-let private handleTransactions account transactions blockNumber =
-    List.fold (fun (outputs,txDeltas) (txHash,tx) ->
-       handleTransaction txHash tx account outputs txDeltas blockNumber
-    ) (account.outputs, account.deltas) transactions
+let importWatchOnlyAddress dataAccess session chain address =
+    Address.decodePK chain address
+    |> Result.bind (fun pkHash ->
+        if DataAccess.Addresses.contains dataAccess session pkHash then
+            Error "address already exist"
+        else
+            let address = {
+                pkHash = pkHash
+                addressType = WatchOnly
+            }
 
-let private handleMempoolTransactions account =
-    handleTransactions account account.mempool None
+            DataAccess.Addresses.put dataAccess session pkHash address
 
-let handleBlock blockHash block account =
-    let txHashes = List.map (fun tx -> Transaction.hash tx) block.transactions
-    let transactions = List.zip txHashes block.transactions
+            Ok ()
+    )
 
-    let outputs, deltas = handleTransactions account transactions (Some block.header.blockNumber)
+let private filterOutputByConfirmations account confirmations output =
+    match output.confirmationStatus with
+    | Confirmed (blockNumber,_,_) ->
+        if confirmations = 0ul || confirmations = 1ul then
+            true
+        else
+            blockNumber <= (account.blockNumber - confirmations) + 1ul
+    | Unconfirmed -> confirmations = 0ul
 
-    // remove all transactions from list
-    let set = Set.ofList txHashes
-    let mempool = List.reject (fun (txHash,_) -> Set.contains txHash set) account.mempool
 
-    { account with
-        tip = blockHash;
-        blockNumber = block.header.blockNumber;
-        mempool = mempool;
-        outputs = outputs;
-        deltas = deltas }
+let getReceived dataAccess session view chain confirmations =
+    let account = DataAccess.Account.get dataAccess session
 
-let undoBlock block account =
-    let undoTransaction tx (outputs,mempool) =
+    let outputs =
+        View.Outputs.getAll view dataAccess session
+        |> List.filter (filterOutputByConfirmations account confirmations)
+
+    List.fold (fun received (output:Output) ->
+        let address = Address.encode chain (Address.PK output.pkHash)
+
+        let key = (address, output.spend.asset)
+
+        match Map.tryFind key received with
+        | Some amount -> Map.add key (amount + output.spend.amount) received
+        | None -> Map.add key output.spend.amount received
+    ) Map.empty outputs
+
+let getAddressOutputs dataAccess session view chain address =
+    let account = DataAccess.Account.get dataAccess session
+
+    let confirmations output =
+        match output.confirmationStatus with
+        | Confirmed (blockNumber,_,_) -> account.blockNumber - blockNumber + 1ul
+        | _ -> 0ul
+
+    let isSpent = function
+        | Spent _ -> true
+        | _ -> false
+
+    Address.decodePK chain address
+        |> Result.map (fun pkHash ->
+
+            View.AddressOutputs.get view dataAccess session pkHash
+            |> List.map (fun output -> output.outpoint, output.spend,confirmations output, isSpent output.status))
+
+let private foldToBalance outputs =
+    List.fold (fun received (output:Output) ->
+        match Map.tryFind output.spend.asset received with
+        | Some amount -> Map.add output.spend.asset (amount + output.spend.amount) received
+        | None -> Map.add output.spend.asset output.spend.amount received
+    ) Map.empty outputs
+
+let getAddressBalance dataAccess session view chain address confirmations =
+    Address.decodePK chain address
+    |> Result.map (fun pkHash ->
+        let account = DataAccess.Account.get dataAccess session
+
+        let outputs =
+            View.AddressOutputs.get view dataAccess session pkHash
+            |> List.filter (filterOutputByConfirmations account confirmations)
+
+        outputs
+        |> List.filter (fun (output:Output) -> output.status = Unspent)
+        |> foldToBalance
+    )
+
+let getBalance dataAccess session view confirmations =
+    let account = DataAccess.Account.get dataAccess session
+
+    let spendableAddresses =
+        DataAccess.Addresses.getAll dataAccess session
+        |> List.filter (fun address -> address.addressType <> WatchOnly) // Both payment and change addresses
+        |> List.map (fun address -> address.pkHash)
+        |> Set.ofList
+
+    let outputs =
+        View.Outputs.getAll view dataAccess session
+        |> List.filter (filterOutputByConfirmations account confirmations)
+
+    outputs
+    |> List.filter (fun output -> Set.contains output.pkHash spendableAddresses && output.status = Unspent)
+    |> foldToBalance
+
+let getUnspentOutputs dataAccess session view confirmations =
+    let account = DataAccess.Account.get dataAccess session
+
+    View.Outputs.getAll view dataAccess session
+    |> List.filter (filterOutputByConfirmations account confirmations)
+    |> List.map (fun output -> output.outpoint,{lock=output.lock;spend=output.spend})
+
+let addBlock dataAccess session blockHash block =
+    block.transactions
+    |> List.mapi (fun index tx -> index,tx)
+    |> List.iter (fun (blockIndex, tx) ->
         let txHash = Transaction.hash tx
 
-        let handleOutput outputs (index,output) =
+        // Mark transaction inputs as spent
+        List.iter (fun input ->
+            match input with
+            | Outpoint outpoint ->
+                match DataAccess.Outputs.tryGet dataAccess session outpoint with
+                | Some output ->
+                    {output with status = Spent (txHash, Confirmed (block.header.blockNumber, blockHash, blockIndex))}
+                    |> DataAccess.Outputs.put dataAccess session outpoint
+                | None ->
+                    ()
+            | _ -> ()
+
+        ) tx.inputs
+
+        // Add new outputs to database
+        tx.outputs
+        |> List.mapi (fun index output -> uint32 index,output)
+        |> List.choose (fun (index,output) ->
             match output.lock with
-            | Coinbase (_,pkHash) when isKeyMatch account pkHash ->
-                let outpoint = {txHash=txHash;index=index;}
-                Map.remove outpoint outputs
-            | PK pkHash when isKeyMatch account pkHash ->
-                let outpoint = {txHash=txHash;index=index;}
-                Map.remove outpoint outputs
-            | _ -> outputs
+            | Coinbase (_,pkHash)
+            | PK pkHash when (DataAccess.Addresses.contains dataAccess session pkHash) ->
+                Some (pkHash,index,output)
+            | _ -> None)
+        |> List.iter (fun (pkHash,index,output) ->
+            let outpoint = {txHash=txHash; index=index}
 
-        let handleInput outputs input =
-            match Map.tryFind input outputs with
-            | Some (Spent output) -> Map.add input (Unspent output) outputs
-            | _ -> outputs
+            let output = {
+                pkHash = pkHash
+                spend = output.spend
+                lock = output.lock
+                outpoint = outpoint
+                status = Unspent
+                confirmationStatus = Confirmed (block.header.blockNumber, blockHash, blockIndex)
+            }
 
-        let outputs' =
-            tx.inputs
-            |> List.choose (function | Outpoint outpoint -> Some outpoint | Mint _ -> None)
-            |> List.fold handleInput outputs
+            DataAccess.Outputs.put dataAccess session outpoint output
 
-        let outputsWithIndex = List.mapi (fun i output -> (uint32 i,output)) tx.outputs
-        let outputs' = List.fold handleOutput outputs' outputsWithIndex
+            // Add the new output to the address
+            DataAccess.AddressOutputs.put dataAccess session pkHash outpoint
+        )
+    )
 
-        let mempool =
-            // adding the transaction back to mempool only if the transaction affected the account
-            if outputs' <> outputs then
-                (txHash,tx) :: mempool
-            else
-                mempool
+    let account = DataAccess.Account.get dataAccess session
 
-        outputs',mempool
+    {account with blockNumber = block.header.blockNumber; blockHash = blockHash}
+    |> DataAccess.Account.put dataAccess session
 
-    let outputs,mempool = List.foldBack undoTransaction block.transactions (account.outputs,account.mempool)
+let undoBlock dataAccess session block =
+    List.rev block.transactions
+    |> List.iter (fun tx ->
+        // Unmark outputs as spent
+        List.iter (fun input ->
+            match input with
+            | Outpoint outpoint ->
+                match DataAccess.Outputs.tryGet dataAccess session outpoint with
+                | Some output ->
+                    {output with status = Unspent}
+                    |> DataAccess.Outputs.put dataAccess session outpoint
+                | None ->
+                    ()
+            | _ -> ()
 
-    {account with tip=block.header.parent;blockNumber=block.header.blockNumber - 1ul; outputs=outputs;mempool = mempool}
+        ) tx.inputs
+
+        let txHash = Transaction.hash tx
+
+        // Delete outputs
+        tx.outputs
+        |> List.mapi (fun index _ -> uint32 index)
+        |> List.iter (fun index ->
+            let outpoint = {txHash=txHash; index=index}
+
+            match DataAccess.Outputs.tryGet dataAccess session outpoint with
+            | Some output ->
+                DataAccess.Outputs.delete dataAccess session outpoint
+                DataAccess.AddressOutputs.delete dataAccess session output.pkHash outpoint
+            | None -> ()
+        )
+    )
+
+    let account = DataAccess.Account.get dataAccess session
+
+    {account with blockNumber = block.header.blockNumber - 1ul; blockHash = block.header.parent}
+    |> DataAccess.Account.put dataAccess session
 
 type private SyncAction =
     | Undo of Block
     | Add of Block * Hash
 
-let private writer = new Writer.WriterBuilder<SyncAction>()
-
-let sync tipBlockHash (getHeader:Hash -> BlockHeader) (getBlock:Hash -> Block) account =
-    let blockNumber hash =
-        if hash <> Hash.zero then
-            (getHeader hash).blockNumber
-        else
-            0ul
+let sync dataAccess session tipBlockHash (tipHeader:BlockHeader) (getHeader:Hash -> BlockHeader) (getBlock:Hash -> Block) =
+    let account = DataAccess.Account.get dataAccess session
 
     // Find the fork block of the account and the blockchain, logging actions
     // to perform. Undo each block in the account's chain but not the blockchain,
@@ -200,347 +321,109 @@ let sync tipBlockHash (getHeader:Hash -> BlockHeader) (getBlock:Hash -> Block) a
         else
             locate (((getHeader x).parent, i-1ul), ((getHeader y).parent, j-1ul)) (Add (getBlock x, x) :: Undo (getBlock y) :: acc)
 
-    let actions = locate ((tipBlockHash, blockNumber tipBlockHash), (account.tip, blockNumber account.tip)) []
+    let actions = locate ((tipBlockHash, tipHeader.blockNumber), (account.blockHash, account.blockNumber)) []
+
     let toUndo, toAdd = List.partition (function | Undo _ -> true | _ -> false) actions
     let toUndo = List.rev toUndo     // Blocks to be undo were found backwards.
     let sortedActions = toUndo @ toAdd
 
-    let account =
-        List.fold
-            <|  fun accnt ->
-                    function
-                    | Undo blk -> undoBlock blk accnt
-                    | Add (blk,hash) -> handleBlock hash blk accnt
-            <| account
-            <| sortedActions
-
-    account
-
-let getUnspentOutputs account =
-    // we first update the account according to the mempool transactions
-    let outputs, txDeltas = handleMempoolTransactions account
-
-    let outputs =
-        outputs
-        |> Map.filter (fun _ output ->
-            match output with
-            | Unspent _-> true
-            | _ -> false)
-        |> Map.map (fun _ output ->
-            match output with
-            | Unspent output -> output
-            | _ -> failwith "unexpected")
-
-    outputs, txDeltas
-
-let addTransaction txHash (tx:Transaction) account =
-    // check if the transaction is relevant to the account
-    let anyOutput = List.exists (fun output ->
-        match output.lock with
-        | PK pkHash when isKeyMatch account pkHash -> true
-        | Coinbase (_,pkHash) when isKeyMatch account pkHash -> true
-        | _ -> false) tx.outputs
-
-    let unspentOutputs, _ = getUnspentOutputs account
-
-    let anyInputs =
-        tx.inputs
-        |> List.choose (function | Outpoint outpoint -> Some outpoint | Mint _ -> None)
-        |> List.exists (fun input -> Map.containsKey input unspentOutputs)
-
-    if anyInputs || anyOutput then
-        let mempool = List.add (txHash,tx) account.mempool
-
-        {account with mempool = mempool}
-    else
-        account
-
-let getBalance account =
-    let unspent, _ = getUnspentOutputs account
-
-    Map.fold (fun balance _ output ->
-        match Map.tryFind output.spend.asset balance with
-        | Some amount -> Map.add output.spend.asset (amount+output.spend.amount) balance
-        | None -> Map.add output.spend.asset output.spend.amount balance) Map.empty unspent
+    sortedActions
+    |> List.iter (function
+        | Undo block -> undoBlock dataAccess session block
+        | Add (block,hash) -> addBlock dataAccess session hash block)
 
 
-let getHistory skip take account =
-    let list =
-        handleMempoolTransactions account
-        |> snd
-        |> List.map (fun txDelta ->
-            txDelta.txHash,
-            txDelta.deltas
-            |> List.fold (fun amounts spend ->
-                let asset, amount =
-                    match spend with
-                    | Spent spend -> spend.asset, 0L - int64 spend.amount
-                    | Unspent spend -> spend.asset, int64 spend.amount
-                let amount' =
-                    (match Map.tryFind asset amounts with
-                    | Some amount -> amount
-                    | None -> 0L)
-                Map.add asset (amount' + amount) amounts
-            ) Map.empty,
-            match txDelta.blockNumber with | Some blockNumber -> blockNumber | None -> 0ul
-        )
-        |> List.rev
+let reset dataAccess session =
+    let account = DataAccess.Account.get dataAccess session
 
-    let list = List.skip (min skip (List.length list)) list
-    List.take (min take (List.length list)) list
+    {account with blockHash = Hash.zero; blockNumber = 0ul}
+    |> DataAccess.Account.put dataAccess session
 
-let private collectInputs account amount asset secretKey =
-    let unspent, _ = getUnspentOutputs account
+    DataAccess.Outputs.truncate dataAccess session
+    DataAccess.AddressOutputs.truncate dataAccess session
 
-    let collectInputs ((inputs, keys), collectedAmount) outpoint output =
-        let isMature =
-            match output.lock with
-            | Coinbase (blockNumber,_) -> (account.blockNumber + 1ul) - blockNumber >= CoinbaseMaturity
-            | _ -> true
+let sign dataAccess session password path message = result {
+    let account = DataAccess.Account.get dataAccess session
 
-        if isMature && amount > collectedAmount && asset = output.spend.asset then
-            let keyPair = secretKey, account.publicKey
-            (((outpoint,output) :: inputs, keyPair :: keys), output.spend.amount + collectedAmount)
+    let! secretKey =
+            Secured.decrypt password account.secureMnemonicPhrase
+            >>= ExtendedKey.fromMnemonicPhrase
+            >>= ExtendedKey.derivePath path
+            >>= ExtendedKey.getPrivateKey
+
+    return Crypto.sign secretKey message
+}
+
+let getPublicKey dataAccess session password path  =
+    let account = DataAccess.Account.get dataAccess session
+
+    Secured.decrypt password account.secureMnemonicPhrase
+    >>= ExtendedKey.fromMnemonicPhrase
+    >>= ExtendedKey.derivePath path
+    >>= ExtendedKey.getPublicKey
+
+let checkPassword dataAccess session password =
+    let account = DataAccess.Account.get dataAccess session
+
+    Secured.decrypt password account.secureMnemonicPhrase
+    |> Result.map ignore
+
+let getMnemonicPhrase dataAccess session password =
+    let account = DataAccess.Account.get dataAccess session
+
+    Secured.decrypt password account.secureMnemonicPhrase
+
+let getHistory dataAccess session view skip take =
+    let account = DataAccess.Account.get dataAccess session
+
+    let outputs = View.Outputs.getAll view dataAccess session
+
+    let getConfirmations confirmationStatus =
+        match confirmationStatus with
+        | Confirmed (blockNumber,_,blockIndex) ->
+            account.blockNumber - blockNumber + 1ul, blockIndex
+        | Unconfirmed ->
+            0ul,0
+
+    let incoming = List.map (fun output ->
+        let txHash = output.outpoint.txHash
+        let confirmations,blockIndex = getConfirmations output.confirmationStatus
+
+        txHash, output.spend.asset, output.spend.amount |> bigint,confirmations,blockIndex) outputs
+
+    let outgoing = List.choose (fun output ->
+        match output.status with
+        | Unspent -> None
+        | Spent (txHash,confirmationStatus) ->
+            let confirmations,blockIndex = getConfirmations confirmationStatus
+
+            (txHash, output.spend.asset, output.spend.amount |> bigint |> (*) -1I,confirmations,blockIndex)
+            |> Some) outputs
+
+    let all =
+        incoming @ outgoing
+        |> List.fold (fun txs (txHash, asset, amount, confirmations, blockIndex) ->
+            match Map.tryFind (txHash, asset) txs with
+            | None -> Map.add (txHash, asset) (amount, confirmations, blockIndex) txs
+            | Some (amount',_,_) -> Map.add (txHash, asset) (amount + amount', confirmations, blockIndex) txs) Map.empty
+        |> Map.toSeq
+        |> Seq.map (fun ((txHash, asset),(amount, confirmations, blockIndex)) ->
+            if amount >= 0I then
+                (txHash,TransactionDirection.In, {asset=asset;amount = uint64 amount}, confirmations, blockIndex)
+            else
+                (txHash,TransactionDirection.Out, {asset=asset;amount = amount * -1I |> uint64}, confirmations, blockIndex))
+        |> List.ofSeq
+
+    let comparer (_,_,_,x1,x2) (_,_,_,y1,y2) =
+        if x1 < y1 then
+            -1
+        elif x1 > y1 then
+           1
         else
-            ((inputs, keys), collectedAmount)
+            y2 - x2
 
-    let (inputs, keys), collectedAmount = Map.fold collectInputs (([],[]),0UL) unspent
+    List.sortWith comparer all
+    |> List.skip skip
+    |> fun xs -> if List.length xs < take then xs else List.take take xs
+    |> List.map (fun (txHash,direction,spend,confirmations,_) -> txHash,direction,spend,confirmations)
 
-    if collectedAmount >= amount then
-        Ok (inputs,keys,collectedAmount)
-    else
-        Error "Not enough tokens"
-
-let private addChange inputAmount asset account outputs =
-    let outputAmount =
-        List.filter (fun o -> o.spend.asset = asset) outputs
-        |> List.sumBy (fun o -> o.spend.amount)
-
-    if inputAmount > outputAmount then
-        let changeOutput =
-            {
-                spend = { amount=(inputAmount-outputAmount);asset=asset};
-                lock = PK (PublicKey.hash account.publicKey)
-            }
-
-        List.add changeOutput outputs
-    else
-        outputs
-
-let createTransactionFromLock lk spend (account, extendedKey) = result {
-    let! zenKey = deriveZenKey extendedKey
-    let! secretKey = ExtendedKey.getPrivateKey zenKey
-
-    let! (inputs, keys, inputAmount) = collectInputs account spend.amount spend.asset secretKey
-    let inputPoints = List.map (fst >> Outpoint) inputs
-    let outputs = addChange inputAmount spend.asset account [{ spend = spend; lock = lk }]
-    return
-        Transaction.sign keys { version = Version0
-                                inputs = inputPoints
-                                outputs = outputs
-                                witnesses = []
-                                contract = None }
-}
-
-let createTransaction pkHash spend accoundData =
-    createTransactionFromLock (PK pkHash) spend accoundData
-
-let createContractRecord code =
-    result {
-        let contractId = Contract.makeContractId Version0 code
-
-        let! hints = Measure.measure
-                        (sprintf "recording hints for contract %A" contractId)
-                        (lazy(Contract.recordHints code))
-        let! queries = ZFStar.totalQueries hints
-
-        return
-            (contractId,
-                {   code = code
-                    hints = hints
-                    rlimit = rlimit
-                    queries = queries })
-    }
-
-let createActivationTransactionFromContract chain (contractId, ({queries=queries;code=code} as contractV0)) (numberOfBlocks:uint32) (account, extendedKey) =
-
-    result {
-        let codeLength = String.length code |> uint64
-
-        let activationFee = queries * rlimit |> uint64
-        let activationSacrifice = chain.sacrificePerByteBlock * codeLength * (uint64 numberOfBlocks)
-
-        let! zenKey = deriveZenKey extendedKey
-        let! secretKey = ExtendedKey.getPrivateKey zenKey
-
-        let! (inputs,keys,inputAmount) = collectInputs account (activationSacrifice + activationFee) Asset.Zen secretKey
-        let inputPoints = List.map (fst >> Outpoint) inputs
-
-        let outputs =
-            [
-                { spend = { amount = activationSacrifice; asset = Asset.Zen }; lock = ActivationSacrifice }
-                { spend = { amount = activationFee; asset = Asset.Zen }; lock = Fee }
-            ]
-            |> addChange inputAmount Asset.Zen account
-
-        return Transaction.sign
-            keys
-            {
-                version = Version0
-                inputs = inputPoints
-                outputs = outputs
-                witnesses = []
-                contract = Some (V0 contractV0)
-            }
-    }
-
-let createActivateContractTransaction chain code (numberOfBlocks:uint32) (account, extendedKey) =
-    result {
-        let! contractWithId = createContractRecord code
-        return! createActivationTransactionFromContract chain contractWithId numberOfBlocks (account, extendedKey)
-
-    }
-
-let createExtendContractTransaction client chainParams (contractId:ContractId) (numberOfBlocks:uint32) (account, extendedKey) =
-    let activeContracts = Blockchain.getActiveContracts client
-
-    result {
-        let! code =
-            activeContracts
-            |> List.tryFind (function
-                             | { contractId = contractId' } when contractId' = contractId -> true
-                             | _ -> false)
-            |> function
-            | Some activeContract -> Ok activeContract.code
-            | None -> Error "contract is not active"
-
-        let codeLength = String.length code |> uint64
-        let extensionSacrifice = chainParams.sacrificePerByteBlock * codeLength * (uint64 numberOfBlocks)
-        let spend = { amount = extensionSacrifice; asset = Asset.Zen }
-
-        let! zenKey = deriveZenKey extendedKey
-        let! secretKey = ExtendedKey.getPrivateKey zenKey
-
-        let! (inputs,keys,inputAmount) = collectInputs account spend.amount spend.asset secretKey
-        let inputPoints = List.map (fst >> Outpoint) inputs
-
-        let outputs =
-            [{ spend = spend; lock = ExtensionSacrifice contractId }]
-            |> addChange inputAmount spend.asset account
-        return Transaction.sign
-            keys
-            {
-                version = Version0
-                inputs = inputPoints
-                outputs = outputs
-                witnesses = []
-                contract = None
-            }
-    }
-
-let addReturnAddressToData publicKey data =
-    let addReturnAddressToData' dict =
-        let returnAddress = PK (PublicKey.hash publicKey)
-
-        Zen.Dictionary.add "returnAddress"B (ZData.Lock (ZFStar.fsToFstLock returnAddress)) dict
-        |> Cost.__force
-        |> ZData.Dict
-        |> ZData.Collection
-        |> Some
-        |> Ok
-
-    match data with
-    | Some (ZData.Collection (ZData.Dict dict)) -> addReturnAddressToData' dict
-    | None -> addReturnAddressToData' Zen.Dictionary.empty
-    | _ -> Error "data can only be empty or dict in order to add return address"
-
-let private signFirstWitness signKey tx = result {
-    match signKey with
-    | Some signKey ->
-        let! witnessIndex =
-            List.tryFindIndex (fun witness ->
-                match witness with
-                | ContractWitness _ -> true
-                | _ -> false) tx.witnesses
-            |> ofOption "missing contact witness"
-        let! wintess =
-            match tx.witnesses.[witnessIndex] with
-            | ContractWitness cw -> Ok cw
-            | _ -> Error "missing contact witness"
-
-        let txHash = Transaction.hash tx
-
-        let! signature = ExtendedKey.sign txHash signKey
-        let! publicKey = ExtendedKey.getPublicKey signKey
-
-        let witness = {wintess with signature=Some (publicKey,signature)}
-        let witnesses = List.update witnessIndex (ContractWitness witness) tx.witnesses
-
-        return {tx with witnesses = witnesses}
-    | None -> return tx
-}
-
-let createExecuteContractTransaction executeContract (contractId:ContractId) command data provideReturnAddress sign spends (account, extendedKey) = result {
-    let Zen = Asset.Zen
-    let mutable txSkeleton = TxSkeleton.empty
-    let mutable keys = List.empty
-
-    let! zenKey = deriveZenKey extendedKey
-    let! secretKey = ExtendedKey.getPrivateKey zenKey
-    let pkHash = PublicKey.hash account.publicKey
-
-    if Map.isEmpty spends then
-        // To avoid rejection of a valid contract transaction due to possible all-mint inputs
-        // or same txhash, until we implement fees, we include a temp fee of one kalapa
-        let tempFeeAmount = 1UL
-
-        let! inputs, keys', collectedAmount =
-            collectInputs account tempFeeAmount Zen secretKey
-        let inputs = List.map TxSkeleton.Input.PointedOutput inputs
-
-        txSkeleton <-
-            TxSkeleton.addInputs inputs txSkeleton
-            |> TxSkeleton.addChange Zen collectedAmount tempFeeAmount pkHash
-
-        let feeOutput = { lock = Fee; spend = { amount = tempFeeAmount; asset = Zen } }
-        txSkeleton <- TxSkeleton.addOutput feeOutput txSkeleton
-
-        keys <- List.append keys keys'
-    else
-        for (asset, amount) in Map.toSeq spends do
-            let! inputs, keys', collectedAmount =
-                collectInputs account amount asset secretKey
-            let inputs = List.map TxSkeleton.Input.PointedOutput inputs
-
-            txSkeleton <-
-                TxSkeleton.addInputs inputs txSkeleton
-                |> TxSkeleton.addChange asset collectedAmount amount pkHash
-
-            keys <- List.append keys keys'
-
-    let! data =
-        if provideReturnAddress then
-            addReturnAddressToData account.publicKey data
-        else
-            Ok data
-
-    let! signKey =
-        match sign with
-        | Some keyPath ->
-            ExtendedKey.derivePath keyPath extendedKey
-            <@> Some
-        | None -> Ok None
-
-    let! sender =
-        match signKey with
-        | Some signKey ->
-            ExtendedKey.getPublicKey signKey
-            <@> Some
-        | None -> Ok None
-
-    let! unsignedTx = executeContract contractId command sender data txSkeleton
-
-    let sign tx = signFirstWitness signKey tx <@> Transaction.sign keys
-
-    return! sign unsignedTx
-}

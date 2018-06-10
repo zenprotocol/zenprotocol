@@ -31,7 +31,7 @@ let cf _ _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 20)
 
 let sampleContractId = Contract.makeContractId Version0 sampleContractCode
 
-let contractWithId = Account.createContractRecord sampleContractCode
+let contractWithId = TestWallet.createContractRecord sampleContractCode
 
 let private sampleContractTester txSkeleton contractId =
     let spend = {

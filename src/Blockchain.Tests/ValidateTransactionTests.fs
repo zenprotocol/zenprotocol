@@ -27,7 +27,7 @@ let chain = Chain.getChainParameters Chain.Local
 // Helper functions for the tests
 let getStringBytes (str : string) = System.Text.Encoding.UTF8.GetBytes str
 let createTransaction address amount account =
-    match Account.createTransaction address { asset = Asset.Zen; amount = amount } account with
+    match TestWallet.createTransaction address { asset = Asset.Zen; amount = amount } account with
     | Result.Ok tx -> tx
     | Result.Error error -> failwith error
 let getTxOutpoints txHash tx = [ for i in 0 .. List.length tx.outputs - 1 -> {txHash=txHash;index= uint32 i} ]
@@ -163,7 +163,7 @@ let ``origin tx hit mempool, orphan tx should be added to mempool``() =
     let tx1Hash = Transaction.hash tx1
 
     let tx2 =
-        (Account.addTransaction tx1Hash tx1 account1, account1Key)
+        (TestWallet.addTransaction tx1Hash tx1 account1, account1Key)
         |> createTransaction (publicKeyHash account2) 1UL
     let tx2Hash = Transaction.hash tx2
 
@@ -206,7 +206,7 @@ let ``orphan transaction is eventually invalid``() =
 
     let tx2 =
         let tx =
-            (Account.addTransaction tx1Hash tx1 account1, account1key)
+            (TestWallet.addTransaction tx1Hash tx1 account1, account1key)
             |> createTransaction (publicKeyHash account2) 2UL
         // let's change one of the outputs value and reassign to make invalid tx
         let output = tx.outputs.[0]
@@ -254,12 +254,12 @@ let ``two orphan transaction spending same input``() =
     let tx1Hash = Transaction.hash tx1
 
     let tx2 =
-        (Account.addTransaction tx1Hash tx1 account1, account1Key)
+        (TestWallet.addTransaction tx1Hash tx1 account1, account1Key)
         |> createTransaction (publicKeyHash account2) 1UL
     let tx2Hash = Transaction.hash tx2
 
     let tx3 =
-        (Account.addTransaction tx1Hash tx1 account1, account1Key)
+        (TestWallet.addTransaction tx1Hash tx1 account1, account1Key)
         |> createTransaction (publicKeyHash account3) 1UL
     let tx3Hash = Transaction.hash tx3
 
@@ -311,7 +311,7 @@ let ``Valid contract should be added to ActiveContractSet``() =
 
     let tx =
         let txResult = Result.bind (fun cWithId ->
-            Account.createActivationTransactionFromContract chain cWithId 1ul rootAccount) contractWithId
+            TestWallet.createActivationTransactionFromContract chain cWithId 1ul rootAccount) contractWithId
         match txResult with
             | Result.Ok tx ->
                 tx
@@ -349,7 +349,7 @@ let ``Invalid contract should not be added to ActiveContractSet or mempool``() =
     let contractId = Contract.makeContractId Version0 contractCode
 
     let tx =
-        let input, output = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head
+        let input, output = TestWallet.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head
         let output' = {output with lock=PK (publicKeyHash rootAccount)}
         { version=Version0; inputs=[ Outpoint input ]; outputs=[ output' ]; witnesses=[]; contract = Some (V0 { code = contractCode; hints = ""; rlimit = 0u; queries = 0u }) }
         |> (Transaction.sign [ rootKeyPair ])
@@ -387,7 +387,7 @@ let ``contract activation arrived, running orphan transaction``() =
     let account = createTestAccount()
 
     let activationTransaction =
-        Account.createActivationTransactionFromContract chain contractWithId 1ul account
+        TestWallet.createActivationTransactionFromContract chain contractWithId 1ul account
         |> getResult
     let activationTxHash = Transaction.hash activationTransaction
 

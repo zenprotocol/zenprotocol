@@ -29,6 +29,9 @@ let addInputs inputs (txSkeleton:T) =
 let addOutput output (txSkeleton:T) =
     {txSkeleton with outputs=List.append txSkeleton.outputs [output]}
 
+let addOutputs outputs (txSkeleton:T) =
+    {txSkeleton with outputs=List.append txSkeleton.outputs outputs}
+
 let addChange asset inputsAmount outputsAmount pkHash txSkeleton =
     if inputsAmount > outputsAmount then
         addOutput {lock=PK pkHash;spend={amount=inputsAmount-outputsAmount;asset=asset}} txSkeleton

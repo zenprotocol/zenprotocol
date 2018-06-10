@@ -4,6 +4,21 @@ open FSharp.Data
 open Api.Types
 open Consensus.Types
 
+let rec omitNullFields = function
+    | JsonValue.Array items ->
+        items
+        |> Array.map omitNullFields
+        |> JsonValue.Array
+    | JsonValue.Record properties ->
+        properties
+        |> Array.filter (fun (_,jsonValue) ->
+            match jsonValue with
+            | JsonValue.Null -> false
+            | _ -> true)
+        |> Array.map (fun (name,value) -> name, omitNullFields value)
+        |> JsonValue.Record
+    | value -> value
+
 let spendEncoder spend =
     SpendJson.Root (spend.asset.AsString, (int64)spend.amount)
     |> fun j -> j.JsonValue
@@ -42,8 +57,7 @@ let lockEncoder (lock:Lock) =
         let hvJson = LockJson.HighVLock ((int)identifier, FsBech32.Base16.encode data)
         LockJson.Record (None, None, None, None, Some hvJson)
         |> LockJson.Root
-    |> fun j -> j.JsonValue
-
+    |> fun json -> json.JsonValue
 
 let outputEncoder (output:Output) =
     JsonValue.Record [|
@@ -59,6 +73,7 @@ let transactionEncoder (tx:Transaction) =
             ("outputs", JsonValue.Array [| for op in tx.outputs -> outputEncoder op |])
             // witnesses and contracts not yet sent
         |]
+    |> omitNullFields
 
 let blockHeaderEncoder (bh:BlockHeader) =
     BlockHeaderJson.Root (
