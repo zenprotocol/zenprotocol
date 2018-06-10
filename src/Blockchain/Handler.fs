@@ -156,6 +156,15 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
             }:ActiveContract)
         |> List.ofSeq
         |> requestId.reply<ActiveContract list>
+    | GetActiveContract contractId ->
+        ActiveContractSet.tryFind contractId state.memoryState.activeContractSet
+        |> Option.map (fun contract ->
+            {
+                contractId = contract.contractId
+                expiry = contract.expiry
+                code = contract.code
+            }:ActiveContract)
+        |> requestId.reply
     | GetHeaders ->
         let rec getHeaders tip headers =
             let header = BlockRepository.getHeader session tip

@@ -13,11 +13,11 @@ let MDB_DUPFIXED =  0x10ul
 let MDB_NODUPDATA = 0x20ul
 
 
-let MDB_KEYEXIST = -30799  
+let MDB_KEYEXIST = -30799
 
 let MDB_NOTFOUND = -30798
 
-type CursorOperation = 
+type CursorOperation =
     | First = 0
     | FirstDuplicate = 1
     | GetBoth = 2
@@ -35,7 +35,7 @@ type CursorOperation =
     | PreviousNoDuplicate=14
     | Set=15
     | SetKey=16
-    | SetRange=17    
+    | SetRange=17
 
 [<Struct;StructLayout(LayoutKind.Sequential)>]
 type Data =
@@ -64,6 +64,9 @@ extern int mdb_dbi_open(IntPtr txn, string name, uint32 flags, uint32& db)
 
 [<DllImport("lmdb", CallingConvention = CallingConvention.Cdecl)>]
 extern void mdb_dbi_close(IntPtr env, uint32 dbi)
+
+[<DllImport("lmdb", CallingConvention = CallingConvention.Cdecl)>]
+extern int mdb_drop(IntPtr txn, uint32 dbi, int del);
 
 [<DllImport("lmdb", CallingConvention = CallingConvention.Cdecl)>]
 extern int mdb_txn_begin(IntPtr env, IntPtr parent, uint32 flags, IntPtr& txn)
@@ -95,41 +98,41 @@ extern int mdb_cursor_get(IntPtr cursor, Data& key, Data& data, CursorOperation 
 [<DllImport("lmdb", CallingConvention = CallingConvention.Cdecl)>]
 extern IntPtr mdb_strerror(int err);
 
-let errorToString err = 
+let errorToString err =
     let handle = mdb_strerror err
-    
+
     Marshal.PtrToStringAnsi (handle)
 
-let checkErrorCode result = 
+let checkErrorCode result =
     if result <> 0 then
-        failwith (errorToString result)     
-        
+        failwith (errorToString result)
+
 type PinnedByteArray =
     | PinnedByteArray of GCHandle*byte[]
-    interface System.IDisposable with   
-        member x.Dispose () =            
-            let (PinnedByteArray (handle,_)) = x            
-            handle.Free()           
-        
+    interface System.IDisposable with
+        member x.Dispose () =
+            let (PinnedByteArray (handle,_)) = x
+            handle.Free()
+
 let dataToByteArray (value:Data) =
-    let count = int32 value.size 
+    let count = int32 value.size
     let bytes = Array.zeroCreate<byte> count
-    
+
     Marshal.Copy (value.data,bytes,0,count)
-    
+
     bytes
-    
+
 let byteArrayToData (PinnedByteArray (_, bytes)) =
     let address = Marshal.UnsafeAddrOfPinnedArrayElement (bytes,0)
- 
-    {size=Array.length bytes |> uint64; data=address}  
 
-let pin data = 
+    {size=Array.length bytes |> uint64; data=address}
+
+let pin data =
     let handle = GCHandle.Alloc (data,GCHandleType.Pinned)
-    
-    PinnedByteArray (handle,data)                  
 
-[<CompilationRepresentation (CompilationRepresentationFlags.ModuleSuffix)>]   
+    PinnedByteArray (handle,data)
+
+[<CompilationRepresentation (CompilationRepresentationFlags.ModuleSuffix)>]
 module Data =
-    let empty = {size=0UL;data=IntPtr.Zero}        
-            
+    let empty = {size=0UL;data=IntPtr.Zero}
+

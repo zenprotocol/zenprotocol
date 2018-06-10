@@ -2,6 +2,7 @@ module Wallet.Tests.SerializationTests
 
 open Consensus
 open Consensus.Serialization.Serialization
+open Consensus.Tests
 open Hash
 open Types
 open Transaction
@@ -10,66 +11,86 @@ open FsCheck
 open FsCheck.NUnit
 open Wallet
 open FsUnit
+open Infrastructure.Result
 open Serialization
-open Wallet.Account
+open Wallet.Types
+
 
 type WalletGenerators =
-    static member HashGenerator() =
+
+    static member ExtendedPublicKeyGenerator() =
         gen {
-            let! bytes = Gen.arrayOfLength Hash.Length Arb.generate<byte>
-            return Hash bytes
-        }
-    static member PublicKeyGenerator() =
-        gen {
-            let _, publicKey = Crypto.KeyPair.create()
+            let! seed = Gen.arrayOfLength 64 Arb.generate<byte>
+            let publicKey =
+                ExtendedKey.create seed
+                >>= ExtendedKey.neuter
+                |> get
+
             return publicKey
         }
-    static member TxDeltaGenerator() =
+
+    static member OutputGenerator() =
         gen {
-            let! txHash = WalletGenerators.HashGenerator()
-            let! deltas = Arb.generate<List<SpendStatus>>
-            let! blockNumber = Arb.generate<Option<uint32>> 
+            let! pkHash = ConsensusGenerator.HashGenerator().Generator
+            let! spend = Arb.generate<Spend>
+            let lock = PK pkHash
+            let! outpoint = Arb.generate<Outpoint>
+            let! status = Arb.generate<Status>
+            let! confirmationStatus = Arb.generate<ConfirmationStatus>
+
+            return {
+                pkHash=pkHash
+                spend=spend
+                lock=lock
+                outpoint=outpoint
+                status=status
+                confirmationStatus=confirmationStatus
+            }
+        }
+        |> Arb.fromGen
+
+    static member AccountGenerator() =
+        gen {
+            let! blockNumber = Arb.generate<uint32>
+            let! blockHash = ConsensusGenerator.HashGenerator().Generator
+            let! counter = Arb.generate<int32>
+            let! publicKey = WalletGenerators.ExtendedPublicKeyGenerator()
+            let! secure = Gen.arrayOf Arb.generate<byte>
+            let! externalPkHash = ConsensusGenerator.HashGenerator().Generator
+            let! changePKHash = ConsensusGenerator.HashGenerator().Generator
 
             return
                 {
-                    txHash = txHash
-                    deltas = deltas
-                    blockNumber = blockNumber
+                    blockNumber=blockNumber
+                    blockHash=blockHash
+                    counter=counter
+                    publicKey=publicKey
+                    secureMnemonicPhrase=secure
+                    externalPKHash=externalPkHash
+                    changePKHash=changePKHash
                 }
         }
         |> Arb.fromGen
 
-    static member WalletGenerator() =
-        gen {
-            let! deltas = Arb.generate<List<TxDelta>>
-            let! outputs = Arb.generate<Map<Outpoint, OutputStatus>>
-            let! transactions = Gen.listOf <| Consensus.Tests.ConsensusGenerator.Transaction().Generator
-            let transactions = List.map (fun tx -> { tx with witnesses = [] }) transactions
-            let txHashes = List.map Transaction.hash transactions
-            let mempool = List.zip txHashes transactions
-            let! tip = WalletGenerators.HashGenerator()
-            let! blockNumber = Arb.generate<uint32> 
-            let! publicKey = WalletGenerators.PublicKeyGenerator()
-            
-            return
-                {
-                    deltas = deltas
-                    outputs = outputs
-                    mempool = mempool
-                    tip = tip
-                    blockNumber = blockNumber
-                    publicKey = publicKey
-                }            
-        }
-        |> Arb.fromGen
-    
 [<OneTimeSetUp>]
 let setup = fun () ->
     Arb.register<Consensus.Tests.ConsensusGenerator>() |> ignore
     Arb.register<WalletGenerators>() |> ignore
 
-[<Property(EndSize=10000)>]
-let ``Wallet serialization round trip produces same result`` (value:Account.T) =
+[<Property(EndSize=10000,MaxTest=1000)>]
+let ``Account serialization round trip produces same result`` (value:Account) =
     value
-    |> Wallet.serialize
-    |> Wallet.deserialize = Some value
+    |> Account.serialize
+    |> Account.deserialize = Some value
+
+[<Property(EndSize=10000,MaxTest=1000)>]
+let ``Address serialization round trip produces same result`` (value:Address) =
+    value
+    |> Address.serialize
+    |> Address.deserialize = Some value
+
+[<Property(EndSize=10000,MaxTest=1000)>]
+let ``Output serialization round trip produces same result`` (value:Output) =
+    value
+    |> Output.serialize
+    |> Output.deserialize = Some value

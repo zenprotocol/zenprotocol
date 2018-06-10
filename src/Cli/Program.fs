@@ -152,23 +152,15 @@ let main argv =
         | Some (History args) ->
             let skip, take = args.GetResult <@ Pagination_Arguments @>
             let transactions =
-                "wallet/transactions"
+                sprintf "wallet/transactions?skip=%d&take=%d" skip take
                 |> getUri
-                |> (new TransactionsRequestJson.Root(skip, take))
-                    .JsonValue.Request
-                |> getResponse
-                |> TransactionsResponseJson.Parse
+                |> TransactionsResponseJson.Load
 
-            printfn "TxHash\t| Block\t Asset\t| Amount"
+            printfn "TxHash\t| Asset\t| Amount\t|Confirmations"
             printfn "==================================================="
 
             Array.iter (fun (entry:TransactionsResponseJson.Root) ->
-                printfn "\n%s\t%i" entry.TxHash entry.BlockNumber
-
-                Array.iter (fun (amount:TransactionsResponseJson.Delta) ->
-                    printfn "\t| %s\t| %d" amount.Asset amount.Amount
-                ) entry.Deltas
-
+                printfn "%s\t%s\t%d\t%d" entry.TxHash entry.Asset entry.Amount entry.Confirmations
             ) transactions
         | Some (Address _) ->
             let result =

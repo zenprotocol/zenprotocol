@@ -23,6 +23,7 @@ type ReaderBuilder() =
     member this.Return x = fun buffer -> Some x,buffer
     member this.Yield x = fun buffer -> Some x,buffer
     member this.YieldFrom (r:Reader<'a>) = fun (stream:Stream.T) -> r stream
+    member this.ReturnFrom (r:Reader<'a>) = fun (stream:Stream.T) -> r stream
     member this.For (seq,body) =
         fun (stream:Stream.T) ->
             let xs,stream = Seq.fold (fun (list, stream) i ->
@@ -391,7 +392,7 @@ module Serialization =
             ops.writeNumber8 res
         let private write72 ops = fun s ->
             ops.writeNumber1 0xFEuy
-            >> ops.writeNumber8 s 
+            >> ops.writeNumber8 s
         let write ops = fun amount ->
             let s,e,f = parse amount
             if f <= 3
