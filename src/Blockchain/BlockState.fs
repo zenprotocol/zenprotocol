@@ -17,15 +17,11 @@ type T =
     }
     
 let initAcs (contracts : ContractState list) contractPath =
-    let getOk (contractId,result) =
-         match result with
-         | Ok x -> contractId,x
-         | Error error -> failwithf "cannot load contract from db due to %A" error
-  
     contracts
     |> List.map (fun contractState ->
         ContractId.contractHash contractState.contractId,
-        Contract.load contractPath contractState.expiry contractState.code contractState.contractId)
-    |> List.map getOk
+        Contract.load contractPath contractState.expiry contractState.code contractState.contractId
+        |> Result.mapError failwith
+        |> Infrastructure.Result.get)
     |> List.toArray
     |> SparseMerkleTree.addMultiple ActiveContractSet.empty

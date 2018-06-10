@@ -830,7 +830,7 @@ module Serialization =
                     PublicKey.write ops publicKey
                     >> Signature.write ops signature
                   ) cw.signature
-                >> VarInt.write ops cw.cost
+                >> ops.writeNumber8 cw.cost //TODO: optimize
             | HighVWitness (_, bytes) ->
                 FixedSizeBytes.write ops bytes
 
@@ -868,7 +868,7 @@ module Serialization =
                         let! signature = Signature.read
                         return publicKey, signature
                     })
-                    let! cost = VarInt.read
+                    let! cost = readNumber8 //TODO: optimize
                     return ContractWitness {
                         contractId = contractId
                         command = command

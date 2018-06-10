@@ -91,7 +91,7 @@ type ContractWitness =
         inputsLength: uint32
         outputsLength: uint32
         signature: (PublicKey * Signature) option
-        cost: uint32
+        cost: uint64
     }
     with
         member x.endOutputs = x.beginOutputs + x.outputsLength - 1ul

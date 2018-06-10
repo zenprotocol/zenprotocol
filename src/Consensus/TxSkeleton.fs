@@ -116,5 +116,5 @@ let getContractWitness contractId command messageBody stateCommitment initialTxS
         inputsLength = length finalTxSkeleton.pInputs - length initialTxSkelton.pInputs
         outputsLength = length finalTxSkeleton.outputs - length initialTxSkelton.outputs
         signature = None
-        cost = uint32 cost
+        cost = uint64 cost
     }

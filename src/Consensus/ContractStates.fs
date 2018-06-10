@@ -12,13 +12,10 @@ type T = Map<ContractId, data option>
 
 let asDatabase = Map.empty
 
-let private get getState contract states =
+let tryGetState getState contract states =
     match Map.tryFind contract states with
         | Some x -> x
         | None -> getState contract
-
-let tryGetState getState states contractId =
-    get getState contractId states
 
 let tryFind contractId states =
     match Map.tryFind contractId states with

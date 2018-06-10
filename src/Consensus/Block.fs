@@ -239,7 +239,7 @@ let validate chain =
     >=> checkCommitments
 
 /// Apply block to UTXO and ACS, operation can fail
-let connect chain getUTXO contractsPath (parent:BlockHeader) timestamp utxoSet acs contractCache ema contractStates =
+let connect chain getUTXO contractsPath (parent:BlockHeader) timestamp utxoSet acs contractCache ema getContractState contractStates =
     let checkBlockNumber (block:Block) =
         if parent.blockNumber + 1ul <> block.header.blockNumber then
             Error "blockNumber mismatch"
@@ -277,7 +277,7 @@ let connect chain getUTXO contractsPath (parent:BlockHeader) timestamp utxoSet a
                 let txHash = (Transaction.hash tx)
 
                 let! _,acs,contractCache,contractStates =
-                    TransactionValidation.validateInContext chain getUTXO contractsPath block.header.blockNumber block.header.timestamp acs contractCache set contractStates txHash tx
+                    TransactionValidation.validateInContext chain getUTXO contractsPath block.header.blockNumber block.header.timestamp acs contractCache set getContractState contractStates txHash tx
                     |> Result.mapError (sprintf "transactions failed inputs validation due to %A")
 
                 let set = UtxoSet.handleTransaction getUTXO txHash tx set
@@ -335,21 +335,19 @@ let connect chain getUTXO contractsPath (parent:BlockHeader) timestamp utxoSet a
         else
             Error "commitments mismatch"
 
-    let checkWeight (block,ema) = result {
+    let checkWeight (block,set,acs,ema,contractCache,contractStates) = result {
         let! weight = Weight.blockWeight getUTXO utxoSet block
         let maxWeight = chain.maxBlockWeight
         if weight <= maxWeight
         then
-            return block,ema
+            return block,set,acs,ema,contractCache,contractStates
         else
-            let err = sprintf
-                        "Block weight of %A is greater than maximum block weight %A" weight maxWeight
-            return! Error err
+            return! Error "block weight exceeds maximum"
     }
 
     checkBlockNumber
     >=> checkDifficulty
-    >=> checkWeight
     >=> checkTxInputs
+    >=> checkWeight
     >=> checkCoinbase
     >=> checkCommitments

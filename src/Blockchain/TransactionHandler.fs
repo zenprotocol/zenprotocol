@@ -20,7 +20,7 @@ let private validateOrphanTransaction chainParams session contractPath blockNumb
     effectsWriter
         {
             match TransactionValidation.validateInContext chainParams (getUTXO session) contractPath (blockNumber + 1ul) timestamp
-                    state.activeContractSet state.contractCache state.utxoSet state.contractStates txHash tx with
+                    state.activeContractSet state.contractCache state.utxoSet (getContractState session) state.contractStates txHash tx with
             | Ok (tx, acs, contractCache, contractStates) ->
                 let utxoSet = UtxoSet.handleTransaction (getUTXO session) txHash tx state.utxoSet
                 let mempool = MemPool.add txHash tx state.mempool
@@ -73,11 +73,11 @@ let rec validateOrphanTransactions chainParams session contractPath blockNumber 
             return state'
     }
 
-let validateInputs chainParams session contractPath blockNumber timestamp txHash tx state shouldPublishEvents =
+let validateInputs chainParams session contractPath blockNumber timestamp txHash tx state shouldPublishEvents getContractState =
     effectsWriter
         {
             match TransactionValidation.validateInContext chainParams (getUTXO session) contractPath (blockNumber + 1ul) timestamp
-                    state.activeContractSet state.contractCache state.utxoSet state.contractStates txHash tx with
+                    state.activeContractSet state.contractCache state.utxoSet (getContractState session) state.contractStates txHash tx with
             | Error Orphan ->
                 let orphanPool = OrphanPool.add txHash tx state.orphanPool
 
@@ -149,7 +149,7 @@ let validateTransaction chainParams session contractPath blockNumber timestamp t
 
                 return state
             | Ok tx ->
-                return! validateInputs chainParams session contractPath blockNumber timestamp txHash tx state true
+                return! validateInputs chainParams session contractPath blockNumber timestamp txHash tx state true getContractState
     }
 
 let executeContract session txSkeleton timestamp contractId command sender messageBody state commitToState =
@@ -173,7 +173,7 @@ let executeContract session txSkeleton timestamp contractId command sender messa
                 }
 
             let contractState =
-                ContractStates.tryGetState (getContractState session) contractStates contract.contractId
+                ContractStates.tryGetState (getContractState session) contract.contractId contractStates
 
             let stateCommitment = 
                 if commitToState then
@@ -211,7 +211,7 @@ let executeContract session txSkeleton timestamp contractId command sender messa
                     let totalCost = cost + totalCost
 
                     // We can now commit to the cost, so lets alter it with the real cost
-                    let witness = {witness with cost = uint32 cost}
+                    let witness = {witness with cost = uint64 cost}
 
                     let witnesses = List.add (ContractWitness witness) witnesses
 

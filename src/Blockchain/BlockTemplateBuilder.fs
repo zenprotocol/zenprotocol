@@ -7,6 +7,7 @@ open Blockchain.State
 open Consensus
 
 let getUTXO = UtxoSetRepository.get
+let getContractState = ContractStateRepository.get
 
 // We pre-compute the weights of all transactions in the mempool.
 // It may be better to compute the weights when transactions are inserted, but
@@ -37,7 +38,7 @@ let selectOrderedTransactions (chain:Chain.ChainParameters) (session:DatabaseCon
         let newWeight = weight+wt
         if newWeight > maxWeight then (state, added, notAdded, false, weight) else
         validateInContext chain (getUTXO session) contractPath (blockNumber + 1ul) timestamp
-            state.activeContractSet state.contractCache state.utxoSet ContractStates.asDatabase txHash tx
+            state.activeContractSet state.contractCache state.utxoSet (getContractState session) ContractStates.asDatabase txHash tx
         |> function
             | Error (Orphan | ContractNotActive) ->
                 (state, added, (txHash,tx,wt)::notAdded, altered, weight)
