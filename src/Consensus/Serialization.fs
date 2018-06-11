@@ -215,8 +215,17 @@ module Serialization =
             Map.toList
             >> Seq.write ops writerFn
         let read readerFn = reader {
-            let! seq = Seq.read readerFn
-            return Map.ofSeq seq
+            let! l = List.read readerFn
+            
+            let rec isSorted l =
+                match l with
+                | [] | [_] -> true
+                | h1::(h2::_ as tail) -> h1 <= h2 && isSorted tail
+ 
+            if not <| isSorted l then 
+                yield! fail
+            else
+                return Map.ofList l
         }
 
     module ContractId =
