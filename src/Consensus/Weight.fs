@@ -52,7 +52,7 @@ let contractWitnessWeight (cWit:ContractWitness) =
 let activationWeight contract =
     match contract with
     | V0 contract ->
-        contract.queries * contract.rlimit |> bigint
+        contract.queries * contract.rlimit / 100ul |> bigint
     | HighV _ -> 
         0I
     

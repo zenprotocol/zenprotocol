@@ -240,7 +240,7 @@ let createActivationTransactionFromContract chain (contractId, ({queries=queries
     result {
         let codeLength = String.length code |> uint64
 
-        let activationFee = queries * rlimit |> uint64
+        let activationFee = queries * rlimit / 100ul |> uint64
         let activationSacrifice = chain.sacrificePerByteBlock * codeLength * (uint64 numberOfBlocks)
 
         let! zenKey = deriveZenKey extendedKey
