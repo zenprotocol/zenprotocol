@@ -73,7 +73,7 @@ let rec validateOrphanTransactions chainParams session contractPath blockNumber 
             return state'
     }
 
-let validateInputs chainParams session contractPath blockNumber timestamp txHash tx state shouldPublishEvents getContractState =
+let validateInputs chainParams session contractPath blockNumber timestamp txHash tx state shouldPublishEvents =
     effectsWriter
         {
             match TransactionValidation.validateInContext chainParams (getUTXO session) contractPath (blockNumber + 1ul) timestamp
@@ -149,7 +149,7 @@ let validateTransaction chainParams session contractPath blockNumber timestamp t
 
                 return state
             | Ok tx ->
-                return! validateInputs chainParams session contractPath blockNumber timestamp txHash tx state true getContractState
+                return! validateInputs chainParams session contractPath blockNumber timestamp txHash tx state true
     }
 
 let executeContract session txSkeleton timestamp contractId command sender messageBody state commitToState =
@@ -197,7 +197,7 @@ let executeContract session txSkeleton timestamp contractId command sender messa
                         | stateUpdate.Delete -> 
                             ContractStates.delete contract.contractId contractStates, None
                         | stateUpdate.NoChange ->
-                            contractStates, ContractStates.tryFind contract.contractId contractStates
+                            contractStates, contractState
                         | stateUpdate.Update data ->
                             ContractStates.update contract.contractId data contractStates, Some data
 
