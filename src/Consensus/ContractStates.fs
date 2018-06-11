@@ -17,11 +17,6 @@ let tryGetState getState contract states =
         | Some x -> x
         | None -> getState contract
 
-let tryFind contractId states =
-    match Map.tryFind contractId states with
-    | Some value -> value
-    | None -> None
-
 let update contractId data states =
     Map.add contractId (Some data) states
    

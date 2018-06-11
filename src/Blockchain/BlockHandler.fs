@@ -221,7 +221,7 @@ let getMemoryState chainParams session contractPath blockNumber timestamp mempoo
 
     Map.fold (fun writer txHash (_,tx) ->
         Writer.bind writer (fun memoryState ->
-            TransactionHandler.validateInputs chainParams session contractPath blockNumber timestamp txHash tx memoryState false getContractState
+            TransactionHandler.validateInputs chainParams session contractPath blockNumber timestamp txHash tx memoryState false
         )) memoryState mempool
 
             
