@@ -25,6 +25,7 @@ let contractPath =
 let rlimit = 2723280u
 
 let getUTXO _ = UtxoSet.NoOutput
+let getContractState _ = None
 
 let compile code = lazy (result {
     let! hints = Contract.recordHints code
@@ -53,7 +54,7 @@ let ``Should compile``() =
     |> ignore
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Should get 'elaborate' error for invalid code``() =
     ((compile (sampleContractCode + "###")).Force ()
     , (Error "elaborate" : Result<Contract.T, string>))
@@ -65,7 +66,7 @@ let mapError = function
 
 let validateInputs (contract:Contract.T) utxos tx  =
     let acs = ActiveContractSet.add contract.contractId contract ActiveContractSet.empty
-    TransactionValidation.validateInContext Chain.localParameters getUTXO contractPath 1ul 1_000_000UL acs Map.empty utxos (Transaction.hash tx) tx
+    TransactionValidation.validateInContext Chain.localParameters getUTXO contractPath 1ul 1_000_000UL acs Map.empty utxos getContractState ContractStates.asDatabase (Transaction.hash tx) tx
     |> Result.mapError mapError
 
 let validateBasic tx  =
@@ -75,19 +76,19 @@ let validateBasic tx  =
 let runAndValidate inputTx utxoSet (lazyCompiled : Lazy<_>) =
     lazyCompiled.Force ()
     |> Result.bind (fun contract ->
-        Contract.run contract inputTx context "" Anonymous None List.empty
-        |> Result.bind (fun (tx, _) ->
-            let cost = Contract.getCost contract inputTx context "" Anonymous None List.empty
+        Contract.run contract inputTx context "" Anonymous None List.empty None
+        |> Result.bind (fun (tx, _, _) ->
+            let cost = Contract.getCost contract inputTx context "" Anonymous None List.empty None
             tx
             |> TxSkeleton.checkPrefix inputTx
             |> Result.map (fun finalTxSkeleton ->
-                let cw = TxSkeleton.getContractWitness contract.contractId "" None inputTx finalTxSkeleton cost
+                let cw = TxSkeleton.getContractWitness contract.contractId "" None NotCommitted inputTx finalTxSkeleton cost
                 Transaction.fromTxSkeleton finalTxSkeleton
                 |> Transaction.addWitnesses [ ContractWitness cw ])
             |> Result.map (Transaction.sign [ sampleKeyPair ])
             |> Result.bind validateBasic
             |> Result.bind (validateInputs contract utxoSet))
-            |> Result.map (fun (tx, _, _) -> tx)
+            |> Result.map (fun (tx, _, _, _) -> tx)
     )
 
 let compileRunAndValidate inputTx utxoSet code =
@@ -104,117 +105,127 @@ let ``Contract generated transaction should be valid``() =
     |> shouldEqual
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Should get expected contract cost``() =
     (compiledSampleContract.Force ()
      |> Result.map (fun contract ->
-        Contract.getCost contract sampleInputTx context "" Anonymous None List.empty)
-    , (Ok 212L : Result<int64, string>))
+        Contract.getCost contract sampleInputTx context "" Anonymous None List.empty None)
+    , (Ok 214L : Result<int64, string>))
     |> shouldEqual
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Contract should be able to create its own tokens``() =
     compileRunAndValidate sampleInputTx utxoSet
-         """
-         open Zen.Types
-         open Zen.Base
-         open Zen.Cost
+        """
+        open Zen.Types
+        open Zen.Base
+        open Zen.Cost
 
-         module RT = Zen.ResultT
-         module Tx = Zen.TxSkeleton
+        module RT = Zen.ResultT
+        module Tx = Zen.TxSkeleton
+        module C = Zen.Cost
 
-         let main txSkeleton _ contractHash command sender data wallet =
-           let! asset = Zen.Asset.getDefault contractHash in
-           let lock = ContractLock contractHash in
-           let spend = {
-               asset=asset;
-               amount=1000UL
-               } in
+        let main txSkeleton _ contractId command sender messageBody wallet state =
+            let! asset = Zen.Asset.getDefault contractId in
+            let lock = ContractLock contractId in
+            let spend = {
+                asset=asset;
+                amount=1000UL
+            } in
 
-           let pInput = Mint spend in
+            let pInput = Mint spend in
 
-           let! txSkeleton =
-               Tx.addInput pInput txSkeleton
-               >>= Tx.lockToContract spend.asset spend.amount contractHash in
+            let! txSkeleton =
+                Tx.addInput pInput txSkeleton
+                >>= Tx.lockToContract spend.asset spend.amount contractId in
 
-           RT.ok (txSkeleton, None)
+            RT.ok @ { tx = txSkeleton; message = None; state = NoChange}
 
-           val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 9
-                    let cf _ _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 21)
+            let cf _ _ _ _ _ _ _ =
+                64 + (64 + 64 + 0) + 23
+                |> cast nat
+                |> C.ret
            """
     |> Result.mapError failwith
     |> ignore
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Contract should not be able to create zero amounts``() =
     (compileRunAndValidate sampleInputTx utxoSet
-         """
-         open Zen.Types
-         open Zen.Base
-         open Zen.Cost
+        """
+        open Zen.Types
+        open Zen.Base
+        open Zen.Cost
 
-         module RT = Zen.ResultT
-         module Tx = Zen.TxSkeleton
+        module RT = Zen.ResultT
+        module Tx = Zen.TxSkeleton
+        module C = Zen.Cost
 
-         let main txSkeleton _ contractHash command sender data wallet =
-           let! asset = Zen.Asset.getDefault contractHash in
-           let lock = ContractLock contractHash in
-           let spend = {
-               asset=asset;
-               amount=0UL
-               } in
+        let main txSkeleton _ contractId command sender messageBody wallet state =
+            let! asset = Zen.Asset.getDefault contractId in
+            let lock = ContractLock contractId in
+            let spend = {
+                asset=asset;
+                amount=0UL
+            } in
 
-           let pInput = Mint spend in
+            let pInput = Mint spend in
 
-           let! txSkeleton =
-               Tx.addInput pInput txSkeleton
-               >>= Tx.lockToContract spend.asset spend.amount contractHash in
+            let! txSkeleton =
+                Tx.addInput pInput txSkeleton
+                >>= Tx.lockToContract spend.asset spend.amount contractId in
 
-           RT.ok (txSkeleton, None)
+            RT.ok @ { tx = txSkeleton; message = None; state = NoChange}
 
-           val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 9
-                    let cf _ _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 21)
+            let cf _ _ _ _ _ _ _ =
+                64 + (64 + 64 + 0) + 23
+                |> cast nat
+                |> C.ret
            """
     , (Error "structurally invalid input(s)" : Result<Transaction, string>))
     |> shouldEqual
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Contract should not be able to create tokens other than its own``() =
     (compileRunAndValidate sampleInputTx utxoSet
-         """
-         open Zen.Types
-         open Zen.Base
-         open Zen.Cost
+        """
+        open Zen.Types
+        open Zen.Base
+        open Zen.Cost
 
-         module RT = Zen.ResultT
-         module Tx = Zen.TxSkeleton
+        module RT = Zen.ResultT
+        module Tx = Zen.TxSkeleton
+        module C = Zen.Cost
 
-         let main txSkeleton _ contractHash command sender data wallet =
-           let asset = Zen.Asset.zenAsset in
-           let lock = ContractLock contractHash in
-           let spend = {
-               asset=asset;
-               amount=1000UL
-               } in
+        let main txSkeleton _ contractId command sender messageBody wallet state =
+            let asset = Zen.Asset.zenAsset in
+            let lock = ContractLock contractId in
+            let spend = {
+                asset=asset;
+                amount=1000UL
+            } in
 
-           let pInput = Mint spend in
+            let pInput = Mint spend in
 
-           let! txSkeleton =
-               Tx.addInput pInput txSkeleton
-               >>= Tx.lockToContract spend.asset spend.amount contractHash in
+            let! txSkeleton =
+                Tx.addInput pInput txSkeleton
+                >>= Tx.lockToContract spend.asset spend.amount contractId in
 
-           RT.ok (txSkeleton, None)
+            RT.ok @ { tx = txSkeleton; message = None; state = NoChange}
 
-         let cf _ _ _ _ _ _ = ret (64 + 64 + 18 <: nat)
-         """
+        let cf _ _ _ _ _ _ _ =
+            64 + 64 + 20
+            |> cast nat
+            |> C.ret
+        """
     , (Error "illegal creation of tokens" : Result<Transaction, string>))
     |> shouldEqual
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Contract should be able to destroy its own tokens locked to it``() =
     let contract = """
     open Zen.Types
@@ -223,15 +234,17 @@ let ``Contract should be able to destroy its own tokens locked to it``() =
 
     module RT = Zen.ResultT
     module Tx = Zen.TxSkeleton
+    module C = Zen.Cost
 
-    let main txSkeleton _ contractHash command sender data wallet =
-        let! asset = Zen.Asset.getDefault contractHash in
-        let! txSkeleton1 = Tx.destroy 1000UL asset txSkeleton in
-        RT.ok (txSkeleton1, None)
+    let main txSkeleton _ contractId command sender messageBody wallet state =
+        let! asset = Zen.Asset.getDefault contractId in
+        let! txSkeleton = Tx.destroy 1000UL asset txSkeleton in
+        RT.ok @ { tx = txSkeleton; message = None; state = NoChange}
 
-    val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 7
-        let cf _ _ _ _ _ _ = ret (64 + (64 + 0) + 11)
-
+    let cf _ _ _ _ _ _ _ =
+        64 + (64 + 0) + 13
+        |> cast nat
+        |> C.ret
     """
 
     let contractId = Contract.makeContractId Version0 contract
@@ -274,7 +287,7 @@ let ``Contract should be able to destroy its own tokens locked to it``() =
 
     let sampleExpectedResult =
         Transaction.fromTxSkeleton sampleOutputTx
-        |> Transaction.addWitnesses [ ContractWitness <| TxSkeleton.getContractWitness contractId "" None sampleInputTx sampleOutputTx 139L]
+        |> Transaction.addWitnesses [ ContractWitness <| TxSkeleton.getContractWitness contractId "" None NotCommitted sampleInputTx sampleOutputTx 141L]
         |> Transaction.sign [ sampleKeyPair ]
 
     (compileRunAndValidate sampleInputTx utxoSet contract
@@ -282,34 +295,37 @@ let ``Contract should be able to destroy its own tokens locked to it``() =
     |> shouldEqual
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Contract should be able to use its context``() =
     let code = """
     open Zen.Types
     open Zen.Base
     open Zen.Cost
-    
+
     module RT = Zen.ResultT
     module Tx = Zen.TxSkeleton
-    
-    let main txSkeleton contractContext contractHash command sender data wallet =
-    let! asset = Zen.Asset.getDefault contractHash in
-    let lock = ContractLock contractHash in
+    module C = Zen.Cost
+
+    let main txSkeleton contractContext contractId command sender messageBody wallet state =
+    let! asset = Zen.Asset.getDefault contractId in
+    let lock = ContractLock contractId in
     let spend = {
         asset=asset;
         amount=contractContext.timestamp
     } in
-    
+
     let pInput = Mint spend in
-    
+
     let! txSkeleton =
     Tx.addInput pInput txSkeleton
-    >>= Tx.lockToContract spend.asset spend.amount contractHash in
-    
-    RT.ok (txSkeleton, None)
-    
-    val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 9
-    let cf _ _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 22)
+    >>= Tx.lockToContract spend.asset spend.amount contractId in
+
+    RT.ok @ { tx = txSkeleton; message = None; state = NoChange}
+
+    let cf _ _ _ _ _ _ _ =
+        64 + (64 + 64 + 0) + 24
+        |> cast nat
+        |> C.ret
     """
     compileRunAndValidate sampleInputTx utxoSet code
     |> Result.mapError failwith

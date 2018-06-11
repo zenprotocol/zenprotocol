@@ -38,7 +38,7 @@ let main busName chain numberOfThreads =
 
         let actors =
             [1..numberOfThreads]
-            |> List.map (fun _ -> MininingActor.create chain busName address)
+            |> List.map (fun _ -> MiningActor.create chain busName address)
 
         eventX "Miner running"
         |> Log.info

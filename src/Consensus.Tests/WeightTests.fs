@@ -81,13 +81,14 @@ let ``Contract validated transaction should have the right cost``() =
     let cWitness = {
         contractId=ContractId (Version0,cHash);
         command = "foo";
-        data = None;
+        messageBody = None;
+        stateCommitment = NotCommitted
         beginInputs = 0u;       //
         beginOutputs = 0u;      //  Consumes entire transaction
         inputsLength = 11u;     //
         outputsLength = 3u;     //
         signature = None;
-        cost = 200u;
+        cost = 200UL;
     }
     let tx = {
         version = Version0
@@ -120,22 +121,23 @@ let ``Two contracts in sequence should have the right cost``() =
     let cWitness1 = {
         contractId=ContractId (Version0,cHash);
         command = "foo";
-        data = None;
+        messageBody = None;
+        stateCommitment = NotCommitted
         beginInputs = 0u;
         beginOutputs = 0u;
         inputsLength = 5u;
         outputsLength = 2u;
         signature = None;
-        cost = 200u;
+        cost = 200UL;
     }
     let cWitness2 = {
         cWitness1 with
-            data = None;
+            messageBody = None;
             beginInputs = 5u;
             beginOutputs = 2u;
             inputsLength = 5u;
             outputsLength = 1u;
-            cost = 50u;
+            cost = 50UL;
     }
     let tx = {
         version = Version0

@@ -96,7 +96,7 @@ module Serialization =
         let write ops writerFn = function
             | Option.Some value ->
                 Byte.write ops Some
-                >> writerFn value
+                >> writerFn ops value
             | Option.None ->
                 Byte.write ops None
         let read readerFn = reader {
@@ -181,10 +181,6 @@ module Serialization =
     module Seq =
         let private writeBody ops writerFn =
             let write writerFn seq stream =
-                //let mutable stream = stream //TODO: this is not 'stream' if ops are Counters
-                //for item in seq do
-                //    stream <- writerFn ops item stream
-                //stream
                 let aux stream item = writerFn ops item stream
                 seq |> Seq.fold aux stream
 
@@ -532,7 +528,6 @@ module Serialization =
             return publicKey
         }
 
-
     module Lock =
         [<Literal>]
         let private PKIdentifier = 1u
@@ -651,19 +646,6 @@ module Serialization =
                 return int64 i
             }
 
-        module List =
-            let write = Seq.write
-            let read readerFn = reader {
-                let! seq = Seq.read readerFn
-                return List.ofSeq seq
-            }
-
-        module Array =
-            let write = Seq.write
-            let read readerFn = reader {
-                let! seq = Seq.read readerFn
-                return Array.ofSeq seq
-            }
         module Hash =
             let write ops = Hash.Hash >> Hash.write ops
             let read = reader {
@@ -733,7 +715,7 @@ module Serialization =
                 >> PublicKey.write ops publicKey
             | ZData.Collection (ZData.Array arr) ->
                 Byte.write ops CollectionArrayData
-                >> Array.write ops write arr
+                >> Seq.write ops write arr
             | ZData.Collection (ZData.Dict (map, _)) ->
                 Byte.write ops CollectionDictData
                 >> Map.write ops (fun ops (key, data)->
@@ -741,7 +723,7 @@ module Serialization =
                     >> write ops data) map
             | ZData.Collection (ZData.List l) ->
                 Byte.write ops CollectionListData
-                >> List.write ops write (ZFStar.fstToFsList l)
+                >> Seq.write ops write (ZFStar.fstToFsList l)
 
         let rec read = reader {
             let! discriminator = Byte.read
@@ -794,6 +776,37 @@ module Serialization =
                 yield! fail
         }
 
+    module StateCommitment =
+        [<Literal>]
+        let private SerializedNoState = 1uy
+        [<Literal>]
+        let private SerializedState = 2uy
+        [<Literal>]
+        let private SerializedNotCommitted = 3uy
+
+        let write ops = function
+        | NoState ->
+            Byte.write ops SerializedNoState
+        | State hash ->
+            Byte.write ops SerializedState
+            >> Hash.write ops hash
+        | NotCommitted ->
+            Byte.write ops SerializedNotCommitted
+
+        let read = reader {
+            let! discriminator = Byte.read
+            match discriminator with
+            | SerializedNoState ->
+                return NoState
+            | SerializedState ->
+                let! hash = Hash.read
+                return State hash
+            | SerializedNotCommitted ->
+                return NotCommitted
+            | _ ->
+                yield! fail
+        }
+
     module Witness =
         [<Literal>]
         let private PKIdentifier = 1u
@@ -807,16 +820,17 @@ module Serialization =
             | ContractWitness cw ->
                 ContractId.write ops cw.contractId
                 >> String.write ops cw.command
-                >> Option.write ops (Data.write ops) cw.data
+                >> Option.write ops Data.write cw.messageBody
+                >> StateCommitment.write ops cw.stateCommitment
                 >> VarInt.write ops cw.beginInputs
                 >> VarInt.write ops cw.beginOutputs
                 >> VarInt.write ops cw.inputsLength
                 >> VarInt.write ops cw.outputsLength
-                >> Option.write ops (fun (publicKey, signature) ->
+                >> Option.write ops (fun ops (publicKey, signature) ->
                     PublicKey.write ops publicKey
                     >> Signature.write ops signature
                   ) cw.signature
-                >> VarInt.write ops cw.cost
+                >> ops.writeNumber8 cw.cost //TODO: optimize
             | HighVWitness (_, bytes) ->
                 FixedSizeBytes.write ops bytes
 
@@ -843,7 +857,8 @@ module Serialization =
                 | ContractIdentifier ->
                     let! contractId = ContractId.read
                     let! command = String.read
-                    let! data = Option.read Data.read
+                    let! messageBody = Option.read Data.read
+                    let! stateCommitment = StateCommitment.read
                     let! beginInputs = VarInt.read
                     let! beginOutputs = VarInt.read
                     let! inputsLength = VarInt.read
@@ -853,11 +868,12 @@ module Serialization =
                         let! signature = Signature.read
                         return publicKey, signature
                     })
-                    let! cost = VarInt.read
+                    let! cost = readNumber8 //TODO: optimize
                     return ContractWitness {
                         contractId = contractId
                         command = command
-                        data = data
+                        messageBody = messageBody
+                        stateCommitment = stateCommitment
                         beginInputs = beginInputs
                         beginOutputs = beginOutputs
                         inputsLength = inputsLength
@@ -882,6 +898,16 @@ module Serialization =
             let! lock = Lock.read
             let! spend = Spend.read
             return { lock = lock; spend = spend }
+        }
+
+    module PointedOutput =
+        let write ops = fun (outpoint, output) ->
+            Outpoint.write ops outpoint
+            >> Output.write ops output
+        let read = reader {
+            let! outpoint = Outpoint.read
+            let! output = Output.read
+            return outpoint, output
         }
 
     module Contract =
@@ -942,7 +968,7 @@ module Serialization =
             ops.writeNumber4 tx.version
             >> Seq.write ops Input.write tx.inputs
             >> Seq.write ops Output.write tx.outputs
-            >> Option.write ops (Contract.write ops) tx.contract
+            >> Option.write ops Contract.write tx.contract
             >> match mode with
                | Full -> Seq.write ops Witness.write tx.witnesses
                | WithoutWitness -> id
@@ -1042,23 +1068,8 @@ module Block =
         |> Block.write serializers bk
         |> getBuffer
     let deserialize bytes =
-        let readBk = reader {
-            let! header = Header.read
-            let! commitmentsList = List.read Hash.read
-            let! transactions = List.read (Transaction.read Full)
-
-            return {
-                header = header
-                txMerkleRoot = commitmentsList.[0]
-                witnessMerkleRoot = commitmentsList.[1]
-                activeContractSetMerkleRoot = commitmentsList.[2]
-                commitments = commitmentsList.[3 .. List.length commitmentsList - 1]
-                transactions = List.ofSeq transactions
-            }
-        }
-
         Stream (bytes, 0)
-        |> run readBk
+        |> run Block.read
 
 module Data =
     let serialize data =

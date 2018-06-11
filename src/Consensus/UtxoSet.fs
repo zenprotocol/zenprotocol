@@ -25,8 +25,9 @@ let handleTransaction getUTXO txHash tx set =
     let folder state input =
         match get getUTXO input state with
         | Unspent output -> Map.add input (Spent output) state
-        | NoOutput
-        | Spent _ -> failwith "Expected output to be unspent"
+        | NoOutput 
+        | Spent _ ->
+            failwith "Expected output to be unspent"
 
     let outputsWithIndex = List.mapi (fun i output -> (uint32 i,output)) tx.outputs
 

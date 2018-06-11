@@ -126,6 +126,7 @@ let transactionWeight =
 
 
 // HACK: Something is wrong with using utxoSet here. Need to work out what.
+// TODO: don't use utxo set here
 let bkWeight weights getUTXO utxoSet txs =
     let inner (weight, memUTXOs) (txHash, tx) = result {
         let! txWeight = txWeight weights getUTXO memUTXOs tx

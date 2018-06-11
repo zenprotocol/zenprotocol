@@ -71,17 +71,18 @@ let hashBlock b = Block.hash b.header, b
 let state = {
     memoryState =
         {
-            utxoSet=utxoSet
-            mempool=mempool
-            orphanPool=orphanPool
-            activeContractSet=acs
-            contractCache=ContractCache.empty
+            utxoSet = utxoSet
+            mempool = mempool
+            orphanPool = orphanPool
+            activeContractSet = acs
+            contractCache = ContractCache.empty
+            contractStates = ContractStates.asDatabase
         }
     tipState =
         {
            tip = ExtendedBlockHeader.empty
-           activeContractSet=acs
-           ema=ema
+           activeContractSet = acs
+           ema = ema
         }
     initialBlockDownload = InitialBlockDownload.Inactive
     headers=0ul
@@ -341,7 +342,6 @@ let ``orphan chain become longer than main chain``() =
     List.iter (fun block ->
         let blockHash = Block.hash block.header
         let extendedHeader = BlockRepository.getHeader session blockHash
-        printfn "%d %A" extendedHeader.header.blockNumber extendedHeader.status
         extendedHeader.status |> should equal ExtendedBlockHeader.MainChain) alternativeChain
 
     // now validating orphan chain which is longer
@@ -521,8 +521,6 @@ let ``2 orphan chains, two longer than main, longest is invalid, should pick sec
 
     let tip = List.last sideChain2
 
-    printfn "%A" events
-
     events |> should haveLength 7
     events.[0] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock mainChain.[1])))
     events.[1] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock mainChain.[0])))
@@ -621,9 +619,9 @@ let ``block with a contract activation is added to chain``() =
 
     let contract = {
         contractId=contractId
-        mainFn = fun tx _ _ _ _ _ _  -> Ok (tx,None)
-        costFn = fun _ _ _ _ _ _ -> 1L
-        expiry=1002ul
+        mainFn = fun tx _ _ _ _ _ _ _ -> Ok (tx,None,Zen.Types.Main.stateUpdate.NoChange)
+        costFn = fun _ _ _ _ _ _ _ -> 1L
+        expiry = 1001ul
         code = sampleContractCode
     }
 

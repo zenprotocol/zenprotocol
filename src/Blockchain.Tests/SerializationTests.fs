@@ -31,10 +31,18 @@ type BlockchainGenerators =
                     }
                 }
 
+            let! contractStatesUndoData = Gen.listOf <| gen {
+                let! hash = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+                let contractId = ContractId (Version0, Hash hash)
+                let! dataOption = Arb.generate<Zen.Types.Data.data Option>
+                return contractId, dataOption
+            }
+
             return
                 ({
                     ema = ema
                     activeContractSet = activeContractSet
+                    contractStatesUndoData = contractStatesUndoData
                 } : BlockState.T)
         }
         |> Arb.fromGen

@@ -30,7 +30,7 @@ type ExtendContractArgs =
         member arg.Usage = ""
 
 type ExecuteContractArgs =
-    | [<MainCommand("COMMAND");ExactlyOnce>] ExecuteContract_Arguments of address:string * command:string * data:string * asset:string * amount:int64 * password:string
+    | [<MainCommand("COMMAND");ExactlyOnce>] ExecuteContract_Arguments of address:string * command:string * messageBody:string * asset:string * amount:int64 * password:string
     interface IArgParserTemplate with
         member arg.Usage = ""
 
@@ -211,15 +211,15 @@ let main argv =
                 .JsonValue.Request
             |> printResponse
         | Some (Execute args) ->
-            let address, command, data, asset, amount, password =
+            let address, command, messageBody, asset, amount, password =
                 args.GetResult <@ ExecuteContract_Arguments @>
 
-            let data = if data = "None" || data = "none" || data = "null" then "" else data
+            let messageBody = if messageBody = "None" || messageBody = "none" || messageBody = "null" then "" else messageBody
 
             "wallet/contract/execute"
             |> getUri
             |> (new ContractExecuteRequestJson.Root(
-                    address, command, data,
+                    address, command, messageBody,
                     new ContractExecuteRequestJson.Options(true, ""),
                         [| new ContractExecuteRequestJson.Spend(asset, amount) |],
                         password))

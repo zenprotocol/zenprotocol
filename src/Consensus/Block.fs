@@ -239,7 +239,7 @@ let validate chain =
     >=> checkCommitments
 
 /// Apply block to UTXO and ACS, operation can fail
-let connect chain getUTXO contractsPath (parent:BlockHeader) timestamp utxoSet acs contractCache ema =
+let connect chain getUTXO contractsPath (parent:BlockHeader) timestamp utxoSet acs contractCache ema getContractState contractStates =
     let checkBlockNumber (block:Block) =
         if parent.blockNumber + 1ul <> block.header.blockNumber then
             Error "blockNumber mismatch"
@@ -264,7 +264,7 @@ let connect chain getUTXO contractsPath (parent:BlockHeader) timestamp utxoSet a
             let set = List.fold (fun set tx ->
                 let txHash = (Transaction.hash tx)
                 UtxoSet.handleTransaction getUTXO txHash tx set) utxoSet block.transactions
-            Ok (block,set,acs,ema,contractCache)
+            Ok (block,set,acs,ema,contractCache,contractStates)
         else
             let coinbase = List.head block.transactions
             let withoutCoinbase = List.tail block.transactions
@@ -272,21 +272,21 @@ let connect chain getUTXO contractsPath (parent:BlockHeader) timestamp utxoSet a
             let set = UtxoSet.handleTransaction getUTXO (Transaction.hash coinbase) coinbase utxoSet
 
             List.fold (fun state tx -> result {
-                let! block,set,acs,ema,contractCache = state
+                let! block,set,acs,ema,contractCache,contractStates = state
 
                 let txHash = (Transaction.hash tx)
 
-                let! _,acs,contractCache =
-                    TransactionValidation.validateInContext chain getUTXO contractsPath block.header.blockNumber block.header.timestamp acs contractCache set txHash tx
+                let! _,acs,contractCache,contractStates =
+                    TransactionValidation.validateInContext chain getUTXO contractsPath block.header.blockNumber block.header.timestamp acs contractCache set getContractState contractStates txHash tx
                     |> Result.mapError (sprintf "transactions failed inputs validation due to %A")
 
                 let set = UtxoSet.handleTransaction getUTXO txHash tx set
-                return block,set,acs,ema,contractCache
-            }) (Ok (block,set,acs,ema,contractCache)) withoutCoinbase
+                return block,set,acs,ema,contractCache,contractStates
+            }) (Ok (block,set,acs,ema,contractCache,contractStates)) withoutCoinbase
 
-    let checkCoinbase (block,set,acs,ema,contractCache) =
+    let checkCoinbase (block,set,acs,ema,contractCache,contractStates) =
         if isGenesis chain block then
-            Ok (block,set,acs,ema,contractCache)
+            Ok (block,set,acs,ema,contractCache,contractStates)
         else
             let coinbase = List.head block.transactions
             let transactions = List.tail block.transactions
@@ -317,9 +317,9 @@ let connect chain getUTXO contractsPath (parent:BlockHeader) timestamp utxoSet a
             if coinbaseTotals <> blockRewardAndFees then
                 Error "block reward is incorrect"
             else
-                Ok (block,set,acs,ema,contractCache)
+                Ok (block,set,acs,ema,contractCache,contractStates)
 
-    let checkCommitments (block,set,acs,ema,contractCache) =
+    let checkCommitments (block,set,acs,ema,contractCache,contractStates) =
         let acs = ActiveContractSet.expireContracts block.header.blockNumber acs
         let acsMerkleRoot = SparseMerkleTree.root acs
 
@@ -331,25 +331,23 @@ let connect chain getUTXO contractsPath (parent:BlockHeader) timestamp utxoSet a
         // We ignore the known commitments in the block as we already calculated them
         // Only check that the final commitment is correct
         if commitments = block.header.commitments then
-            Ok (block,set,acs,contractCache,ema)
+            Ok (block,set,acs,contractCache,ema,contractStates)
         else
             Error "commitments mismatch"
 
-    let checkWeight (block,ema) = result {
+    let checkWeight (block,set,acs,ema,contractCache,contractStates) = result {
         let! weight = Weight.blockWeight getUTXO utxoSet block
         let maxWeight = chain.maxBlockWeight
         if weight <= maxWeight
         then
-            return block,ema
+            return block,set,acs,ema,contractCache,contractStates
         else
-            let err = sprintf
-                        "Block weight of %A is greater than maximum block weight %A" weight maxWeight
-            return! Error err
+            return! Error "block weight exceeds maximum"
     }
 
     checkBlockNumber
     >=> checkDifficulty
-    >=> checkWeight
     >=> checkTxInputs
+    >=> checkWeight
     >=> checkCoinbase
     >=> checkCommitments

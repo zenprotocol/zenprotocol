@@ -154,17 +154,18 @@ let private fstToFsTx: txSkeleton -> TxSkeleton.T = function
         { pInputs=pInputs; outputs=outputs }
 
 let fstTofsMessage (msg: Zen.Types.Main.message) : Consensus.Types.Message =
-    { contractId = fstToFsContractId msg.contractId
+    { recipient = fstToFsContractId msg.recipient
       command = fstToFsString msg.command
-      data = fstToFsOption msg.data }
+      body = fstToFsOption msg.body }
 
-let convertResult (tx, message : Native.option<message>)
-    : TxSkeleton.T * Option<Message> =
-    fstToFsTx tx, message
-                  |> fstToFsOption
-                  |> Option.map fstTofsMessage
+let convertResult (result : contractReturn) =
+    fstToFsTx result.tx,
+    result.message
+        |> fstToFsOption
+        |> Option.map fstTofsMessage,
+    result.state
 
-let convertWallet (wallet:PointedOutput list) : Prims.list<pointedOutput>=
+let fsToFstWallet (wallet:PointedOutput list) : Prims.list<pointedOutput> =
     List.map fsToFstPointedOutput wallet
     |> fsToFstList
 

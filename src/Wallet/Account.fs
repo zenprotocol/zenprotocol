@@ -426,4 +426,3 @@ let getHistory dataAccess session view skip take =
     |> List.skip skip
     |> fun xs -> if List.length xs < take then xs else List.take take xs
     |> List.map (fun (txHash,direction,spend,confirmations,_) -> txHash,direction,spend,confirmations)
-
