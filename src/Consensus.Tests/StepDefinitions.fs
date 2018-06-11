@@ -12,9 +12,7 @@ open Consensus
 open ZFStar
 open Crypto
 open Types
-open FStar.UInt
 open System
-open Wallet
 open Blockchain.State
 open System.IO
 open FsUnit
@@ -28,8 +26,8 @@ let private (?=) expected actual = actual |> should equal expected
 [<Literal>]
 let rlimit = 2723280u
 
-let chain = Chain.getChainParameters Chain.Local
 let timestamp = 1515594186383UL + 1UL
+let chain = { Chain.getChainParameters Chain.Local with proofOfWorkLimit = Difficulty.uncompress 553648127u; genesisTime = timestamp - 1_000_000UL }
 
 let tempDir () =
     Path.Combine
@@ -517,7 +515,7 @@ module Binding =
         |> Zen.Types.Data.Collection
         |> initData dataLabel
 
-    // Signes a tx
+    // Signs a tx
     let [<Given>] ``(.*) is signed with (.*)`` txLabel keyLabels =
         let tx = findTx txLabel
         let keyPairs =
@@ -528,7 +526,7 @@ module Binding =
         updateTx txLabel tx
         |> ignore
 
-    // Signes a tx
+    // Signs a tx
     let [<When>] ``signing (.*) with (.*)`` txLabel keyLabels =
         let tx = findTx txLabel
         let keyPairs =
@@ -555,7 +553,7 @@ module Binding =
         let state' = { state with tipState = { state.tipState with ema = EMA.create chain }}
 
         let events, state' =
-            BlockHandler.validateBlock chain session.context.contractPath session timestamp None genesisBlock false state'
+            BlockHandler.validateBlock chain session.context.contractPath session (timestamp + 1000_000_000UL) None genesisBlock false state'
             |> Infrastructure.Writer.unwrap
 
         events |> should contain (EffectsWriter.EventEffect (BlockAdded (genesisHash, genesisBlock)))
@@ -597,7 +595,15 @@ module Binding =
 
                 ) parentAcs txs
 
-            let block = Block.createTemplate chain parent timestamp state.tipState.ema newAcs txs Hash.zero
+            let rawblock = Block.createTemplate chain parent (timestamp + (uint64 parent.blockNumber)*1_000_000UL) state.tipState.ema newAcs txs Hash.zero
+
+            let rec addPow bk ctr =
+                if ctr > 20 then failwith "You're testing with a real blockchain difficulty. Try setting the proofOfWorkLimit to the lowest value."
+                match Block.validateHeader chain bk.header with
+                | Ok _ -> bk
+                | _ -> addPow {bk with header = {bk.header with nonce=(fst bk.header.nonce, snd bk.header.nonce + 1UL)}} (ctr+1)
+
+            let block = addPow rawblock 0
 
             // Save the ACS, so that when extending a chain using a parent - the right amount of sacrifice in the coinbase would be calculated
             testingState <- { testingState with acs = Map.add block.header newAcs testingState.acs }
@@ -611,8 +617,8 @@ module Binding =
             testingState <- { testingState with blocks = Map.add label block.header testingState.blocks }
         | _ -> ()
 
-        let events, state' =
-            BlockHandler.validateBlock chain session.context.contractPath session timestamp None block false state
+        let _, state' =
+            BlockHandler.validateBlock chain session.context.contractPath session (timestamp + 100_000_000UL) None block false state
             |> Infrastructure.Writer.unwrap
 
       //  events |> should contain (EffectsWriter.EventEffect (BlockAdded (Block.hash block.header, block)))
@@ -635,13 +641,12 @@ module Binding =
     // Checks that tx passes in-context validation
     let [<Then>] ``(.*) should pass validation`` txLabel =
         let tx = findTx txLabel
-        let chainParams = Chain.getChainParameters Chain.Test
 
         let acs =
             Map.fold (fun acs contractId contract -> ActiveContractSet.add contractId contract acs) ActiveContractSet.empty contractExecutionCache
 
         match TransactionValidation.validateInContext
-            chainParams
+            chain
             (getUTXO session)
             session.context.contractPath
             1ul
