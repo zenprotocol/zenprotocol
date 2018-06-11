@@ -21,9 +21,11 @@ type ContractActivateResponseJson = JsonProvider<"""
 
 type SendRequestJson = JsonProvider<"""
 {
-    "address": "address",
-    "asset": "asset",
-    "amount": 2147483649,
+    "outputs": [{
+        "address": "address",
+        "asset": "asset",
+        "amount": 2147483649
+    }],
     "password": "password"
 }
 """>

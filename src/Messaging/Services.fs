@@ -183,7 +183,7 @@ module Wallet =
         | GetTransactions of skip: int * take: int
         | GetBalance
         | ImportSeed of string list * password:string
-        | Send of Hash * Spend * password:string
+        | Send of outputs:List<Hash * Spend> * password:string
         | ActivateContract of string * uint32 * password:string
         | ExtendContract of ContractId * uint32 * password:string
         | ExecuteContract of ContractId * string * data option * provideReturnAddress:bool * sign:string option * Map<Asset, uint64> * password:string
@@ -212,8 +212,8 @@ module Wallet =
     let getAddress client =
         send<string> client serviceName GetAddress
 
-    let createTransaction client address spend password =
-        send<Transaction> client serviceName (Send (address, spend, password))
+    let createTransaction client outputs password =
+        send<Transaction> client serviceName (Send (outputs, password))
 
     let activateContract client code numberOfBlocks password =
         send<ActivateContractResponse> client serviceName (ActivateContract (code, numberOfBlocks, password))

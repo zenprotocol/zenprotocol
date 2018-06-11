@@ -17,17 +17,33 @@ let private getSpend asset amount =
 let parseSendJson chain json =
     try
         let json = SendRequestJson.Parse json
+        let mutable outputs = List.empty
+        let mutable errors = List.empty
 
         if String.length json.Password = 0 then
-            Error "Password is empty"
+            errors <- "Password is empty" :: errors
+        if json.Outputs.Length = 0 then
+            errors <- "Outputs is empty" :: errors
         else
-            Address.decodePK chain json.Address
-            |> function
-            | Error err ->
-                Error ("Address is invalid: " + err)
-            | Ok pkHash ->
-                getSpend json.Asset json.Amount
-                |> Result.map (fun spend -> (pkHash, spend, json.Password))
+            for output in json.Outputs do
+                Address.decodePK chain output.Address
+                |> function
+                | Error err ->
+                    errors <- ("Address is invalid: " + err) :: errors
+                | Ok pkHash ->
+                    match getSpend output.Asset output.Amount with
+                    | Ok spend ->
+                        outputs <- (pkHash, spend) :: outputs
+                    | Error err ->
+                        errors <- err :: errors
+
+        if List.isEmpty errors then
+            Ok (outputs, json.Password)
+        else
+            errors
+            |> String.concat " "
+            |> Error
+
     with _ as ex ->
         Error ("Json invalid: " + ex.Message)
 

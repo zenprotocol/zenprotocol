@@ -209,8 +209,8 @@ let handleRequest chain client (request,reply) =
             replyError error
     | Post ("/wallet/send", Some body) ->
         match parseSendJson chain body with
-        | Ok (pkHash, spend, password) ->
-            Wallet.createTransaction client pkHash spend password
+        | Ok (outputs, password) ->
+            Wallet.createTransaction client outputs password
             |> validateTx
         | Error error ->
             replyError error
