@@ -13,7 +13,7 @@ type ChainParameters =
         name:string;
         proofOfWorkLimit:Hash.Hash;
         blockInterval:uint64;
-        smoothingFactor:float;
+        smoothingFactor:bigint;
         maxBlockWeight:bigint;
         sacrificePerByteBlock:uint64;
         genesisHash:Hash.Hash;
@@ -27,7 +27,7 @@ let mainParameters =
         name="main"
         proofOfWorkLimit=Difficulty.uncompress 0x1d00fffful;
         blockInterval=236682UL;
-        smoothingFactor=0.035;
+        smoothingFactor=28I;
         maxBlockWeight=1000_000_000I;
         sacrificePerByteBlock=1UL;
         genesisHash=Hash.zero
@@ -41,7 +41,7 @@ let testParameters =
         name="testnet"
         proofOfWorkLimit=Difficulty.uncompress 0x20fffffful;
         blockInterval=60UL*1000UL;
-        smoothingFactor=0.035;
+        smoothingFactor=28I;
         maxBlockWeight=1000_000_000I;
         sacrificePerByteBlock=1UL;
         genesisHash= get <| Hash.fromString "24dcf8ba5c6494e515737323e3e8425c2171c710640d3ee2958e5d1f9293313f";

@@ -26,7 +26,7 @@ let getRandomNonce () =
 let create chain busName address =
     let findNonce client (template:Block) nonce =
         let mutable found = false
-        let mutable attemptsLeft = 10000 // number of attemps before trying to fetch a message
+        let mutable attemptsLeft = 10000 // number of attempts before trying to fetch a message
 
         let mutable n1 = fst nonce
         let mutable n2 = snd nonce
