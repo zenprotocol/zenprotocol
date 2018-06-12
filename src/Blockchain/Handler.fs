@@ -215,6 +215,7 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
             medianTime = EMA.earliest state.tipState.ema
             difficulty = difficulty
             initialBlockDownload = syncing
+            tipBlockHash = Block.hash state.tipState.tip.header
         }
         |> requestId.reply
 

@@ -22,6 +22,7 @@ module Blockchain =
         difficulty:float
         medianTime:uint64
         initialBlockDownload:bool
+        tipBlockHash:Hash.Hash
     }
 
     type Command =
