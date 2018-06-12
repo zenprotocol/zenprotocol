@@ -141,8 +141,10 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             |> reply<unit> requestId
 
             accountStatus
-        | Send (address, spend, password) ->
-            TransactionCreator.createTransaction dataAccess session view password (PK address) spend
+        | Send (outputs, password) ->
+            outputs
+            |> List.map (fun (hash, spend) -> { lock = PK hash; spend = spend })
+            |> TransactionCreator.createTransaction dataAccess session view password
             |> reply<Transaction> requestId
 
             accountStatus

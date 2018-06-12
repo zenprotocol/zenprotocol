@@ -91,7 +91,7 @@ let private getChangeOutputs inputs amounts account =
         else
             changes) List.empty inputs
 
-let createTransactionFromOutputs dataAccess session view password outputs contract = result {
+let createTransactionFromOutputs dataAccess session view password contract outputs = result {
     let account = DataAccess.Account.get dataAccess session
 
     let! extendedPrivateKey =
@@ -141,8 +141,8 @@ let createTransactionFromOutputs dataAccess session view password outputs contra
     return Transaction.sign keys transaction
 }
 
-let createTransaction dataAccess session view password lockTo spend =
-    createTransactionFromOutputs dataAccess session view password [{spend=spend;lock=lockTo}] None
+let createTransaction dataAccess session view password outputs =
+    createTransactionFromOutputs dataAccess session view password None outputs
 
 
 let addReturnAddressToData pkHash data =
@@ -294,7 +294,7 @@ let createActivateContractTransaction dataAccess session view chain password cod
 
         let codeLength = String.length code |> uint64
 
-        let activationFee = queries * rlimit |> uint64
+        let activationFee = queries * rlimit / 100ul |> uint64
         let activationSacrifice = chain.sacrificePerByteBlock * codeLength * (uint64 numberOfBlocks)
 
         let outputs =
@@ -303,7 +303,7 @@ let createActivateContractTransaction dataAccess session view chain password cod
                 { spend = { amount = activationFee; asset = Asset.Zen }; lock = Fee }
             ]
 
-        return! createTransactionFromOutputs dataAccess session view password outputs contract
+        return! createTransactionFromOutputs dataAccess session view password contract outputs
     }
 
 let createExtendContractTransaction dataAccess session view (getContract:ContractId->ActiveContract option) chainParams password (contractId:ContractId) (numberOfBlocks:uint32)=
@@ -319,5 +319,5 @@ let createExtendContractTransaction dataAccess session view (getContract:Contrac
 
         let outputs = [output]
 
-        return! createTransactionFromOutputs dataAccess session view password outputs None
+        return! createTransactionFromOutputs dataAccess session view password None outputs
     }

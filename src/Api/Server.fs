@@ -2,9 +2,10 @@ module Api.Server
 
 open FSharp.Data
 open Consensus
+open Serialization
 open Infrastructure
-open Infrastructure.ServiceBus
-open Infrastructure.Http
+open ServiceBus
+open Http
 open Api.Types
 open Parsing
 open Messaging.Services
@@ -16,6 +17,7 @@ open Logary.Message
 open Api.Helpers
 open FSharp.Data
 open Hopac.Extensions.Seq
+open FsBech32
 
 type T =
     {
@@ -209,9 +211,22 @@ let handleRequest chain client (request,reply) =
             replyError error
     | Post ("/wallet/send", Some body) ->
         match parseSendJson chain body with
-        | Ok (pkHash, spend, password) ->
-            Wallet.createTransaction client pkHash spend password
+        | Ok (outputs, password) ->
+            Wallet.createTransaction client outputs password
             |> validateTx
+        | Error error ->
+            replyError error
+    | Post ("/wallet/transaction", Some body) ->
+        match parseSendJson chain body with
+        | Ok (outputs, password) ->
+            match Wallet.createTransaction client outputs password with 
+            | Ok tx ->
+                tx
+                |> Transaction.serialize Full
+                |> Base16.encode
+                |> TextContent
+                |> reply StatusCode.OK
+            | Error error -> replyError error
         | Error error ->
             replyError error
     | Get ("/wallet/transactions", query) ->

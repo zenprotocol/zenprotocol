@@ -436,7 +436,7 @@ module Binding =
 
         let _, contract = getContractRecord contractLabel
         let codeLength = String.length contract.code |> uint64
-        let activationFee = contract.queries * rlimit |> uint64
+        let activationFee = contract.queries * rlimit /100ul |> uint64
         let activationSacrifice = chain.sacrificePerByteBlock * codeLength * (uint64 blocks)
 
         let outputs =

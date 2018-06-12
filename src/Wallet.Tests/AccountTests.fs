@@ -129,7 +129,7 @@ let ``creating, not enough tokens``() =
 
     let view = View.addMempoolTransaction dataAccess session (Transaction.hash tx) tx View.empty
 
-    let result = TransactionCreator.createTransaction dataAccess session view password (PK Hash.zero) { asset = Asset.Zen; amount = 11UL }
+    let result = TransactionCreator.createTransaction dataAccess session view password [ { lock = (PK Hash.zero); spend = { asset = Asset.Zen; amount = 11UL } } ]
 
     let expected:Result<Transaction,string> = Error "Not enough tokens"
 
@@ -148,7 +148,7 @@ let ``creating, no change``() =
     let bob = View.addMempoolTransaction dataAccess session (Transaction.hash tx) tx View.empty
 
     // sending money to alice
-    let result = TransactionCreator.createTransaction dataAccess session bob password lockToAlice { asset = Asset.Zen; amount = 10UL }
+    let result = TransactionCreator.createTransaction dataAccess session bob password [ { lock = lockToAlice; spend = { asset = Asset.Zen; amount = 10UL } } ]
 
     match result with
     | Error x -> failwithf "expected transaction %s" x
@@ -170,7 +170,7 @@ let ``creating, with change``() =
     let bob = View.addMempoolTransaction dataAccess session (Transaction.hash tx) tx View.empty
 
     // sending money to alice
-    let result = TransactionCreator.createTransaction dataAccess session bob password lockToAlice { asset = Asset.Zen; amount = 7UL }
+    let result = TransactionCreator.createTransaction dataAccess session bob password [ { lock = lockToAlice; spend = { asset = Asset.Zen; amount = 7UL } } ]
 
     match result with
     | Error x -> failwithf "expected transaction %s" x
@@ -197,7 +197,7 @@ let ``picking the correct asset``() =
     bob |> balanceShouldBe session Asset.Zen 10UL
 
     // sending money to alice
-    let result = TransactionCreator.createTransaction dataAccess session bob password lockToAlice { asset = Asset.Zen; amount = 7UL }
+    let result = TransactionCreator.createTransaction dataAccess session bob password [ { lock = lockToAlice; spend = { asset = Asset.Zen; amount = 7UL } } ]
 
     match result with
     | Error x -> failwithf "expected transaction %s" x
@@ -224,7 +224,7 @@ let ``picking from multiple inputs``() =
     let bob = View.addMempoolTransaction dataAccess session (Transaction.hash tx) tx View.empty
 
     // sending money to alice
-    let result = TransactionCreator.createTransaction dataAccess session bob password lockToAlice { asset = Asset.Zen; amount = 10UL }
+    let result = TransactionCreator.createTransaction dataAccess session bob password [ { lock = lockToAlice; spend = { asset = Asset.Zen; amount = 10UL } } ]
 
     match result with
         | Error x -> failwithf "expected transaction %s" x
@@ -505,7 +505,7 @@ let ``wallet won't spend coinbase if not mature enough``() =
 
     let expected: Result<Transaction,string>= Error "Not enough tokens"
 
-    TransactionCreator.createTransaction dataAccess session view password (PK accountPKHash) { asset = Asset.Zen; amount = 1UL }
+    TransactionCreator.createTransaction dataAccess session view password [ { lock = (PK accountPKHash); spend = { asset = Asset.Zen; amount = 1UL } } ]
     |> should equal expected
 
 [<Test>]
@@ -530,7 +530,7 @@ let ``wallet spend coinbase with coinbase mature enough``() =
 
     let view = View.addMempoolTransaction dataAccess session originHash origin View.empty
 
-    TransactionCreator.createTransaction dataAccess session view password (PK accountPKHash) { asset = Asset.Zen; amount = 1UL }
+    TransactionCreator.createTransaction dataAccess session view password [ { lock = (PK accountPKHash); spend = { asset = Asset.Zen; amount = 1UL } } ]
     |> should be ok
 
 [<Test>]
@@ -560,7 +560,7 @@ let ``wallet spend coinbase when come from block``() =
 
     Account.addBlock dataAccess session (Block.hash block.header) block
 
-    TransactionCreator.createTransaction dataAccess session View.empty password (PK accountPKHash) { asset = Asset.Zen; amount = 1UL }
+    TransactionCreator.createTransaction dataAccess session View.empty password [ { lock = (PK accountPKHash); spend = { asset = Asset.Zen; amount = 1UL } } ]
     |> should be ok
 
 [<Test>]

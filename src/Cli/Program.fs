@@ -135,7 +135,7 @@ let main argv =
             let asset, amount, address, password = args.GetResult <@ Send_Arguments @>
             "wallet/send"
             |> getUri
-            |> (new SendRequestJson.Root(address, asset, amount, password))
+            |> (new SendRequestJson.Root([| new SendRequestJson.Output(address, asset, amount) |], password))
                 .JsonValue.Request
             |> printResponse
         | Some (Balance _) ->
