@@ -87,7 +87,8 @@ let handleRequest chain client (request,reply) =
                 info.headers |> int,
                 info.difficulty |> decimal,
                 info.medianTime |> int64,
-                info.initialBlockDownload)).JsonValue
+                info.initialBlockDownload,
+                info.tipBlockHash |> Hash.toString)).JsonValue
 
         reply StatusCode.OK (JsonContent json)
 

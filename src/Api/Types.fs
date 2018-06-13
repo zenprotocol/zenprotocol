@@ -89,7 +89,8 @@ type BlockChainInfoJson = JsonProvider<"""
     "headers":100,
     "difficulty":0.1,
     "medianTime":2147483648,
-    "initialBlockDownload":true
+    "initialBlockDownload":true,
+    "tip": "hash"
 }""">
 
 type ImportSeedJson = JsonProvider<"""
