@@ -47,7 +47,7 @@ let main txSkeleton context contractId command sender data wallet state =
   | None ->
       RT.autoFailw "returnAddress is required"
 
-let cf _ _ _ _ _ wallet =
+let cf _ _ _ _ _ wallet _ =
     (4 + 64 + 2 + (64 + (64 + (64 + 64 + (Zen.Wallet.size wallet * 128 + 192) + 0)) + 25) + 31)
     |> cast nat
     |> ret
