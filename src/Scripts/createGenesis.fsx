@@ -29,7 +29,7 @@ let decodeCrowdsale pk =
 
     PK <| Hash.compute bytes
 
-let OneZen = 100_000UL
+let OneZen = 100_000_000UL
 
 let tx = {
     version=0ul;
