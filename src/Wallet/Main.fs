@@ -78,6 +78,8 @@ let private reply<'a> (requestId:RequestId) (value : Result<'a,string>) =
 let requestHandler chain client (requestId:RequestId) request dataAccess session accountStatus =
     match accountStatus with
     | NoAccount ->
+        let error = Error "no account"
+
         match request with
         | AccountExists ->
             Ok false
@@ -104,8 +106,73 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             | Error error ->
                 reply<unit> requestId (Error error)
                 NoAccount
-        | _ ->
-            reply requestId (Error "no account")
+        | GetBalance ->
+            error
+            |> reply<BalanceResponse> requestId
+            NoAccount
+        | GetAddressPKHash ->
+            error
+            |> reply<Hash.Hash> requestId
+            NoAccount
+        | GetAddress ->
+            error
+            |> reply<string> requestId
+            NoAccount
+        | GetTransactions _ ->
+            error
+            |> reply<TransactionsResponse> requestId
+            NoAccount
+        | Send _ ->
+            error
+            |> reply<Transaction> requestId
+            NoAccount
+        | ActivateContract _ ->
+            error
+            |> reply<ActivateContractResponse> requestId
+            NoAccount
+        | ExtendContract _ ->
+            error
+            |> reply<Transaction> requestId
+            NoAccount
+        | ExecuteContract _ ->
+            error
+            |> reply<Transaction> requestId
+            NoAccount
+        | GetPublicKey _ ->
+            error
+            |> reply<PublicKey> requestId
+            NoAccount
+        | Sign _ ->
+            error
+            |> reply<Crypto.Signature> requestId
+            NoAccount
+        | CheckPassword _ ->
+            error
+            |> reply<bool> requestId
+            NoAccount
+        | GetMnemonicPhrase _ ->
+            error
+            |> reply<string> requestId
+            NoAccount
+        | ImportWatchOnlyAddress _ ->
+            error
+            |> reply<unit> requestId
+            NoAccount
+        | GetReceivedByAddress _ ->
+            error
+            |> reply<Map<(string*Asset),uint64>> requestId
+            NoAccount
+        | GetNewAddress _ ->
+            error
+            |> reply<string * int> requestId
+            NoAccount
+        | GetAddressOutputs _ ->
+            error
+            |> reply<List<(Outpoint*Spend*uint32*bool)>> requestId
+            NoAccount
+        | GetAddressBalance _ ->
+            error
+            |> reply<Map<Asset, uint64>> requestId
             NoAccount
     | Exist view ->
 
