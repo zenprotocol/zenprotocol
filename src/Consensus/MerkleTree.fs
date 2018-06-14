@@ -1,6 +1,6 @@
 module Consensus.MerkleTree
 
-let private findSplitIndex length = 
+let private findSplitIndex length =
     Seq.initInfinite (fun i -> pown 2 i)
     |> Seq.find (fun i -> i * 2 >= length)
 
