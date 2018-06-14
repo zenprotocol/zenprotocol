@@ -42,6 +42,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ACS.feature.cs" />
+    <Compile Include="ContractExamples.feature.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ContractState.feature.cs" />
     <Compile Include="SimpleBlockChain.feature.cs" />
@@ -53,6 +54,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="ACS.feature" />
+    <Content Include="ContractExamples.feature" />
     <Content Include="ContractState.feature" />
     <Content Include="Contracts\c1.fst">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>

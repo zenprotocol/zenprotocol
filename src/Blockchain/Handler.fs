@@ -106,12 +106,11 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
     match request with
     | ExecuteContract (contractId, command, sender, messageBody, txSkeleton) ->
         TransactionHandler.executeContract session txSkeleton timestamp contractId command sender messageBody state false
-        |> requestId.reply
+        |> requestId.reply<Result<Transaction, string>>
     | GetBlockTemplate pkHash ->
         let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList chain session state timestamp
-        let block = Block.createTemplate chain state.tipState.tip.header timestamp state.tipState.ema memState.activeContractSet validatedTransactions pkHash
-
-        requestId.reply block
+        Block.createTemplate chain state.tipState.tip.header timestamp state.tipState.ema memState.activeContractSet validatedTransactions pkHash
+        |> requestId.reply<Block>
     | GetBlock blockHash ->
         match BlockRepository.tryGetHeader session blockHash with
         | Some header ->
@@ -164,7 +163,7 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
                 expiry = contract.expiry
                 code = contract.code
             }:ActiveContract)
-        |> requestId.reply
+        |> requestId.reply<ActiveContract option>
     | GetHeaders ->
         let rec getHeaders tip headers =
             let header = BlockRepository.getHeader session tip
@@ -174,14 +173,11 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
             else
                 getHeaders header.header.parent (header.header :: headers)
 
-        let headers = getHeaders state.tipState.tip.hash []
-
-        requestId.reply headers
-
+        getHeaders state.tipState.tip.hash []
+        |> requestId.reply<BlockHeader list>
     | GetMempool ->
-        let txs = MemPool.toList state.memoryState.mempool
-        requestId.reply txs
-
+        MemPool.toList state.memoryState.mempool
+        |> requestId.reply<List<Hash.Hash * Transaction>>
     | GetBlockChainInfo ->
         let tip = state.tipState.tip.header
 
@@ -217,7 +213,7 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
             initialBlockDownload = syncing
             tipBlockHash = Block.hash state.tipState.tip.header
         }
-        |> requestId.reply
+        |> requestId.reply<BlockchainInfo>
 
     | GetTransaction txHash ->
         match MemPool.getTransaction txHash state.memoryState.mempool with

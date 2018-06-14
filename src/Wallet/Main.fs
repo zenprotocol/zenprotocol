@@ -175,7 +175,6 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             |> reply<Map<Asset, uint64>> requestId
             NoAccount
     | Exist view ->
-
         let chainParams = Consensus.Chain.getChainParameters chain
         match request with
         | GetBalance ->
@@ -203,7 +202,7 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             |> reply<TransactionsResponse> requestId
 
             accountStatus
-        | ImportSeed (words, password) ->
+        | ImportSeed (_, _) ->
             Error "account already exist"
             |> reply<unit> requestId
 
@@ -316,13 +315,13 @@ let main dataPath busName chain (wipe:Wipe) =
 
             let accountStatus =
                 match wipe, account with
-                | Reset, Some account  ->
+                | Reset, Some _  ->
                     eventX "Resetting account"
                     |> Log.info
 
                     Account.reset dataAccess session
                     sync dataAccess session client
-                | NoWipe, Some account ->
+                | NoWipe, Some _ ->
                     eventX "Syncing account..."
                     |> Log.info
 
