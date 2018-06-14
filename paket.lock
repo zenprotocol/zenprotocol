@@ -135,3 +135,16 @@ NUGET
     zen_z3_linux (4.5.1.8-v1f29cebd4df)
     zen_z3_osx (4.5.1.8-v1f29cebd4df6)
     zen_z3_windows (4.5.1.7-v1f29cebd4df)
+    Zulib (0.3.26)
+      BouncyCastle
+      FAKE (>= 4.0 < 5.0)
+      FsBech32 (>= 0.1.0.7)
+      FsCheck
+      FSharp.Compatibility.OCaml
+      FSharpx.Collections
+      NUnit
+      Zen.FSharp.Compiler.Service (17.0.2)
+      zen_z3_linux (4.5.1.8-v1f29cebd4df)
+      zen_z3_osx (4.5.1.8-v1f29cebd4df6)
+      zen_z3_windows (4.5.1.7-v1f29cebd4df)
+      ZFStar (0.0.25)

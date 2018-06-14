@@ -35,6 +35,7 @@ nuget SpecFlow.NUnit
 
 source https://www.myget.org/F/zenprotocol/api/v2
 
+nuget Zulib 0.3.26
 nuget zen_z3_linux 4.5.1.8-v1f29cebd4df
 nuget zen_z3_osx 4.5.1.8-v1f29cebd4df6
 nuget zen_secp256k1_linux 0.1.0.26-v6ad5cdb42a1a
