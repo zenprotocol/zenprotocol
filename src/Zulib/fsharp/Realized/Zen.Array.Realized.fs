@@ -38,3 +38,17 @@ let init_item (_:Prims.nat) (_:Prims.nat)
               (_:(Prims.nat -> Cost.t<'a, unit>))
               (_:Prims.nat)
               : unit = ()
+
+open FStar.Pervasives
+
+let tryMap<'a,'b> n (f:'a->Cost.t<Native.option<'b>, Prims.unit>) arr =
+    Array.map f arr
+    |> Array.map Cost.__force
+    |> Array.choose (fun item ->
+        match item with
+        | Native.Some x -> Some x
+        | Native.None -> None)
+    |> Some
+
+
+
