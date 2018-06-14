@@ -61,21 +61,24 @@ let setup = fun () ->
 
     module RT = Zen.ResultT
     module Tx = Zen.TxSkeleton
+    module C = Zen.Cost
 
-    let main txSkeleton _ contractHash command sender data wallet =
+    let main txSkeleton _ contractId command sender messageBody wallet state =
         if command = "contract2_test" then
         begin
-            let! contractToken = Zen.Asset.getDefault contractHash in
+            let! contractToken = Zen.Asset.getDefault contractId in
             let! txSkeleton =
                 Tx.mint 50UL contractToken txSkeleton
-                >>= Tx.lockToContract contractToken 50UL contractHash in
-            RT.ok (txSkeleton, None)
+                >>= Tx.lockToContract contractToken 50UL contractId in
+            RT.ok @ { tx = txSkeleton; message = None; state = NoChange}
         end
         else
             RT.autoFailw "unsupported command"
 
-    val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 9
-        let cf _ _ _ _ _ _ = ret (64 + (64 + 64 + 0) + 21)
+    let cf _ _ _ _ _ _ _ = 
+        64 + (64 + 64 + 0) + 23
+        |> cast nat
+        |> C.ret
     """
     let contract2Id = Contract.makeContractId Version0 contract2Code
 
@@ -89,31 +92,34 @@ let setup = fun () ->
             module RT = Zen.ResultT
             module Tx = Zen.TxSkeleton
             module ContractId = Zen.ContractId
+            module C = Zen.Cost
             
-            let main txSkeleton _ contractHash command sender data wallet =
+            let main txSkeleton _ contractId command sender messageBody wallet state =
                 if command = "contract1_test" then
                 begin
-                    let! asset = Zen.Asset.getDefault contractHash in
+                    let! asset = Zen.Asset.getDefault contractId in
                     let! txSkeleton =
                         Tx.mint 25UL asset txSkeleton
-                        >>= Tx.lockToContract asset 25UL contractHash in
+                        >>= Tx.lockToContract asset 25UL contractId in
                     let! contractId = ContractId.fromString "%s" in
                     match contractId with 
                     | Some contractId -> 
                         let message = {
-                            contractId = contractId;
+                            recipient = contractId;
                             command = "contract2_test";
-                            data = data
+                            body = messageBody
                         } in
-                        RT.ok (txSkeleton, Some message)
+                        RT.ok @ { tx = txSkeleton; message = Some message; state = NoChange}
                     | None ->
                         RT.autoFailw "could not parse contractId from string" 
                 end
                 else
                     RT.autoFailw "unsupported command"
 
-            val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 11
-            let cf _ _ _ _ _ _ = ret (64 + (64 + 64 + (64 + 0)) + 31)
+            let cf _ _ _ _ _ _ _ = 
+                64 + (64 + 64 + (64 + 0)) + 33
+                |> cast nat
+                |> C.ret
         """
 
     contracts <- result {
@@ -128,7 +134,7 @@ let tearDown = fun () ->
     clean ()
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Should produce execute contracts with message passed between them``() =
     result {
         let! (contract1, contract2) = contracts
@@ -153,19 +159,19 @@ let ``Should produce execute contracts with message passed between them``() =
         let stringData = Zen.Types.Data.data.String "Some string data"B |> Some
         let context = {blockNumber=100u;timestamp=1_000_000UL}
 
-        let! (tx, message) = Contract.run contract1 TxSkeleton.empty context "contract1_test" Anonymous stringData List.empty
+        let! (tx, message, _) = Contract.run contract1 TxSkeleton.empty context "contract1_test" Anonymous stringData List.empty None
 
         let command =
             match message with
-            | Some {contractId=contractId;command=command;data=data} when contractId = ContractId (contract2.version,contract2.hash) ->
-                data
+            | Some {recipient=recipient;command=command;body=messageBody} when recipient = ContractId (contract2.version,contract2.hash) ->
+                messageBody
                 |> should equal stringData
 
                 command
             | _ ->
                 failwithf "should be some message"
 
-        let! (tx, message) = Contract.run contract2 tx context command Anonymous None List.empty
+        let! (tx, message, _) = Contract.run contract2 tx context command Anonymous None List.empty None
 
         match message with
         | Some _ ->

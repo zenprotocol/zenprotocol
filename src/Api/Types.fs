@@ -21,9 +21,11 @@ type ContractActivateResponseJson = JsonProvider<"""
 
 type SendRequestJson = JsonProvider<"""
 {
-    "address": "address",
-    "asset": "asset",
-    "amount": 2147483649,
+    "outputs": [{
+        "address": "address",
+        "asset": "asset",
+        "amount": 2147483649
+    }],
     "password": "password"
 }
 """>
@@ -48,7 +50,7 @@ type ContractExecuteRequestJson = JsonProvider<"""
 {
     "address": "address",
     "command": "command",
-    "data": "data",
+    "messageBody": "message body",
     "options": {
         "returnAddress": true,
         "sign": "m/0/9'"
@@ -86,7 +88,9 @@ type BlockChainInfoJson = JsonProvider<"""
     "blocks":100,
     "headers":100,
     "difficulty":0.1,
-    "medianTime":2147483648
+    "medianTime":2147483648,
+    "initialBlockDownload":true,
+    "tip": "hash"
 }""">
 
 type ImportSeedJson = JsonProvider<"""
@@ -100,13 +104,9 @@ type TransactionsResponseJson = JsonProvider<"""
 [
     {
         "txHash": "hash",
-        "deltas": [
-            {
-                "asset": "asset",
-                "amount": -2147483453648
-            }
-        ],
-        "blockNumber": 342347423
+        "asset":"asset",
+        "amount":2147483453648,
+        "confirmations": 0
     }
 ]
 """>
@@ -142,13 +142,6 @@ type SignJson = JsonProvider<"""
 type CheckPasswordJson = JsonProvider<"""
 {
     "password": "secret"
-}
-""">
-
-type TransactionsRequestJson = JsonProvider<"""
-{
-    "skip": 1000,
-    "take": 1000
 }
 """>
 
@@ -198,5 +191,32 @@ type OutpointJson = JsonProvider<"""
 {
     "txHash": "12..34",
     "index": 1234
+}
+""">
+
+type ImportAddressResultJson = JsonProvider<"""
+{
+    "address":"address",
+    "index":1234
+}""">
+
+type ReceivedByAddressJson = JsonProvider<"""
+{
+    "address":"address",
+    "asset":"asset",
+    "amount":1234567890000
+}
+""">
+
+type AddressOutputJson = JsonProvider<"""
+{
+    "outpoint":{
+        "txHash":"abbbb",
+        "index": 0
+    },
+    "asset":"abcd",
+    "amount":1234567890000,
+    "confirmations":0,
+    "spent":true
 }
 """>

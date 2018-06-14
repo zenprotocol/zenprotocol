@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 const proc = require('child_process');
 const path = require('path');
 
@@ -19,7 +18,10 @@ function start(args, dirname = __dirname) {
 
   if (process.platform !== "win32") {
     args.unshift(nodePath);
-    node = proc.spawn('mono', args, {
+
+    let mono = process.platform == 'darwin' ? '/Library/Frameworks/Mono.framework/Versions/Current/Commands/mono' : 'mono'
+
+    node = proc.spawn(mono, args, {
         cwd: workingDirectory
     });
   }

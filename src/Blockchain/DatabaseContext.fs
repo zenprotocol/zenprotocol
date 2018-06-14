@@ -5,6 +5,7 @@ open Consensus
 open Types
 open UtxoSet
 open FStar
+open ContractStates
 open Infrastructure
 open Serialization
 
@@ -16,6 +17,7 @@ type T =
         databaseContext:DataAccess.DatabaseContext
         tip:SingleValue<Hash.Hash>
         utxoSet:Collection<Outpoint, OutputStatus>
+        contractStates:Collection<ContractId, Zen.Types.Data.data>
         contractUtxo:MultiCollection<ContractId,PointedOutput>
         blocks:Collection<Hash.Hash,ExtendedBlockHeader.T>
         blockChildrenIndex: Index<Hash.Hash,ExtendedBlockHeader.T,Hash.Hash>
@@ -95,6 +97,12 @@ let create dataPath =
             OutputStatus.serialize
             OutputStatus.deserialize
 
+    let contractStates = 
+        Collection.create session "contractStates"
+            ContractId.serialize
+            Data.serialize
+            Data.deserialize
+
     let contractUtxo =
         MultiCollection.create session "contractUtxo" ContractId.toBytes
             PointedOutput.serialize
@@ -118,6 +126,7 @@ let create dataPath =
         databaseContext = databaseContext
         tip=tip
         utxoSet=utxoSet
+        contractStates=contractStates
         contractUtxo=contractUtxo
         blocks=blocks
         blockChildrenIndex=blockChildrenIndex

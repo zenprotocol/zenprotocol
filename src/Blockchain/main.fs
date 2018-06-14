@@ -66,7 +66,7 @@ let main dataPath chainParams busName wipe =
                 ActiveContractSet.empty,
                 EMA.create chainParams,
                 ContractCache.empty
-
+                
         let tipState =
             {
                 activeContractSet=acs
@@ -81,6 +81,7 @@ let main dataPath chainParams busName wipe =
                 mempool=MemPool.empty
                 orphanPool=OrphanPool.create ()
                 contractCache=contractCache
+                contractStates=ContractStates.asDatabase
             }
 
         let state =

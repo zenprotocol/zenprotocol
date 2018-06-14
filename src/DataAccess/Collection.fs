@@ -12,6 +12,7 @@ let create (session:Session) name keySerializer valueSerializer valueDeseralizer
     |> checkErrorCode
 
     {
+        name=name
         environment=session.env
         database=db;
         keySerializer=keySerializer
@@ -59,10 +60,42 @@ let tryGet collection (session:Session) key =
     else
         errorToString result |> failwith
 
+let getAll (collection:Collection<'a,'b>) (session:Session) =
+    let mutable cursor = IntPtr.Zero
+
+    mdb_cursor_open (session.tx, collection.database, &cursor) |> checkErrorCode
+
+    let mutable keyData = Data.empty
+    let mutable valueData = Data.empty
+
+    let moveTo = mdb_cursor_get (cursor, &keyData, &valueData,CursorOperation.First) = 0
+
+    // TODO: change to sequence
+    if moveTo then
+        let rec getNext values =
+            mdb_cursor_get (cursor, &keyData, &valueData, CursorOperation.GetCurrent) |> checkErrorCode
+
+            let bytes = dataToByteArray valueData
+            let value = collection.valueDeseralizer bytes
+                        |> Option.get
+
+            let moveNext = mdb_cursor_get (cursor, &keyData, &valueData, CursorOperation.Next) = 0
+
+            let values = value :: values
+
+            if moveNext then
+                getNext values
+            else
+                values
+
+        getNext [] |> List.rev
+    else
+        []
+
 let get collection (session:Session) key =
     match tryGet collection session key with
     | Some value -> value
-    | None -> failwithf "key was not found in the collection %A" key
+    | None -> failwithf "key was not found in the collection %s %A" collection.name key
 
 let put collection session key value =
     let keyBytes = collection.keySerializer key
@@ -84,13 +117,19 @@ let delete collection session key =
     let mutable keyData = byteArrayToData pinnedKey
     let mutable valueData = Data.empty
 
-    mdb_del(session.tx, collection.database, &keyData, &valueData)
-    |> checkErrorCode
+    let result = mdb_del(session.tx, collection.database, &keyData, &valueData)
+    
+    if result = 0 || result = MDB_NOTFOUND then
+        //TODO: at the moment delete is not supported with indices, so
+        // we throw when collection has indices
+        if not <| List.isEmpty collection.indices then
+            failwith "delete doesn't work with indices"
+    else
+        errorToString result |> failwith
 
-    //TODO: at the moment delete is not supported with indices, so
-    // we throw when collection has indices
-    if not <| List.isEmpty collection.indices then
-        failwith "delete doesn't work with indices"
+let truncate (collection:Collection<'a,'b>) session =
+    mdb_drop(session.tx, collection.database,0)
+    |> checkErrorCode
 
 let containsKey collection (session:Session) key =
     Option.isSome <| tryGet collection session key

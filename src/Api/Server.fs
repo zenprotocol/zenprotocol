@@ -2,18 +2,22 @@ module Api.Server
 
 open FSharp.Data
 open Consensus
+open Serialization
 open Infrastructure
-open Infrastructure.ServiceBus
-open Infrastructure.Http
+open ServiceBus
+open Http
 open Api.Types
 open Parsing
 open Messaging.Services
 open Messaging.Services.Wallet
-open Result
+open Infrastructure.Result
 open Zen.Crypto
 open Consensus.Crypto
 open Logary.Message
 open Api.Helpers
+open FSharp.Data
+open Hopac.Extensions.Seq
+open FsBech32
 
 type T =
     {
@@ -25,6 +29,15 @@ type T =
         member x.Dispose() =
             (x.client :> System.IDisposable).Dispose()
             (x.agent :> System.IDisposable).Dispose()
+
+let parseConfirmations query reply get =
+    match Map.tryFind "confirmations" query with
+    | None -> get 0ul
+    | Some confirmations ->
+        match System.UInt32.TryParse confirmations with
+        | true, confirmations -> get confirmations
+        | _ -> reply StatusCode.BadRequest (TextContent "invalid confirmations")
+
 
 let handleRequest chain client (request,reply) =
     let replyError error =
@@ -73,7 +86,9 @@ let handleRequest chain client (request,reply) =
                 info.blocks|> int,
                 info.headers |> int,
                 info.difficulty |> decimal,
-                info.medianTime |> int64)).JsonValue
+                info.medianTime |> int64,
+                info.initialBlockDownload,
+                info.tipBlockHash |> Hash.toString)).JsonValue
 
         reply StatusCode.OK (JsonContent json)
 
@@ -197,26 +212,36 @@ let handleRequest chain client (request,reply) =
             replyError error
     | Post ("/wallet/send", Some body) ->
         match parseSendJson chain body with
-        | Ok (pkHash, spend, password) ->
-            Wallet.createTransaction client pkHash spend password
+        | Ok (outputs, password) ->
+            Wallet.createTransaction client outputs password
             |> validateTx
         | Error error ->
             replyError error
-    | Post ("/wallet/transactions", Some body) ->
-        match parseTransactionsRequestJson body with
+    | Post ("/wallet/transaction", Some body) ->
+        match parseSendJson chain body with
+        | Ok (outputs, password) ->
+            match Wallet.createTransaction client outputs password with 
+            | Ok tx ->
+                tx
+                |> Transaction.serialize Full
+                |> Base16.encode
+                |> TextContent
+                |> reply StatusCode.OK
+            | Error error -> replyError error
+        | Error error ->
+            replyError error
+    | Get ("/wallet/transactions", query) ->
+        match parseTransactionsRequestJson query with
         | Ok (skip, take) ->
             match Wallet.getTransactions client skip take with
             | Ok txs ->
                 let json =
                     txs
+                    |> List.map (fun (txHash,direction, spend, confirmations) ->
+                        let amount = if direction = TransactionDirection.In then spend.amount |> int64 else spend.amount |> int64 |> (*) -1L
+
+                        (new TransactionsResponseJson.Root(Hash.toString txHash, Asset.toString spend.asset, amount, int confirmations)).JsonValue)
                     |> List.toArray
-                    |> Array.map (fun (txHash, amounts, blockNumer) ->
-                        let deltas =
-                            amounts
-                            |> Map.toArray
-                            |> Array.map (fun (asset, amount) ->
-                                new TransactionsResponseJson.Delta(Asset.toString asset, amount))
-                        (new TransactionsResponseJson.Root(Hash.toString txHash, deltas, int blockNumer)).JsonValue)
                     |> JsonValue.Array
                 (new TransactionsResponseJson.Root(json)).JsonValue
                 |> JsonContent
@@ -252,15 +277,13 @@ let handleRequest chain client (request,reply) =
     | Post ("/wallet/contract/execute", Some body) ->
         match parseContractExecuteJson chain body with
         | Error error -> replyError error
-        | Ok (contractId, command, data, returnAddress, sign, spends, password) ->
-            Wallet.executeContract client contractId command data returnAddress sign spends password
+        | Ok (contractId, command, message, returnAddress, sign, spends, password) ->
+            Wallet.executeContract client contractId command message returnAddress sign spends password
             |> validateTx
     | Get ("/wallet/resync", _) ->
         Wallet.resyncAccount client
         reply StatusCode.OK NoContent
     | Post ("/blockchain/publishblock", Some body) ->
-        printfn "hello-----------------------------"
-
         match parsePublishBlockJson body with
         | Error error ->
             printfn "error deserializing block"
@@ -286,11 +309,26 @@ let handleRequest chain client (request,reply) =
         | FSharp.Core.Error _ ->
             TextContent (sprintf "invalid address %A" query)
             |> reply StatusCode.BadRequest
-    | Get ("blockchain/block", query) ->
+    | Get ("/blockchain/block", query) ->
         match Map.tryFind "hash" query with
         | None ->
-              TextContent (sprintf "hash is missing")
-              |> reply StatusCode.BadRequest
+              match Map.tryFind "blockNumber" query with
+              | Some blockNumber ->
+                  match System.UInt32.TryParse blockNumber with
+                  | false,_ ->
+                      TextContent (sprintf "couldn't decode hash")
+                      |> reply StatusCode.BadRequest
+                  | true, blockNumber ->
+                      match Blockchain.getBlockByNumber client blockNumber with
+                      | None ->
+                          TextContent (sprintf "block not found")
+                          |> reply StatusCode.NotFound
+                      | Some block ->
+                          reply StatusCode.OK (JsonContent <| blockEncoder block)
+              | None ->
+                  TextContent (sprintf "hash or blockNumber are missing")
+                  |> reply StatusCode.BadRequest
+
         | Some h ->
             match Hash.fromString h with
             | Error _ ->
@@ -303,6 +341,110 @@ let handleRequest chain client (request,reply) =
                     |> reply StatusCode.NotFound
                 | Some block ->
                     reply StatusCode.OK (JsonContent <| blockEncoder block)
+
+    | Get ("/blockchain/transaction", query) ->
+        match Map.tryFind "hash" query with
+        | Some hash ->
+            let hex = (Map.tryFind "hex" query |> Option.defaultValue "false") = "true"
+
+            Hash.fromString hash
+            |> Result.bind (Blockchain.getTransaction client >> ofOption "transaction not found")
+            |> Result.map (fun (tx,confirmations) ->
+                let confirmations = "confirmations", (confirmations |> decimal |> JsonValue.Number)
+
+                if hex then
+                    let tx = Transaction.toHex tx
+
+                    [| "tx", JsonValue.String tx; confirmations |]
+                    |> JsonValue.Record
+                    |> JsonContent
+                    |> reply StatusCode.OK
+                else
+                    let tx = transactionEncoder tx
+
+                    [| "tx", tx; confirmations |]
+                    |> JsonValue.Record
+                    |> JsonContent
+                    |> reply StatusCode.OK)
+
+            |> Result.mapError (TextContent >> reply StatusCode.NotFound)
+            |> ignore
+        | None ->
+            reply StatusCode.BadRequest NoContent
+    | Post ("/blockchain/publishtransaction", Some tx) ->
+        match JsonValue.TryParse tx with
+        | Some (JsonValue.String tx) ->
+            match Transaction.fromHex tx with
+            | Some tx ->
+                Blockchain.validateTransaction client tx
+                reply StatusCode.OK NoContent
+            | None ->
+                reply StatusCode.BadRequest NoContent
+        | _ ->
+            reply StatusCode.BadRequest NoContent
+    | Post ("/wallet/importwatchonlyaddress", Some address) ->
+        match JsonValue.TryParse address with
+        | Some (JsonValue.String address) ->
+            match Wallet.importWatchOnlyAddress client address with
+            | Ok () -> reply StatusCode.OK NoContent
+            | Error error -> reply StatusCode.BadRequest (TextContent error)
+        | _ -> reply StatusCode.BadRequest NoContent
+    | Post ("/wallet/getnewaddress", _) ->
+        match Wallet.getNewAddress client with
+        | Ok (address,index) ->
+            (new ImportAddressResultJson.Root(address,index)).JsonValue
+            |> JsonContent
+            |> reply StatusCode.OK
+        | Error error -> reply StatusCode.BadRequest (TextContent error)
+    | Get ("/wallet/receivedbyaddress", query) ->
+        let get confirmations =
+            match Wallet.getReceivedByAddress client confirmations with
+            | Ok received ->
+                Map.toSeq received
+                |> Seq.map (fun ((address,asset),amount) -> (new ReceivedByAddressJson.Root(address, Asset.toString asset, int64 amount)).JsonValue)
+                |> Seq.toArray
+                |> JsonValue.Array
+                |> JsonContent
+                |> reply StatusCode.OK
+            | Error error -> reply StatusCode.BadRequest (TextContent error)
+
+        parseConfirmations query reply get
+
+    | Get ("/wallet/addressoutputs",query) ->
+        match Map.tryFind "address" query with
+        | Some address ->
+            match Wallet.getAddressOutputs client address with
+            | Ok outputs ->
+                outputs
+                |> List.map (fun ((outpoint:Types.Outpoint),(spend:Types.Spend),confirmations,spent) ->
+                    new AddressOutputJson.Root(new AddressOutputJson.Outpoint(Hash.toString outpoint.txHash, outpoint.index |> int32),
+                        Asset.toString spend.asset, spend.amount |> int64, int confirmations,spent))
+                |> List.map (fun json -> json.JsonValue)
+                |> List.toArray
+                |> JsonValue.Array
+                |> JsonContent
+                |> reply StatusCode.OK
+            | Error error -> reply StatusCode.BadRequest (TextContent error)
+        | _ -> reply StatusCode.BadRequest (TextContent "address is missing")
+    | Get("/wallet/addressbalance", query) ->
+        let get confirmations =
+            match Map.tryFind "address" query with
+            | Some address ->
+                match Wallet.getAddressBalance client address confirmations with
+                | Ok balances ->
+                    balances
+                    |> Map.toSeq
+                    |> Seq.map (fun (asset,amount) -> new SpendJson.Root(Asset.toString asset, int64 amount))
+                    |> Seq.map (fun json -> json.JsonValue)
+                    |> Seq.toArray
+                    |> JsonValue.Array
+                    |> JsonContent
+                    |> reply StatusCode.OK
+                | Error error -> reply StatusCode.BadRequest (TextContent error)
+            | _ -> reply StatusCode.BadRequest (TextContent "address is missing")
+
+
+        parseConfirmations query reply get
     | _ ->
         reply StatusCode.NotFound NoContent
 

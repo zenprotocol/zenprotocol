@@ -51,10 +51,13 @@
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="KeyPathParser.fs" />
     <Compile Include="ExtendedKey.fs" />
+    <Compile Include="Types.fs" />
     <Compile Include="Secured.fs" />
-    <Compile Include="Account.fs" />
     <Compile Include="Serialization.fs" />
     <Compile Include="DataAccess.fs" />
+    <Compile Include="View.fs" />
+    <Compile Include="Account.fs" />
+    <Compile Include="TransactionCreator.fs" />
     <Compile Include="Main.fs" />
     <Content Include="paket.references" />
     <ProjectReference Include="..\Consensus\Consensus.fsproj">

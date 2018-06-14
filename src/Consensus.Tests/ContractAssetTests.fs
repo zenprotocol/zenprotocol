@@ -49,8 +49,8 @@ let compileAndRun code =
     let stubContext:Types.ContractContext = {blockNumber=1000u;timestamp=1000000UL}
     compile code
     |> Result.bind (fun contract ->
-        Contract.run contract TxSkeleton.empty stubContext "" Types.Anonymous None List.empty
-        |> Result.map (fun (tx, _) -> tx)
+        Contract.run contract TxSkeleton.empty stubContext "" Types.Anonymous None List.empty None
+        |> Result.map (fun (tx, _, _) -> tx)
     )
 
 let shouldBeOk result =
@@ -59,7 +59,7 @@ let shouldBeOk result =
     |> ignore
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Should generate assets from a string and from an int``() =
     let contractCode = """
         open Zen.Types
@@ -70,25 +70,28 @@ let ``Should generate assets from a string and from an int``() =
         module RT = Zen.ResultT
         module Tx = Zen.TxSkeleton
         module S = FStar.String
+        module C = Zen.Cost
 
-        let main txSkeleton _ contractHash command sender data wallet =
+        let main txSkeleton _ contractId command sender messageBody wallet state =
             let str = "Test" in
 
             if S.length str < 29 then
             begin
-                let! assetString = Zen.Asset.fromSubtypeString contractHash str in
-                let! assetInt = Zen.Asset.fromSubtypeInt contractHash 9999999ul in
+                let! assetString = Zen.Asset.fromSubtypeString contractId str in
+                let! assetInt = Zen.Asset.fromSubtypeInt contractId 9999999ul in
                 let! txSkeleton =
                     Tx.mint 10UL assetInt txSkeleton
                     >>= Tx.mint 20UL assetString
                 in
-                RT.ok (txSkeleton, None)
+                RT.ok @ { tx = txSkeleton; message = None; state = NoChange}
             end
             else
                 RT.autoFailw "unexpected"
 
-        val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 11
-        let cf _ _ _ _ _ _ = ret (64 + (64 + (64 + 64 + 0)) + 26)
+        let cf _ _ _ _ _ _ _ =
+            64 + (64 + (64 + 64 + 0)) + 28
+            |> cast nat
+            |> C.ret
         """
     compileAndRun contractCode
     |> shouldBeOk

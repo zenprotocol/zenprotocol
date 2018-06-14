@@ -1,5 +1,6 @@
 module Consensus.Transaction
 
+open Consensus.Serialization
 open TxSkeleton
 open Types
 open Crypto
@@ -7,6 +8,13 @@ open Serialization
 
 let hash =
     Transaction.serialize WithoutWitness >> Hash.compute
+
+let toHex =
+    Transaction.serialize Full >> FsBech32.Base16.encode
+
+let fromHex hex =
+    FsBech32.Base16.decode hex
+    |> Option.bind (Transaction.deserialize Full)
 
 let witnessHash =
     //TODO: only serialize witness

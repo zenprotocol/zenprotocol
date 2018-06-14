@@ -164,19 +164,20 @@ let ``Transaction validation should fail with structurally invalid witness data`
     let validContractWitness = {
         contractId=ContractId (Version0,validHash)
         command = "command"
-        data = None
+        messageBody = None
+        stateCommitment = NotCommitted
         beginInputs = 0ul
         beginOutputs = 0ul
         inputsLength = 0ul
         outputsLength = 0ul
         signature = None
-        cost = 1ul
+        cost = 1UL
     }
 
     let check = ContractWitness >> check
 
     check <| { validContractWitness with command = null }
-    check <| { validContractWitness with cost = 0ul }
+    check <| { validContractWitness with cost = 0UL }
 
 [<Test>]
 let ``Signed transaction should be valid``() =
@@ -216,13 +217,14 @@ let ``Transaction validation should fail when inputs consist only of mints``() =
     let contractWitness = {
         contractId = ContractId (Version0, validHash)
         command = ""
-        data = None
+        messageBody = None
+        stateCommitment = NotCommitted
         beginInputs = 0ul
         beginOutputs = 0ul
         inputsLength = 0ul
         outputsLength = 0ul
         signature = None
-        cost = 1ul
+        cost = 1UL
     }
     {
         version = Version0

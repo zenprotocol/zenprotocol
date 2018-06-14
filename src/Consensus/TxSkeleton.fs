@@ -29,6 +29,9 @@ let addInputs inputs (txSkeleton:T) =
 let addOutput output (txSkeleton:T) =
     {txSkeleton with outputs=List.append txSkeleton.outputs [output]}
 
+let addOutputs outputs (txSkeleton:T) =
+    {txSkeleton with outputs=List.append txSkeleton.outputs outputs}
+
 let addChange asset inputsAmount outputsAmount pkHash txSkeleton =
     if inputsAmount > outputsAmount then
         addOutput {lock=PK pkHash;spend={amount=inputsAmount-outputsAmount;asset=asset}} txSkeleton
@@ -101,17 +104,17 @@ let isSkeletonOf txSkeleton tx outputs =
     && outputs = outputsFromSkeleton
     && tx.outputs = txSkeleton.outputs
 
-let getContractWitness contractId command data initialTxSkelton finalTxSkeleton (cost:int64)  =
+let getContractWitness contractId command messageBody stateCommitment initialTxSkelton finalTxSkeleton (cost:int64)  =
     let length list = List.length list |> uint32
-
     {
         contractId = contractId
         command = command
-        data = data
+        messageBody = messageBody
+        stateCommitment = stateCommitment
         beginInputs = length initialTxSkelton.pInputs
         beginOutputs = length initialTxSkelton.outputs
         inputsLength = length finalTxSkeleton.pInputs - length initialTxSkelton.pInputs
         outputsLength = length finalTxSkeleton.outputs - length initialTxSkelton.outputs
         signature = None
-        cost = uint32 cost
+        cost = uint64 cost
     }

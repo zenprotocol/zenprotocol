@@ -62,6 +62,7 @@
     <Compile Include="Weight.fs" />
     <Compile Include="Contract.fs" />
     <Compile Include="ContractCache.fs" />
+    <Compile Include="ContractStates.fs" />
     <Compile Include="ActiveContractSet.fs" />
     <Compile Include="ValidationError.fs" />
     <Compile Include="InputValidation\State.fs" />

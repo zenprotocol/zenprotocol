@@ -1,6 +1,5 @@
-﻿module Consensus.EMA
+module Consensus.EMA
 open Consensus.Chain
-open Consensus.Types
 
 type T  = {
     difficulty: uint32;
@@ -8,7 +7,7 @@ type T  = {
 }
 
 [<Literal>]
-let adjustment = 0.984
+let adjustment = 0.982
 
 let clamp lower upper x = min upper (max lower x)
 
@@ -28,16 +27,21 @@ let private median timestamps =
     else
         List.item (List.length timestamps / 2) (List.sort timestamps) // inaccurate on even lengths, doesn't matter
 
-let add chain header ema =
-    let newDelayed = push header ema.delayed
-    if List.length ema.delayed < 11 then {ema with delayed = newDelayed} else // First 11 blocks don't alter difficulty
-    let alpha = chain.smoothingFactor
-    let currentInterval = float <| newDelayed.[10]-newDelayed.[9]
-    let currentTarget = Hash.toBigInt <| Difficulty.uncompress ema.difficulty
-    let estimate = float currentTarget * ((1.0-alpha) + (alpha * currentInterval) / (float chain.blockInterval * adjustment))
+let nextDifficultyTarget targetInterval smoothing solveTime difficulty =
+    let currentDifficultyTarget = Hash.toBigInt <| Difficulty.uncompress difficulty
+    let t = bigint (decimal targetInterval * decimal adjustment)
+    let st = clamp -(15I * 60I * 1000I) (6I * t) solveTime
+    currentDifficultyTarget * (smoothing * t - t + st) / (smoothing * t)    // st large => raise target => lower difficulty
+
+let add chain timestamp ema =
+    let newDelayed = push timestamp ema.delayed
+    let l = List.length newDelayed
+    if l <= 1 then {ema with delayed = newDelayed} else // First block doesn't alter difficulty
+    let solveTime = (bigint newDelayed.[l-1]) - (bigint newDelayed.[l-2])     // may be negative
+    let unclampedNextTarget = nextDifficultyTarget chain.blockInterval chain.smoothingFactor solveTime ema.difficulty
     let nextTarget = clamp  (Hash.toBigInt <| Difficulty.maximum)   // maximum difficulty => low target
                             (Hash.toBigInt <| chain.proofOfWorkLimit)   // high target
-                            (bigint estimate)
+                            unclampedNextTarget
     let nextDifficulty = Difficulty.compress <| Hash.fromBigInt nextTarget
     {ema with delayed = newDelayed; difficulty = nextDifficulty}
 

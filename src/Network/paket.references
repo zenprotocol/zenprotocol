@@ -1,7 +1,7 @@
 FsPickler
 FsNetMQ
 FSharp.Control.Reactive
-System.Reactive.Core
+System.Reactive.Compatibility
 FSharp.Core
 FSharp.Compiler.Tools
 FSharp.Data

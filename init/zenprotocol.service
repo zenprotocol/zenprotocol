@@ -1,0 +1,12 @@
+[Unit]
+Description=Zen Protocol
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/usr/lib/node_modules/@zen/zen-node/Release/
+ExecStart=/usr/bin/mono /usr/lib/node_modules/@zen/zen-node/Release/zen-node.exe --data-path /var/zenprotocol/
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

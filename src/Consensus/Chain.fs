@@ -13,7 +13,7 @@ type ChainParameters =
         name:string;
         proofOfWorkLimit:Hash.Hash;
         blockInterval:uint64;
-        smoothingFactor:float;
+        smoothingFactor:bigint;
         maxBlockWeight:bigint;
         sacrificePerByteBlock:uint64;
         genesisHash:Hash.Hash;
@@ -27,7 +27,7 @@ let mainParameters =
         name="main"
         proofOfWorkLimit=Difficulty.uncompress 0x1d00fffful;
         blockInterval=236682UL;
-        smoothingFactor=0.035;
+        smoothingFactor=28I;
         maxBlockWeight=1000_000_000I;
         sacrificePerByteBlock=1UL;
         genesisHash=Hash.zero
@@ -41,12 +41,12 @@ let testParameters =
         name="testnet"
         proofOfWorkLimit=Difficulty.uncompress 0x20fffffful;
         blockInterval=60UL*1000UL;
-        smoothingFactor=0.035;
+        smoothingFactor=28I;
         maxBlockWeight=1000_000_000I;
         sacrificePerByteBlock=1UL;
-        genesisHash= get <| Hash.fromString "62af3061a2733437478f538baad39c12f73fae4be736486ca8d83da41dd1b72c";
+        genesisHash= get <| Hash.fromString "cd5f23c9566bbd420af11b10fca668b95ff784f1fd729fb83522d9c20b7de71a";
         genesisTime=1517828985040UL
-        networkId=2007ul
+        networkId=2009ul
         contractSacrificePerBytePerBlock=ContractSacrificePerBytePerBlock
     }
 
@@ -54,7 +54,7 @@ let localParameters = {
     testParameters with
         name="local"
         genesisHash =
-            get <| Hash.fromString "f4681a6ac22d278af4d9e850face50215b2430c7138ac4b75f196cedd8933bed";
+            get <| Hash.fromString "839bce12bcab0d5621c54105743c1666598d8107c35c139254aad567cdc3ff90";
         genesisTime=1515594186383UL
         networkId=1002ul
 }

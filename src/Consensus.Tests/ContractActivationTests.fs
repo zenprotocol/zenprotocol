@@ -8,11 +8,14 @@ open Wallet
 open NUnit.Framework
 open FsUnit
 open TestsInfrastructure.Constraints
+open TestsInfrastructure.Nunit
 open Helper
 
 let chain = Chain.Local
 let localParams = Chain.getChainParameters chain
 let getUTXO _ = UtxoSet.NoOutput
+let getContractState _ = None
+
 let contractPath =
     System.IO.Path.Combine
         [| System.IO.Path.GetTempPath(); System.IO.Path.GetRandomFileName() |]
@@ -21,7 +24,7 @@ let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO rootTxHash
 
 let validateInContext = validateInContext localParams getUTXO contractPath
 
-type TxResult = Result<Transaction*ActiveContractSet.T*ContractCache.T,ValidationError>
+type TxResult = Result<Transaction * ActiveContractSet.T * ContractCache.T * ContractStates.T,ValidationError>
 
 let unwrap =
     function
@@ -40,13 +43,13 @@ let (sampleContractId, sampleContractRecord) as sampleContractWithId =
     unwrap SampleContract.contractWithId
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Contract activation without contract sacrifice should fail``() =
 
     let rootAccount = createTestAccount() |> fst
 
-    let outpoint = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
-    let output = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
+    let outpoint = TestWallet.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
+    let output = TestWallet.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
 
     let tx =
         {version = Version0; contract = Some (V0 sampleContractRecord); inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
@@ -55,18 +58,18 @@ let ``Contract activation without contract sacrifice should fail``() =
 
     let expected:TxResult = General "Contract activation must include activation sacrifice" |> Error
 
-    validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet txHash tx
-    |> should equal expected
+    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase txHash tx, expected)
+    |> shouldEqual
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Contract activation with too low contract activation sacrifice``() =
 
     let rootAccount = createTestAccount() |> fst
 
-    let outpoint = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
+    let outpoint = TestWallet.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
     let outputs =
-        let output = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
+        let output = TestWallet.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
 
         [
             {lock=ActivationSacrifice;spend={amount=1UL;asset=Asset.Zen}}
@@ -80,25 +83,25 @@ let ``Contract activation with too low contract activation sacrifice``() =
 
     let expected:TxResult = General "Contract must be activated for at least one block" |> Error
 
-    validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet txHash tx
-    |> should equal expected
+    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase txHash tx, expected)
+    |> shouldEqual
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Contract extension with too low contract extension sacrifice``() =
     let rootAccount = createTestAccount()
 
     let tx =
-        Account.createActivationTransactionFromContract localParams sampleContractWithId 1ul rootAccount
+        TestWallet.createActivationTransactionFromContract localParams sampleContractWithId 1ul rootAccount
         |> unwrap
 
-    let _, acs, _ =
-        validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet (Transaction.hash tx) tx
+    let _, acs, _, _ =
+        validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase (Transaction.hash tx) tx
         |> unwrap
 
-    let outpoint = Account.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> fst
+    let outpoint = TestWallet.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> fst
     let outputs =
-        let output = Account.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> snd
+        let output = TestWallet.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> snd
 
         [
             {lock=ExtensionSacrifice sampleContractId;spend={amount=1UL;asset=Asset.Zen}}
@@ -111,18 +114,18 @@ let ``Contract extension with too low contract extension sacrifice``() =
 
     let expected:TxResult = General "Contract must be activated for at least one block" |> Error
 
-    validateInContext 1ul 1_000_000UL acs ContractCache.empty utxoSet (Transaction.hash tx) tx
-    |> should equal expected
+    (validateInContext 1ul 1_000_000UL acs ContractCache.empty utxoSet getContractState ContractStates.asDatabase (Transaction.hash tx) tx, expected)
+    |> shouldEqual
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Contract extension of a non active contract should fail``() =
     let contractId = Contract.makeContractId Version0 "1"
     let rootAccount = createTestAccount()
 
-    let outpoint = Account.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> fst
+    let outpoint = TestWallet.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> fst
     let outputs =
-        let output = Account.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> snd
+        let output = TestWallet.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> snd
 
         [
             {lock=ExtensionSacrifice contractId;spend={amount=1UL;asset=Asset.Zen}}
@@ -135,11 +138,11 @@ let ``Contract extension of a non active contract should fail``() =
 
     let expected:TxResult = General "Contract(s) must be active" |> Error
 
-    validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet (Transaction.hash tx) tx
-    |> should equal expected
+    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase (Transaction.hash tx) tx, expected)
+    |> shouldEqual
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Contract activation with asset other than zen should fail``() =
 
     let asset = Asset (ContractId (Version0, Hash.compute "1"B),Hash.zero)
@@ -165,11 +168,11 @@ let ``Contract activation with asset other than zen should fail``() =
 
     let expected:TxResult = General "Sacrifice must be paid in Zen" |> Error
 
-    validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet txHash tx
-    |> should equal expected
+    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase txHash tx, expected)
+    |> shouldEqual
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Contract extension with asset other than zen should fail``() =
     let asset = Asset (ContractId (Version0, Hash.compute "1"B),Hash.zero)
 
@@ -195,11 +198,11 @@ let ``Contract extension with asset other than zen should fail``() =
 
     let expected:TxResult = General "Sacrifice must be paid in Zen" |> Error
 
-    validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet txHash tx
-    |> should equal expected
+    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase txHash tx, expected)
+    |> shouldEqual
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Contract activation with exact amount``() =
     let contractId=SampleContract.sampleContractId
 
@@ -210,20 +213,20 @@ let ``Contract activation with exact amount``() =
     let blocks = 123ul
 
     let tx =
-        Account.createActivationTransactionFromContract localParams sampleContractWithId blocks rootAccount
+        TestWallet.createActivationTransactionFromContract localParams sampleContractWithId blocks rootAccount
         |> unwrap
 
-    let _, acs, _ =
-        validateInContext initialBlock initialTime ActiveContractSet.empty ContractCache.empty utxoSet (Transaction.hash tx) tx
+    let _, acs, _, _ =
+        validateInContext initialBlock initialTime ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase (Transaction.hash tx) tx
         |> unwrap
 
     match ActiveContractSet.tryFind contractId acs with
     | Some contract ->
-        contract.expiry |> should equal (blocks + initialBlock)
+        contract.expiry |> should equal (blocks + initialBlock - 1ul)
     | _ -> failwith "contract is not active"
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Contract extension with exact amount``() =
     let code = SampleContract.sampleContractCode
     let contractId = SampleContract.sampleContractId
@@ -237,21 +240,21 @@ let ``Contract extension with exact amount``() =
     let extensionSacrifice = localParams.sacrificePerByteBlock * (String.length code |> uint64) * (uint64 extendBlocks)
 
     let tx =
-        Account.createActivationTransactionFromContract localParams sampleContractWithId activateBlocks rootAccount
+        TestWallet.createActivationTransactionFromContract localParams sampleContractWithId activateBlocks rootAccount
         |> unwrap
 
-    let _, acs, _ =
-        validateInContext initialBlock initialTime ActiveContractSet.empty ContractCache.empty utxoSet (Transaction.hash tx) tx
+    let _, acs, _, _ =
+        validateInContext initialBlock initialTime ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase (Transaction.hash tx) tx
         |> unwrap
 
     match ActiveContractSet.tryFind contractId acs with
     | Some contract ->
-        contract.expiry |> should equal (activateBlocks + initialBlock)
+        contract.expiry |> should equal (activateBlocks + initialBlock - 1ul)
     | _ -> failwith "contract is not active"
 
-    let outpoint = Account.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> fst
+    let outpoint = TestWallet.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> fst
     let outputs =
-        let output = Account.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> snd
+        let output = TestWallet.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> snd
 
         [
             {lock=ExtensionSacrifice contractId;spend={amount=extensionSacrifice;asset=Asset.Zen}}
@@ -262,17 +265,17 @@ let ``Contract extension with exact amount``() =
         {version = Version0; contract=None; inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
         |> Transaction.sign [rootKeyPair]
 
-    let _, acs, _ =
-        validateInContext initialBlock initialTime acs ContractCache.empty utxoSet (Transaction.hash tx) tx
+    let _, acs, _, _ =
+        validateInContext initialBlock initialTime acs ContractCache.empty utxoSet getContractState ContractStates.asDatabase (Transaction.hash tx) tx
         |> unwrap
 
     match ActiveContractSet.tryFind contractId acs with
     | Some contract ->
-        contract.expiry |> should equal (activateBlocks + extendBlocks + initialBlock)
+        contract.expiry |> should equal (activateBlocks + extendBlocks - 1ul + initialBlock - 1ul)
     | _ -> failwith "contract is not active"
 
 [<Test>]
-[<ParallelizableAttribute>]
+[<Parallelizable>]
 let ``Contract extension with more than one output``() =
     let code = SampleContract.sampleContractCode
     let contractId = SampleContract.sampleContractId
@@ -288,21 +291,21 @@ let ``Contract extension with more than one output``() =
     let extensionSacrifice2 = localParams.sacrificePerByteBlock * (String.length code |> uint64) * (uint64 extendBlocks2)
 
     let tx =
-        Account.createActivationTransactionFromContract localParams sampleContractWithId activateBlocks rootAccount
+        TestWallet.createActivationTransactionFromContract localParams sampleContractWithId activateBlocks rootAccount
         |> unwrap
 
-    let _, acs, _ =
-        validateInContext initialBlock initialTime ActiveContractSet.empty ContractCache.empty utxoSet (Transaction.hash tx) tx
+    let _, acs, _, _ =
+        validateInContext initialBlock initialTime ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase (Transaction.hash tx) tx
         |> unwrap
 
     match ActiveContractSet.tryFind contractId acs with
     | Some contract ->
-        contract.expiry |> should equal (activateBlocks + initialBlock)
+        contract.expiry |> should equal (activateBlocks + initialBlock - 1ul)
     | _ -> failwith "contract is not active"
 
-    let outpoint = Account.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> fst
+    let outpoint = TestWallet.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> fst
     let outputs =
-        let output = Account.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> snd
+        let output = TestWallet.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> snd
 
         [
             {lock=ExtensionSacrifice contractId;spend={amount=extensionSacrifice1;asset=Asset.Zen}}
@@ -314,13 +317,13 @@ let ``Contract extension with more than one output``() =
         {version = Version0; contract=None; inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
         |> Transaction.sign [rootKeyPair]
 
-    let _, acs, _ =
-        validateInContext initialBlock initialTime acs ContractCache.empty utxoSet (Transaction.hash tx) tx
+    let _, acs, _, _ =
+        validateInContext initialBlock initialTime acs ContractCache.empty utxoSet getContractState ContractStates.asDatabase (Transaction.hash tx) tx
         |> unwrap
 
     match ActiveContractSet.tryFind contractId acs with
     | Some contract ->
-        contract.expiry |> should equal (activateBlocks + extendBlocks1 + extendBlocks2 + initialBlock)
+        contract.expiry |> should equal (activateBlocks + extendBlocks1 - 1ul + extendBlocks2 - 1ul + initialBlock - 1ul)
     | _ -> failwith "contract is not active"
 
 [<Test>]
@@ -330,9 +333,9 @@ let ``Contract activation without hints should fail``() =
     let rootAccount = createTestAccount() |> fst
 
     let activationSacrificeAmount = 1000UL
-    let outpoint = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
+    let outpoint = TestWallet.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
     let outputs =
-        let output = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
+        let output = TestWallet.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
 
         [
             {lock=ActivationSacrifice;spend={amount=activationSacrificeAmount;asset=Asset.Zen}}
@@ -346,8 +349,8 @@ let ``Contract activation without hints should fail``() =
 
     let expected:TxResult = General "total queries: invalid hints" |> Error
 
-    validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet (Transaction.hash tx) tx
-    |> should equal expected
+    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase (Transaction.hash tx) tx, expected)
+    |> shouldEqual
 
 [<Test>]
 let ``Contract activation with invalid queries should fail``() =
@@ -355,9 +358,9 @@ let ``Contract activation with invalid queries should fail``() =
     let rootAccount = createTestAccount() |> fst
 
     let activationSacrificeAmount = 1000UL
-    let outpoint = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
+    let outpoint = TestWallet.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
     let outputs =
-        let output = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
+        let output = TestWallet.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
 
         [
             {lock=ActivationSacrifice;spend={amount=activationSacrificeAmount;asset=Asset.Zen}}
@@ -373,17 +376,17 @@ let ``Contract activation with invalid queries should fail``() =
 
     let expected:TxResult = General "Total queries mismatch" |> Error
 
-    validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet (Transaction.hash tx) tx
-    |> should equal expected
+    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase (Transaction.hash tx) tx, expected)
+    |> shouldEqual
 
 [<Test>]
 let ``Contract with activation sacrifice but without a contract should fail``() =
     let rootAccount = createTestAccount() |> fst
 
     let activationSacrificeAmount = 1000UL
-    let outpoint = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
+    let outpoint = TestWallet.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> fst
     let outputs =
-        let output = Account.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
+        let output = TestWallet.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head |> snd
         [
             {lock=ActivationSacrifice;spend={amount=activationSacrificeAmount;asset=Asset.Zen}}
             {output with spend={output.spend with amount = output.spend.amount - activationSacrificeAmount}}
@@ -396,5 +399,5 @@ let ``Contract with activation sacrifice but without a contract should fail``() 
 
     let expected:Result<Transaction,ValidationError> = General "tx with an activation sacrifice must include a contract" |> Error
 
-    validateBasic tx
-    |> should equal expected
+    (validateBasic tx, expected)
+    |> shouldEqual

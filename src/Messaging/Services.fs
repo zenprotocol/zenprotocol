@@ -22,6 +22,7 @@ module Blockchain =
         difficulty:float
         medianTime:uint64
         initialBlockDownload:bool
+        tipBlockHash:Hash.Hash
     }
 
     type Command =
@@ -44,11 +45,14 @@ module Blockchain =
         | GetBlockTemplate of pkHash:Hash
         | GetTip
         | GetBlock of Hash
+        | GetBlockByNumber of uint32
         | GetBlockHeader of Hash
         | GetActiveContracts
+        | GetActiveContract of ContractId
         | GetBlockChainInfo
         | GetHeaders
         | GetMempool
+        | GetTransaction of Hash
 
     type Response = unit
 
@@ -64,8 +68,8 @@ module Blockchain =
     let handleMemPool client peerId txHashes =
         Command.send client serviceName (HandleMemPool (peerId,txHashes))
 
-    let executeContract client contractId command sender data txSkeleton =
-        ExecuteContract (contractId,command, sender, data, txSkeleton)
+    let executeContract client contractId command sender messageBody txSkeleton =
+        ExecuteContract (contractId,command, sender, messageBody, txSkeleton)
         |> Request.send<Request, Result<Transaction,string>> client serviceName
 
     let validateBlock client peerId block =
@@ -102,11 +106,20 @@ module Blockchain =
     let getBlock client blockHash =
         Request.send<Request,Block option> client serviceName (GetBlock blockHash)
 
+    let getTransaction client txHash =
+        Request.send<Request,(Transaction*uint32) option> client serviceName (GetTransaction txHash)
+
+    let getBlockByNumber client blockNumber =
+        Request.send<Request,Block option> client serviceName (GetBlockByNumber blockNumber)
+
     let getTip client =
         Request.send<Request,(Hash*BlockHeader) option> client serviceName GetTip
 
     let getActiveContracts client =
         Request.send<Request,ActiveContract list> client serviceName GetActiveContracts
+
+    let getActiveContract client contractId =
+        Request.send<Request,ActiveContract option> client serviceName (GetActiveContract contractId)
 
     let getBlockChainInfo client =
         Request.send<Request,BlockchainInfo> client serviceName GetBlockChainInfo
@@ -154,7 +167,12 @@ module Network =
 
 module Wallet =
     type BalanceResponse = Map<Asset,uint64>
-    type TransactionsResponse = List<Hash*Map<Asset,int64>*uint32>
+
+    type TransactionDirection =
+        | In
+        | Out
+
+    type TransactionsResponse = List<Hash*TransactionDirection*Spend*uint32>
     type ActivateContractResponse = Transaction * ContractId
 
     type Command =
@@ -166,7 +184,7 @@ module Wallet =
         | GetTransactions of skip: int * take: int
         | GetBalance
         | ImportSeed of string list * password:string
-        | Send of Hash * Spend * password:string
+        | Send of outputs:List<Hash * Spend> * password:string
         | ActivateContract of string * uint32 * password:string
         | ExtendContract of ContractId * uint32 * password:string
         | ExecuteContract of ContractId * string * data option * provideReturnAddress:bool * sign:string option * Map<Asset, uint64> * password:string
@@ -175,6 +193,11 @@ module Wallet =
         | GetPublicKey of path:string * password:string
         | GetMnemonicPhrase of password:string
         | Sign of Hash * path:string * password:string
+        | ImportWatchOnlyAddress of string
+        | GetNewAddress
+        | GetReceivedByAddress of confirmations:uint32
+        | GetAddressOutputs of address:string
+        | GetAddressBalance of address:string * confirmations:uint32
 
     let serviceName = "wallet"
 
@@ -190,8 +213,8 @@ module Wallet =
     let getAddress client =
         send<string> client serviceName GetAddress
 
-    let createTransaction client address spend password =
-        send<Transaction> client serviceName (Send (address, spend, password))
+    let createTransaction client outputs password =
+        send<Transaction> client serviceName (Send (outputs, password))
 
     let activateContract client code numberOfBlocks password =
         send<ActivateContractResponse> client serviceName (ActivateContract (code, numberOfBlocks, password))
@@ -199,8 +222,8 @@ module Wallet =
     let extendContract client address numberOfBlocks password =
         send<Transaction> client serviceName (ExtendContract (address, numberOfBlocks, password))
 
-    let executeContract client address command data provideReturnAddress sign spends password =
-        send<Transaction> client serviceName (ExecuteContract (address, command, data, provideReturnAddress, sign, spends, password))
+    let executeContract client address command messageBody provideReturnAddress sign spends password =
+        send<Transaction> client serviceName (ExecuteContract (address, command, messageBody, provideReturnAddress, sign, spends, password))
 
     let importSeed client words password =
         send<unit> client serviceName (ImportSeed (words, password))
@@ -225,3 +248,18 @@ module Wallet =
 
     let getMnemonicPhrase client password =
         Request.send<Request, Result<string, string>> client serviceName (GetMnemonicPhrase password)
+
+    let importWatchOnlyAddress client address =
+        Request.send<Request, Result<unit,string>> client serviceName (ImportWatchOnlyAddress address)
+
+    let getNewAddress client =
+        Request.send<Request, Result<string * int,string>> client serviceName GetNewAddress
+
+    let getReceivedByAddress client confirmations =
+        Request.send<Request, Result<Map<(string*Asset), uint64>,string>> client serviceName (GetReceivedByAddress confirmations)
+
+    let getAddressOutputs client address =
+        Request.send<Request, Result<List<(Outpoint*Spend*uint32*bool)>,string>> client serviceName (GetAddressOutputs address)
+
+    let getAddressBalance client address confirmations =
+        Request.send<Request, Result<Map<Asset, uint64>,string>> client serviceName (GetAddressBalance (address,confirmations))

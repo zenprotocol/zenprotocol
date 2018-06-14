@@ -32,6 +32,7 @@ let mutable state = {
             orphanPool = orphanPool
             activeContractSet = acs
             contractCache = ContractCache.empty
+            contractStates = ContractStates.asDatabase
         }
     tipState =
         {
@@ -56,7 +57,7 @@ let shouldBeErrorMessage message =
     | Error err -> err |> should equal message
 
 let activateContract code account session state =
-    Account.createActivateContractTransaction chain code 1ul account
+    TestWallet.createActivateContractTransaction chain code 1ul account
     |> Result.map (fun tx ->
         let events, state =
             Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
@@ -93,23 +94,24 @@ let setUp = fun () ->
     module W = Zen.Wallet
     module RT = Zen.ResultT
     module Tx = Zen.TxSkeleton
+    module C = Zen.Cost
 
-    let main txSkeleton _ contractHash command sender data wallet =
+    let main txSkeleton _ contractId command sender messageBody wallet state =
         let! result =
             Tx.lockToPubKey zenAsset 10UL zeroHash txSkeleton
-            >>= Tx.fromWallet zenAsset 10UL contractHash wallet in
+            >>= Tx.fromWallet zenAsset 10UL contractId wallet in
 
         let result' =
             match result with
-            | Some tx -> Some (tx, None)
+            | Some tx -> Some @ { tx = tx; message = None; state = NoChange}
             | None -> None in
 
         RT.of_option "not enough Zens" result'
 
-    val cf: txSkeleton -> context -> string -> sender -> option data -> wallet -> cost nat 12
-        let cf _ _ _ _ _ wallet =
-            let res : nat = (64 + (W.size wallet * 128 + 192) + 0 + 20) in
-            ret res
+    let cf _ _ _ _ _ wallet _ =
+        64 + (W.size wallet * 128 + 192) + 0 + 22
+        |> cast nat
+        |> C.ret
     """ account session state
     |> function
     | Ok (state', cHash') ->
@@ -127,7 +129,9 @@ let ``Wallet using contract should execute``() =
     let output = {lock=Contract contractId;spend={asset=Asset.Zen;amount=10UL}}
     let utxoSet = Map.add {txHash=Hash.zero;index=10ul} (UtxoSet.Unspent output) utxoSet
 
-    TransactionHandler.executeContract session sampleInputTx 1ul 1_000_000UL contractId "" None None { state.memoryState with utxoSet = utxoSet }
+    let state = { state with memoryState = { state.memoryState with utxoSet = utxoSet } }
+
+    TransactionHandler.executeContract session sampleInputTx 1_000_000UL contractId "" None None state false
     |> shouldBeOk
 
 [<Test>]
@@ -135,13 +139,15 @@ let ``Contract should not be able to lock more token than available``() =
     let output = {lock=Contract contractId;spend={asset=Asset.Zen;amount=9UL}}
     let utxoSet = Map.add {txHash=Hash.zero;index=1ul} (UtxoSet.Unspent output) utxoSet
 
-    TransactionHandler.executeContract session sampleInputTx 1ul 1_000_000UL contractId "" None None { state.memoryState with utxoSet = utxoSet }
+    let state = { state with memoryState = { state.memoryState with utxoSet = utxoSet } }
+
+    TransactionHandler.executeContract session sampleInputTx 1_000_000UL contractId "" None None state false
     |> shouldBeErrorMessage "not enough Zens"
 
 [<Test>]
 let ``Contract should not have enough tokens when output is missing``() =
 
-    TransactionHandler.executeContract session sampleInputTx 1ul 1_000_000UL contractId "" None None state.memoryState
+    TransactionHandler.executeContract session sampleInputTx 1_000_000UL contractId "" None None state false
     |> shouldBeErrorMessage "not enough Zens"
 
 [<Test>]
@@ -149,7 +155,9 @@ let ``Contract should not have enough tokens when output locked to PK address``(
     let output = {lock=PK Hash.zero;spend={asset=Asset.Zen;amount=10UL}}
     let utxoSet = Map.add {txHash=Hash.zero;index=10ul} (UtxoSet.Unspent output) utxoSet
 
-    TransactionHandler.executeContract session sampleInputTx 1ul 1_000_000UL contractId "" None None { state.memoryState with utxoSet = utxoSet }
+    let state = { state with memoryState = { state.memoryState with utxoSet = utxoSet } }
+
+    TransactionHandler.executeContract session sampleInputTx 1_000_000UL contractId "" None None state false
     |> shouldBeErrorMessage "not enough Zens"
 
 [<Test>]
@@ -157,5 +165,7 @@ let ``Contract should not have enough tokens when output is spent``() =
     let output = {lock=PK Hash.zero;spend={asset=Asset.Zen;amount=10UL}}
     let utxoSet = Map.add {txHash=Hash.zero;index=10ul} (UtxoSet.Spent output) utxoSet
 
-    TransactionHandler.executeContract session sampleInputTx 1ul 1_000_000UL contractId "" None None { state.memoryState with utxoSet = utxoSet }
+    let state = { state with memoryState = { state.memoryState with utxoSet = utxoSet } }
+
+    TransactionHandler.executeContract session sampleInputTx 1_000_000UL contractId "" None None state false
     |> shouldBeErrorMessage "not enough Zens"

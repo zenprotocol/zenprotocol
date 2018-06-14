@@ -30,7 +30,7 @@ type ExtendContractArgs =
         member arg.Usage = ""
 
 type ExecuteContractArgs =
-    | [<MainCommand("COMMAND");ExactlyOnce>] ExecuteContract_Arguments of address:string * command:string * data:string * asset:string * amount:int64 * password:string
+    | [<MainCommand("COMMAND");ExactlyOnce>] ExecuteContract_Arguments of address:string * command:string * messageBody:string * asset:string * amount:int64 * password:string
     interface IArgParserTemplate with
         member arg.Usage = ""
 
@@ -135,7 +135,7 @@ let main argv =
             let asset, amount, address, password = args.GetResult <@ Send_Arguments @>
             "wallet/send"
             |> getUri
-            |> (new SendRequestJson.Root(address, asset, amount, password))
+            |> (new SendRequestJson.Root([| new SendRequestJson.Output(address, asset, amount) |], password))
                 .JsonValue.Request
             |> printResponse
         | Some (Balance _) ->
@@ -152,23 +152,15 @@ let main argv =
         | Some (History args) ->
             let skip, take = args.GetResult <@ Pagination_Arguments @>
             let transactions =
-                "wallet/transactions"
+                sprintf "wallet/transactions?skip=%d&take=%d" skip take
                 |> getUri
-                |> (new TransactionsRequestJson.Root(skip, take))
-                    .JsonValue.Request
-                |> getResponse
-                |> TransactionsResponseJson.Parse
+                |> TransactionsResponseJson.Load
 
-            printfn "TxHash\t| Block\t Asset\t| Amount"
+            printfn "TxHash\t| Asset\t| Amount\t|Confirmations"
             printfn "==================================================="
 
             Array.iter (fun (entry:TransactionsResponseJson.Root) ->
-                printfn "\n%s\t%i" entry.TxHash entry.BlockNumber
-
-                Array.iter (fun (amount:TransactionsResponseJson.Delta) ->
-                    printfn "\t| %s\t| %d" amount.Asset amount.Amount
-                ) entry.Deltas
-
+                printfn "%s\t%s\t%d\t%d" entry.TxHash entry.Asset entry.Amount entry.Confirmations
             ) transactions
         | Some (Address _) ->
             let result =
@@ -219,15 +211,15 @@ let main argv =
                 .JsonValue.Request
             |> printResponse
         | Some (Execute args) ->
-            let address, command, data, asset, amount, password =
+            let address, command, messageBody, asset, amount, password =
                 args.GetResult <@ ExecuteContract_Arguments @>
 
-            let data = if data = "None" || data = "none" || data = "null" then "" else data
+            let messageBody = if messageBody = "None" || messageBody = "none" || messageBody = "null" then "" else messageBody
 
             "wallet/contract/execute"
             |> getUri
             |> (new ContractExecuteRequestJson.Root(
-                    address, command, data,
+                    address, command, messageBody,
                     new ContractExecuteRequestJson.Options(true, ""),
                         [| new ContractExecuteRequestJson.Spend(asset, amount) |],
                         password))
@@ -246,7 +238,7 @@ let main argv =
                 printfn " %s %s\t| %d" activeContract.Address activeContract.ContractId activeContract.Expire) activeContracts
         | Some (PublishBlock args) ->
             let block = args.GetResult <@ PublishBlock_Arguments @>
-            "/blockchain/publishblock"
+            "blockchain/publishblock"
             |> getUri
             |> (new PublishBlockJson.Root(block))
                 .JsonValue.Request

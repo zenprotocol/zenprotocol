@@ -2,48 +2,40 @@ open Zen.Types
 open Zen.Base
 open Zen.Cost
 open Zen.Asset
+open Zen.Data
 
-module E = Zen.Error
-module ET = Zen.ErrorT
+module D = Zen.Dictionary
 module Tx = Zen.TxSkeleton
+module C = Zen.Cost
+module RT = Zen.ResultT
 
-val cf: txSkeleton -> string -> data -> option lock -> #l:nat -> wallet l -> cost nat 13
-let cf _ _ _ _ #l _ =
-    ret (64 + (l * 128 + 192) + 15 + 9 + 11)
+let cf _ _ _ _ _ wallet _ =
+    4 + 64 + 2 + (64 + (Zen.Wallet.size wallet * 128 + 192) + 0 + 13) + (0 + 5) + 22
+    |> C.ret #nat
+    
+let get txSkeleton contractId (wallet:wallet) returnAddress =
+    Tx.lockToAddress zenAsset 10000UL returnAddress txSkeleton
+    >>= Tx.fromWallet zenAsset 10000UL contractId wallet
+    >>= RT.of_option "contract doesn't have enough zens to pay you"
 
-val withNoContract: result txSkeleton -> cost (result (txSkeleton ** option message)) 9
-let withNoContract result =
-    match result with
-    | OK txSkeleton -> ET.ret (txSkeleton,None)
-    | EX e -> ET.autoFail e
-    | ERR msg -> ET.autoFailw msg
-
-val get: #l:nat -> txSkeleton -> contractHash -> option lock -> wallet l -> cost (result txSkeleton) (64 + (l * 128 + 192) + 15)
-let get #l txSkeleton contractHash returnAddress (wallet:wallet l) =
-  match returnAddress with
-  | Some returnAddress ->
-      let txSkeleton =
-        Tx.lockToAddress zenAsset 10000UL returnAddress txSkeleton
-        >>= Tx.fromWallet zenAsset 10000UL contractHash wallet in
-
-      ET.of_optionT "contract doesn't have enough zens to pay you" txSkeleton
-  | None ->
-      ET.autoFailw "returnAddress is required"
-
-val init: txSkeleton -> contractHash -> cost (result txSkeleton) (64 + 64 + 8)
-let init txSkeleton contractHash  =
-  let! tokens = Tx.getAvailableTokens zenAsset txSkeleton in
-
-  let txSkeleton = Tx.lockToContract zenAsset tokens contractHash txSkeleton in
-  ET.retT txSkeleton
-
-val main: txSkeleton -> hash -> string -> data -> option lock -> #l:nat -> wallet l -> cost (result (txSkeleton ** option message))  (64 + (l * 128 + 192) + 15 + 9 + 11)
-let main txSkeleton contractHash command data returnAddress #l wallet =
-  if command <> "init" then
-    get txSkeleton contractHash returnAddress wallet
-    >>= withNoContract
-
-  else
-    autoInc (init txSkeleton contractHash >>= withNoContract)
-
-
+let init txSkeleton contractId =
+    let! tokens = Tx.getAvailableTokens zenAsset txSkeleton in
+    Tx.lockToContract zenAsset tokens contractId txSkeleton
+    
+let main txSkeleton _ contractId command _ messageBody wallet _ =
+    let open RT in
+    
+    begin
+        if command <> "init" then
+            messageBody 
+            >!= tryDict
+            >?= D.tryFind "returnAddress"
+            >?= tryLock
+            |> RT.of_optionT "returnAddress is required"
+            >>= get txSkeleton contractId wallet
+        else
+            init txSkeleton contractId
+            |> liftCost 
+            |> autoInc
+    end
+    >>= (fun tx -> RT.ok @ { tx = tx; message = None; state = NoChange })

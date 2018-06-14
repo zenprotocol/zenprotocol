@@ -1,6 +1,7 @@
 ﻿module Infrastructure.ZFStar
 
 open System
+open System.Reflection
 open System.IO
 open Microsoft.FSharp.Compiler.SourceCodeServices
 open Exception
@@ -17,9 +18,6 @@ let private error s =
     sprintf "%s: %s" s
 
 let private compile' path moduleName code =
-    //let code = code + """nopen MBrace.FsPickler.Combinators
-    //let pickler = Pickler.auto<ZFStar.Contract>
-    //let pickled = Binary.pickle pickler mainFunction"""
     try
         let tempFileName = Path.GetTempFileName()
         let codeFileName = changeExtention ".fs" tempFileName
@@ -44,7 +42,6 @@ let private compile' path moduleName code =
                     "-r"; (+/) "System.dll";
                     "-r"; (+/) "System.Numerics.dll";
                     "-r"; "Zulib.dll";
-                    //"-r"; "FsPickler.dll";
                     "-r"; "FSharp.Compatibility.OCaml.dll"|])
             if exitCode = 0 then
                 Ok ()
@@ -196,12 +193,17 @@ let compile path code hints rlimit moduleName =
     |> Result.bind (compile' path moduleName)
 
 let load path moduleName =
-    try
-        Path.Combine(path, sprintf "%s.dll" moduleName)
-        |> System.Reflection.Assembly.LoadFrom
-        |> Ok
-    with _ as ex ->
-        Error ex.Message
+    let assemblyPath = Path.Combine(path, sprintf "%s.dll" moduleName)
+
+    if File.Exists assemblyPath then
+        try
+            assemblyPath
+            |> Assembly.LoadFrom
+            |> Ok
+        with _ as ex ->
+            Error ex.Message
+    else
+        Error "compiled contract DLL file not found"
 
 let totalQueries hints =
     let oDir, file = initOutputDir "" //as for now, using the filesystem as temporary solution

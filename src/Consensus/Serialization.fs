@@ -23,6 +23,7 @@ type ReaderBuilder() =
     member this.Return x = fun buffer -> Some x,buffer
     member this.Yield x = fun buffer -> Some x,buffer
     member this.YieldFrom (r:Reader<'a>) = fun (stream:Stream.T) -> r stream
+    member this.ReturnFrom (r:Reader<'a>) = fun (stream:Stream.T) -> r stream
     member this.For (seq,body) =
         fun (stream:Stream.T) ->
             let xs,stream = Seq.fold (fun (list, stream) i ->
@@ -56,6 +57,7 @@ module Serialization =
     type Operations<'a> = {
         writeBytes: Byte[] -> int32 -> 'a -> 'a
         writeNumber1: uint8 -> 'a -> 'a
+        writeNumber2: uint16 -> 'a -> 'a
         writeNumber4: uint32 -> 'a -> 'a
         writeNumber8: uint64 -> 'a -> 'a
     }
@@ -63,6 +65,7 @@ module Serialization =
     let serializers: Operations<Stream.T> = {
         writeBytes = writeBytes
         writeNumber1 = writeNumber1
+        writeNumber2 = writeNumber2
         writeNumber4 = writeNumber4
         writeNumber8 = writeNumber8
     }
@@ -70,6 +73,7 @@ module Serialization =
     let counters: Operations<uint32> = {
         writeBytes = fun _ len count -> count + (uint32 len)
         writeNumber1 = fun _ count -> count + 1u
+        writeNumber2 = fun _ count -> count + 2u
         writeNumber4 = fun _ count -> count + 4u
         writeNumber8 = fun _ count -> count + 8u
     }
@@ -92,7 +96,7 @@ module Serialization =
         let write ops writerFn = function
             | Option.Some value ->
                 Byte.write ops Some
-                >> writerFn value
+                >> writerFn ops value
             | Option.None ->
                 Byte.write ops None
         let read readerFn = reader {
@@ -177,10 +181,6 @@ module Serialization =
     module Seq =
         let private writeBody ops writerFn =
             let write writerFn seq stream =
-                //let mutable stream = stream //TODO: this is not 'stream' if ops are Counters
-                //for item in seq do
-                //    stream <- writerFn ops item stream
-                //stream
                 let aux stream item = writerFn ops item stream
                 seq |> Seq.fold aux stream
 
@@ -215,8 +215,17 @@ module Serialization =
             Map.toList
             >> Seq.write ops writerFn
         let read readerFn = reader {
-            let! seq = Seq.read readerFn
-            return Map.ofSeq seq
+            let! l = List.read readerFn
+
+            let rec isSorted l =
+                match l with
+                | [] | [_] -> true
+                | h1::(h2::_ as tail) -> h1 <= h2 && isSorted tail
+
+            if not <| isSorted l then
+                yield! fail
+            else
+                return Map.ofList l
         }
 
     module ContractId =
@@ -231,23 +240,242 @@ module Serialization =
         }
 
     module Asset =
-        let write ops = fun (Asset (contractId,subType)) ->
-            ContractId.write ops contractId
-            >> Hash.write ops subType
+        let private writeSubtype ops l = fun sb ->
+            Byte.write ops (byte l)
+            >> FixedSizeBytes.write ops sb
+        let private versionBytes (v:uint32) =
+            if v &&& 0xFFFFFFE0u = 0u
+            then [| byte v |]
+            elif v &&& 0xFFFFF000u = 0u
+            then [| 0x20uy ||| byte (v >>> 7);
+                    0x7Fuy &&& byte v |]
+            elif v &&& 0xFFF80000u = 0u
+            then [| 0x20uy ||| byte (v >>> 14);
+                    0x80uy ||| byte (v >>> 7);
+                    0x7Fuy &&& byte v |]
+            elif v &&& 0xFC000000u = 0u
+            then [| 0x20uy ||| byte (v >>> 21);
+                    0x80uy ||| byte (v >>> 14);
+                    0x80uy ||| byte (v >>> 7);
+                    0x7Fuy &&& byte v |]
+            else [| 0x20uy ||| byte (v >>> 28);
+                    0x80uy ||| byte (v >>> 21);
+                    0x80uy ||| byte (v >>> 14);
+                    0x80uy ||| byte (v >>> 7);
+                    0x7Fuy &&& byte v |]
+
+        let write ops = fun (Asset (ContractId (version, cHash),(Hash sb as subtype))) ->
+            let vbs = versionBytes version
+            if cHash = Hash.zero && subtype = Hash.zero
+            then
+                FixedSizeBytes.write ops vbs
+            else
+                match Array.tryFindIndexBack (fun b -> b <> 0uy) sb with
+                | None ->                               // subtype = Hash.zero
+                    vbs.[0] <- 0x80uy ||| vbs.[0]
+                    FixedSizeBytes.write ops vbs
+                    >> Hash.write ops cHash
+                | Some n when n < 30 ->
+                    vbs.[0] <- 0x40uy ||| vbs.[0]
+                    FixedSizeBytes.write ops vbs
+                    >> Hash.write ops cHash
+                    >> Byte.write ops (byte (n + 1))
+                    >> FixedSizeBytes.write ops sb.[..n]
+                | Some _ ->
+                    vbs.[0] <- 0xC0uy ||| vbs.[0]
+                    FixedSizeBytes.write ops vbs
+                    >> Hash.write ops cHash
+                    >> Hash.write ops subtype
+
+        let rec private readVersion v counter = reader {
+            if counter > 3 || (counter <> 0 && v = 0u) then yield! fail else
+            let! b = Byte.read
+            let nextV = v + (uint32 (b &&& 0x7Fuy))
+            if b &&& 0x80uy = 0uy
+            then return nextV
+            elif nextV >= pown 2u 25 then yield! fail     //will be > 2^32
+            else
+                let! res = readVersion (nextV * 128u) (counter + 1)
+                return res
+        }
+
+        let private readSubtype = reader {
+            let! len = Byte.read
+            if len = 0x00uy then return Hash.zero else
+            let! subtype = FixedSizeBytes.read (int len)
+            let res = Array.zeroCreate<byte> Hash.Length
+            Array.blit subtype 0 res 0 (int len)
+            return Hash res
+        }
 
         let read = reader {
-            let! contractId = ContractId.read
-            let! subType = Hash.read
-            return Asset (contractId, subType)
+            let! first = Byte.read
+            let! version =
+                let v = (uint32 (first &&& 0x1Fuy))
+                if (first &&& 0x20uy) = 0uy
+                then
+                    reader { return v }
+                else
+                    readVersion (v*128u) 0
+            let! cHash, isAbsentCHash =
+                if (first &&& 0xC0uy) = 0uy
+                then
+                    reader { return (Hash.zero, true) }
+                else
+                    reader {
+                        let! h = Hash.read
+                        return (h,false)
+                    }
+            let! subtype, isAbsentSubtype, isCompressedSubtype =
+                match (first &&& 0xC0uy) with
+                | 0x0uy | 0x80uy ->
+                    reader { return Hash.zero, true, false }
+                | 0xC0uy ->
+                    reader {
+                        let! h = Hash.read
+                        return (h,false,false)
+                    }
+                | _ ->
+                    reader {
+                        let! h = readSubtype
+                        return (h,false,true)
+                    }
+            match cHash, subtype with
+            | cHash, subtype when
+                cHash = Hash.zero && subtype = Hash.zero
+                && ((not isAbsentCHash) || (not isAbsentSubtype)) ->
+                yield! fail
+            | _, subtype when
+                subtype = Hash.zero
+                && (not isAbsentSubtype) ->
+                yield! fail
+            | cHash, (Hash sb as subtype) when
+                cHash <> Hash.zero && subtype <> Hash.zero &&
+                sb.[Hash.Length-2] = 0uy && sb.[Hash.Length-1] = 0uy
+                && (not isCompressedSubtype) ->
+                yield! fail
+            | _ ->
+                return Asset (ContractId (version, cHash), subtype)
+        }
+
+    module Amount =
+        let private factor (x:uint64) =
+            let rec inner (s,e) =
+                if s % 10UL <> 0UL
+                then (s,e)
+                else
+                    inner (s/10UL,e+1)
+            inner (x,0)
+        let private figures s =
+            let rec inner (s,f) =
+                if s = 0UL then f
+                else
+                    inner (s/10UL,f+1)
+            inner (s,0)
+        let private parse x =
+            if x = 0UL then (0UL, 0, 0)
+            else
+                let s,e = factor x
+                let f = figures s
+                (s,e,f)
+        let private write16 ops = fun (s,e) ->
+            let res =
+                s ||| (e <<< 10)
+            ops.writeNumber2 res
+        [<Literal>]
+        let cutoff = 0x04000000u
+        let private write32 ops = fun (s,e) ->
+            if s < cutoff
+            then
+                let shifted = (0x20u ||| e) <<< 26
+                ops.writeNumber4 (s ||| shifted)
+            else
+                let shifted = (0x60u ||| e) <<< 25
+                ops.writeNumber4 ((s - cutoff) ||| shifted)
+        let private write64 ops = fun s ->
+            let res = ((0x7EUL <<< 56) ||| s)
+            ops.writeNumber8 res
+        let private write72 ops = fun s ->
+            ops.writeNumber1 0xFEuy
+            >> ops.writeNumber8 s
+        let write ops = fun amount ->
+            let s,e,f = parse amount
+            if f <= 3
+            then
+                write16 ops (uint16 s, uint16 e)
+            elif f <= 8
+            then
+                if e <= 12
+                then
+                    write32 ops (uint32 s, uint32 e)
+                else
+                    write32 ops (uint32 s * pown 10u (e-12),12u)
+            elif amount < pown 2UL 56
+            then
+                write64 ops amount
+            else
+                write72 ops amount
+        let read = reader {
+            let! first = readNumber1
+            if
+                (first &&& 0x7Euy) = 0x7Cuy                //qNaN
+                || (first &&& 0x7Cuy) = 0x78uy             //Infinity
+            then
+                yield! fail
+            elif (first &&& 0x7Euy) = 0x7Euy
+            then
+                if first >= 0x80uy                          //72 bit
+                then
+                    let! amount = readNumber8
+                    return amount
+                else                                        //64 bit
+                    let! second = readNumber1
+                    let! third = readNumber2
+                    let! fourth = readNumber4
+                    return
+                        (uint64 fourth)
+                        + ((uint64 third) <<< 32)
+                        + ((uint64 second) <<< 48)
+            elif first < 0x80uy                             //16 bit
+            then
+                let! second = readNumber1
+                if (first &&& 0x60uy) = 0x60uy              //non-canonical
+                then
+                    let e = int (first &&& 0x1Fuy)
+                    let s = (uint64 second) + 0x400UL
+                    return s * pown 10UL e
+                else                                        //canonical
+                    let e = int ((first &&& 0x7Cuy) >>> 2)
+                    let s = (uint64 second) + ((uint64 (first &&& 0x03uy)) <<< 8)
+                    return s * pown 10UL e
+            else                                            //32 bit
+                let! second = readNumber1
+                let! lower = readNumber2
+                if (first &&& 0x40uy) = 0uy
+                then
+                    let e = int ((first &&& 0x3Cuy) >>> 2)
+                    let s =
+                        (uint64 lower)
+                        + ((uint64 second) <<< 16)
+                        + ((uint64 (first &&& 0x03uy)) <<< 24)
+                    return s * pown 10UL e
+                else
+                    let e = int ((first &&& 0x1Euy) >>> 1)
+                    let s =
+                        (uint64 lower)
+                        + ((uint64 second) <<< 16)
+                        + ((uint64 (first &&& 0x01uy)) <<< 24)
+                        + 0x4000000UL
+                    return s * pown 10UL e
         }
 
     module Spend =
         let write ops = fun { asset = asset; amount = amount } ->
             Asset.write ops asset
-            >> ops.writeNumber8 amount
+            >> Amount.write ops amount
         let read = reader {
             let! asset = Asset.read
-            let! amount = readNumber8
+            let! amount = Amount.read
             return { asset = asset; amount = amount }
         }
 
@@ -308,7 +536,6 @@ module Serialization =
 
             return publicKey
         }
-
 
     module Lock =
         [<Literal>]
@@ -425,20 +652,6 @@ module Serialization =
                 return int64 i
             }
 
-        module List =
-            let write = Seq.write
-            let read readerFn = reader {
-                let! seq = Seq.read readerFn
-                return List.ofSeq seq
-            }
-
-        module Array =
-            let write = Seq.write
-            let read readerFn = reader {
-                let! seq = Seq.read readerFn
-                return Array.ofSeq seq
-            }
-
         module Hash =
             let write ops = Hash.Hash >> Hash.write ops
             let read = reader {
@@ -508,7 +721,7 @@ module Serialization =
                 >> PublicKey.write ops publicKey
             | ZData.Collection (ZData.Array arr) ->
                 Byte.write ops CollectionArrayData
-                >> Array.write ops write arr
+                >> Seq.write ops write arr
             | ZData.Collection (ZData.Dict (map, _)) ->
                 Byte.write ops CollectionDictData
                 >> Map.write ops (fun ops (key, data)->
@@ -516,7 +729,7 @@ module Serialization =
                     >> write ops data) map
             | ZData.Collection (ZData.List l) ->
                 Byte.write ops CollectionListData
-                >> List.write ops write (ZFStar.fstToFsList l)
+                >> Seq.write ops write (ZFStar.fstToFsList l)
 
         let rec read = reader {
             let! discriminator = Byte.read
@@ -569,6 +782,37 @@ module Serialization =
                 yield! fail
         }
 
+    module StateCommitment =
+        [<Literal>]
+        let private SerializedNoState = 1uy
+        [<Literal>]
+        let private SerializedState = 2uy
+        [<Literal>]
+        let private SerializedNotCommitted = 3uy
+
+        let write ops = function
+        | NoState ->
+            Byte.write ops SerializedNoState
+        | State hash ->
+            Byte.write ops SerializedState
+            >> Hash.write ops hash
+        | NotCommitted ->
+            Byte.write ops SerializedNotCommitted
+
+        let read = reader {
+            let! discriminator = Byte.read
+            match discriminator with
+            | SerializedNoState ->
+                return NoState
+            | SerializedState ->
+                let! hash = Hash.read
+                return State hash
+            | SerializedNotCommitted ->
+                return NotCommitted
+            | _ ->
+                yield! fail
+        }
+
     module Witness =
         [<Literal>]
         let private PKIdentifier = 1u
@@ -582,16 +826,17 @@ module Serialization =
             | ContractWitness cw ->
                 ContractId.write ops cw.contractId
                 >> String.write ops cw.command
-                >> Option.write ops (Data.write ops) cw.data
+                >> Option.write ops Data.write cw.messageBody
+                >> StateCommitment.write ops cw.stateCommitment
                 >> VarInt.write ops cw.beginInputs
                 >> VarInt.write ops cw.beginOutputs
                 >> VarInt.write ops cw.inputsLength
                 >> VarInt.write ops cw.outputsLength
-                >> Option.write ops (fun (publicKey, signature) ->
+                >> Option.write ops (fun ops (publicKey, signature) ->
                     PublicKey.write ops publicKey
                     >> Signature.write ops signature
                   ) cw.signature
-                >> VarInt.write ops cw.cost
+                >> ops.writeNumber8 cw.cost //TODO: optimize
             | HighVWitness (_, bytes) ->
                 FixedSizeBytes.write ops bytes
 
@@ -618,7 +863,8 @@ module Serialization =
                 | ContractIdentifier ->
                     let! contractId = ContractId.read
                     let! command = String.read
-                    let! data = Option.read Data.read
+                    let! messageBody = Option.read Data.read
+                    let! stateCommitment = StateCommitment.read
                     let! beginInputs = VarInt.read
                     let! beginOutputs = VarInt.read
                     let! inputsLength = VarInt.read
@@ -628,11 +874,12 @@ module Serialization =
                         let! signature = Signature.read
                         return publicKey, signature
                     })
-                    let! cost = VarInt.read
+                    let! cost = readNumber8 //TODO: optimize
                     return ContractWitness {
                         contractId = contractId
                         command = command
-                        data = data
+                        messageBody = messageBody
+                        stateCommitment = stateCommitment
                         beginInputs = beginInputs
                         beginOutputs = beginOutputs
                         inputsLength = inputsLength
@@ -657,6 +904,16 @@ module Serialization =
             let! lock = Lock.read
             let! spend = Spend.read
             return { lock = lock; spend = spend }
+        }
+
+    module PointedOutput =
+        let write ops = fun (outpoint, output) ->
+            Outpoint.write ops outpoint
+            >> Output.write ops output
+        let read = reader {
+            let! outpoint = Outpoint.read
+            let! output = Output.read
+            return outpoint, output
         }
 
     module Contract =
@@ -717,7 +974,7 @@ module Serialization =
             ops.writeNumber4 tx.version
             >> Seq.write ops Input.write tx.inputs
             >> Seq.write ops Output.write tx.outputs
-            >> Option.write ops (Contract.write ops) tx.contract
+            >> Option.write ops Contract.write tx.contract
             >> match mode with
                | Full -> Seq.write ops Witness.write tx.witnesses
                | WithoutWitness -> id
@@ -818,23 +1075,8 @@ module Block =
         |> Block.write serializers bk
         |> getBuffer
     let deserialize bytes =
-        let readBk = reader {
-            let! header = Header.read
-            let! commitmentsList = List.read Hash.read
-            let! transactions = List.read (Transaction.read Full)
-
-            return {
-                header = header
-                txMerkleRoot = commitmentsList.[0]
-                witnessMerkleRoot = commitmentsList.[1]
-                activeContractSetMerkleRoot = commitmentsList.[2]
-                commitments = commitmentsList.[3 .. List.length commitmentsList - 1]
-                transactions = List.ofSeq transactions
-            }
-        }
-
         Stream (bytes, 0)
-        |> run readBk
+        |> run Block.read
 
 module Data =
     let serialize data =

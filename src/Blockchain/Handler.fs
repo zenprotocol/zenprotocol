@@ -104,8 +104,8 @@ let handleCommand chainParams command session timestamp (state:State) =
 
 let handleRequest chain (requestId:RequestId) request session timestamp state =
     match request with
-    | ExecuteContract (contractId, command,sender ,data, txSkeleton) ->
-        TransactionHandler.executeContract session txSkeleton state.tipState.tip.header.blockNumber timestamp contractId command sender data state.memoryState
+    | ExecuteContract (contractId, command, sender, messageBody, txSkeleton) ->
+        TransactionHandler.executeContract session txSkeleton timestamp contractId command sender messageBody state false
         |> requestId.reply
     | GetBlockTemplate pkHash ->
         let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList chain session state timestamp
@@ -119,6 +119,21 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
             |> Some
             |> requestId.reply<Types.Block option>
         | None -> requestId.reply<Types.Block option> None
+    | GetBlockByNumber blockNumber ->
+        if blockNumber > state.tipState.tip.header.blockNumber || blockNumber = 0ul then
+            requestId.reply<Types.Block option> None
+        else
+            let rec findBlock (header:ExtendedBlockHeader.T) =
+                if header.header.blockNumber = blockNumber then
+                    BlockRepository.getFullBlock session header
+                else
+                    BlockRepository.getHeader session header.header.parent
+                    |> findBlock
+
+            findBlock state.tipState.tip
+            |> Some
+            |> requestId.reply<Types.Block option>
+
     | GetBlockHeader blockHash ->
         match BlockRepository.tryGetHeader session blockHash with
         | Some header ->
@@ -141,6 +156,15 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
             }:ActiveContract)
         |> List.ofSeq
         |> requestId.reply<ActiveContract list>
+    | GetActiveContract contractId ->
+        ActiveContractSet.tryFind contractId state.memoryState.activeContractSet
+        |> Option.map (fun contract ->
+            {
+                contractId = contract.contractId
+                expiry = contract.expiry
+                code = contract.code
+            }:ActiveContract)
+        |> requestId.reply
     | GetHeaders ->
         let rec getHeaders tip headers =
             let header = BlockRepository.getHeader session tip
@@ -191,8 +215,28 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
             medianTime = EMA.earliest state.tipState.ema
             difficulty = difficulty
             initialBlockDownload = syncing
+            tipBlockHash = Block.hash state.tipState.tip.header
         }
         |> requestId.reply
+
+    | GetTransaction txHash ->
+        match MemPool.getTransaction txHash state.memoryState.mempool with
+        | Some tx ->
+            Some (tx,0ul)
+            |> requestId.reply<(Transaction*uint32) option>
+        | None ->
+            TransactionRepository.tryGetTransaction session txHash
+            |> Option.bind (fun tx ->
+                TransactionRepository.tryGetTransactionBlock session txHash
+                |> Option.map (fun block -> tx,block))
+            |> function
+            | Some (tx,block) ->
+                let confirmations = (state.tipState.tip.header.blockNumber - block.header.blockNumber) + 1ul
+
+                Some (tx,confirmations)
+                |> requestId.reply<(Transaction*uint32) option>
+            | None ->
+                requestId.reply<(Transaction*uint32) option> None
 
     ret state
 

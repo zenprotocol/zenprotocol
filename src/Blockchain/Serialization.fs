@@ -21,7 +21,10 @@ module BlockState =
             ContractId.write ops contractState.contractId
             >> ops.writeNumber4 contractState.expiry
             >> String.write ops contractState.code) blockState.activeContractSet
-
+        >> Seq.write ops (fun ops (contractId, dataOption) ->
+            ContractId.write ops contractId
+            >> Option.write ops Data.write dataOption) blockState.contractStatesUndoData
+        
     let private read = reader {
         let! difficulty = readNumber4
         let! delayed = List.read readNumber8
@@ -35,9 +38,17 @@ module BlockState =
                 code=code
             }
         }
+        
+        let! contractStatesUndoData = List.read <| reader {
+            let! contractId = ContractId.read
+            let! dataOption = Option.read Data.read
+            return contractId, dataOption
+        }
+        
         return {
             ema = { difficulty = difficulty; delayed = delayed }
             activeContractSet = activeContractSet
+            contractStatesUndoData = contractStatesUndoData
         }
     }
 
@@ -92,7 +103,7 @@ module ExtendedBlockHeader =
         Hash.write ops extendedBlockHeader.hash
         >> Header.write ops extendedBlockHeader.header
         >> BlockStatus.write ops extendedBlockHeader.status
-        >> Option.write ops (BigInt.write ops) extendedBlockHeader.chainWork
+        >> Option.write ops BigInt.write extendedBlockHeader.chainWork
         >> Hash.write ops extendedBlockHeader.txMerkleRoot
         >> Hash.write ops extendedBlockHeader.witnessMerkleRoot
         >> Hash.write ops extendedBlockHeader.activeContractSetMerkleRoot
@@ -181,7 +192,7 @@ module OutputStatus =
     let deserialize bytes =
         Stream (bytes, 0)
         |> run read
-
+        
 module PointedOutput =
     open Zen.Types.Extracted
 
@@ -233,3 +244,14 @@ module Hashes =
         |> Array.chunkBySize Hash.Length
         |> Array.toSeq
         |> Seq.map Hash.Hash
+        
+module ContractId =
+    let serialize outputStatus =
+        ContractId.write counters outputStatus 0ul
+        |> int32
+        |> create
+        |> ContractId.write serializers outputStatus
+        |> getBuffer
+    let deserialize bytes =
+        Stream (bytes, 0)
+        |> run ContractId.read

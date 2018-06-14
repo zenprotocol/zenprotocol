@@ -69,6 +69,7 @@ let private activateContract (chainParams : Chain.ChainParameters) contractPath 
                 let! activationSacrifices = getActivationSacrifice tx
 
                 let! numberOfBlocks = getSacrificeBlocks chainParams contract.code activationSacrifices
+                let expiry = blockNumber + numberOfBlocks - 1ul
 
                 match ActiveContractSet.tryFind contractId acs with
                 | Some contract ->
@@ -83,13 +84,13 @@ let private activateContract (chainParams : Chain.ChainParameters) contractPath 
                                     contractId = contractId
                                     mainFn = mainFn
                                     costFn = costFn
-                                    expiry = blockNumber + numberOfBlocks
+                                    expiry = expiry
                                     code = contract.code
                                 } : Contract.T), contractCache
                         | None ->
                             let compile contract =
                                 Contract.compile contractPath contract
-                                |> Result.bind (fun _ -> Contract.load contractPath (blockNumber + numberOfBlocks) contract.code contractId)
+                                |> Result.bind (fun _ -> Contract.load contractPath expiry contract.code contractId)
                                 |> Result.mapError (fun error -> 
                                     eventX "Contract activation failed: {error}"
                                     >> setField "error" (sprintf "%A" error)
@@ -123,7 +124,7 @@ let private extendContracts chainParams acs tx = result {
                             | Some contract -> Ok contract
                             | _ -> GeneralError "Contract(s) must be active"
             let! blocks = getSacrificeBlocks chainParams contract.code amount
-            let contract = {contract with expiry = contract.expiry + blocks}
+            let contract = {contract with expiry = contract.expiry + blocks - 1ul}
             return ActiveContractSet.add contract.contractId contract acs
         }) (Ok acs)
 }
@@ -212,7 +213,7 @@ let private checkStructure =
         if List.isEmpty tx.witnesses || List.exists (function
             | ContractWitness { command = command
                                 cost = cost } ->
-                isNull command || cost = 0ul
+                isNull command || cost = 0UL
             | HighVWitness (identifier, bytes) ->
                 identifier <= 2u // last reserved identifier for witness types
                 || isEmptyArr bytes
@@ -316,14 +317,14 @@ let validateCoinbase blockNumber =
     >=> checkNoContractInCoinbase
     >=> checkOutputsOverflow
 
-let validateInContext chainParams getUTXO contractPath blockNumber timestamp acs contractCache set txHash tx = result {
+let validateInContext chainParams getUTXO contractPath blockNumber timestamp acs contractCache set getContractState contractState txHash tx = result {
     let! outputs = tryGetUtxos getUTXO set tx
     let txSkel = TxSkeleton.fromTransaction tx outputs
 
     do! checkAmounts txSkel
-    do! InputValidation.StateMachine.validate blockNumber timestamp acs outputs txHash tx txSkel
+    let! contractStates = InputValidation.StateMachine.validate blockNumber timestamp acs outputs getContractState contractState txHash tx txSkel
 
     let! acs, contractCache = activateContract chainParams contractPath blockNumber acs contractCache tx
     let! acs = extendContracts chainParams acs tx
-    return tx, acs, contractCache
+    return tx, acs, contractCache, contractStates
 }

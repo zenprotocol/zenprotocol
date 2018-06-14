@@ -17,17 +17,33 @@ let private getSpend asset amount =
 let parseSendJson chain json =
     try
         let json = SendRequestJson.Parse json
+        let mutable outputs = List.empty
+        let mutable errors = List.empty
 
         if String.length json.Password = 0 then
-            Error "Password is empty"
+            errors <- "Password is empty" :: errors
+        if json.Outputs.Length = 0 then
+            errors <- "Outputs is empty" :: errors
         else
-            Address.decodePK chain json.Address
-            |> function
-            | Error err ->
-                Error ("Address is invalid: " + err)
-            | Ok pkHash ->
-                getSpend json.Asset json.Amount
-                |> Result.map (fun spend -> (pkHash, spend, json.Password))
+            for output in json.Outputs do
+                Address.decodePK chain output.Address
+                |> function
+                | Error err ->
+                    errors <- ("Address is invalid: " + err) :: errors
+                | Ok pkHash ->
+                    match getSpend output.Asset output.Amount with
+                    | Ok spend ->
+                        outputs <- (pkHash, spend) :: outputs
+                    | Error err ->
+                        errors <- err :: errors
+
+        if List.isEmpty errors then
+            Ok (outputs, json.Password)
+        else
+            errors
+            |> String.concat " "
+            |> Error
+
     with _ as ex ->
         Error ("Json invalid: " + ex.Message)
 
@@ -52,11 +68,11 @@ let parseContractExecuteJson chain json =
                     |> ignore
 
                 if List.isEmpty errors then
-                    let data =
-                        if System.String.IsNullOrEmpty json.Data then
+                    let messageBody =
+                        if System.String.IsNullOrEmpty json.MessageBody then
                             None
                         else
-                            match Base16.decode json.Data with
+                            match Base16.decode json.MessageBody with
                             | Some data ->
                                 match Serialization.Data.deserialize data with
                                 | Some data -> Some data
@@ -69,7 +85,7 @@ let parseContractExecuteJson chain json =
                         else
                             Some json.Options.Sign
 
-                    Ok (contractId, json.Command, data, json.Options.ReturnAddress, sign, spends, json.Password)
+                    Ok (contractId, json.Command, messageBody, json.Options.ReturnAddress, sign, spends, json.Password)
                 else
                     errors
                     |> String.concat " "
@@ -173,13 +189,15 @@ let parseCheckPasswordJson json =
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
 
-let parseTransactionsRequestJson json =
-    try
-        let json = TransactionsRequestJson.Parse json
-
-        if json.Skip < 0 || json.Take < 0 then
+let parseTransactionsRequestJson query =
+    match Map.tryFind "take" query, Map.tryFind "skip" query with
+    | Some take, Some skip ->
+        match System.Int32.TryParse take, System.Int32.TryParse skip with
+        | (true,take),(true,skip) ->
+            if skip < 0 || take < 0 then
+                Error "Invalid values"
+            else
+                Ok (skip,take)
+        | _ ->
             Error "Invalid values"
-        else
-            Ok (json.Skip, json.Take)
-    with _ as ex ->
-        Error ("Json is invalid: " + ex.Message)
+    | _ -> Error "Invalid values"
