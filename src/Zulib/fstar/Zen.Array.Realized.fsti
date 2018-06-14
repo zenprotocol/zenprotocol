@@ -29,4 +29,4 @@ val init_item(#a:Type)(#n:nat): l:pos
   -> Lemma (force (init l f >>= item i) == force (f i))
 
 val tryMap(#a #b:Type)(#n:nat): (a -> cost (option b) n) -> array a
-  -> option (array b)
+  -> cost (option (array b)) 1
