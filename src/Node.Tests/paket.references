@@ -11,3 +11,4 @@ NUnit
 FsUnit
 System.Reflection.Metadata
 FSharp.Data
+Zulib

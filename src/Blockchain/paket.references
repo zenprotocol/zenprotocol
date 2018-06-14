@@ -4,3 +4,4 @@ FSharp.Control.Reactive
 System.Reactive.Compatibility
 FSharp.Compiler.Tools
 Logary
+Zulib

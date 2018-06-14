@@ -34,10 +34,6 @@ before_build:
       "registry=https://www.myget.org/F/zenprotocol/npm/`r`n//www.myget.org/F/zenprotocol/npm/:_authToken=`$`{MYGET_TOKEN`}" | Out-File (Join-Path $ENV:APPVEYOR_BUILD_FOLDER "package/.npmrc") -Encoding UTF8   
 build_script:
   - paket.cmd restore
-  - cd src\Zulib
-  - build.cmd Extract
-  - build.cmd Build
-  - cd ..\..
   - msbuild src/zenprotocol.sln /property:Configuration=Release /t:Node
   - cd package
   - md Release

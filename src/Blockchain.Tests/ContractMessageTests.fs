@@ -158,7 +158,7 @@ let main txSkeleton _ contractId command sender messageBody wallet state =
             let! txSkeleton =
                 Tx.mint tokens asset txSkeleton
                 >>= Tx.lockToAddress asset tokens returnAddress in
-            let! contractId = ContractId.fromString "%s" in
+            let! contractId = ContractId.parse "%s" in
             match contractId with
             | Some contractId ->
                 let message = {
