@@ -27,3 +27,6 @@ val init_item(#a:Type)(#n:nat): l:pos
   -> f:((i:nat{i<l}) -> cost a n)
   -> i:nat{i < l}
   -> Lemma (force (init l f >>= item i) == force (f i))
+
+val tryMap(#a #b:Type)(#n:nat): (a -> cost (option b) n) -> array a
+  -> option (array b)

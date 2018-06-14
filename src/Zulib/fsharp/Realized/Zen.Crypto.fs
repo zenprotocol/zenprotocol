@@ -63,3 +63,12 @@ let parsePublicKey (bs16:byte array) : Cost.t<FStar.Pervasives.Native.option<pub
                 | _ -> FStar.Pervasives.Native.None
     ) |> Cost.C
 
+let parseHash (s: Prims.string): Cost.t<FStar.Pervasives.Native.option<byte []>, unit> =
+    lazy (
+        if s.Length <> 64 then FStar.Pervasives.Native.None else
+
+        let bs16 = System.Text.Encoding.ASCII.GetString s
+        match Base16.decode bs16 with
+        | None -> FStar.Pervasives.Native.None
+        | Some bytes -> FStar.Pervasives.Native.Some bytes
+    ) |> Cost.C
