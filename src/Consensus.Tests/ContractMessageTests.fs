@@ -101,7 +101,7 @@ let setup = fun () ->
                     let! txSkeleton =
                         Tx.mint 25UL asset txSkeleton
                         >>= Tx.lockToContract asset 25UL contractId in
-                    let! contractId = ContractId.fromString "%s" in
+                    let! contractId = ContractId.parse "%s" in
                     match contractId with 
                     | Some contractId -> 
                         let message = {

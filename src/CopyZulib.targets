@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-      <ZulibOutputFiles Include="$(SolutionDir)\Zulib\fstar\**\*.*" />
+      <ZulibOutputFiles Include="$(SolutionDir)\..\packages\Zulib\output\Zulib\**\*.*" />
   </ItemGroup>
 
   <Target Name="CopyZulibToOutput" AfterTargets="Compile">

@@ -58,7 +58,7 @@ let ``ContractId created from string should yield expected`` (version : uint32) 
         orig.ToString()
         |> System.Text.Encoding.ASCII.GetBytes
     
-    match Zen.ContractId.fromString asstring |> unCost with
+    match Zen.ContractId.parse asstring |> unCost with
     | option.Some (ver, cHash) ->
         let tested = Consensus.Types.ContractId (ver, Consensus.Hash.Hash cHash)
         tested = orig
@@ -100,7 +100,9 @@ let ``Asset encoding round trip should produce same result`` (Asset asset) =
         (Consensus.Types.Asset (contractId, Consensus.Hash.Hash subType)).ToString()
         |> System.Text.Encoding.ASCII.GetBytes
     
-    match Zen.Asset.fromString asstring |> unCost with
+    printfn "%A" asstring.[0..35]
+    
+    match Zen.Asset.parse asstring |> unCost with
     | option.Some tested -> tested = asset
     | option.None -> false
     
@@ -113,8 +115,9 @@ let ``Asset encoding round trip should produce same result, using zero sub type`
         (Consensus.Types.Asset (contractId, Consensus.Hash.Hash subType)).ToString()
         |> System.Text.Encoding.ASCII.GetBytes
     
-    match Zen.Asset.fromString asstring |> unCost with
-    | option.Some tested -> tested = (ver, cHash, subType)
+    match Zen.Asset.parse asstring |> unCost with
+    | option.Some tested ->
+        tested = (ver, cHash, subType)
     | option.None -> false
     
 [<Property(MaxTest=10000)>]
@@ -126,6 +129,6 @@ let ``Asset encoding round trip should produce same result, using Zen asset`` (H
         (Consensus.Types.Asset (contractId, Consensus.Hash.Hash subType)).ToString()
         |> System.Text.Encoding.ASCII.GetBytes
     
-    match Zen.Asset.fromString asstring |> unCost with
+    match Zen.Asset.parse asstring |> unCost with
     | option.Some tested -> tested = (ver, cHash, subType)
     | option.None -> false

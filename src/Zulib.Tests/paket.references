@@ -3,3 +3,4 @@ FsUnit
 FsBech32
 FsCheck.NUnit
 FSharp.Data
+Zulib
