@@ -118,7 +118,7 @@
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
       <ItemGroup>
         <Reference Include="FSharp.Compatibility.OCaml">
-          <HintPath>..\..\packages\FSharp.Compatibility.OCaml\lib\net40\FSharp.Compatibility.OCaml.dll</HintPath>
+          <HintPath>..\..\packages\FSharp.Compatibility.OCaml\lib\net45\FSharp.Compatibility.OCaml.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>

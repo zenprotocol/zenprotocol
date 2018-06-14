@@ -118,7 +118,7 @@ let setUp = fun () ->
           | Some tx -> Some @ { tx = tx; message = None; state = NoChange }
           | None -> None in
 
-      RT.of_option "contract doesn't have enough zens tokens" result
+      RT.ofOption "contract doesn't have enough zens tokens" result
 
     let main txSkeleton _ contractId command sender messageBody wallet state =
       let! returnAddress =
