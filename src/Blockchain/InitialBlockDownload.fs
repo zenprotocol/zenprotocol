@@ -8,7 +8,7 @@ open Infrastructure
 open Infrastructure.Timestamp
 open Logary.Message
 
-let treshhold = 1000ul
+let treshhold = 500ul
 
 let timeout = 3UL * Second
 
