@@ -63,7 +63,7 @@ let createGenesis (chain:Chain.ChainParameters) transactions nonce =
         |> List.map Transaction.witnessHash
         |> MerkleTree.computeRoot
 
-    let acsMerkleRoot = SparseMerkleTree.root ActiveContractSet.empty
+    let acsMerkleRoot = ActiveContractSet.root ActiveContractSet.empty
 
     let commitments =
         createCommitments txMerkleRoot witnessMerkleRoot acsMerkleRoot []
@@ -144,7 +144,7 @@ let createTemplate chain (parent:BlockHeader) timestamp (ema:EMA.T) acs transact
         |> MerkleTree.computeRoot
 
     let acs = ActiveContractSet.expireContracts blockNumber acs
-    let acsMerkleRoot = SparseMerkleTree.root acs
+    let acsMerkleRoot = ActiveContractSet.root acs
 
     let parentHash = hash parent
 
@@ -321,7 +321,7 @@ let connect chain getUTXO contractsPath (parent:BlockHeader) timestamp utxoSet a
 
     let checkCommitments (block,set,acs,ema,contractCache,contractStates) =
         let acs = ActiveContractSet.expireContracts block.header.blockNumber acs
-        let acsMerkleRoot = SparseMerkleTree.root acs
+        let acsMerkleRoot = ActiveContractSet.root acs
 
         // we already validated txMerkleRoot and witness merkle root at the basic validation, re-calculate with acsMerkleRoot
         let commitments =

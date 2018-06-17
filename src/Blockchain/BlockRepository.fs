@@ -25,7 +25,7 @@ let getFullBlock session (block:ExtendedBlockHeader.T) =
         Collection.get session.context.blockTransactions session.session block.hash
         |> Seq.map (Collection.get session.context.transactions session.session)
         |> Seq.toList
-        
+
     {
         header=block.header
         txMerkleRoot=block.txMerkleRoot
@@ -53,20 +53,14 @@ let saveFullBlock session blockHash (block:Block) =
     List.iter (fun (_,txHash) ->
         MultiCollection.put session.context.transactionBlocks session.session txHash blockHash) transactions
 
-let saveBlockState session blockHash (acs:ActiveContractSet.T) ema contractStatesUndoData =
+let saveBlockState session blockHash (acsUndoData:ActiveContractSet.UndoData) contractStatesUndoData ema =
     let blockState =
         {
             ema = ema
-            activeContractSet =
-                ActiveContractSet.getContracts acs
-                |> Seq.map (fun contract -> {
-                                                contractId=contract.contractId
-                                                expiry=contract.expiry
-                                                code=contract.code})
-                |> List.ofSeq
-            contractStatesUndoData = contractStatesUndoData            
+            activeContractSetUndoData = acsUndoData
+            contractStatesUndoData = contractStatesUndoData
         }
-        
+
     Collection.put session.context.blockState session.session blockHash blockState
 
 let getBlockState session blockHash =
@@ -80,9 +74,8 @@ let tryGetTip session =
     | Some blockHash ->
         let header = getHeader session blockHash
         let blockState = getBlockState session blockHash
-        let acs = BlockState.initAcs blockState.activeContractSet session.context.contractPath
 
-        Some (header,acs,blockState.ema)
+        Some (header,blockState.ema)
     | None -> None
 
 let updateTip session blockHash =

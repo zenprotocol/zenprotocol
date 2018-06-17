@@ -1,5 +1,7 @@
 module Blockchain.DatabaseContext
 
+open Blockchain.Serialization
+open Blockchain.Serialization
 open DataAccess
 open Consensus
 open Types
@@ -18,6 +20,7 @@ type T =
         tip:SingleValue<Hash.Hash>
         utxoSet:Collection<Outpoint, OutputStatus>
         contractStates:Collection<ContractId, Zen.Types.Data.data>
+        activeContractSet:Collection<Hash.Hash,ActiveContractSet.ContractKey>
         contractUtxo:MultiCollection<ContractId,PointedOutput>
         blocks:Collection<Hash.Hash,ExtendedBlockHeader.T>
         blockChildrenIndex: Index<Hash.Hash,ExtendedBlockHeader.T,Hash.Hash>
@@ -97,7 +100,13 @@ let create dataPath =
             OutputStatus.serialize
             OutputStatus.deserialize
 
-    let contractStates = 
+    let activeContractSet =
+        Collection.create session "activeContractset"
+            Hash.bytes
+            ContractKey.serialize
+            ContractKey.deserialize
+
+    let contractStates =
         Collection.create session "contractStates"
             ContractId.serialize
             Data.serialize
@@ -126,6 +135,7 @@ let create dataPath =
         databaseContext = databaseContext
         tip=tip
         utxoSet=utxoSet
+        activeContractSet=activeContractSet
         contractStates=contractStates
         contractUtxo=contractUtxo
         blocks=blocks

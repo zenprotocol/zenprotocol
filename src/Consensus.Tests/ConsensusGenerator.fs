@@ -78,7 +78,7 @@ type ConsensusGenerator =
                 |> List.map Transaction.witnessHash
                 |> MerkleTree.computeRoot
 
-            let acsMerkleRoot = SparseMerkleTree.root ActiveContractSet.empty
+            let acsMerkleRoot = ActiveContractSet.root ActiveContractSet.empty
 
             let commitments =
                 [ txMerkleRoot; witnessMerkleRoot; acsMerkleRoot; ]
