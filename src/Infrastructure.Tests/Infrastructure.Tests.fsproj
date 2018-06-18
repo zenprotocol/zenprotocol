@@ -71,7 +71,6 @@
       </PropertyGroup>
     </When>
   </Choose>
-  <Import Project="..\CopyZulib.targets" />
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
       <ItemGroup>

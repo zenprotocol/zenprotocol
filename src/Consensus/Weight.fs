@@ -78,30 +78,34 @@ let updateSkeleton (skeleton, currentSkeleton) nInputs nOutputs =
               outputs = List.append currentSkeleton.outputs outputsDone})
 
 let accumulateWeights weights fixedSkeleton =
-    let rec accumulateWeights skeletonPair total witnesses = result {
-        let! skeleton, currentSkeleton = skeletonPair
-        match skeleton.pInputs, witnesses with
-        | [], [] -> return total    // Covers coinbase tranasctions
-        | [], _ -> return! Error "Too many witnesses"
-        | _, [] -> return! Error "Too few witnesses"
-        | pInput::_, witness::ws ->
-            let! weight, nInputs, nOutputs =
-                match pInput, witness with
-                | PKPair -> Ok weights.pk
-                | ContractPair cWitness ->
-                    Ok <| weights.contract cWitness
-                | _ -> Error "Wrong witness type"
-            return! accumulateWeights
+    let rec accumulateWeights0 (skeletonPair:Result<TxSkeleton.T * TxSkeleton.T, string>) (total:bigint) witnesses =
+        match skeletonPair with 
+        | Error error -> Error error
+        | Ok (skeleton, currentSkeleton) ->
+            match skeleton.pInputs, witnesses with
+            | [], [] -> Ok total    // Covers coinbase tranasctions
+            | [], _ -> Error "Too many witnesses"
+            | _, [] -> Error "Too few witnesses"
+            | pInput::_, witness::ws ->
+                let inputWeight =
+                    match pInput, witness with
+                    | PKPair -> Ok weights.pk
+                    | ContractPair cWitness ->
+                        Ok <| weights.contract cWitness
+                    | _ -> Error "Wrong witness type"
+                    
+                match inputWeight with
+                | Ok (weight, nInputs, nOutputs) ->
+                    accumulateWeights0 
                         (updateSkeleton (skeleton, currentSkeleton) nInputs nOutputs)
-                        (total+weight)
-                        ws
-    }
-    accumulateWeights (Ok (fixedSkeleton, TxSkeleton.empty)) 0I
+                        (total + weight) ws
+                | Error (error:string) -> Error error
+                          
+    accumulateWeights0 (Ok (fixedSkeleton, TxSkeleton.empty)) 0I
 
-let txWeight weights
-        getUTXO memUTXOs tx = result {
-    let! outputs =  getOutputs getUTXO memUTXOs tx.inputs
-                        |> (|ResultOf|) "Output lookup error"
+let txWeight weights getUTXO memUTXOs tx = result {
+    let! outputs = getOutputs getUTXO memUTXOs tx.inputs
+                   |> (|ResultOf|) "Output lookup error"
     let! skeleton =
         try
             Ok <| TxSkeleton.fromTransaction tx outputs

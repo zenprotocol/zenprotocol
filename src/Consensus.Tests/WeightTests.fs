@@ -195,3 +195,41 @@ let ``Contract activation weight should be positive``() =
     actWeight |> should be ok
     let (Ok wt) = actWeight
     wt |> should be (greaterThan 0I)
+    
+[<Test>]
+let ``Transaction with large amount of inputs should not fail weight calculation``() =
+    let mutable keys = []
+    let mutable inputs = []
+    let mutable utxos = UtxoSet.asDatabase
+    
+    let size = 5000u
+    for i in [ 1u .. size ] do
+        let bytes =
+            Infrastructure.BigEndianBitConverter.uint32ToBytes i
+        let bytes =
+            bytes
+            |> Array.append (Array.zeroCreate (Consensus.Hash.Length - (Array.length bytes)))
+        let input =
+            {
+               txHash = Hash bytes
+               index = 0u
+            }
+        let privateKey, publicKey = KeyPair.create()
+        let output = { lock = publicKey |> PublicKey.hash |> PK ; spend = { asset = Asset.Zen; amount = 1UL } }
+
+        keys <- Infrastructure.List.add (privateKey, publicKey) keys
+        inputs <- Infrastructure.List.add (Outpoint input) inputs
+        utxos <- Map.add input (Unspent output) utxos
+                
+    let _, publicKey = KeyPair.create()
+    let output = { lock = publicKey |> PublicKey.hash |> PK ; spend = { asset = Asset.Zen; amount = 1UL * (uint64 size) } }
+    let tx = {
+        version = Version0
+        inputs = inputs
+        witnesses = []
+        outputs = [ output ]
+        contract = None
+    }
+    let signedTx = Transaction.sign keys tx
+    let txWeight = transactionWeight getUTXO utxos signedTx
+    shouldEqual (txWeight, (Ok 500000000I : Result<bigint,string>))

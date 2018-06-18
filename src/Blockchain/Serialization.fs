@@ -13,41 +13,65 @@ open FsNetMQ.Stream.Reader
 open Infrastructure
 open UtxoSet
 
+module ContractKey =
+    let write ops (contract: ActiveContractSet.ContractKey) =
+        ContractId.write ops contract.contractId
+        >> ops.writeNumber4 contract.expiry
+        >> String.write ops contract.code
+
+    let read = reader {
+       let! contractId = ContractId.read
+       let! expiry = readNumber4
+       let! code = String.read
+
+       return ({
+                    contractId=contractId
+                    expiry=expiry
+                    code=code
+               }:ActiveContractSet.ContractKey)
+    }
+
+    let serialize contract =
+        write counters contract 0ul
+        |> int32
+        |> create
+        |> write serializers contract
+        |> getBuffer
+
+    let deserialize bytes =
+        Stream (bytes, 0)
+        |> run read
+
 module BlockState =
     let private write ops blockState =
         ops.writeNumber4 blockState.ema.difficulty
         >> Seq.write ops (fun ops -> ops.writeNumber8) blockState.ema.delayed
-        >> Seq.write ops (fun ops contractState ->
-            ContractId.write ops contractState.contractId
-            >> ops.writeNumber4 contractState.expiry
-            >> String.write ops contractState.code) blockState.activeContractSet
+        >> Seq.write ops (fun ops (contractId, contractOption) ->
+            ContractId.write ops contractId
+            >> Option.write ops ContractKey.write contractOption) blockState.activeContractSetUndoData
         >> Seq.write ops (fun ops (contractId, dataOption) ->
             ContractId.write ops contractId
             >> Option.write ops Data.write dataOption) blockState.contractStatesUndoData
-        
+
     let private read = reader {
         let! difficulty = readNumber4
         let! delayed = List.read readNumber8
-        let! activeContractSet = List.read <| reader {
+        let! activeContractSetUndoData = List.read <| reader {
             let! contractId = ContractId.read
-            let! expiry = readNumber4
-            let! code = String.read
-            return {
-                contractId=contractId
-                expiry=expiry
-                code=code
-            }
+            let! contractOption = Option.read ContractKey.read
+
+            return contractId,contractOption
         }
-        
+
         let! contractStatesUndoData = List.read <| reader {
             let! contractId = ContractId.read
             let! dataOption = Option.read Data.read
             return contractId, dataOption
         }
-        
+
         return {
             ema = { difficulty = difficulty; delayed = delayed }
-            activeContractSet = activeContractSet
+            activeContractSetUndoData = activeContractSetUndoData
             contractStatesUndoData = contractStatesUndoData
         }
     }
@@ -192,7 +216,7 @@ module OutputStatus =
     let deserialize bytes =
         Stream (bytes, 0)
         |> run read
-        
+
 module PointedOutput =
     open Zen.Types.Extracted
 
@@ -244,7 +268,7 @@ module Hashes =
         |> Array.chunkBySize Hash.Length
         |> Array.toSeq
         |> Seq.map Hash.Hash
-        
+
 module ContractId =
     let serialize outputStatus =
         ContractId.write counters outputStatus 0ul

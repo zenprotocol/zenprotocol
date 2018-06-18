@@ -5,6 +5,7 @@ open Consensus
 open Types
 open Infrastructure
 open Blockchain.EffectsWriter
+open Consensus
 open Messaging.Events
 open State
 open Logary.Message
@@ -12,6 +13,10 @@ open Logary.Message
 let getUTXO = UtxoSetRepository.get
 let getOutput = TransactionRepository.getOutput
 let getContractState = ContractStateRepository.get
+let loadContract contractPath expiry code contractId =
+    match Contract.load contractPath expiry code contractId with
+    | Error error-> failwith error // We should abort node if we fail to load loadable contract
+    | Ok contract -> contract
 
 // Change the status of the entire chain from the root orphan block up to all tips from Orphan to Connected
 let private unorphanChain session (root:ExtendedBlockHeader.T) =
@@ -87,14 +92,16 @@ let private connectChain chainParams contractPath timestamp session (origin:Exte
                 |> Log.info
 
                 validTip,(utxoSet,acs,ema,mempool,contractCache,contractStates)
-            | Ok (block,utxoSet,acs,contractCache,ema,contractStates') ->
+            | Ok (block,utxoSet,acs',contractCache,ema,contractStates') ->
 
-                ContractStates.getUndoData (getContractState session) contractStates' contractStates
-                |> BlockRepository.saveBlockState session tip.hash acs ema
+                let acsUndoData = ActiveContractSet.getUndoData acs' acs
+                let contractStatesUndoData = ContractStates.getUndoData (getContractState session) contractStates' contractStates
+
+                BlockRepository.saveBlockState session tip.hash acsUndoData contractStatesUndoData ema
 
                 let mempool = MemPool.handleBlock block mempool
 
-                tip,(utxoSet,acs,ema,mempool,contractCache,contractStates')) (origin, originState) headers
+                tip,(utxoSet,acs',ema,mempool,contractCache,contractStates')) (origin, originState) headers
 
 let private connectLongestChain chainParams contractPath timestamp session origin originState chains minChainWork =
     let connectChain tip (best,state) =
@@ -179,11 +186,10 @@ let rec private addBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:Extende
     }
 
 // Undo blocks from current state in order to get the state of the forkblock
-let rec private undoBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:ExtendedBlockHeader.T) utxoSet mempool contractCache contractStates =
+let rec private undoBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:ExtendedBlockHeader.T) utxoSet acs contractStates mempool contractCache  =
     let blockState = BlockRepository.getBlockState session tip.hash
 
     if tip.header = forkBlock.header then
-        let acs = BlockState.initAcs blockState.activeContractSet session.context.contractPath
         (utxoSet,acs,blockState.ema,mempool,contractCache,contractStates)
     else
         let parent = BlockRepository.getHeader session tip.header.parent
@@ -195,10 +201,12 @@ let rec private undoBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:Extend
                 (getOutput session)
                 (getUTXO session)
                 fullBlock utxoSet
-                
+
+        let acs = ActiveContractSet.undoBlock (loadContract session.context.contractPath) blockState.activeContractSetUndoData acs
         let contractStates = ContractStates.undoBlock blockState.contractStatesUndoData contractStates
-        undoBlocks session forkBlock parent utxoSet mempool contractCache contractStates
-        
+
+        undoBlocks session forkBlock parent utxoSet acs contractStates mempool contractCache
+
 // After applying block or blocks we must read mempool transactions to the ACS and UTXO
 let getMemoryState chainParams session contractPath blockNumber timestamp mempool orphanPool acs contractCache =
 
@@ -224,7 +232,7 @@ let getMemoryState chainParams session contractPath blockNumber timestamp mempoo
             TransactionHandler.validateInputs chainParams session contractPath blockNumber timestamp txHash tx memoryState false
         )) memoryState mempool
 
-            
+
 let private rollForwardChain chainParams contractPath timestamp state session block persistentBlock acs ema =
     effectsWriter {
         // unorphan any orphan chain starting with current block
@@ -252,9 +260,11 @@ let private rollForwardChain chainParams contractPath timestamp state session bl
 
             UtxoSetRepository.save session utxoSet
             ContractStateRepository.save session contractStates
+            ActiveContractSetRepository.save session acs
+            let acs = ActiveContractSet.clearChanges acs
 
             let tipState = {activeContractSet=acs;ema=ema;tip=tip}
-            let! memoryState = getMemoryState chainParams session contractPath tip.header.blockNumber tip.header.timestamp mempool state.memoryState.orphanPool acs contractCache 
+            let! memoryState = getMemoryState chainParams session contractPath tip.header.blockNumber tip.header.timestamp mempool state.memoryState.orphanPool acs contractCache
 
             do! addBlocks session persistentBlock tip
 
@@ -276,7 +286,7 @@ let private rollForwardChain chainParams contractPath timestamp state session bl
             >> setField "blockNumber" tipState.tip.header.blockNumber
             >> setField "tip" (Hash.toString tipState.tip.hash)
             |> Log.info
-            
+
             // Not publishing new blocks during the initial download phase
             if not <| InitialBlockDownload.isActive state.initialBlockDownload then
                 do! publishBlock block.header
@@ -298,21 +308,25 @@ let private handleGenesisBlock chainParams contractPath session timestamp (state
 
             return {state with initialBlockDownload = ibd}
         | Ok (block,utxoSet,acs,contractCache,ema,contractStates) ->
-        
+
             eventX "BlockHandler: Genesis block received"
             |> Log.info
 
             let extendedHeader = ExtendedBlockHeader.createGenesis blockHash block
             BlockRepository.saveHeader session extendedHeader
             BlockRepository.saveFullBlock session blockHash block
-            
-            ContractStates.getUndoData (getContractState session) contractStates ContractStates.asDatabase
-            |> BlockRepository.saveBlockState session blockHash acs ema
-            
+
+            let acsUndoData = ActiveContractSet.getUndoData acs state.tipState.activeContractSet
+            let contractStatesUndoData = ContractStates.getUndoData (getContractState session) contractStates ContractStates.asDatabase
+
+            BlockRepository.saveBlockState session blockHash acsUndoData contractStatesUndoData ema
+
             BlockRepository.updateTip session extendedHeader.hash
 
             UtxoSetRepository.save session utxoSet
             ContractStateRepository.save session contractStates
+            ActiveContractSetRepository.save session acs
+            let acs = ActiveContractSet.clearChanges acs
 
             do! publish (BlockAdded (blockHash, block))
 
@@ -320,7 +334,7 @@ let private handleGenesisBlock chainParams contractPath session timestamp (state
 
             let state = {state with initialBlockDownload = ibd; memoryState = { state.memoryState with contractStates = contractStates; contractCache = contractCache }}
 
-            return! rollForwardChain chainParams contractPath timestamp state session block extendedHeader acs ema 
+            return! rollForwardChain chainParams contractPath timestamp state session block extendedHeader acs ema
     }
 
 // Handle new block that is extending the main chain
@@ -350,21 +364,25 @@ let private handleMainChain chain contractPath session timestamp (state:State) (
             |> Log.info
 
             let! initialBlockDownload = InitialBlockDownload.received timestamp blockHash state.initialBlockDownload
-            let state = { state with initialBlockDownload = initialBlockDownload; 
+            let state = { state with initialBlockDownload = initialBlockDownload;
                                      memoryState = { state.memoryState with contractCache = contractCache }}
 
             let extendedHeader = ExtendedBlockHeader.createMain parent blockHash block
 
             BlockRepository.saveHeader session extendedHeader
             BlockRepository.saveFullBlock session blockHash block
-            
-            ContractStates.getUndoData (getContractState session) contractStates ContractStates.asDatabase
-            |> BlockRepository.saveBlockState session extendedHeader.hash acs ema
-            
+
+            let acsUndoData = ActiveContractSet.getUndoData acs state.tipState.activeContractSet
+            let contractStatesUndoData = ContractStates.getUndoData (getContractState session) contractStates ContractStates.asDatabase
+
+            BlockRepository.saveBlockState session extendedHeader.hash acsUndoData contractStatesUndoData ema
+
             BlockRepository.updateTip session extendedHeader.hash
 
             UtxoSetRepository.save session utxoSet
             ContractStateRepository.save session contractStates
+            ActiveContractSetRepository.save session acs
+            let acs = ActiveContractSet.clearChanges acs
 
             // Pulishing event of the new block
             do! publish (BlockAdded (blockHash, block))
@@ -406,7 +424,7 @@ let private handleForkChain chain contractPath session timestamp (state:State) p
 
             // undo blocks from mainnet to get fork block state
             let forkState = undoBlocks session forkBlock currentTip
-                                UtxoSet.asDatabase state.memoryState.mempool state.memoryState.contractCache state.memoryState.contractStates
+                                UtxoSet.asDatabase state.tipState.activeContractSet ContractStates.asDatabase state.memoryState.mempool state.memoryState.contractCache
 
             match connectLongestChain chain contractPath timestamp session forkBlock forkState chains currentChainWork with
             | None ->
@@ -429,12 +447,14 @@ let private handleForkChain chain contractPath session timestamp (state:State) p
                 BlockRepository.updateTip session tip.hash
                 UtxoSetRepository.save session utxoSet
                 ContractStateRepository.save session contractStates
+                ActiveContractSetRepository.save session acs
+                let acs = ActiveContractSet.clearChanges acs
 
                 do! removeBlocks session forkBlock currentTip
                 do! addBlocks session forkBlock tip
 
                 let tipState = {activeContractSet=acs;ema=ema;tip=tip}
-                
+
                 let! memoryState = getMemoryState chain session contractPath tip.header.blockNumber timestamp mempool state.memoryState.orphanPool acs contractCache
 
                 // Not publishing new blocks during the initial download phase

@@ -45,8 +45,3 @@ nuget zen_z3_windows 4.5.1.7-v1f29cebd4df
 source https://www.myget.org/F/nunit/api/v3/index.json
 
 nuget NUnit.ConsoleRunner  ~> 3.9.0-dev-03997
-
-group Zulib
-    source https://nuget.org/api/v2
-
-    nuget System.Reflection.Metadata 1.4.1.0

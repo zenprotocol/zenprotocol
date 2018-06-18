@@ -61,10 +61,10 @@ type ContractCostFn =
 
 type Contract = {
     contractId: ContractId
-    mainFn: ContractMainFn
-    costFn: ContractCostFn
     expiry: uint32
     code: string
+    mainFn: ContractMainFn
+    costFn: ContractCostFn
 }
 with
     member x.version =
@@ -166,7 +166,7 @@ let getCost contract = contract.costFn
 
 let run contract txSkeleton context command sender messageBody wallet state =
     contract.mainFn txSkeleton context contract.contractId command sender messageBody wallet state
-        
+
 let getContractWallet (txSkeleton:TxSkeleton.T) (w:ContractWitness) =
     txSkeleton.pInputs.[int w.beginInputs .. int w.endInputs]
     |> List.choose (fun input ->

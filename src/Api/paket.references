@@ -6,3 +6,4 @@ FSharp.Compiler.Tools
 FsBech32
 Newtonsoft.Json
 Logary
+Zulib

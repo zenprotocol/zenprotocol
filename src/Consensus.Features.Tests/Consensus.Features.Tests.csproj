@@ -1,6 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\..\packages\NUnit\build\NUnit.props" Condition="Exists('..\..\packages\NUnit\build\NUnit.props')" Label="Paket" />
+  <Import Project="..\..\packages\FSharp.Compiler.Tools\build\FSharp.Compiler.Tools.props" Condition="Exists('..\..\packages\FSharp.Compiler.Tools\build\FSharp.Compiler.Tools.props')" Label="Paket" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -42,6 +43,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ACS.feature.cs" />
+    <Compile Include="ContractExamples.feature.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ContractState.feature.cs" />
     <Compile Include="SimpleBlockChain.feature.cs" />
@@ -53,6 +55,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="ACS.feature" />
+    <Content Include="ContractExamples.feature" />
     <Content Include="ContractState.feature" />
     <Content Include="Contracts\c1.fst">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
@@ -97,7 +100,17 @@
     </When>
   </Choose>
   <Import Project="..\SpecFlowGenerator.targets" />
-  <Import Project="..\CopyZulib.targets" />
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
+      <ItemGroup>
+        <Reference Include="BouncyCastle.Crypto">
+          <HintPath>..\..\packages\BouncyCastle\lib\BouncyCastle.Crypto.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
       <ItemGroup>
@@ -108,6 +121,28 @@
         </Reference>
         <Reference Include="FParsecCS">
           <HintPath>..\..\packages\FParsec\lib\net40-client\FParsecCS.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
+      <ItemGroup>
+        <Reference Include="FsBech32">
+          <HintPath>..\..\packages\FsBech32\lib\net45\FsBech32.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
+      <ItemGroup>
+        <Reference Include="FsCheck">
+          <HintPath>..\..\packages\FsCheck\lib\net452\FsCheck.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
@@ -130,6 +165,17 @@
       <ItemGroup>
         <Reference Include="FSharp.Core">
           <HintPath>..\..\packages\FSharp.Core\lib\net45\FSharp.Core.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
+      <ItemGroup>
+        <Reference Include="FSharpx.Collections">
+          <HintPath>..\..\packages\FSharpx.Collections\lib\net40\FSharpx.Collections.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
@@ -248,10 +294,34 @@
       </ItemGroup>
     </When>
   </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
+      <ItemGroup>
+        <Reference Include="Zen.FSharp.Compiler.Service">
+          <HintPath>..\..\packages\Zen.FSharp.Compiler.Service\lib\net45\Zen.FSharp.Compiler.Service.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
+      <ItemGroup>
+        <Reference Include="Zulib">
+          <HintPath>..\..\packages\Zulib\lib\Zulib.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
   <Import Project="..\..\packages\SpecFlow\build\SpecFlow.targets" Condition="Exists('..\..\packages\SpecFlow\build\SpecFlow.targets')" Label="Paket" />
   <Import Project="..\..\packages\zen_secp256k1_linux\build\$(__paket__zen_secp256k1_linux_targets).targets" Condition="Exists('..\..\packages\zen_secp256k1_linux\build\$(__paket__zen_secp256k1_linux_targets).targets')" Label="Paket" />
   <Import Project="..\..\packages\zen_secp256k1_osx\build\$(__paket__zen_secp256k1_osx_targets).targets" Condition="Exists('..\..\packages\zen_secp256k1_osx\build\$(__paket__zen_secp256k1_osx_targets).targets')" Label="Paket" />
   <Import Project="..\..\packages\zen_z3_linux\build\zen_z3_linux.targets" Condition="Exists('..\..\packages\zen_z3_linux\build\zen_z3_linux.targets')" Label="Paket" />
   <Import Project="..\..\packages\zen_z3_osx\build\$(__paket__zen_z3_osx_targets).targets" Condition="Exists('..\..\packages\zen_z3_osx\build\$(__paket__zen_z3_osx_targets).targets')" Label="Paket" />
+  <Import Project="..\..\packages\zen_z3_windows\build\zen_z3_windows.targets" Condition="Exists('..\..\packages\zen_z3_windows\build\zen_z3_windows.targets')" Label="Paket" />
   <Import Project="..\..\packages\ZFStar\build\ZFStar.targets" Condition="Exists('..\..\packages\ZFStar\build\ZFStar.targets')" Label="Paket" />
+  <Import Project="..\..\packages\Zulib\build\Zulib.targets" Condition="Exists('..\..\packages\Zulib\build\Zulib.targets')" Label="Paket" />
 </Project>

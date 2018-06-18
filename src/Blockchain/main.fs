@@ -1,5 +1,6 @@
 ﻿module Blockchain.Main
 
+open Blockchain
 open FsNetMQ
 open FSharp.Control
 open Infrastructure
@@ -45,28 +46,30 @@ let main dataPath chainParams busName wipe =
         let tip, acs, ema, contractCache =
             use session = DatabaseContext.createSession databaseContext
             match BlockRepository.tryGetTip session with
-            | Some (tip,acs,ema) ->
+            | Some (tip,ema) ->
                 eventX "Loading tip from db #{blockNumber} {blockHash}"
                 >> setField "blockNumber" tip.header.blockNumber
                 >> setField "blockHash" (Hash.toString tip.hash)
                 |> Log.info
 
+                let acs = ActiveContractSetRepository.get session
+
                 tip,
                 acs,
                 ema,
-                Seq.fold (fun contractCache contract -> 
-                    ContractCache.add contract contractCache) 
+                Seq.fold (fun contractCache contract ->
+                    ContractCache.add contract contractCache)
                     ContractCache.empty (ActiveContractSet.getContracts acs)
 
             | None ->
                 eventX "No tip in db"
                 |> Log.info
-                
+
                 ExtendedBlockHeader.empty,
                 ActiveContractSet.empty,
                 EMA.create chainParams,
                 ContractCache.empty
-                
+
         let tipState =
             {
                 activeContractSet=acs

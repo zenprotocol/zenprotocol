@@ -51,6 +51,7 @@
     <Compile Include="UtxoSetRepository.fs" />
     <Compile Include="ContractUtxoRepository.fs" />
     <Compile Include="ContractStateRepository.fs" />
+    <Compile Include="ActiveContractSetRepository.fs" />
     <Compile Include="BlockRepository.fs" />
     <Compile Include="Tree.fs" />
     <Compile Include="EffectsWriter.fs" />

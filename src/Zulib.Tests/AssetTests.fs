@@ -14,12 +14,12 @@ module Arbitrary =
     type Hash = Hash of byte[]
     type SubtypeString = SubtypeString of Prims.string
     type Asset = Asset of Zen.Types.Extracted.asset
-    
+
     type Generators =
         static member string() =
             Arb.fromGen <| gen {
                 let! value =
-                    Arb.generate<Prims.string> 
+                    Arb.generate<Prims.string>
                     |> Gen.filter ((<>) null)
                     |> Gen.filter (fun s -> Seq.length s < 29)
                 return SubtypeString value
@@ -40,13 +40,13 @@ module Arbitrary =
                 let! (ContractId contractId) = Arb.generate<ContractId>
                 let (ver, cHash) = contractId
                 let! (Hash subType) = Arb.generate<Hash>
-                
+
                 return Asset (ver, cHash, subType)
             }
-            
+
 open Arbitrary
 open Zen.Crypto
-    
+
 [<OneTimeSetUp>]
 let setup = fun () ->
     Arb.register<Generators>() |> ignore
@@ -57,18 +57,18 @@ let ``ContractId created from string should yield expected`` (version : uint32) 
     let asstring =
         orig.ToString()
         |> System.Text.Encoding.ASCII.GetBytes
-    
+
     match Zen.ContractId.parse asstring |> unCost with
     | option.Some (ver, cHash) ->
         let tested = Consensus.Types.ContractId (ver, Consensus.Hash.Hash cHash)
         tested = orig
     | _ -> false
-    
+
 [<Property(MaxTest=10000)>]
 let ``Asset created from string subtype should yield expected`` (ContractId contractId) (SubtypeString value) =
     let ver, cHash, subType = Zen.Asset.fromSubtypeString contractId value |> unCost
     let expectedVer, expectedCHash = contractId
-    let expectedSubtype = 
+    let expectedSubtype =
         let bom = [| 0xEFuy; 0xBBuy; 0xBFuy |]
         32 - Array.length value - Array.length bom
         |> Array.zeroCreate
@@ -78,14 +78,14 @@ let ``Asset created from string subtype should yield expected`` (ContractId cont
     ver = expectedVer
     && cHash = expectedCHash
     && subType = expectedSubtype
-        
+
 [<Property(MaxTest=10000)>]
 let ``Asset created from int subtype should yield expected`` (ContractId contractId) (i : uint32) =
     let ver, cHash, subType = Zen.Asset.fromSubtypeInt contractId i |> unCost
     let expectedVer, expectedCHash = contractId
-    let expectedSubtype = 
+    let expectedSubtype =
         let bytes = Infrastructure.BigEndianBitConverter.uint32ToBytes i
-        bytes 
+        bytes
         |> Array.append (Array.zeroCreate (Consensus.Hash.Length - (Array.length bytes)))
 
     ver = expectedVer
@@ -98,14 +98,16 @@ let ``Asset encoding round trip should produce same result`` (Asset asset) =
     let contractId = Consensus.Types.ContractId (ver, Consensus.Hash.Hash cHash)
     let asstring =
         (Consensus.Types.Asset (contractId, Consensus.Hash.Hash subType)).ToString()
-        |> System.Text.Encoding.ASCII.GetBytes
-    
-    printfn "%A" asstring.[0..35]
-    
+
+    let asstring = asstring |> System.Text.Encoding.ASCII.GetBytes
+
+
     match Zen.Asset.parse asstring |> unCost with
-    | option.Some tested -> tested = asset
-    | option.None -> false
-    
+    | option.Some tested ->
+        tested = asset
+    | option.None ->
+        false
+
 [<Property(MaxTest=10000)>]
 let ``Asset encoding round trip should produce same result, using zero sub type`` (ContractId contractId) =
     let ver, cHash = contractId
@@ -114,12 +116,11 @@ let ``Asset encoding round trip should produce same result, using zero sub type`
     let asstring =
         (Consensus.Types.Asset (contractId, Consensus.Hash.Hash subType)).ToString()
         |> System.Text.Encoding.ASCII.GetBytes
-    
+
     match Zen.Asset.parse asstring |> unCost with
-    | option.Some tested ->
-        tested = (ver, cHash, subType)
+    | option.Some tested -> tested = (ver, cHash, subType)
     | option.None -> false
-    
+
 [<Property(MaxTest=10000)>]
 let ``Asset encoding round trip should produce same result, using Zen asset`` (Hash subType) =
     let zeroHash = Consensus.Hash.zero |> Consensus.Hash.bytes
@@ -128,7 +129,7 @@ let ``Asset encoding round trip should produce same result, using Zen asset`` (H
     let asstring =
         (Consensus.Types.Asset (contractId, Consensus.Hash.Hash subType)).ToString()
         |> System.Text.Encoding.ASCII.GetBytes
-    
+
     match Zen.Asset.parse asstring |> unCost with
     | option.Some tested -> tested = (ver, cHash, subType)
     | option.None -> false
