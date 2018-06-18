@@ -389,7 +389,7 @@ let ``block with wrong coinbase reward``() =
         |> List.map Transaction.witnessHash
         |> MerkleTree.computeRoot
 
-    let acsMerkleRoot = SparseMerkleTree.root ActiveContractSet.empty
+    let acsMerkleRoot = ActiveContractSet.root ActiveContractSet.empty
 
     let commitments = MerkleTree.computeRoot [txMerkleRoot;witnessMerkleRoot;acsMerkleRoot]
 
@@ -529,7 +529,7 @@ let ``block with coinbase with multiple asset as reward should fail``() =
         |> List.map Transaction.witnessHash
         |> MerkleTree.computeRoot
 
-    let acsMerkleRoot = SparseMerkleTree.root ActiveContractSet.empty
+    let acsMerkleRoot = ActiveContractSet.root ActiveContractSet.empty
 
     let commitments = MerkleTree.computeRoot [txMerkleRoot;witnessMerkleRoot;acsMerkleRoot;]
 
@@ -582,7 +582,7 @@ let ``coinbase reward split over multiple outputs``() =
         |> List.map Transaction.witnessHash
         |> MerkleTree.computeRoot
 
-    let acsMerkleRoot = SparseMerkleTree.root ActiveContractSet.empty
+    let acsMerkleRoot = ActiveContractSet.root ActiveContractSet.empty
 
     let commitments = MerkleTree.computeRoot [txMerkleRoot;witnessMerkleRoot;acsMerkleRoot;]
 

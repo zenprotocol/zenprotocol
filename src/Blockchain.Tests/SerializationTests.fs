@@ -19,16 +19,25 @@ type BlockchainGenerators =
     static member BlockState() =
         gen {
             let! ema = Arb.generate<EMA.T>
-            let! activeContractSet =
+            let! activeContractSetUndoData =
                 Gen.listOf <| gen {
                     let! hash = Gen.arrayOfLength Hash.Length Arb.generate<byte>
-                    let! expiry = Arb.generate<uint32>
-                    let! code = Arb.generate<string> |> Gen.filter ((<>) null)
-                    return {
-                        contractId=ContractId (Version0, Hash hash)
-                        expiry=expiry
-                        code=code
+                    let contractId = ContractId (Version0, Hash hash)
+
+                    let createContractKey = gen {
+                        let! expiry = Arb.generate<uint32>
+                        let! code = Arb.generate<string> |> Gen.filter ((<>) null)
+
+                        return ({
+                                    contractId = contractId
+                                    expiry=expiry
+                                    code=code
+                                }:ActiveContractSet.ContractKey)
                     }
+
+                    let! contractKey = Gen.optionOf createContractKey
+
+                    return contractId,contractKey
                 }
 
             let! contractStatesUndoData = Gen.listOf <| gen {
@@ -41,7 +50,7 @@ type BlockchainGenerators =
             return
                 ({
                     ema = ema
-                    activeContractSet = activeContractSet
+                    activeContractSetUndoData = activeContractSetUndoData
                     contractStatesUndoData = contractStatesUndoData
                 } : BlockState.T)
         }

@@ -144,13 +144,15 @@ let ``genesis block accepted``() =
 
     BlockRepository.tryGetTip session
     |> should equal (Some (state'.tipState.tip,
-                           state'.tipState.activeContractSet,
                            state'.tipState.ema))
+
+    let acs = ActiveContractSetRepository.get session
 
     state'.tipState.tip.status |> should equal ExtendedBlockHeader.MainChain
     state'.tipState.tip.header |> should equal block.header
     state'.memoryState.utxoSet |> should equal UtxoSet.asDatabase
     state'.tipState.activeContractSet |> should equal state'.memoryState.activeContractSet
+    acs |> should equal state'.tipState.activeContractSet
     areOutpointsInSet session rootTxOutpoints UtxoSet.asDatabase |> should equal true
 
 [<Test>]
@@ -198,13 +200,15 @@ let ``validate new valid block which extended main chain``() =
 
     BlockRepository.tryGetTip session
     |> should equal (Some (state'.tipState.tip,
-                           state'.tipState.activeContractSet,
                            state'.tipState.ema))
+
+    let acs = ActiveContractSetRepository.get session
 
     state'.tipState.tip.status |> should equal ExtendedBlockHeader.MainChain
     state'.tipState.tip.header |> should equal block.header
     state'.memoryState.utxoSet |> should equal UtxoSet.asDatabase
     state'.tipState.activeContractSet |> should equal state'.memoryState.activeContractSet
+    acs |> should equal state'.memoryState.activeContractSet
     areOutpointsInSet session rootTxOutpoints UtxoSet.asDatabase |> should equal false // SHOULD be spent
     areOutpointsInSet session (getTxOutpoints tx) UtxoSet.asDatabase |> should equal true
 
@@ -290,13 +294,15 @@ let ``validate new block which connect orphan chain which extend main chain``() 
 
     BlockRepository.tryGetTip session
     |> should equal (Some (state'.tipState.tip,
-                           state'.tipState.activeContractSet,
                            state'.tipState.ema))
+
+    let acs = ActiveContractSetRepository.get session
 
     state'.tipState.tip.status |> should equal ExtendedBlockHeader.MainChain
     state'.tipState.tip.header |> should equal block.header
     state'.memoryState.utxoSet |> should equal UtxoSet.asDatabase
     state'.tipState.activeContractSet |> should equal state'.memoryState.activeContractSet
+    acs |> should equal state'.memoryState.activeContractSet
     areOutpointsInSet session rootTxOutpoints UtxoSet.asDatabase |> should equal false
     areOutpointsInSet session (getTxOutpoints tx) UtxoSet.asDatabase |> should equal true
 
@@ -364,7 +370,6 @@ let ``orphan chain become longer than main chain``() =
 
     BlockRepository.tryGetTip session
     |> should equal (Some (state.tipState.tip,
-                           state.tipState.activeContractSet,
                            state.tipState.ema))
 
     events |> should haveLength 7
@@ -376,10 +381,13 @@ let ``orphan chain become longer than main chain``() =
     events.[5] |> should equal (EffectsWriter.NetworkCommand (PublishBlock tip.header))
     events.[6] |> should equal (EffectsWriter.EventEffect (TipChanged tip.header))
 
+    let acs = ActiveContractSetRepository.get session
+
     state.tipState.tip.status |> should equal ExtendedBlockHeader.MainChain
     state.tipState.tip.header |> should equal tip.header
     state.memoryState.utxoSet |> should equal UtxoSet.asDatabase
     state.tipState.activeContractSet |> should equal state.memoryState.activeContractSet
+    acs |> should equal state.tipState.activeContractSet
     isAccountInSet session account UtxoSet.asDatabase |> should equal true
     isAccountInSet session sideChainAccount UtxoSet.asDatabase |> should equal false
 
@@ -636,13 +644,9 @@ let ``block with a contract activation is added to chain``() =
     events |> should haveLength 3
     events |> should contain (EffectsWriter.EventEffect (BlockAdded (hashBlock block)))
 
-    let tip = BlockRepository.tryGetTip session
+    let acs = ActiveContractSetRepository.get session
 
-    tip |> should be some
-
-    let _,acs,_ = (Option.get tip)
-
-    SparseMerkleTree.root acs |> should equal (SparseMerkleTree.root state'.tipState.activeContractSet)
+    ActiveContractSet.root acs |> should equal (ActiveContractSet.root state'.tipState.activeContractSet)
 
 [<Test>]
 let ``validate new block header should ask for block``() =
