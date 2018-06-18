@@ -84,7 +84,12 @@ let private fstar outDir inputFile args =
 
 let private wrapFStar errorResult outputFile fstarFn =
     fstarFn
-    |> Result.mapError (fun _ -> errorResult)
+    |> Result.mapError (fun error ->
+#if DEBUG
+        sprintf "%A\n%A" errorResult error)
+#else
+        errorResult
+#endif
     |> Result.map (fun _ -> File.ReadAllText outputFile)
 
 let initOutputDir moduleName =
