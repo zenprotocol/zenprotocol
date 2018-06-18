@@ -75,7 +75,7 @@ let setup = fun () ->
         else
             RT.autoFailw "unsupported command"
 
-    let cf _ _ _ _ _ _ _ = 
+    let cf _ _ _ _ _ _ _ =
         64 + (64 + 64 + 0) + 23
         |> cast nat
         |> C.ret
@@ -93,7 +93,7 @@ let setup = fun () ->
             module Tx = Zen.TxSkeleton
             module ContractId = Zen.ContractId
             module C = Zen.Cost
-            
+
             let main txSkeleton _ contractId command sender messageBody wallet state =
                 if command = "contract1_test" then
                 begin
@@ -101,9 +101,9 @@ let setup = fun () ->
                     let! txSkeleton =
                         Tx.mint 25UL asset txSkeleton
                         >>= Tx.lockToContract asset 25UL contractId in
-                    let! contractId = ContractId.fromString "%s" in
-                    match contractId with 
-                    | Some contractId -> 
+                    let! contractId = ContractId.parse "%s" in
+                    match contractId with
+                    | Some contractId ->
                         let message = {
                             recipient = contractId;
                             command = "contract2_test";
@@ -111,12 +111,12 @@ let setup = fun () ->
                         } in
                         RT.ok @ { tx = txSkeleton; message = Some message; state = NoChange}
                     | None ->
-                        RT.autoFailw "could not parse contractId from string" 
+                        RT.autoFailw "could not parse contractId from string"
                 end
                 else
                     RT.autoFailw "unsupported command"
 
-            let cf _ _ _ _ _ _ _ = 
+            let cf _ _ _ _ _ _ _ =
                 64 + (64 + 64 + (64 + 0)) + 33
                 |> cast nat
                 |> C.ret

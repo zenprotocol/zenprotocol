@@ -20,7 +20,7 @@ nuget FSharp.Configuration
 nuget Argu
 nuget FSharp.Data
 nuget FsBech32 >= 0.1.0.7
-nuget ZFStar 0.0.19
+nuget ZFStar 0.0.25
 nuget Zen.FSharp.Compiler.Service 17.0.2
 nuget ZFS-Tools 0.0.19
 nuget FSharpx.Extras
@@ -40,13 +40,10 @@ nuget zen_z3_osx 4.5.1.8-v1f29cebd4df6
 nuget zen_secp256k1_linux 0.1.0.26-v6ad5cdb42a1a
 nuget zen_secp256k1_osx 0.1.0.26-v6ad5cdb42a1a
 nuget zen_z3_windows 4.5.1.7-v1f29cebd4df
+nuget Zulib 0.3.33
 
 source https://www.myget.org/F/nunit/api/v3/index.json
 
 nuget NUnit.ConsoleRunner  ~> 3.9.0-dev-03997
 
-group Zulib
-    source https://nuget.org/api/v2
-
-    nuget System.Reflection.Metadata 1.4.1.0
 

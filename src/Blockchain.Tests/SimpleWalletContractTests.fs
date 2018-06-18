@@ -106,7 +106,7 @@ let setUp = fun () ->
             | Some tx -> Some @ { tx = tx; message = None; state = NoChange}
             | None -> None in
 
-        RT.of_option "not enough Zens" result'
+        RT.ofOption "not enough Zens" result'
 
     let cf _ _ _ _ _ wallet _ =
         64 + (W.size wallet * 128 + 192) + 0 + 22

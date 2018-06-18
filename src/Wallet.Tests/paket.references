@@ -7,3 +7,4 @@ zen_secp256k1_osx
 FSharp.Compiler.Tools
 Base58Check
 NBitcoin
+Zulib
