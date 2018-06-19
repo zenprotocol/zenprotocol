@@ -169,6 +169,8 @@ let createTemplate chain (parent:BlockHeader) timestamp (ema:EMA.T) acs transact
 let validateHeader chain header  =
     let h = hash header
 
+    if h = chain.genesisHash then Ok header else
+
     let difficulty = Difficulty.uncompress header.difficulty
     let proofOfWorkLimit = chain.proofOfWorkLimit
 
