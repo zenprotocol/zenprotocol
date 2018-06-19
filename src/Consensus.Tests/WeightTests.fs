@@ -34,7 +34,7 @@ let ``Transaction with one PK lock in inputs should have corresponding cost``() 
         contract = None
     }
     let utxos = Map.ofSeq [ testInput1, Unspent output ]
-    let sTx = Transaction.sign oneKeyPair tx
+    let sTx = Transaction.sign oneKeyPair TxHash tx
     let txWeight = transactionWeight getUTXO utxos sTx
     let pkWeight, _, _ = pkWitnessWeight
     shouldEqual (txWeight, (Ok pkWeight : Result<bigint,string>))
@@ -51,7 +51,7 @@ let ``Transaction with many PK locks in inputs should have right cost``() =
             { lock = lk; spend = { asset = Asset.Zen; amount = 1UL} } ]
     let tx = { version=Version0;inputs=inputs;witnesses=[];outputs=outputs;contract=None }
     let utxos = Map.ofList <| List.zip outpoints (List.map Unspent outputs)
-    let sTx = Transaction.sign keys tx
+    let sTx = Transaction.sign keys TxHash tx
     let txWeight = transactionWeight getUTXO utxos sTx
     let pkWeight, _, _ = pkWitnessWeight
     shouldEqual (txWeight, (Ok (pkWeight * bigint (List.length keys)) : Result<bigint,string>))
@@ -163,7 +163,7 @@ let ``Transaction with too many witnesses should fail``() =
         contract = None
     }
     let utxos = Map.ofSeq [ testInput1, Unspent output ]
-    let sTx = Transaction.sign twoKeyPairs tx
+    let sTx = Transaction.sign twoKeyPairs TxHash tx
     let txWeight = transactionWeight getUTXO utxos sTx
     shouldEqual (txWeight, (Error "Too many witnesses" : Result<bigint,string>))
 
@@ -195,13 +195,13 @@ let ``Contract activation weight should be positive``() =
     actWeight |> should be ok
     let (Ok wt) = actWeight
     wt |> should be (greaterThan 0I)
-    
+
 [<Test>]
 let ``Transaction with large amount of inputs should not fail weight calculation``() =
     let mutable keys = []
     let mutable inputs = []
     let mutable utxos = UtxoSet.asDatabase
-    
+
     let size = 5000u
     for i in [ 1u .. size ] do
         let bytes =
@@ -220,7 +220,7 @@ let ``Transaction with large amount of inputs should not fail weight calculation
         keys <- Infrastructure.List.add (privateKey, publicKey) keys
         inputs <- Infrastructure.List.add (Outpoint input) inputs
         utxos <- Map.add input (Unspent output) utxos
-                
+
     let _, publicKey = KeyPair.create()
     let output = { lock = publicKey |> PublicKey.hash |> PK ; spend = { asset = Asset.Zen; amount = 1UL * (uint64 size) } }
     let tx = {
@@ -230,6 +230,6 @@ let ``Transaction with large amount of inputs should not fail weight calculation
         outputs = [ output ]
         contract = None
     }
-    let signedTx = Transaction.sign keys tx
+    let signedTx = Transaction.sign keys TxHash tx
     let txWeight = transactionWeight getUTXO utxos signedTx
     shouldEqual (txWeight, (Ok 500000000I : Result<bigint,string>))

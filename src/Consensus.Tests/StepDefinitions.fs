@@ -522,7 +522,7 @@ module Binding =
             keyLabels
             |> split
             |> List.map findKey
-        let tx = Transaction.sign keyPairs tx
+        let tx = Transaction.sign keyPairs TxHash tx
         updateTx txLabel tx
         |> ignore
 
@@ -533,7 +533,7 @@ module Binding =
             keyLabels
             |> split
             |> List.map findKey
-        let tx = Transaction.sign keyPairs tx
+        let tx = Transaction.sign keyPairs TxHash tx
         updateTx txLabel tx
         |> ignore
 

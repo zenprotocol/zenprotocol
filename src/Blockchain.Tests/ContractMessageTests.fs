@@ -234,7 +234,7 @@ let ``Should execute contract chain and get a valid transaction``() =
 
         let! tx = TransactionHandler.executeContract session inputTx timestamp contractId1 "" None data state false
 
-        let tx = Transaction.sign [ sampleKeyPair ] tx
+        let tx = Transaction.sign [ sampleKeyPair ] TxHash tx
         let txHash = Transaction.hash tx
 
         let events, memoryState =

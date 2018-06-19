@@ -138,7 +138,7 @@ let createTransactionFromOutputs dataAccess session view password contract outpu
         contract = contract
     }
 
-    return Transaction.sign keys transaction
+    return Transaction.sign keys TxHash transaction
 }
 
 let createTransaction dataAccess session view password outputs =
@@ -270,7 +270,7 @@ let createExecuteContractTransaction dataAccess session view executeContract pas
 
     let! unsignedTx = executeContract contractId command sender data txSkeleton
 
-    let sign tx = signFirstWitness signKey tx <@> Transaction.sign keys
+    let sign tx = signFirstWitness signKey tx <@> Transaction.sign keys FollowingWitnesses
 
     return! sign unsignedTx
 }

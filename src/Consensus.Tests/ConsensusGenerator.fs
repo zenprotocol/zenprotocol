@@ -282,7 +282,7 @@ type ConsensusGenerator =
             gen {
                 let secretKey, publicKey = KeyPair.create()
                 let! hash = Arb.generate<Hash.Hash>
-                return PKWitness (publicKey, sign secretKey hash)
+                return PKWitness (TxHash, publicKey, sign secretKey hash)
             }
 
         let contractWitnessGenerator nInputs nOutputs =

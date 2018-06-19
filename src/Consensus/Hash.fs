@@ -32,6 +32,8 @@ let computeMultiple (bytes: byte array seq) =
     sha3.DoFinal(hash, 0) |> ignore
     Hash hash
 
+let joinHashes (Hash a) (Hash b) = computeMultiple [a;b]
+
 let bytes (Hash hash) = hash
 
 let fromBytes bytes =

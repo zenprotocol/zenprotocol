@@ -166,7 +166,7 @@ let executeContract session txSkeleton timestamp contractId command sender messa
                 ContractUtxoRepository.getContractUtxo session contractId state.memoryState.utxoSet
                 |> List.reject (isInTxSkeleton txSkeleton)
 
-            let contractContext : ContractContext = 
+            let contractContext : ContractContext =
                 {
                     blockNumber = state.tipState.tip.header.blockNumber
                     timestamp = timestamp
@@ -175,26 +175,26 @@ let executeContract session txSkeleton timestamp contractId command sender messa
             let contractState =
                 ContractStates.tryGetState (getContractState session) contract.contractId contractStates
 
-            let stateCommitment = 
+            let stateCommitment =
                 if commitToState then
                     match contractState with
-                    | Some data -> 
+                    | Some data ->
                         Serialization.Data.serialize data
                         |> Hash.compute
                         |> State
                     | None -> NoState
                 else
                     NotCommitted
-            
+
             contractState
             |> Contract.run contract txSkeleton contractContext command sender messageBody contractWallet
             |> Result.bind (fun (tx, message, updatedState) ->
 
                 TxSkeleton.checkPrefix txSkeleton tx
                 |> Result.bind (fun finalTxSkeleton ->
-                    let contractStates, contractState = 
+                    let contractStates, contractState =
                         match updatedState with
-                        | stateUpdate.Delete -> 
+                        | stateUpdate.Delete ->
                             ContractStates.delete contract.contractId contractStates, None
                         | stateUpdate.NoChange ->
                             contractStates, contractState
@@ -202,12 +202,12 @@ let executeContract session txSkeleton timestamp contractId command sender messa
                             ContractStates.update contract.contractId data contractStates, Some data
 
                     let witness = TxSkeleton.getContractWitness contract.contractId command messageBody stateCommitment txSkeleton finalTxSkeleton 0L
-                                        
+
                     // To commit to the cost we need the real contract wallet
                     let contractWallet = Contract.getContractWallet tx witness
 
                     let cost = Contract.getCost contract txSkeleton contractContext command sender messageBody contractWallet contractState
-                    
+
                     let totalCost = cost + totalCost
 
                     // We can now commit to the cost, so lets alter it with the real cost
@@ -237,7 +237,7 @@ let executeContract session txSkeleton timestamp contractId command sender messa
 
         let tx =
             Transaction.fromTxSkeleton finalTxSkeleton
-            |> Transaction.addWitnesses witnesses
+            |> Transaction.pushWitnesses witnesses
 
         tx
     )

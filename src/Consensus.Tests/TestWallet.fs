@@ -208,7 +208,8 @@ let createTransactionFromLock lk spend (account, extendedKey) = result {
     let inputPoints = List.map (fst >> Outpoint) inputs
     let outputs = addChange inputAmount spend.asset account [{ spend = spend; lock = lk }]
     return
-        Transaction.sign keys { version = Version0
+        Transaction.sign keys TxHash {
+                                version = Version0
                                 inputs = inputPoints
                                 outputs = outputs
                                 witnesses = []
@@ -257,7 +258,7 @@ let createActivationTransactionFromContract chain (contractId, ({queries=queries
             |> addChange inputAmount Asset.Zen account
 
         return Transaction.sign
-            keys
+            keys TxHash
             {
                 version = Version0
                 inputs = inputPoints
@@ -376,7 +377,7 @@ let createExecuteContractTransaction executeContract (contractId:ContractId) com
 
     let! unsignedTx = executeContract contractId command sender data txSkeleton
 
-    let sign tx = signFirstWitness signKey tx <@> Transaction.sign keys
+    let sign tx = signFirstWitness signKey tx <@> Transaction.sign keys FollowingWitnesses
 
     return! sign unsignedTx
 }

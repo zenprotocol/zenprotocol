@@ -294,7 +294,7 @@ let ``block with invalid contract failed connecting``() =
 
     let tx =
         { version = Version0; contract = Some (V0 { code="ada";hints=goodHints;rlimit=0u;queries=goodTotalQueries }); inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
-        |> Transaction.sign [ rootKeyPair ]
+        |> Transaction.sign [ rootKeyPair ] TxHash
 
     let contract : Contract.T =
         {
@@ -321,7 +321,7 @@ let ``block with invalid contract failed connecting``() =
 let ``block with coinbase lock within a regular transaction should fail``() =
     let publicKey = Crypto.PublicKey <| Array.create 64 1uy
     let signature = Crypto.Signature <| Array.create 64 1uy
-    let witness = PKWitness (publicKey, signature)
+    let witness = PKWitness (TxHash, publicKey, signature)
     let tx =
         {
             version = Version0
