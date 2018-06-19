@@ -24,7 +24,7 @@ type T = {
 }
 
 let createContext dataPath =
-    Platform.combine dataPath "payment"
+    Platform.combine dataPath "wallet"
     |> DatabaseContext.create
 
 let init databaseContext =
