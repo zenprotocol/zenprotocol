@@ -214,7 +214,7 @@ let ``orphan transaction is eventually invalid``() =
         let output' = {output with spend = {amount = output.spend.amount - 1UL; asset = output.spend.asset}}
         let outputs = output' :: List.tail tx.outputs
         let tx' = { tx with outputs = outputs}
-        Transaction.sign [getSecretKey account1key,account1.publicKey] tx'
+        Transaction.sign [getSecretKey account1key,account1.publicKey] TxHash tx'
     let tx2Hash = Transaction.hash tx2
 
     // Sending orphan transaction first, which should be added to orphan list
@@ -353,7 +353,7 @@ let ``Invalid contract should not be added to ActiveContractSet or mempool``() =
         let input, output = TestWallet.getUnspentOutputs rootAccount |> fst |> Map.toSeq |> Seq.head
         let output' = {output with lock=PK (publicKeyHash rootAccount)}
         { version=Version0; inputs=[ Outpoint input ]; outputs=[ output' ]; witnesses=[]; contract = Some (V0 { code = contractCode; hints = ""; rlimit = 0u; queries = 0u }) }
-        |> (Transaction.sign [ rootKeyPair ])
+        |> (Transaction.sign [ rootKeyPair ] TxHash)
 
     let txHash = Transaction.hash tx
 
@@ -405,7 +405,7 @@ let ``contract activation arrived, running orphan transaction``() =
         let txHash = Transaction.hash tx
         let pkWitness =
             let signature = Crypto.sign samplePrivateKey txHash
-            PKWitness (samplePublicKey, signature)
+            PKWitness (TxHash, samplePublicKey, signature)
         txHash, { tx with witnesses = pkWitness :: tx.witnesses }
 
     let events, state =

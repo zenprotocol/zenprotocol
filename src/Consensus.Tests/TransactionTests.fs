@@ -11,6 +11,9 @@ open TransactionValidation
 open TransactionNunitHelpers
 open TransactionHelpers
 open TestsInfrastructure.Nunit
+open FsUnit
+open Hopac.Extensions.Seq
+open TestsInfrastructure.Constraints
 
 let acs = ActiveContractSet.empty
 
@@ -40,7 +43,7 @@ let ``Transaction should be orphan``() =
 let ``Transaction basic validation should be Ok``() =
     let publicKey = Crypto.PublicKey <| Array.create 64 1uy
     let signature = Crypto.Signature <| Array.create 64 1uy
-    let witness = PKWitness (publicKey, signature)
+    let witness = PKWitness (TxHash, publicKey, signature)
     let output = { lock = PK testHash; spend = { asset = Asset.Zen; amount = 1UL } }
     let tx = {
         version = Version0
@@ -80,7 +83,7 @@ let ``Transaction validation should fail with duplicate inputs error``() =
 
     let publicKey = Crypto.PublicKey <| Array.create 64 1uy
     let signature = Crypto.Signature <| Array.create 64 1uy
-    let witness = PKWitness (publicKey, signature)
+    let witness = PKWitness (TxHash, publicKey, signature)
 
     check { tx with inputs = [ Outpoint testInput1; Outpoint testInput1 ]
                     outputs = [ { lock = PK testHash; spend = { asset = Asset.Zen; amount = 1UL } } ]
@@ -128,7 +131,7 @@ let ``Transaction validation should fail with structurally invalid output data``
 
     let publicKey = Crypto.PublicKey <| Array.create 64 1uy
     let signature = Crypto.Signature <| Array.create 64 1uy
-    let witness = PKWitness (publicKey, signature)
+    let witness = PKWitness (TxHash, publicKey, signature)
     let tx = { tx with witnesses = [ witness ]; inputs = [ Outpoint { txHash = validHash; index = 0ul } ] }
 
 
@@ -235,3 +238,149 @@ let ``Transaction validation should fail when inputs consist only of mints``() =
     }
     |> basicValidationMsg "inputs consist of mints only"
     |> shouldEqual
+
+[<Test>]
+let ``sign with FollowingWitnesses sighash``() =
+    let keys = getKeys 2
+
+    let secret, publicKey = keys.[0]
+    let secret2, publicKey2 = keys.[1]
+
+    let outputLock1 = PK (PublicKey.hash publicKey)
+    let output1 = { lock = outputLock1; spend = { asset = Asset.Zen; amount = 1UL } }
+
+    let outputLock2 = PK (PublicKey.hash publicKey2)
+    let output2 = {lock = outputLock2; spend = { asset = Asset.Zen; amount = 1UL } }
+
+    let tx = {
+        version = Version0
+        inputs = [ Outpoint testInput1;Outpoint testInput2]
+        witnesses = []
+        outputs = [ {lock = PK Hash.zero; spend = {asset = Asset.Zen; amount = 2UL}} ]
+        contract = None
+    }
+
+    let utxos = Map.ofSeq [ testInput1, Unspent output1; testInput2, Unspent output2 ]
+
+    let signedTx =
+        Transaction.sign [(secret2, publicKey2)] TxHash tx
+        |> Transaction.sign [(secret, publicKey)] FollowingWitnesses
+
+    let txHash = Transaction.hash signedTx
+
+    let sigHash = signedTx.witnesses.[0] |> function PKWitness (sigHash,_,_) -> sigHash
+    sigHash |> should equal FollowingWitnesses
+
+    inputsValidation 1ul 0UL acs utxos signedTx txHash
+    |> should be ok
+
+[<Test>]
+let ``sign with FollowingWitnesses sighash last input in tx``() =
+    let keys = getKeys 2
+
+    let secret, publicKey = keys.[0]
+    let secret2, publicKey2 = keys.[1]
+
+    let outputLock1 = PK (PublicKey.hash publicKey)
+    let output1 = { lock = outputLock1; spend = { asset = Asset.Zen; amount = 1UL } }
+
+    let outputLock2 = PK (PublicKey.hash publicKey2)
+    let output2 = {lock = outputLock2; spend = { asset = Asset.Zen; amount = 1UL } }
+
+    let tx = {
+        version = Version0
+        inputs = [ Outpoint testInput1;Outpoint testInput2]
+        witnesses = []
+        outputs = [ {lock = PK Hash.zero; spend = {asset = Asset.Zen; amount = 2UL}} ]
+        contract = None
+    }
+
+    let utxos = Map.ofSeq [ testInput1, Unspent output1; testInput2, Unspent output2 ]
+
+    let signedTx =
+        Transaction.sign [(secret2, publicKey2)] FollowingWitnesses tx
+        |> Transaction.sign [(secret, publicKey)] TxHash
+
+    let txHash = Transaction.hash signedTx
+
+    let sigHash = signedTx.witnesses.[1] |> function PKWitness (sigHash,_,_) -> sigHash
+    sigHash |> should equal FollowingWitnesses
+
+    inputsValidation 1ul 0UL acs utxos signedTx txHash
+    |> should be ok
+
+[<Test>]
+let ``sign with FollowingWitnesses sighash and modify following witness``() =
+    let keys = getKeys 2
+
+    let secret, publicKey = keys.[0]
+    let secret2, publicKey2 = keys.[1]
+
+    let outputLock1 = PK (PublicKey.hash publicKey)
+    let output1 = { lock = outputLock1; spend = { asset = Asset.Zen; amount = 1UL } }
+
+    let outputLock2 = PK (PublicKey.hash publicKey2)
+    let output2 = {lock = outputLock2; spend = { asset = Asset.Zen; amount = 1UL } }
+
+    let tx = {
+        version = Version0
+        inputs = [ Outpoint testInput1;Outpoint testInput2]
+        witnesses = []
+        outputs = [ {lock = PK Hash.zero; spend = {asset = Asset.Zen; amount = 2UL}} ]
+        contract = None
+    }
+
+    let utxos = Map.ofSeq [ testInput1, Unspent output1; testInput2, Unspent output2 ]
+
+    let signedTx =
+        Transaction.sign [(secret, publicKey)] FollowingWitnesses tx
+        |> Transaction.sign [(secret2, publicKey2)] TxHash
+
+    let signedTx = {signedTx with witnesses = List.rev signedTx.witnesses}
+
+    let txHash = Transaction.hash signedTx
+
+    let expected:Result<Transaction,ValidationError.ValidationError> = Error (ValidationError.General "invalid PK witness signature")
+
+    inputsValidation 1ul 0UL acs utxos signedTx txHash |> should equal expected
+
+[<Test>]
+let ``sign last input with FollowingWitnesses sighash and add another witness``() =
+    let keys = getKeys 2
+
+    let secret, publicKey = keys.[0]
+    let secret2, publicKey2 = keys.[1]
+
+    let outputLock1 = PK (PublicKey.hash publicKey)
+    let output1 = { lock = outputLock1; spend = { asset = Asset.Zen; amount = 1UL } }
+
+    let outputLock2 = PK (PublicKey.hash publicKey2)
+    let output2 = {lock = outputLock2; spend = { asset = Asset.Zen; amount = 1UL } }
+
+    let tx = {
+        version = Version0
+        inputs = [ Outpoint testInput1;Outpoint testInput2]
+        witnesses = []
+        outputs = [ {lock = PK Hash.zero; spend = {asset = Asset.Zen; amount = 2UL}} ]
+        contract = None
+    }
+
+    let utxos = Map.ofSeq [ testInput1, Unspent output1; testInput2, Unspent output2 ]
+
+    let signedTx =
+        Transaction.sign [(secret2, publicKey2)] FollowingWitnesses tx
+        |> Transaction.sign [(secret, publicKey)] TxHash
+
+    let witnesses = List.append signedTx.witnesses [signedTx.witnesses.[0]]
+
+    let signedTx = {signedTx with witnesses = witnesses}
+
+    let txHash = Transaction.hash signedTx
+
+    let expected:Result<Transaction,ValidationError.ValidationError> = Error (ValidationError.General "invalid PK witness signature")
+
+    inputsValidation 1ul 0UL acs utxos signedTx txHash
+    |> should equal expected
+
+
+

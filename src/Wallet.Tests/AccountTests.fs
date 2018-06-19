@@ -17,7 +17,10 @@ let chainParams = Chain.localParameters
 
 let ema = EMA.create chainParams
 
-let databaseContext = DataAccess.createContext "test"
+let tempDir () = System.IO.Path.Combine
+                    [| System.IO.Path.GetTempPath(); System.IO.Path.GetRandomFileName() |]
+
+let databaseContext = DataAccess.createContext (tempDir())
 let dataAccess = DataAccess.init databaseContext
 let password = "1234"
 
@@ -258,6 +261,12 @@ let ``create execute contract transaction``() =
 
     tx.inputs |> should haveLength 1
 
+    // last pkwitness should use FollowingWitnesses
+    List.findBack (function | PKWitness _ -> true | _ -> false) tx.witnesses
+    |> function PKWitness (sigHash,_,_) -> sigHash
+    |> should equal FollowingWitnesses
+
+
 [<Test>]
 let ``create execute contract transaction without explicitly spending any Zen should allocate fee``() =
     use session = DataAccess.DatabaseContext.createSession databaseContext
@@ -289,6 +298,12 @@ let ``create execute contract transaction without explicitly spending any Zen sh
         | Error error -> failwith error
 
     tx.inputs |> should haveLength 1
+
+    // last pkwitness should use FollowingWitnesses
+    List.findBack (function | PKWitness _ -> true | _ -> false) tx.witnesses
+    |> function PKWitness (sigHash,_,_) -> sigHash
+    |> should equal FollowingWitnesses
+
 
 
 [<Test>]

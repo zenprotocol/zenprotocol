@@ -84,8 +84,8 @@ let runAndValidate inputTx utxoSet (lazyCompiled : Lazy<_>) =
             |> Result.map (fun finalTxSkeleton ->
                 let cw = TxSkeleton.getContractWitness contract.contractId "" None NotCommitted inputTx finalTxSkeleton cost
                 Transaction.fromTxSkeleton finalTxSkeleton
-                |> Transaction.addWitnesses [ ContractWitness cw ])
-            |> Result.map (Transaction.sign [ sampleKeyPair ])
+                |> Transaction.pushWitnesses [ ContractWitness cw ])
+            |> Result.map (Transaction.sign [ sampleKeyPair ] TxHash)
             |> Result.bind validateBasic
             |> Result.bind (validateInputs contract utxoSet))
             |> Result.map (fun (tx, _, _, _) -> tx)
@@ -287,8 +287,8 @@ let ``Contract should be able to destroy its own tokens locked to it``() =
 
     let sampleExpectedResult =
         Transaction.fromTxSkeleton sampleOutputTx
-        |> Transaction.addWitnesses [ ContractWitness <| TxSkeleton.getContractWitness contractId "" None NotCommitted sampleInputTx sampleOutputTx 141L]
-        |> Transaction.sign [ sampleKeyPair ]
+        |> Transaction.pushWitnesses [ ContractWitness <| TxSkeleton.getContractWitness contractId "" None NotCommitted sampleInputTx sampleOutputTx 141L]
+        |> Transaction.sign [ sampleKeyPair ] TxHash
 
     (compileRunAndValidate sampleInputTx utxoSet contract
     , (Ok sampleExpectedResult : Result<Transaction, string>))

@@ -20,19 +20,31 @@ let witnessHash =
     //TODO: only serialize witness
     Transaction.serialize Full >> Hash.compute
 
-let addWitnesses witnesses tx =
+let pushWitnesses witnesses tx =
     { tx with witnesses = witnesses @ tx.witnesses }
 
-let sign keyPairs tx =
+let sign keyPairs initialSigHash tx =
     let txHash = hash tx
 
-    let pkWitnesses =
-        List.map (
-            fun ((secretKey, publicKey)) -> PKWitness (publicKey, Crypto.sign secretKey txHash)
-        ) keyPairs
+    let sign (secretKey, publicKey) sigHash tx =
+        let msg =
+            match sigHash with
+            | TxHash -> txHash
+            | FollowingWitnesses ->
+                let witnessesHash = Serialization.Witnesses.hash tx.witnesses
+                Hash.joinHashes txHash witnessesHash
+            | _ -> failwith "unknown sigHash"
 
-    //// TODO: Should we also use sighash and not sign entire transaction?
-    addWitnesses pkWitnesses tx
+        let witness = PKWitness (sigHash, publicKey, Crypto.sign secretKey msg)
+
+        {tx with witnesses = witness :: tx.witnesses}
+
+    // We sign from last to first
+    // Only the last get signed with the initial sigHash, the rest get signed with TxHash
+    List.foldBack (fun keyPair (tx,sigHash) ->
+        let tx = sign keyPair sigHash tx
+        tx,TxHash) keyPairs (tx,initialSigHash)
+    |> fst
 
 let fromTxSkeleton tx =
     {

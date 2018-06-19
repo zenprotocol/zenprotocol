@@ -216,13 +216,13 @@ module Serialization =
             >> Seq.write ops writerFn
         let read readerFn = reader {
             let! l = List.read readerFn
-            
+
             let rec isSorted l =
                 match l with
                 | [] | [_] -> true
                 | h1::(h2::_ as tail) -> h1 <= h2 && isSorted tail
- 
-            if not <| isSorted l then 
+
+            if not <| isSorted l then
                 yield! fail
             else
                 return Map.ofList l
@@ -822,9 +822,22 @@ module Serialization =
         [<Literal>]
         let private ContractIdentifier = 2u
 
+        [<Literal>]
+        let private SigHashTxHash = 1uy
+
+        [<Literal>]
+        let private SigHashFollowingWitnesses = 3uy
+
         let private writerFn ops = function
-            | PKWitness (publicKey, signature) ->
-                PublicKey.write ops publicKey
+            | PKWitness (sigHash, publicKey, signature) ->
+                let sigHashByte =
+                    match sigHash with
+                    | TxHash -> SigHashTxHash
+                    | FollowingWitnesses -> SigHashFollowingWitnesses
+                    | UnknownSigHash x -> x
+
+                Byte.write ops sigHashByte
+                >> PublicKey.write ops publicKey
                 >> Signature.write ops signature
             | ContractWitness cw ->
                 ContractId.write ops cw.contractId
@@ -860,9 +873,17 @@ module Serialization =
             let! value = reader {
                 match identifier with
                 | PKIdentifier ->
+                    let! sigHashByte = Byte.read
+
+                    let sigHash =
+                        match sigHashByte with
+                        | SigHashTxHash -> TxHash
+                        | SigHashFollowingWitnesses -> FollowingWitnesses
+                        | x -> UnknownSigHash x
+
                     let! publicKey = PublicKey.read
                     let! signature = Signature.read
-                    return PKWitness (publicKey, signature)
+                    return PKWitness (sigHash, publicKey, signature)
                 | ContractIdentifier ->
                     let! contractId = ContractId.read
                     let! command = String.read
@@ -1043,6 +1064,7 @@ module Serialization =
                 transactions = transactions
             }
         }
+open Serialization
 
 open Serialization
 
@@ -1090,3 +1112,12 @@ module Data =
     let deserialize bytes =
         Stream (bytes, 0)
         |> run Data.read
+
+module Witnesses  =
+    let hash witnesses =
+        List.write counters Witness.write witnesses 0ul
+        |> int32
+        |> create
+        |> List.write serializers Witness.write witnesses
+        |> getBuffer
+        |> Hash.compute

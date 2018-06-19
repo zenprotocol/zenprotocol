@@ -53,7 +53,7 @@ let ``Contract activation without contract sacrifice should fail``() =
 
     let tx =
         {version = Version0; contract = Some (V0 sampleContractRecord); inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
-        |> Transaction.sign [rootKeyPair]
+        |> Transaction.sign [rootKeyPair] TxHash
     let txHash = Transaction.hash tx
 
     let expected:TxResult = General "Contract activation must include activation sacrifice" |> Error
@@ -78,7 +78,7 @@ let ``Contract activation with too low contract activation sacrifice``() =
 
     let tx =
         {version = Version0; contract = Some (V0 sampleContractRecord); inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
-        |> Transaction.sign [rootKeyPair]
+        |> Transaction.sign [rootKeyPair] TxHash
     let txHash = Transaction.hash tx
 
     let expected:TxResult = General "Contract must be activated for at least one block" |> Error
@@ -110,7 +110,7 @@ let ``Contract extension with too low contract extension sacrifice``() =
 
     let tx =
         {version = Version0; contract=None; inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
-        |> Transaction.sign [rootKeyPair]
+        |> Transaction.sign [rootKeyPair] TxHash
 
     let expected:TxResult = General "Contract must be activated for at least one block" |> Error
 
@@ -134,7 +134,7 @@ let ``Contract extension of a non active contract should fail``() =
 
     let tx =
         {version = Version0; contract=None; inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
-        |> Transaction.sign [rootKeyPair]
+        |> Transaction.sign [rootKeyPair] TxHash
 
     let expected:TxResult = General "Contract(s) must be active" |> Error
 
@@ -163,7 +163,7 @@ let ``Contract activation with asset other than zen should fail``() =
 
     let tx =
         {version=Version0; contract = Some (V0 sampleContractRecord); inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
-        |> Transaction.sign [rootKeyPair]
+        |> Transaction.sign [rootKeyPair] TxHash
     let txHash = Transaction.hash tx
 
     let expected:TxResult = General "Sacrifice must be paid in Zen" |> Error
@@ -193,7 +193,7 @@ let ``Contract extension with asset other than zen should fail``() =
 
     let tx =
         {version = Version0; contract = None; inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
-        |> Transaction.sign [rootKeyPair]
+        |> Transaction.sign [rootKeyPair] TxHash
     let txHash = Transaction.hash tx
 
     let expected:TxResult = General "Sacrifice must be paid in Zen" |> Error
@@ -263,7 +263,7 @@ let ``Contract extension with exact amount``() =
 
     let tx =
         {version = Version0; contract=None; inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
-        |> Transaction.sign [rootKeyPair]
+        |> Transaction.sign [rootKeyPair] TxHash
 
     let _, acs, _, _ =
         validateInContext initialBlock initialTime acs ContractCache.empty utxoSet getContractState ContractStates.asDatabase (Transaction.hash tx) tx
@@ -315,7 +315,7 @@ let ``Contract extension with more than one output``() =
 
     let tx =
         {version = Version0; contract=None; inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
-        |> Transaction.sign [rootKeyPair]
+        |> Transaction.sign [rootKeyPair] TxHash
 
     let _, acs, _, _ =
         validateInContext initialBlock initialTime acs ContractCache.empty utxoSet getContractState ContractStates.asDatabase (Transaction.hash tx) tx
@@ -344,7 +344,7 @@ let ``Contract activation without hints should fail``() =
 
     let tx =
         {version = Version0; contract = Some (V0 { code=code;hints="";rlimit=0u;queries=0u }); inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
-        |> Transaction.sign [rootKeyPair]
+        |> Transaction.sign [rootKeyPair] TxHash
 
 
     let expected:TxResult = General "total queries: invalid hints" |> Error
@@ -371,7 +371,7 @@ let ``Contract activation with invalid queries should fail``() =
 
     let tx =
         {version = Version0; contract = Some (V0 { sampleContractRecord with queries=(totalQueries - 1u)}); inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
-        |> Transaction.sign [rootKeyPair]
+        |> Transaction.sign [rootKeyPair] TxHash
 
 
     let expected:TxResult = General "Total queries mismatch" |> Error
@@ -394,7 +394,7 @@ let ``Contract with activation sacrifice but without a contract should fail``() 
 
     let tx =
         {version = Version0; contract = None; inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
-        |> Transaction.sign [rootKeyPair]
+        |> Transaction.sign [rootKeyPair] TxHash
 
 
     let expected:Result<Transaction,ValidationError> = General "tx with an activation sacrifice must include a contract" |> Error

@@ -757,7 +757,7 @@ let ``Valid template for two transactions which don't depend on each other``() =
         let spend = output.spend
         let outputs = [{spend=spend;lock=PK (publicKeyHash rootAccount)}]
         Transaction.sign
-            [ rootKeyPair ]
+            [ rootKeyPair ] TxHash
             {
                 version = Version0;
                 inputs = [Outpoint outpoint];
