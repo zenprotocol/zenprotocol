@@ -1,6 +1,7 @@
 module Consensus.InputValidation.ContractV0
 
 open Consensus
+open Hopac.Extensions.Seq
 open Types
 open ValidationError
 open TxSkeleton
@@ -19,7 +20,7 @@ let private validateState (contract:Contract.T) witness getContractState contrac
     let computeCommitment =
         Serialization.Data.serialize
         >> Hash.compute
-        
+
     match witness.stateCommitment, ContractStates.tryGetState getContractState contract.contractId contractStates with
     | NoState, None ->
         Ok None
@@ -27,7 +28,7 @@ let private validateState (contract:Contract.T) witness getContractState contrac
         Ok <| Some given
     | NotCommitted, state ->
         Ok state
-    | _ -> 
+    | _ ->
         GeneralError "state commitment mismatch"
 
 let private checkMask w inputTx outputTx =
@@ -56,7 +57,7 @@ let rec private validateInputs contractId inputs count =
                 validateInputs contractId inputs (count - 1ul)
             | _ -> GeneralError "cannot unlock input"
 
-let private validateWitness context acs getContractState contractStates txHash finalTx sender inputs (w:ContractWitness) = result {
+let private validateWitness context acs getContractState contractStates _ finalTx sender inputs (w:ContractWitness) = result {
     match ActiveContractSet.tryFind w.contractId acs with
     | None ->
         return! Error ContractNotActive
@@ -67,7 +68,6 @@ let private validateWitness context acs getContractState contractStates txHash f
             |> Result.mapError General
 
         let contractWallet = Contract.getContractWallet finalTx w
-        
         let! contractState = validateState contract w getContractState contractStates
         
         do! validateCost contract inputTx context sender contractWallet w contractState
@@ -76,10 +76,10 @@ let private validateWitness context acs getContractState contractStates txHash f
         let! outputTx, message, updatedState =
              Contract.run contract inputTx context w.command sender w.messageBody contractWallet contractState
              |> Result.mapError General
-             
-        let contractStates = 
+
+        let contractStates =
             match updatedState with
-            | stateUpdate.Delete -> 
+            | stateUpdate.Delete ->
                 ContractStates.delete contract.contractId contractStates
             | stateUpdate.NoChange ->
                 contractStates
@@ -113,7 +113,20 @@ let private validateWitness context acs getContractState contractStates txHash f
 
 let private getSender (w:ContractWitness) txHash =
     let validateSignature (publicKey,signature) =
-        match Crypto.verify publicKey signature txHash with
+
+        let messageHash =
+            ({
+                recipient = w.contractId
+                command = w.command
+                body = w.messageBody
+            } : Message) 
+            |> Serialization.Message.hash
+
+        let msg =
+            [ txHash; messageHash ]
+            |> Hash.joinHashes
+
+        match Crypto.verify publicKey signature msg with
         | Crypto.Valid ->
             Ok (PKSender publicKey)
         | Crypto.Invalid ->
@@ -136,7 +149,7 @@ let validate blockNumber timestamp acs getContractState contractStates txHash tx
         getSender w txHash
         |> Result.bind (fun sender -> validateWitness {blockNumber=blockNumber;timestamp=timestamp} acs getContractState contractStates txHash tx sender inputs w)
         |> resultToState witnesses
-    | _ -> 
+    | _ ->
         Invalid <| General "expecting a contract 0 witness"
 
 let private isChainContract (w:ContractWitness) (chainContract:ChainedContractState) =

@@ -11,6 +11,8 @@ open TestsInfrastructure.Constraints
 open Consensus.Tests.Helper
 open Infrastructure
 open Messaging.Services.Wallet
+open Wallet.Serialization
+open Wallet.Types
 
 let chain = Chain.Local
 let chainParams = Chain.localParameters
@@ -659,17 +661,21 @@ let ``sign contract wintess``() =
     use session = DataAccess.DatabaseContext.createSession databaseContext
     let view = fundAccount session
 
+    let contractId = ContractId (Version0,Hash.zero)
+    let command = ""
+    let messageBody = None
+
     let executeContract _ _ _ _ txSkeleton =
         let tx =
             txSkeleton
             |> TxSkeleton.addOutput {lock=Contract <| ContractId  (Version0,Hash.zero);spend={asset=Asset.Zen;amount=1UL}}
             |> Transaction.fromTxSkeleton
-
+        
         let tx = {tx with witnesses=[
                                         ContractWitness {
-                                            contractId = ContractId (Version0,Hash.zero)
-                                            command = ""
-                                            messageBody = None
+                                            contractId = contractId
+                                            command = command
+                                            messageBody = messageBody
                                             stateCommitment = NotCommitted
                                             beginInputs=1ul
                                             beginOutputs = 0ul
@@ -691,6 +697,17 @@ let ``sign contract wintess``() =
     let tx:Transaction = Result.get result
 
     let txHash = Transaction.hash tx
+    let messageHash = 
+        {
+            recipient = contractId
+            command = ""
+            body = None
+        }            
+        |> Serialization.Message.hash
+        
+    let msg = 
+        [ txHash; messageHash ]
+        |> Hash.joinHashes
 
     let publicKey = ExtendedKey.derivePath "m/0'" privateKey |> Result.get |> ExtendedKey.getPublicKey |> Result.get
 
@@ -700,7 +717,7 @@ let ``sign contract wintess``() =
     | ContractWitness cw ->
         match cw.signature with
         | Some (publicKey',signature) ->
-            Crypto.verify publicKey signature txHash |> should equal Crypto.Valid
+            Crypto.verify publicKey signature msg |> should equal Crypto.Valid
             publicKey' |> should equal publicKey
         | None ->
             failwith "expected signature"

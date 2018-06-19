@@ -1121,3 +1121,17 @@ module Witnesses  =
         |> List.write serializers Witness.write witnesses
         |> getBuffer
         |> Hash.compute
+
+module Message =
+    let private write ops = fun c ->
+        ContractId.write ops c.recipient
+        >> String.write ops c.command
+        >> Option.write ops Data.write c.body
+
+    let hash contractCommitment =
+        write counters contractCommitment 0ul
+        |> int32
+        |> create
+        |> write serializers contractCommitment
+        |> getBuffer
+        |> Hash.Hash

@@ -1,9 +1,9 @@
 module Consensus.InputValidation.PK
 
 open Consensus
-open Consensus.ValidationError
-open Consensus.Types
-open Consensus.TxSkeleton
+open ValidationError
+open Types
+open TxSkeleton
 open State
 
 module PublicKey = Crypto.PublicKey
@@ -17,7 +17,7 @@ let validate contractState txHash witnesses pkHash inputs =
                 | TxHash -> Some txHash
                 | FollowingWitnesses ->
                     let witnessesHash = Serialization.Witnesses.hash tail
-                    Hash.joinHashes txHash witnessesHash |> Some
+                    Hash.joinHashes [ txHash; witnessesHash ] |> Some
                 | UnknownSigHash _ -> None
 
             match msg with

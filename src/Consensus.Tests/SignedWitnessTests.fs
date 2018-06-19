@@ -99,8 +99,19 @@ let ``contract witness with valid signature``() =
         }
 
     let txHash = Transaction.hash tx
+    let messageHash =
+        {
+            recipient = contractId
+            command = ""
+            body = None
+        }
+        |> Serialization.Message.hash
 
-    let signature = ExtendedKey.sign txHash (snd account) |> Result.get
+    let msg =
+        [ txHash; messageHash ]
+        |> Hash.joinHashes
+
+    let signature = ExtendedKey.sign msg (snd account) |> Result.get
 
     let contractWintess = ContractWitness {
                                               contractId=contractId;
@@ -157,7 +168,7 @@ let ``contract witness with invalid publickey``() =
 
     (result, expected)
     |> shouldEqual
-    
+
 [<Test>]
 let ``contract witness with no signature``() =
     let spend = {asset=Asset.defaultOf contractId;amount=1UL}
@@ -207,11 +218,22 @@ let ``contract witness with unexpcected public key``() =
         }
 
     let txHash = Transaction.hash tx
+    let messageHash =
+        {
+            recipient = contractId
+            command = ""
+            body = None
+        }
+        |> Serialization.Message.hash
+
+    let msg =
+        [ txHash; messageHash ]
+        |> Hash.joinHashes
 
     let key = ExtendedKey.derivePath "m/0'" (snd account) |> Result.get
 
     let publicKey = key |> ExtendedKey.getPublicKey |> Result.get
-    let signature = ExtendedKey.sign txHash key |> Result.get
+    let signature = ExtendedKey.sign msg key |> Result.get
 
     let contractWintess = ContractWitness {
                                               contractId=contractId;
@@ -247,8 +269,19 @@ let ``contract witness with invalid execution cost``() =
         }
 
     let txHash = Transaction.hash tx
+    let messageHash =
+        {
+            recipient = contractId
+            command = ""
+            body = None
+        }
+        |> Serialization.Message.hash
 
-    let signature = ExtendedKey.sign txHash (snd account) |> Result.get
+    let msg =
+        [ txHash; messageHash ]
+        |> Hash.joinHashes
+
+    let signature = ExtendedKey.sign msg (snd account) |> Result.get
 
     let contractWintess = ContractWitness {
                                               contractId=contractId;

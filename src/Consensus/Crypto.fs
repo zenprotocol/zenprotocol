@@ -221,10 +221,10 @@ module KeyPair =
         | Native.Result.Error -> create ()
         | x -> failwithf "Unexpected result %A" x
 
-let sign (SecretKey secretKey) (Hash hash) =
+let sign (SecretKey secretKey) (Hash msg) =
     let signature = Array.create SignatureLength 0uy
 
-    match Native.secp256k1_ecdsa_sign (context, signature, hash, secretKey, System.IntPtr.Zero, System.IntPtr.Zero) with
+    match Native.secp256k1_ecdsa_sign (context, signature, msg, secretKey, System.IntPtr.Zero, System.IntPtr.Zero) with
     | Native.Result.Ok -> Signature.Signature signature
     | x -> failwithf "failed to sign %A" x
 
