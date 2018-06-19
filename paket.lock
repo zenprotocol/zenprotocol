@@ -121,7 +121,7 @@ NUGET
     Zen.FSharp.Compiler.Service (17.0.2)
       System.Collections.Immutable (>= 1.3.1)
       System.Reflection.Metadata (>= 1.4.2)
-    ZFS-Tools (0.0.19)
+    ZFS-Tools (0.0.23)
     ZFStar (0.0.25)
   remote: https://www.myget.org/F/nunit/api/v3/index.json
     NUnit.ConsoleRunner (3.9.0-dev-04001)
@@ -131,7 +131,7 @@ NUGET
     zen_z3_linux (4.5.1.8-v1f29cebd4df)
     zen_z3_osx (4.5.1.8-v1f29cebd4df6)
     zen_z3_windows (4.5.1.7-v1f29cebd4df)
-    Zulib (0.3.33)
+    Zulib (0.3.35)
       BouncyCastle
       FAKE (>= 4.0 < 5.0)
       FsBech32 (>= 0.1.0.7)
