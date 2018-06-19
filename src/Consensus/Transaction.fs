@@ -32,7 +32,7 @@ let sign keyPairs initialSigHash tx =
             | TxHash -> txHash
             | FollowingWitnesses ->
                 let witnessesHash = Serialization.Witnesses.hash tx.witnesses
-                Hash.joinHashes txHash witnessesHash
+                Hash.joinHashes [ txHash; witnessesHash ]
             | _ -> failwith "unknown sigHash"
 
         let witness = PKWitness (sigHash, publicKey, Crypto.sign secretKey msg)
