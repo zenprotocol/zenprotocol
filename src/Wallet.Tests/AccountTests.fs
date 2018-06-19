@@ -13,6 +13,7 @@ open Infrastructure
 open Messaging.Services.Wallet
 open Wallet.Serialization
 open Wallet.Types
+open Infrastructure.Result
 
 let chain = Chain.Local
 let chainParams = Chain.localParameters
@@ -670,7 +671,7 @@ let ``sign contract wintess``() =
             txSkeleton
             |> TxSkeleton.addOutput {lock=Contract <| ContractId  (Version0,Hash.zero);spend={asset=Asset.Zen;amount=1UL}}
             |> Transaction.fromTxSkeleton
-        
+
         let tx = {tx with witnesses=[
                                         ContractWitness {
                                             contractId = contractId
@@ -697,15 +698,15 @@ let ``sign contract wintess``() =
     let tx:Transaction = Result.get result
 
     let txHash = Transaction.hash tx
-    let messageHash = 
+    let messageHash =
         {
             recipient = contractId
             command = ""
             body = None
-        }            
+        }
         |> Serialization.Message.hash
-        
-    let msg = 
+
+    let msg =
         [ txHash; messageHash ]
         |> Hash.joinHashes
 
@@ -722,3 +723,28 @@ let ``sign contract wintess``() =
         | None ->
             failwith "expected signature"
     | _ -> failwith "expected contract witness"
+
+[<Test>]
+let ``Typescript testvector``() =
+    let mnemonic = "one one one one one one one one one one one one one one one one one one one one one one one one"
+    let keyPair =
+        ExtendedKey.fromMnemonicPhrase mnemonic
+        >>= ExtendedKey.derivePath "m/44'/258'/0'/0/0"
+        >>= ExtendedKey.getKeyPair
+        |> get
+
+    let input = {txHash = Hash.zero; index=0ul}
+    let output = {lock = PK (Hash.zero);spend= {amount=100UL;asset=Asset.Zen}}
+
+    let tx =
+        {version=Version0;inputs=[Outpoint input];outputs=[output];contract=None;witnesses=[]}
+        |> Transaction.sign [keyPair] TxHash
+
+//    printfn "%A" (Transaction.hash tx)
+//    printfn "%A" (Transaction.toHex tx)
+
+    let expectedTxHash =
+        (Hash.fromString "5d2f27698e1b82569f5aac6e3b17a445953f72d8543b4d0a965e01d04233500d")
+        |> Infrastructure.Result.get
+
+    Transaction.hash tx |> should equal expectedTxHash
