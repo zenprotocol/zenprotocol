@@ -21,7 +21,7 @@ module Arbitrary =
                 let! value =
                     Arb.generate<Prims.string>
                     |> Gen.filter ((<>) null)
-                    |> Gen.filter (fun s -> Seq.length s < 29)
+                    |> Gen.filter (fun s -> Seq.length s <= 32)
                 return SubtypeString value
             }
         static member hash() =
@@ -68,12 +68,7 @@ let ``ContractId created from string should yield expected`` (version : uint32) 
 let ``Asset created from string subtype should yield expected`` (ContractId contractId) (SubtypeString value) =
     let ver, cHash, subType = Zen.Asset.fromSubtypeString contractId value |> unCost
     let expectedVer, expectedCHash = contractId
-    let expectedSubtype =
-        let bom = [| 0xEFuy; 0xBBuy; 0xBFuy |]
-        32 - Array.length value - Array.length bom
-        |> Array.zeroCreate
-        |> Array.append value
-        |> Array.append bom
+    let expectedSubtype = Array.append value <| Array.zeroCreate (32 - Array.length value)
 
     ver = expectedVer
     && cHash = expectedCHash
@@ -84,9 +79,9 @@ let ``Asset created from int subtype should yield expected`` (ContractId contrac
     let ver, cHash, subType = Zen.Asset.fromSubtypeInt contractId i |> unCost
     let expectedVer, expectedCHash = contractId
     let expectedSubtype =
-        let bytes = Infrastructure.BigEndianBitConverter.uint32ToBytes i
-        bytes
-        |> Array.append (Array.zeroCreate (Consensus.Hash.Length - (Array.length bytes)))
+        let bytes = Array.append [|0uy|] <| Infrastructure.BigEndianBitConverter.uint32ToBytes i
+
+        Array.append bytes (Array.zeroCreate (Consensus.Hash.Length - (Array.length bytes)))
 
     ver = expectedVer
     && cHash = expectedCHash

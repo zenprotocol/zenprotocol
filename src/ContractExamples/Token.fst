@@ -9,6 +9,7 @@ module W = Zen.Wallet
 module RT = Zen.ResultT
 module Tx = Zen.TxSkeleton
 module C = Zen.Cost
+module CR = Zen.ContractResult
 
 let buy txSkeleton contractId returnAddress =
   let! contractToken = Zen.Asset.getDefault contractId in
@@ -18,7 +19,8 @@ let buy txSkeleton contractId returnAddress =
     Tx.lockToContract zenAsset amount contractId txSkeleton
     >>= Tx.mint amount contractToken
     >>= Tx.lockToAddress contractToken amount returnAddress in
-  RT.ok @ { tx = txSkeleton; message = None; state = NoChange }
+
+  CR.ofTxSkel txSkeleton
 
 let redeem txSkeleton contractId returnAddress wallet =
   let! contractToken = Zen.Asset.getDefault contractId in
@@ -29,12 +31,7 @@ let redeem txSkeleton contractId returnAddress wallet =
     >>= Tx.lockToAddress zenAsset amount returnAddress
     >>= Tx.fromWallet zenAsset amount contractId wallet in
 
-  let result =
-      match txSkeleton with
-      | Some tx -> Some @ { tx = tx; message = None; state = NoChange }
-      | None -> None in
-
-  RT.ofOption "contract doesn't have enough zens tokens" result
+  CR.ofOptionTxSkel "contract doesn't have enough zens tokens" txSkeleton
 
 let main txSkeleton _ contractId command sender messageBody wallet state =
   let! returnAddress =
@@ -55,5 +52,5 @@ let main txSkeleton _ contractId command sender messageBody wallet state =
     RT.autoFailw "returnAddress is required"
 
 let cf _ _ _ _ _ wallet _ =
-    4 + 64 + 2 + (64 + (64 + (64 + 64 + (Zen.Wallet.size wallet * 128 + 192) + 0)) + 33) + 31
+    4 + 64 + 2 + (64 + (64 + (64 + 64 + (Zen.Wallet.size wallet * 128 + 192) + 3)) + 25) + 31
     |> C.ret #nat
