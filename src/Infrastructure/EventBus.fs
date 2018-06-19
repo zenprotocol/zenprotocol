@@ -31,14 +31,12 @@ module Broker =
                     (broker.subscriber :> System.IDisposable).Dispose ()
 
     let create poller name =
-        // TODO: unlock highwatermark
-
         let publisher = Socket.pub ()
         Options.setSendHighWatermark publisher 0 |> ignore
         Socket.bind publisher (getPublisherAddress name)
 
         let subscriber = Socket.sub ()
-        Options.setSendHighWatermark publisher 0 |> ignore
+        Options.setRecvHighwatermark subscriber 0 |> ignore
         Socket.bind subscriber (getSubscriberAddress name)
         Socket.subscribe subscriber ""
 
@@ -65,7 +63,6 @@ module Subscriber =
 
     let create<'event> name : Subscriber<'event> =
         let subscriber = Socket.sub ()
-
         Options.setRecvHighwatermark subscriber 0 |> ignore
 
         Socket.subscribe subscriber ""

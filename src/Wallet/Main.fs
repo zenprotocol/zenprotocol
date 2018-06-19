@@ -34,8 +34,8 @@ let eventHandler client event dataAccess session accountStatus =
             |> View.fromMempool dataAccess session
             |> Exist
 
-        | BlockRemoved (_,block) ->
-            Account.undoBlock dataAccess session block
+        | BlockRemoved (blockHash,block) ->
+            Account.undoBlock dataAccess session blockHash block
 
             Exist View.empty
 

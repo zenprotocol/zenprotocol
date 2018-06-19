@@ -93,8 +93,10 @@ module Broker =
             | _ -> services
 
         let server = Socket.router ()
-
+        Options.setRecvHighwatermark server 0 |> ignore
+        Options.setSendHighWatermark server 0 |> ignore
         Socket.bind server (getBrokerAddress name)
+
 
         let observer =
             Poller.addSocket poller server
@@ -141,6 +143,8 @@ module Agent =
 
     let create<'command,'request> poller name service =
         let socket = Socket.dealer ()
+        Options.setRecvHighwatermark socket 0 |> ignore
+        Options.setSendHighWatermark socket 0 |> ignore
         Socket.connect socket (getBrokerAddress name)
 
         Message.send socket (Message.Register {service=service})
@@ -171,6 +175,8 @@ module Client =
 
     let create name =
         let client = Socket.dealer ()
+        Options.setRecvHighwatermark client 0 |> ignore
+        Options.setSendHighWatermark client 0 |> ignore
 
         Socket.connect client (getBrokerAddress name)
 

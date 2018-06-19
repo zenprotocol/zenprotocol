@@ -85,7 +85,7 @@ let ``received tokens - block``() =
 
     let tx = {version=Version0;inputs=[];outputs=[output];witnesses=[];contract=None}
 
-    let block = Block.createTemplate chainParams Block.genesisParent 1UL ema ActiveContractSet.empty [tx] Hash.zero
+    let block = Block.createGenesis chainParams [tx] (0UL,0UL)
 
     Account.addBlock dataAccess session (Block.hash block.header) block
 
@@ -119,7 +119,7 @@ let ``tokens spent - block``() =
 
     let tx' = {version=Version0;inputs=[ Outpoint {txHash=txHash; index=0ul}];outputs=[];witnesses=[];contract=None}
 
-    let block = Block.createTemplate chainParams Block.genesisParent 1UL ema ActiveContractSet.empty [tx;tx'] Hash.zero
+    let block = Block.createGenesis chainParams [tx;tx'] (0UL,0UL)
     Account.addBlock dataAccess session (Block.hash block.header) block
 
     balanceShouldBe session Asset.Zen 10UL View.empty
@@ -322,6 +322,7 @@ let ``account sync up``() =
         difficulty = 0ul
         nonce = 0UL,0UL
     }
+    let startBlockHash = Block.hash startBlockHeader
 
     let account = DataAccess.Account.get dataAccess session
 
@@ -352,7 +353,14 @@ let ``account sync up``() =
 
     let blockHash = Block.hash block.header
 
-    Account.sync dataAccess session blockHash block.header (fun _ -> startBlockHeader) (fun _ -> block)
+    Account.sync dataAccess session blockHash block.header (fun hash ->
+        if hash = startBlockHash then
+            startBlockHeader
+        elif hash = blockHash then
+            header
+        else
+            failwithf "invalid block %A" hash
+        ) (fun _ -> block)
 
     let account = DataAccess.Account.get dataAccess session
 
