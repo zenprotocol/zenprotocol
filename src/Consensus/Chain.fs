@@ -25,7 +25,7 @@ type ChainParameters =
 let mainParameters =
     {
         name="main"
-        proofOfWorkLimit=Difficulty.uncompress 0x1d00fffful;
+        proofOfWorkLimit=Difficulty.uncompress 0x1cffff00ul;
         blockInterval=236682UL;
         smoothingFactor=28I;
         maxBlockWeight=1000_000_000I;
@@ -39,7 +39,7 @@ let mainParameters =
 let testParameters =
     {
         name="testnet"
-        proofOfWorkLimit=Difficulty.uncompress 0x1d00fffful; //0x20fffffful;
+        proofOfWorkLimit=Difficulty.uncompress 0x1cffff00ul; //0x20fffffful;
         blockInterval=236682UL;
         smoothingFactor=28I;
         maxBlockWeight=1000_000_000I;

@@ -1,6 +1,7 @@
 module Miner.MiningActor
 
 open Consensus
+open Consensus.Chain
 open Infrastructure
 open FsNetMQ
 open Miner
@@ -23,39 +24,46 @@ let getRandomNonce () =
 
     System.BitConverter.ToUInt64 (array,0)
 
-let create chain busName address =
+let create (chain:ChainParameters) busName address =
     let findNonce client (template:Block) nonce =
         let mutable found = false
-        let mutable attemptsLeft = 10000 // number of attempts before trying to fetch a message
+        let mutable attemptsLeft = 200_000 // number of attempts before trying to fetch a message
 
         let mutable n1 = fst nonce
         let mutable n2 = snd nonce
 
+        let difficulty = Difficulty.uncompress template.header.difficulty
+
+        let headerBytes = Serialization.Header.serialize template.header
+        BigEndianBitConverter.putUInt64 n1 headerBytes 84
+
         while attemptsLeft > 0 && not found do
-            let header =
-                if n1 = UInt64.MaxValue then
-                    n1 <- getRandomNonce()
-                    n2 <- 0UL
 
-                    {template.header with nonce=n1,n2 }
-                else
-                    n2 <- n2 + 1UL
+            if n1 = UInt64.MaxValue then
+                n1 <- getRandomNonce()
+                n2 <- 0UL
 
-                    {template.header with nonce=n1,n2 }
+                BigEndianBitConverter.putUInt64 n1 headerBytes 84
+            else
+                n2 <- n2 + 1UL
 
-            let block = {template with header=header}
+            BigEndianBitConverter.putUInt64 n2 headerBytes 92
 
-            match Block.validateHeader chain header with
-            | Result.Ok _ ->
+            let blockHash = Hash.compute headerBytes
+
+            if blockHash <= difficulty then
                 eventX "New block mined"
                 |> Log.info
 
                 found <- true
 
+                let header = {template.header with nonce=n1,n2 }
+                let block = {template with header=header}
+
                 // We found a block
                 Messaging.Services.Blockchain.validateMinedBlock client block
                 ()
-            | Result.Error _ ->
+            else
                 attemptsLeft <- attemptsLeft - 1
 
         if found then
