@@ -30,7 +30,7 @@ let ``multiple peers connecting to host`` () =
     waitForAcceptedMessage host 100<milliseconds>
     waitForConnectedMessage peer2 100<milliseconds>
 
-[<Test>]
+[<Test;IgnoreAttribute("Too long for CI")>]
 let ``peer reconnect when other peer is down``()=
     let host = startHost ()
     use peer = startPeer ()

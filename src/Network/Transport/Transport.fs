@@ -131,12 +131,12 @@ let private handleInprocMessage socket inproc networkId msg (peers:Peers) =
         | InProcMessage.MemPool {peerId=peerId;txs=txs} ->
             let routingId = RoutingId.fromBytes peerId
             sendToPeer socket inproc peers routingId (Message.MemPool txs)
-        | InProcMessage.GetTransaction {peerId=peerId; txHash=txHash} ->
+        | InProcMessage.GetTransactions {peerId=peerId; txHashes=txHashes} ->
             let routingId = RoutingId.fromBytes peerId
-            sendToPeer socket inproc peers routingId (Message.GetTransaction txHash)
-        | InProcMessage.SendTransaction {peerId=peerId;tx=tx} ->
+            sendToPeer socket inproc peers routingId (Message.GetTransactions txHashes)
+        | InProcMessage.SendTransactions {peerId=peerId;count=count;txs=txs} ->
             let routingId = RoutingId.fromBytes peerId
-            sendToPeer socket inproc peers routingId (Message.Transaction tx)
+            sendToPeer socket inproc peers routingId (Message.Transactions {count=count;txs=txs})
         | InProcMessage.PublishBlock blockHeader ->
             publishMessage socket inproc peers (Message.NewBlock blockHeader)
         | InProcMessage.GetTip peerId ->
@@ -175,8 +175,8 @@ let private handleInprocMessage socket inproc networkId msg (peers:Peers) =
             | None -> peers
         | InProcMessage.GetTipFromAllPeers ->
             publishMessage socket inproc peers Message.GetTip
-        | InProcMessage.PublishTransaction txHash ->
-            publishMessage socket inproc peers <| Message.NewTransaction txHash
+        | InProcMessage.PublishTransactions txHashes ->
+            publishMessage socket inproc peers <| Message.NewTransactions txHashes
         | msg -> failwithf "unexpected inproc msg %A" msg
 
 let private onError error =
@@ -188,8 +188,8 @@ let private onError error =
 let connect transport address  =
     InProcMessage.send transport.inproc (InProcMessage.Connect address)
 
-let publishTransaction transport txHash =
-    InProcMessage.send transport.inproc (InProcMessage.PublishTransaction txHash)
+let publishTransactions transport txHashes =
+    InProcMessage.send transport.inproc (InProcMessage.PublishTransactions txHashes)
 
 let sendAddress transport peerId address =
     InProcMessage.send transport.inproc (InProcMessage.SendAddress {address=address;peerId=peerId})
@@ -209,11 +209,11 @@ let getMemPool transport peerId =
 let sendMemPool transport peerId txHashes =
     InProcMessage.send transport.inproc (InProcMessage.MemPool {peerId=peerId;txs = txHashes})
 
-let getTransaction transport peerId txHash  =
-    InProcMessage.send transport.inproc (InProcMessage.GetTransaction {peerId=peerId;txHash=txHash})
+let getTransactions transport peerId txHashes  =
+    InProcMessage.send transport.inproc (InProcMessage.GetTransactions {peerId=peerId;txHashes=txHashes})
 
-let sendTransaction transport peerId tx =
-    InProcMessage.send transport.inproc (InProcMessage.SendTransaction {peerId=peerId;tx=tx})
+let sendTransactions transport peerId count txs =
+    InProcMessage.send transport.inproc (InProcMessage.SendTransactions {peerId=peerId;count=count;txs=txs})
 
 let sendBlock transport peerId block =
     InProcMessage.send transport.inproc (InProcMessage.SendBlock {peerId=peerId;block=block})

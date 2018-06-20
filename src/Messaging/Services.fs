@@ -28,7 +28,7 @@ module Blockchain =
     type Command =
         | ValidateTransaction of Types.Transaction
         | RequestMemPool of peerId:byte[]
-        | RequestTransaction of peerId:byte[] * txHash:Hash
+        | RequestTransactions of peerId:byte[] * txHashes:Hash list
         | RequestBlock of peerId:byte[] * blockHash:Hash
         | RequestTip of peerId:byte[]
         | HandleMemPool of peerId:byte[] * Hash list
@@ -38,7 +38,7 @@ module Blockchain =
         | ValidateMinedBlock of Types.Block
         | RequestHeaders of peerId:byte[] * startBlockHashes:Hash list * endBlockHash :Hash
         | HandleHeaders of peerId:byte[] * BlockHeader list
-        | HandleNewTransaction of peerId:byte[] * txHash:Hash
+        | HandleNewTransactions of peerId:byte[] * txHashes:Hash list
 
     type Request =
         | ExecuteContract of ContractId * string * Crypto.PublicKey option * data option * TxSkeleton.T
@@ -62,8 +62,8 @@ module Blockchain =
     let requestMemPool client peerId =
         Command.send client serviceName (RequestMemPool peerId)
 
-    let requestTransaction client peerId txHash =
-        Command.send client serviceName (RequestTransaction (peerId,txHash))
+    let requestTransactions client peerId txHashes =
+        Command.send client serviceName (RequestTransactions (peerId,txHashes))
 
     let handleMemPool client peerId txHashes =
         Command.send client serviceName (HandleMemPool (peerId,txHashes))
@@ -136,17 +136,17 @@ module Blockchain =
     let getMempool client =
         GetMempool |> Request.send<Request, (Hash.Hash * Transaction) list> client serviceName
 
-    let handleNewTransaction client peerId txHash =
-        HandleNewTransaction (peerId,txHash)
+    let handleNewTransactions client peerId txHashes =
+        HandleNewTransactions (peerId,txHashes)
         |> Command.send client serviceName
 
 module Network =
     type Command =
         | SendMemPool of peerId:byte[] * Hash list
-        | SendTransaction of peerId:byte[] * Transaction
+        | SendTransactions of peerId:byte[] * Transaction list
         | SendTip of peerId:byte[] * BlockHeader
         | SendBlock of peerId:byte[] * Block
-        | GetTransaction of peerId:byte[] * Hash
+        | GetTransactions of peerId:byte[] * Hash list
         | GetBlock of Hash
         | GetBlockFrom of peerId:byte[] * Hash
         | PublishBlock of BlockHeader

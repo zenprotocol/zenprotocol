@@ -20,12 +20,12 @@ let sendMemPool peerId txHashes =
     let command = Network.SendMemPool (peerId, txHashes)
     Writer([NetworkCommand command],())
 
-let sendTransaction peerId tx =
-    let command = Network.SendTransaction (peerId, tx)
+let sendTransactions peerId txs =
+    let command = Network.SendTransactions (peerId, txs)
     Writer([NetworkCommand command],())
 
-let getTransaction peerId txHash =
-    let command = Network.GetTransaction (peerId, txHash)
+let getTransactions peerId txHashes =
+    let command = Network.GetTransactions (peerId, txHashes)
     Writer([NetworkCommand command],())
 
 let getBlock blockHash =

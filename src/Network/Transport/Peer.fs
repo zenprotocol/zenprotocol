@@ -13,8 +13,8 @@ let version = 0ul;
 
 // TODO: those should come from configuration?
 // For now those are configured for fast unit testing
-let pingInterval = System.TimeSpan.FromSeconds(10.0)
-let pingTimeout = System.TimeSpan.FromSeconds(5.0)
+let pingInterval = System.TimeSpan.FromSeconds(60.0)
+let pingTimeout = System.TimeSpan.FromSeconds(20.0)
 let helloTimeout = System.TimeSpan.FromSeconds(5.0)
 
 type CloseReason =
@@ -173,7 +173,10 @@ let handleConnectingState socket next peer msg =
                 | _ -> ()
 
                 {peer with state=Active; ping=NoPing (getNow ())}
-        | _ ->
+        | msg ->
+            eventX "Expecting HelloAck but got {msg}"
+            >> setField "msg" (sprintf "%A" msg)
+            |> Log.info
             closePeer socket ExpectingHelloAck peer
 
 let handleActiveState socket next peer msg =
@@ -203,8 +206,8 @@ let handleActiveState socket next peer msg =
                 match nonce = nonce with
                 | true -> {peer with ping=NoPing (getNow ())}
                 | false -> peer
-        | Message.Transaction tx ->
-            next (InProcMessage.Transaction tx)
+        | Message.Transactions msg ->
+            next (InProcMessage.Transactions {count=msg.count;txs=msg.txs})
             peer
         | Message.Address address ->
             next (InProcMessage.Address address)
@@ -221,8 +224,8 @@ let handleActiveState socket next peer msg =
         | Message.MemPool txs ->
             next (InProcMessage.MemPool {peerId=(RoutingId.toBytes peer.routingId);txs=txs})
             peer
-        | Message.GetTransaction txHash ->
-            next (InProcMessage.GetTransaction {peerId=(RoutingId.toBytes peer.routingId); txHash=txHash})
+        | Message.GetTransactions txHashes ->
+            next (InProcMessage.GetTransactions {peerId=(RoutingId.toBytes peer.routingId); txHashes=txHashes})
             peer
         | Message.GetBlock blockHash ->
             next (InProcMessage.BlockRequest {peerId=(RoutingId.toBytes peer.routingId); blockHash=blockHash})
@@ -249,8 +252,8 @@ let handleActiveState socket next peer msg =
         | Message.Headers headers ->
             next (InProcMessage.Headers {peerId=(RoutingId.toBytes peer.routingId);headers=headers})
             peer
-        | Message.NewTransaction txHash ->
-            next (InProcMessage.NewTransaction {peerId=(RoutingId.toBytes peer.routingId);txHash=txHash})
+        | Message.NewTransactions txHashes ->
+            next (InProcMessage.NewTransactions {peerId=(RoutingId.toBytes peer.routingId);txHashes=txHashes})
             peer
         | msg ->
             // TODO: unexpected msg, close peer

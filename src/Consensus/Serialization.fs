@@ -179,7 +179,7 @@ module Serialization =
         }
 
     module Seq =
-        let private writeBody ops writerFn =
+        let writeBody ops writerFn =
             let write writerFn seq stream =
                 let aux stream item = writerFn ops item stream
                 seq |> Seq.fold aux stream
@@ -188,10 +188,14 @@ module Serialization =
         let write ops writerFn seq =
             VarInt.write ops (Seq.length seq |> uint32)
             >> writeBody ops writerFn seq
-        let read readerFn = reader {
-            let! length = VarInt.read
+
+        let readBody length readerFn = reader {
             for _ in [1..int length] do
                 yield! readerFn
+        }
+        let read readerFn = reader {
+            let! length = VarInt.read
+            return! readBody length readerFn
         }
 
     module List =
@@ -1078,6 +1082,19 @@ module Transaction =
     let deserialize mode bytes =
         Stream (bytes, 0)
         |> run (Transaction.read mode)
+
+module Transactions =
+    let serialize mode txs =
+        Seq.writeBody counters (Transaction.write mode) txs 0ul
+        |> int32
+        |> create
+        |> Seq.writeBody serializers (Transaction.write mode) txs
+        |> getBuffer
+
+    let deserialize mode count bytes =
+        Stream (bytes, 0)
+        |> run (Seq.readBody count (Transaction.read mode))
+        |> Option.map List.ofSeq
 
 module Header =
     let serialize header =
