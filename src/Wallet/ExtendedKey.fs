@@ -35,6 +35,13 @@ let getPrivateKey extendedKey =
         privateKey.PrivateKey.ToBytes() |> SecretKey |> Ok
     | _ -> Error "underlying key mismatch"
 
+let getKeyPair extendedKey =
+    getPrivateKey extendedKey
+    >>= (fun privKey ->
+        SecretKey.getPublicKey privKey
+        |> Option.map (fun pubKey -> privKey,pubKey)
+        |> Infrastructure.Result.ofOption "invalid secretKey")
+
 let Hardened = (+) 0x80000000
 let private isHardened i = i < 0
 

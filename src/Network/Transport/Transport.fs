@@ -274,6 +274,8 @@ let create listen bind networkId =
         use observer = Poller.registerEndMessage poller shim
 
         use socket = Socket.peer ()
+        Options.setRecvHighwatermark socket 10000 |> ignore
+        Options.setSendHighWatermark socket 10000 |> ignore
         if listen then
             eventX "Listening on {bind}"
             >> setField "bind" bind

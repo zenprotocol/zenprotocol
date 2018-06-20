@@ -13,6 +13,7 @@ open Infrastructure
 open Messaging.Services.Wallet
 open Wallet.Serialization
 open Wallet.Types
+open Infrastructure.Result
 
 let chain = Chain.Local
 let chainParams = Chain.localParameters
@@ -84,7 +85,7 @@ let ``received tokens - block``() =
 
     let tx = {version=Version0;inputs=[];outputs=[output];witnesses=[];contract=None}
 
-    let block = Block.createTemplate chainParams Block.genesisParent 1UL ema ActiveContractSet.empty [tx] Hash.zero
+    let block = Block.createGenesis chainParams [tx] (0UL,0UL)
 
     Account.addBlock dataAccess session (Block.hash block.header) block
 
@@ -118,7 +119,7 @@ let ``tokens spent - block``() =
 
     let tx' = {version=Version0;inputs=[ Outpoint {txHash=txHash; index=0ul}];outputs=[];witnesses=[];contract=None}
 
-    let block = Block.createTemplate chainParams Block.genesisParent 1UL ema ActiveContractSet.empty [tx;tx'] Hash.zero
+    let block = Block.createGenesis chainParams [tx;tx'] (0UL,0UL)
     Account.addBlock dataAccess session (Block.hash block.header) block
 
     balanceShouldBe session Asset.Zen 10UL View.empty
@@ -321,6 +322,7 @@ let ``account sync up``() =
         difficulty = 0ul
         nonce = 0UL,0UL
     }
+    let startBlockHash = Block.hash startBlockHeader
 
     let account = DataAccess.Account.get dataAccess session
 
@@ -351,7 +353,14 @@ let ``account sync up``() =
 
     let blockHash = Block.hash block.header
 
-    Account.sync dataAccess session blockHash block.header (fun _ -> startBlockHeader) (fun _ -> block)
+    Account.sync dataAccess session blockHash block.header (fun hash ->
+        if hash = startBlockHash then
+            startBlockHeader
+        elif hash = blockHash then
+            header
+        else
+            failwithf "invalid block %A" hash
+        ) (fun _ -> block)
 
     let account = DataAccess.Account.get dataAccess session
 
@@ -670,7 +679,7 @@ let ``sign contract wintess``() =
             txSkeleton
             |> TxSkeleton.addOutput {lock=Contract <| ContractId  (Version0,Hash.zero);spend={asset=Asset.Zen;amount=1UL}}
             |> Transaction.fromTxSkeleton
-        
+
         let tx = {tx with witnesses=[
                                         ContractWitness {
                                             contractId = contractId
@@ -697,15 +706,15 @@ let ``sign contract wintess``() =
     let tx:Transaction = Result.get result
 
     let txHash = Transaction.hash tx
-    let messageHash = 
+    let messageHash =
         {
             recipient = contractId
             command = ""
             body = None
-        }            
+        }
         |> Serialization.Message.hash
-        
-    let msg = 
+
+    let msg =
         [ txHash; messageHash ]
         |> Hash.joinHashes
 
@@ -722,3 +731,28 @@ let ``sign contract wintess``() =
         | None ->
             failwith "expected signature"
     | _ -> failwith "expected contract witness"
+
+[<Test>]
+let ``Typescript testvector``() =
+    let mnemonic = "one one one one one one one one one one one one one one one one one one one one one one one one"
+    let keyPair =
+        ExtendedKey.fromMnemonicPhrase mnemonic
+        >>= ExtendedKey.derivePath "m/44'/258'/0'/0/0"
+        >>= ExtendedKey.getKeyPair
+        |> get
+
+    let input = {txHash = Hash.zero; index=0ul}
+    let output = {lock = PK (Hash.zero);spend= {amount=100UL;asset=Asset.Zen}}
+
+    let tx =
+        {version=Version0;inputs=[Outpoint input];outputs=[output];contract=None;witnesses=[]}
+        |> Transaction.sign [keyPair] TxHash
+
+//    printfn "%A" (Transaction.hash tx)
+//    printfn "%A" (Transaction.toHex tx)
+
+    let expectedTxHash =
+        (Hash.fromString "5d2f27698e1b82569f5aac6e3b17a445953f72d8543b4d0a965e01d04233500d")
+        |> Infrastructure.Result.get
+
+    Transaction.hash tx |> should equal expectedTxHash
