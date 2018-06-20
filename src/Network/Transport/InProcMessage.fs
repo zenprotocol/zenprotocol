@@ -15,7 +15,7 @@ let AcceptedMessageId = 3uy
 [<LiteralAttribute>]
 let DisconnectedMessageId = 4uy
 [<LiteralAttribute>]
-let TransactionMessageId = 10uy
+let TransactionsMessageId = 10uy
 [<LiteralAttribute>]
 let SendAddressMessageId = 11uy
 [<LiteralAttribute>]
@@ -31,9 +31,9 @@ let GetMemPoolMessageId = 16uy
 [<LiteralAttribute>]
 let MemPoolMessageId = 17uy
 [<LiteralAttribute>]
-let GetTransactionMessageId = 18uy
+let GetTransactionsMessageId = 18uy
 [<LiteralAttribute>]
-let SendTransactionMessageId = 19uy
+let SendTransactionsMessageId = 19uy
 [<LiteralAttribute>]
 let BlockMessageId = 20uy
 [<LiteralAttribute>]
@@ -67,9 +67,9 @@ let HeadersMessageId = 34uy
 [<LiteralAttribute>]
 let DisconnectPeerMessageId = 35uy
 [<LiteralAttribute>]
-let PublishTransactionMessageId = 36uy
+let PublishTransactionsMessageId = 36uy
 [<LiteralAttribute>]
-let NewTransactionMessageId = 37uy
+let NewTransactionsMessageId = 37uy
 [<LiteralAttribute>]
 let GetTipFromAllPeersMessageId = 38uy
 
@@ -87,8 +87,10 @@ type Accepted =
 type Disconnected =
         string
 
-type Transaction =
-        byte[]
+type Transactions = {
+        count : uint32
+        txs : byte[]
+    }
 
 type SendAddress = {
         peerId : byte[]
@@ -117,14 +119,15 @@ type MemPool = {
         txs : byte[]
     }
 
-type GetTransaction = {
+type GetTransactions = {
         peerId : byte[]
-        txHash : byte[]
+        txHashes : byte[]
     }
 
-type SendTransaction = {
+type SendTransactions = {
         peerId : byte[]
-        tx : byte[]
+        count : uint32
+        txs : byte[]
     }
 
 type Block = {
@@ -199,12 +202,12 @@ type Headers = {
 type DisconnectPeer =
         byte[]
 
-type PublishTransaction =
+type PublishTransactions =
         byte[]
 
-type NewTransaction = {
+type NewTransactions = {
         peerId : byte[]
-        txHash : byte[]
+        txHashes : byte[]
     }
 
 
@@ -213,7 +216,7 @@ type T =
     | Connected of Connected
     | Accepted of Accepted
     | Disconnected of Disconnected
-    | Transaction of Transaction
+    | Transactions of Transactions
     | SendAddress of SendAddress
     | Address of Address
     | GetAddresses of GetAddresses
@@ -221,8 +224,8 @@ type T =
     | SendAddresses of SendAddresses
     | GetMemPool of GetMemPool
     | MemPool of MemPool
-    | GetTransaction of GetTransaction
-    | SendTransaction of SendTransaction
+    | GetTransactions of GetTransactions
+    | SendTransactions of SendTransactions
     | Block of Block
     | Tip of Tip
     | PublishBlock of PublishBlock
@@ -239,8 +242,8 @@ type T =
     | SendHeaders of SendHeaders
     | Headers of Headers
     | DisconnectPeer of DisconnectPeer
-    | PublishTransaction of PublishTransaction
-    | NewTransaction of NewTransaction
+    | PublishTransactions of PublishTransactions
+    | NewTransactions of NewTransactions
     | GetTipFromAllPeers
 
 module Connect =
@@ -314,21 +317,30 @@ module Disconnected =
             return msg
         }
 
-module Transaction =
-    let getMessageSize (msg:Transaction) =
-            4 + Array.length msg
 
-    let write (msg:Transaction) stream =
+module Transactions =
+    let getMessageSize (msg:Transactions) =
+        0 +
+            4 +
+            4 + Array.length msg.txs +
+            0
+
+    let write (msg:Transactions) stream =
         stream
-        |> Stream.writeNumber4 (uint32 (Array.length msg))
-        |> Stream.writeBytes msg (Array.length msg)
+        |> Stream.writeNumber4 msg.count
+        |> Stream.writeNumber4 (uint32 (Array.length msg.txs))
+        |> Stream.writeBytes msg.txs (Array.length msg.txs)
 
     let read =
         reader {
-            let! msgLength = Stream.readNumber4
-            let! msg = Stream.readBytes (int msgLength)
+            let! count = Stream.readNumber4
+            let! txsLength = Stream.readNumber4
+            let! txs = Stream.readBytes (int txsLength)
 
-            return msg
+            return ({
+                        count = count;
+                        txs = txs;
+                    }: Transactions)
         }
 
 
@@ -471,56 +483,61 @@ module MemPool =
         }
 
 
-module GetTransaction =
+module GetTransactions =
     let peerIdSize = 4
-    let txHashSize = 32
-    let getMessageSize (msg:GetTransaction) =
+    let getMessageSize (msg:GetTransactions) =
         0 +
             4 +
-            32 +
+            4 + Array.length msg.txHashes +
             0
 
-    let write (msg:GetTransaction) stream =
+    let write (msg:GetTransactions) stream =
         stream
         |> Stream.writeBytes msg.peerId 4
-        |> Stream.writeBytes msg.txHash 32
+        |> Stream.writeNumber4 (uint32 (Array.length msg.txHashes))
+        |> Stream.writeBytes msg.txHashes (Array.length msg.txHashes)
 
     let read =
         reader {
             let! peerId = Stream.readBytes 4
-            let! txHash = Stream.readBytes 32
+            let! txHashesLength = Stream.readNumber4
+            let! txHashes = Stream.readBytes (int txHashesLength)
 
             return ({
                         peerId = peerId;
-                        txHash = txHash;
-                    }: GetTransaction)
+                        txHashes = txHashes;
+                    }: GetTransactions)
         }
 
 
-module SendTransaction =
+module SendTransactions =
     let peerIdSize = 4
-    let getMessageSize (msg:SendTransaction) =
+    let getMessageSize (msg:SendTransactions) =
         0 +
             4 +
-            4 + Array.length msg.tx +
+            4 +
+            4 + Array.length msg.txs +
             0
 
-    let write (msg:SendTransaction) stream =
+    let write (msg:SendTransactions) stream =
         stream
         |> Stream.writeBytes msg.peerId 4
-        |> Stream.writeNumber4 (uint32 (Array.length msg.tx))
-        |> Stream.writeBytes msg.tx (Array.length msg.tx)
+        |> Stream.writeNumber4 msg.count
+        |> Stream.writeNumber4 (uint32 (Array.length msg.txs))
+        |> Stream.writeBytes msg.txs (Array.length msg.txs)
 
     let read =
         reader {
             let! peerId = Stream.readBytes 4
-            let! txLength = Stream.readNumber4
-            let! tx = Stream.readBytes (int txLength)
+            let! count = Stream.readNumber4
+            let! txsLength = Stream.readNumber4
+            let! txs = Stream.readBytes (int txsLength)
 
             return ({
                         peerId = peerId;
-                        tx = tx;
-                    }: SendTransaction)
+                        count = count;
+                        txs = txs;
+                    }: SendTransactions)
         }
 
 
@@ -904,52 +921,54 @@ module DisconnectPeer =
             return msg
         }
 
-module PublishTransaction =
-    let txHashSize = 32
-    let getMessageSize (msg:PublishTransaction) =
-            32
+module PublishTransactions =
+    let getMessageSize (msg:PublishTransactions) =
+            4 + Array.length msg
 
-    let write (msg:PublishTransaction) stream =
+    let write (msg:PublishTransactions) stream =
         stream
-        |> Stream.writeBytes msg 32
+        |> Stream.writeNumber4 (uint32 (Array.length msg))
+        |> Stream.writeBytes msg (Array.length msg)
 
     let read =
         reader {
-            let! msg = Stream.readBytes 32
+            let! msgLength = Stream.readNumber4
+            let! msg = Stream.readBytes (int msgLength)
 
             return msg
         }
 
 
-module NewTransaction =
+module NewTransactions =
     let peerIdSize = 4
-    let txHashSize = 32
-    let getMessageSize (msg:NewTransaction) =
+    let getMessageSize (msg:NewTransactions) =
         0 +
             4 +
-            32 +
+            4 + Array.length msg.txHashes +
             0
 
-    let write (msg:NewTransaction) stream =
+    let write (msg:NewTransactions) stream =
         stream
         |> Stream.writeBytes msg.peerId 4
-        |> Stream.writeBytes msg.txHash 32
+        |> Stream.writeNumber4 (uint32 (Array.length msg.txHashes))
+        |> Stream.writeBytes msg.txHashes (Array.length msg.txHashes)
 
     let read =
         reader {
             let! peerId = Stream.readBytes 4
-            let! txHash = Stream.readBytes 32
+            let! txHashesLength = Stream.readNumber4
+            let! txHashes = Stream.readBytes (int txHashesLength)
 
             return ({
                         peerId = peerId;
-                        txHash = txHash;
-                    }: NewTransaction)
+                        txHashes = txHashes;
+                    }: NewTransactions)
         }
 
 
 let private decode stream =
     let readMessage messageId stream =
-            match messageId with
+        match messageId with
         | ConnectMessageId ->
             match Connect.read stream with
             | None,stream -> None,stream
@@ -966,10 +985,10 @@ let private decode stream =
             match Disconnected.read stream with
             | None,stream -> None,stream
             | Some msg, stream -> Some (Disconnected msg), stream
-        | TransactionMessageId ->
-            match Transaction.read stream with
+        | TransactionsMessageId ->
+            match Transactions.read stream with
             | None,stream -> None,stream
-            | Some msg, stream -> Some (Transaction msg), stream
+            | Some msg, stream -> Some (Transactions msg), stream
         | SendAddressMessageId ->
             match SendAddress.read stream with
             | None,stream -> None,stream
@@ -998,14 +1017,14 @@ let private decode stream =
             match MemPool.read stream with
             | None,stream -> None,stream
             | Some msg, stream -> Some (MemPool msg), stream
-        | GetTransactionMessageId ->
-            match GetTransaction.read stream with
+        | GetTransactionsMessageId ->
+            match GetTransactions.read stream with
             | None,stream -> None,stream
-            | Some msg, stream -> Some (GetTransaction msg), stream
-        | SendTransactionMessageId ->
-            match SendTransaction.read stream with
+            | Some msg, stream -> Some (GetTransactions msg), stream
+        | SendTransactionsMessageId ->
+            match SendTransactions.read stream with
             | None,stream -> None,stream
-            | Some msg, stream -> Some (SendTransaction msg), stream
+            | Some msg, stream -> Some (SendTransactions msg), stream
         | BlockMessageId ->
             match Block.read stream with
             | None,stream -> None,stream
@@ -1070,14 +1089,14 @@ let private decode stream =
             match DisconnectPeer.read stream with
             | None,stream -> None,stream
             | Some msg, stream -> Some (DisconnectPeer msg), stream
-        | PublishTransactionMessageId ->
-            match PublishTransaction.read stream with
+        | PublishTransactionsMessageId ->
+            match PublishTransactions.read stream with
             | None,stream -> None,stream
-            | Some msg, stream -> Some (PublishTransaction msg), stream
-        | NewTransactionMessageId ->
-            match NewTransaction.read stream with
+            | Some msg, stream -> Some (PublishTransactions msg), stream
+        | NewTransactionsMessageId ->
+            match NewTransactions.read stream with
             | None,stream -> None,stream
-            | Some msg, stream -> Some (NewTransaction msg), stream
+            | Some msg, stream -> Some (NewTransactions msg), stream
         | GetTipFromAllPeersMessageId ->
             Some GetTipFromAllPeers, stream
         | _ -> None, stream
@@ -1115,7 +1134,7 @@ let send socket msg =
         | Connected msg -> Connected.write msg
         | Accepted msg -> Accepted.write msg
         | Disconnected msg -> Disconnected.write msg
-        | Transaction msg -> Transaction.write msg
+        | Transactions msg -> Transactions.write msg
         | SendAddress msg -> SendAddress.write msg
         | Address msg -> Address.write msg
         | GetAddresses msg -> GetAddresses.write msg
@@ -1123,8 +1142,8 @@ let send socket msg =
         | SendAddresses msg -> SendAddresses.write msg
         | GetMemPool msg -> GetMemPool.write msg
         | MemPool msg -> MemPool.write msg
-        | GetTransaction msg -> GetTransaction.write msg
-        | SendTransaction msg -> SendTransaction.write msg
+        | GetTransactions msg -> GetTransactions.write msg
+        | SendTransactions msg -> SendTransactions.write msg
         | Block msg -> Block.write msg
         | Tip msg -> Tip.write msg
         | PublishBlock msg -> PublishBlock.write msg
@@ -1141,8 +1160,8 @@ let send socket msg =
         | SendHeaders msg -> SendHeaders.write msg
         | Headers msg -> Headers.write msg
         | DisconnectPeer msg -> DisconnectPeer.write msg
-        | PublishTransaction msg -> PublishTransaction.write msg
-        | NewTransaction msg -> NewTransaction.write msg
+        | PublishTransactions msg -> PublishTransactions.write msg
+        | NewTransactions msg -> NewTransactions.write msg
         | GetTipFromAllPeers -> id
 
     let messageId =
@@ -1151,7 +1170,7 @@ let send socket msg =
         | Connected _ -> ConnectedMessageId
         | Accepted _ -> AcceptedMessageId
         | Disconnected _ -> DisconnectedMessageId
-        | Transaction _ -> TransactionMessageId
+        | Transactions _ -> TransactionsMessageId
         | SendAddress _ -> SendAddressMessageId
         | Address _ -> AddressMessageId
         | GetAddresses _ -> GetAddressesMessageId
@@ -1159,8 +1178,8 @@ let send socket msg =
         | SendAddresses _ -> SendAddressesMessageId
         | GetMemPool _ -> GetMemPoolMessageId
         | MemPool _ -> MemPoolMessageId
-        | GetTransaction _ -> GetTransactionMessageId
-        | SendTransaction _ -> SendTransactionMessageId
+        | GetTransactions _ -> GetTransactionsMessageId
+        | SendTransactions _ -> SendTransactionsMessageId
         | Block _ -> BlockMessageId
         | Tip _ -> TipMessageId
         | PublishBlock _ -> PublishBlockMessageId
@@ -1177,8 +1196,8 @@ let send socket msg =
         | SendHeaders _ -> SendHeadersMessageId
         | Headers _ -> HeadersMessageId
         | DisconnectPeer _ -> DisconnectPeerMessageId
-        | PublishTransaction _ -> PublishTransactionMessageId
-        | NewTransaction _ -> NewTransactionMessageId
+        | PublishTransactions _ -> PublishTransactionsMessageId
+        | NewTransactions _ -> NewTransactionsMessageId
         | GetTipFromAllPeers _ -> GetTipFromAllPeersMessageId
 
     let messageSize =
@@ -1187,7 +1206,7 @@ let send socket msg =
         | Connected msg -> Connected.getMessageSize msg
         | Accepted msg -> Accepted.getMessageSize msg
         | Disconnected msg -> Disconnected.getMessageSize msg
-        | Transaction msg -> Transaction.getMessageSize msg
+        | Transactions msg -> Transactions.getMessageSize msg
         | SendAddress msg -> SendAddress.getMessageSize msg
         | Address msg -> Address.getMessageSize msg
         | GetAddresses msg -> GetAddresses.getMessageSize msg
@@ -1195,8 +1214,8 @@ let send socket msg =
         | SendAddresses msg -> SendAddresses.getMessageSize msg
         | GetMemPool msg -> GetMemPool.getMessageSize msg
         | MemPool msg -> MemPool.getMessageSize msg
-        | GetTransaction msg -> GetTransaction.getMessageSize msg
-        | SendTransaction msg -> SendTransaction.getMessageSize msg
+        | GetTransactions msg -> GetTransactions.getMessageSize msg
+        | SendTransactions msg -> SendTransactions.getMessageSize msg
         | Block msg -> Block.getMessageSize msg
         | Tip msg -> Tip.getMessageSize msg
         | PublishBlock msg -> PublishBlock.getMessageSize msg
@@ -1213,8 +1232,8 @@ let send socket msg =
         | SendHeaders msg -> SendHeaders.getMessageSize msg
         | Headers msg -> Headers.getMessageSize msg
         | DisconnectPeer msg -> DisconnectPeer.getMessageSize msg
-        | PublishTransaction msg -> PublishTransaction.getMessageSize msg
-        | NewTransaction msg -> NewTransaction.getMessageSize msg
+        | PublishTransactions msg -> PublishTransactions.getMessageSize msg
+        | NewTransactions msg -> NewTransactions.getMessageSize msg
         | GetTipFromAllPeers -> 0
 
     //  Signature + message ID + message size

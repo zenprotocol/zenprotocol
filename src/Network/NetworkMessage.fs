@@ -15,9 +15,9 @@ let PingMessageId = 3uy
 [<LiteralAttribute>]
 let PongMessageId = 4uy
 [<LiteralAttribute>]
-let NewTransactionMessageId = 5uy
+let NewTransactionsMessageId = 5uy
 [<LiteralAttribute>]
-let TransactionMessageId = 6uy
+let TransactionsMessageId = 6uy
 [<LiteralAttribute>]
 let AddressMessageId = 7uy
 [<LiteralAttribute>]
@@ -29,7 +29,7 @@ let GetMemPoolMessageId = 10uy
 [<LiteralAttribute>]
 let MemPoolMessageId = 11uy
 [<LiteralAttribute>]
-let GetTransactionMessageId = 12uy
+let GetTransactionsMessageId = 12uy
 [<LiteralAttribute>]
 let GetBlockMessageId = 13uy
 [<LiteralAttribute>]
@@ -67,11 +67,13 @@ type Ping =
 type Pong =
         uint32
 
-type NewTransaction =
+type NewTransactions =
         byte[]
 
-type Transaction =
-        byte[]
+type Transactions = {
+        count : uint32
+        txs : byte[]
+    }
 
 type Address =
         string
@@ -84,7 +86,7 @@ type Addresses =
 type MemPool =
         byte[]
 
-type GetTransaction =
+type GetTransactions =
         byte[]
 
 type GetBlock =
@@ -118,14 +120,14 @@ type T =
     | HelloAck of HelloAck
     | Ping of Ping
     | Pong of Pong
-    | NewTransaction of NewTransaction
-    | Transaction of Transaction
+    | NewTransactions of NewTransactions
+    | Transactions of Transactions
     | Address of Address
     | GetAddresses
     | Addresses of Addresses
     | GetMemPool
     | MemPool of MemPool
-    | GetTransaction of GetTransaction
+    | GetTransactions of GetTransactions
     | GetBlock of GetBlock
     | Block of Block
     | GetTip
@@ -215,27 +217,11 @@ module Pong =
             return msg
         }
 
-module NewTransaction =
-    let txHashSize = 32
-    let getMessageSize (msg:NewTransaction) =
-            32
-
-    let write (msg:NewTransaction) stream =
-        stream
-        |> Stream.writeBytes msg 32
-
-    let read =
-        reader {
-            let! msg = Stream.readBytes 32
-
-            return msg
-        }
-
-module Transaction =
-    let getMessageSize (msg:Transaction) =
+module NewTransactions =
+    let getMessageSize (msg:NewTransactions) =
             4 + Array.length msg
 
-    let write (msg:Transaction) stream =
+    let write (msg:NewTransactions) stream =
         stream
         |> Stream.writeNumber4 (uint32 (Array.length msg))
         |> Stream.writeBytes msg (Array.length msg)
@@ -246,6 +232,32 @@ module Transaction =
             let! msg = Stream.readBytes (int msgLength)
 
             return msg
+        }
+
+
+module Transactions =
+    let getMessageSize (msg:Transactions) =
+        0 +
+            4 +
+            4 + Array.length msg.txs +
+            0
+
+    let write (msg:Transactions) stream =
+        stream
+        |> Stream.writeNumber4 msg.count
+        |> Stream.writeNumber4 (uint32 (Array.length msg.txs))
+        |> Stream.writeBytes msg.txs (Array.length msg.txs)
+
+    let read =
+        reader {
+            let! count = Stream.readNumber4
+            let! txsLength = Stream.readNumber4
+            let! txs = Stream.readBytes (int txsLength)
+
+            return ({
+                        count = count;
+                        txs = txs;
+                    }: Transactions)
         }
 
 module Address =
@@ -295,18 +307,19 @@ module MemPool =
             return msg
         }
 
-module GetTransaction =
-    let txHashSize = 32
-    let getMessageSize (msg:GetTransaction) =
-            32
+module GetTransactions =
+    let getMessageSize (msg:GetTransactions) =
+            4 + Array.length msg
 
-    let write (msg:GetTransaction) stream =
+    let write (msg:GetTransactions) stream =
         stream
-        |> Stream.writeBytes msg 32
+        |> Stream.writeNumber4 (uint32 (Array.length msg))
+        |> Stream.writeBytes msg (Array.length msg)
 
     let read =
         reader {
-            let! msg = Stream.readBytes 32
+            let! msgLength = Stream.readNumber4
+            let! msg = Stream.readBytes (int msgLength)
 
             return msg
         }
@@ -438,7 +451,7 @@ module UnknownMessage =
 
 let private decode stream =
     let readMessage messageId stream =
-            match messageId with
+        match messageId with
         | HelloMessageId ->
             match Hello.read stream with
             | None,stream -> None,stream
@@ -455,14 +468,14 @@ let private decode stream =
             match Pong.read stream with
             | None,stream -> None,stream
             | Some msg, stream -> Some (Pong msg), stream
-        | NewTransactionMessageId ->
-            match NewTransaction.read stream with
+        | NewTransactionsMessageId ->
+            match NewTransactions.read stream with
             | None,stream -> None,stream
-            | Some msg, stream -> Some (NewTransaction msg), stream
-        | TransactionMessageId ->
-            match Transaction.read stream with
+            | Some msg, stream -> Some (NewTransactions msg), stream
+        | TransactionsMessageId ->
+            match Transactions.read stream with
             | None,stream -> None,stream
-            | Some msg, stream -> Some (Transaction msg), stream
+            | Some msg, stream -> Some (Transactions msg), stream
         | AddressMessageId ->
             match Address.read stream with
             | None,stream -> None,stream
@@ -479,10 +492,10 @@ let private decode stream =
             match MemPool.read stream with
             | None,stream -> None,stream
             | Some msg, stream -> Some (MemPool msg), stream
-        | GetTransactionMessageId ->
-            match GetTransaction.read stream with
+        | GetTransactionsMessageId ->
+            match GetTransactions.read stream with
             | None,stream -> None,stream
-            | Some msg, stream -> Some (GetTransaction msg), stream
+            | Some msg, stream -> Some (GetTransactions msg), stream
         | GetBlockMessageId ->
             match GetBlock.read stream with
             | None,stream -> None,stream
@@ -552,14 +565,14 @@ let send socket msg =
         | HelloAck msg -> HelloAck.write msg
         | Ping msg -> Ping.write msg
         | Pong msg -> Pong.write msg
-        | NewTransaction msg -> NewTransaction.write msg
-        | Transaction msg -> Transaction.write msg
+        | NewTransactions msg -> NewTransactions.write msg
+        | Transactions msg -> Transactions.write msg
         | Address msg -> Address.write msg
         | GetAddresses -> id
         | Addresses msg -> Addresses.write msg
         | GetMemPool -> id
         | MemPool msg -> MemPool.write msg
-        | GetTransaction msg -> GetTransaction.write msg
+        | GetTransactions msg -> GetTransactions.write msg
         | GetBlock msg -> GetBlock.write msg
         | Block msg -> Block.write msg
         | GetTip -> id
@@ -577,14 +590,14 @@ let send socket msg =
         | HelloAck _ -> HelloAckMessageId
         | Ping _ -> PingMessageId
         | Pong _ -> PongMessageId
-        | NewTransaction _ -> NewTransactionMessageId
-        | Transaction _ -> TransactionMessageId
+        | NewTransactions _ -> NewTransactionsMessageId
+        | Transactions _ -> TransactionsMessageId
         | Address _ -> AddressMessageId
         | GetAddresses _ -> GetAddressesMessageId
         | Addresses _ -> AddressesMessageId
         | GetMemPool _ -> GetMemPoolMessageId
         | MemPool _ -> MemPoolMessageId
-        | GetTransaction _ -> GetTransactionMessageId
+        | GetTransactions _ -> GetTransactionsMessageId
         | GetBlock _ -> GetBlockMessageId
         | Block _ -> BlockMessageId
         | GetTip _ -> GetTipMessageId
@@ -602,14 +615,14 @@ let send socket msg =
         | HelloAck msg -> HelloAck.getMessageSize msg
         | Ping msg -> Ping.getMessageSize msg
         | Pong msg -> Pong.getMessageSize msg
-        | NewTransaction msg -> NewTransaction.getMessageSize msg
-        | Transaction msg -> Transaction.getMessageSize msg
+        | NewTransactions msg -> NewTransactions.getMessageSize msg
+        | Transactions msg -> Transactions.getMessageSize msg
         | Address msg -> Address.getMessageSize msg
         | GetAddresses -> 0
         | Addresses msg -> Addresses.getMessageSize msg
         | GetMemPool -> 0
         | MemPool msg -> MemPool.getMessageSize msg
-        | GetTransaction msg -> GetTransaction.getMessageSize msg
+        | GetTransactions msg -> GetTransactions.getMessageSize msg
         | GetBlock msg -> GetBlock.getMessageSize msg
         | Block msg -> Block.getMessageSize msg
         | GetTip -> 0

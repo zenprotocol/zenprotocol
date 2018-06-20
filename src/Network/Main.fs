@@ -17,19 +17,23 @@ open Network.Transport
 open Serialization
 open Consensus.Chain
 open Logary.Message
+open Network
+open Network
+open Network
+open Network
 
-type State = Connector.T * AddressBook.T * string option
+type State = Connector.T * AddressBook.T * TransactionPublisher.T * string option
 
 let maxConnections = 10
 
-let eventHandler transport event (connector,addressBook, ownAddress) =
+let eventHandler transport event (connector,addressBook,publisher,ownAddress) =
     match event with
     | Event.TransactionAddedToMemPool (txHash, tx) ->
-        Transport.publishTransaction transport (Hash.bytes txHash)
-        connector,addressBook,ownAddress
-    | _ -> connector,addressBook,ownAddress
+        let publisher = TransactionPublisher.add txHash publisher
+        connector,addressBook,publisher,ownAddress
+    | _ -> connector,addressBook,publisher,ownAddress
 
-let transportHandler transport seeds client msg (connector,addressBook,ownAddress) =
+let transportHandler transport seeds client msg (connector,addressBook,publisher,ownAddress) =
     let requestAddresses peerId =
          if not (AddressBook.haveEnoughAddresses addressBook) then
             Transport.getAddresses transport peerId
@@ -38,14 +42,15 @@ let transportHandler transport seeds client msg (connector,addressBook,ownAddres
     let requestTip = Transport.getTip transport
 
     match msg with
-    | InProcMessage.Transaction msg ->
-        match Transaction.deserialize Full msg with
-        | Some tx ->
-            Services.Blockchain.validateTransaction client tx
-            connector,addressBook,ownAddress
+    | InProcMessage.Transactions msg ->
+        match Transactions.deserialize Full msg.count msg.txs with
+        | Some txs ->
+            List.iter (Services.Blockchain.validateTransaction client ) txs
+
+            connector,addressBook,publisher,ownAddress
         | None ->
             //TODO: log non-deserializable transaction
-            connector,addressBook,ownAddress
+            connector,addressBook,publisher,ownAddress
     | InProcMessage.Connected {address=address;peerId=peerId} ->
 
         // We just connected to a remote peer, lets send him our address
@@ -61,7 +66,7 @@ let transportHandler transport seeds client msg (connector,addressBook,ownAddres
         if (AddressBook.contains addressBook address) then
             Transport.publishAddress transport address
 
-        (Connector.connected connector address),addressBook,ownAddress
+        (Connector.connected connector address),addressBook,publisher,ownAddress
     | InProcMessage.Accepted peerId ->
 
         // Request addresses and mempool
@@ -69,17 +74,17 @@ let transportHandler transport seeds client msg (connector,addressBook,ownAddres
         requestMemPool peerId
         requestTip peerId
 
-        connector,addressBook,ownAddress
+        connector,addressBook,publisher,ownAddress
     | InProcMessage.Disconnected address ->
         let connector = Connector.disconnected connector address
-        (Connector.connect transport addressBook connector),addressBook,ownAddress
+        (Connector.connect transport addressBook connector),addressBook,publisher,ownAddress
     | InProcMessage.Address address ->
         match Endpoint.isValid address with
         | false ->
             eventX "Received invalid address from peer {address}"
             >> setField "address" address
             |> Log.warning
-            connector, addressBook,ownAddress // TODO: we should punish the sending node
+            connector, addressBook,publisher,ownAddress // TODO: we should punish the sending node
         | true ->
             let handleAddress () =
                 eventX "Received new address {address}"
@@ -90,25 +95,25 @@ let transportHandler transport seeds client msg (connector,addressBook,ownAddres
                     let addressBook = AddressBook.add addressBook address
 
                     // We might need more peers so lets try to connect to the new peer
-                    (Connector.connect transport addressBook connector), addressBook,ownAddress
-                else connector,addressBook,ownAddress
+                    (Connector.connect transport addressBook connector), addressBook,publisher,ownAddress
+                else connector,addressBook,publisher,ownAddress
 
             match ownAddress with
             | None -> handleAddress ()
             | Some ownAddress when ownAddress <> address -> handleAddress ()
             | _ ->
                 // Own address, do nothing
-                connector, addressBook,ownAddress
+                connector, addressBook,publisher,ownAddress
     | InProcMessage.GetAddresses peerId ->
         Transport.sendAddresses transport peerId (AddressBook.getValidAddresses addressBook)
-        connector, addressBook,ownAddress
+        connector, addressBook,publisher,ownAddress
     | InProcMessage.Addresses addresses ->
         match List.forall Endpoint.isValid addresses with
         | false ->
             eventX "Received invalid addresses from peer"
             |> Log.warning
 
-            connector, addressBook,ownAddress // TODO: we should punish the sending node
+            connector, addressBook,publisher,ownAddress // TODO: we should punish the sending node
         | true ->
             // Filter own address
             let addresses =
@@ -119,11 +124,11 @@ let transportHandler transport seeds client msg (connector,addressBook,ownAddres
             let addressBook = AddressBook.addList addressBook addresses
             let connector = Connector.connect transport addressBook connector
 
-            connector, addressBook,ownAddress
+            connector, addressBook,publisher,ownAddress
     | InProcMessage.GetMemPool peerId ->
         Blockchain.requestMemPool client peerId
 
-        connector, addressBook,ownAddress
+        connector, addressBook,publisher,ownAddress
     | InProcMessage.MemPool {peerId=peerId;txs=bytes} ->
         // Check if valid hashses array
         // TODO: punish sending node if not
@@ -137,50 +142,54 @@ let transportHandler transport seeds client msg (connector,addressBook,ownAddres
 
             Blockchain.handleMemPool client peerId txHashes
 
-        connector, addressBook,ownAddress
-    | InProcMessage.GetTransaction {peerId=peerId;txHash=txHash} ->
-        match Hash.fromBytes txHash with
-        | Some txHash ->
-            Blockchain.requestTransaction client peerId txHash
-        | None ->
-            // TODO: we might want to punish the sending node
-            ()
+        connector, addressBook,publisher,ownAddress
+    | InProcMessage.GetTransactions {peerId=peerId;txHashes=bytes} ->
 
-        connector, addressBook,ownAddress
+        if (Array.length bytes) % Hash.Length = 0 then
+            let txHashes =
+                Array.chunkBySize Hash.Length bytes
+                |> Seq.ofArray
+                |> Seq.map Hash.fromBytes
+                |> Seq.choose id // We know all should pass as we already checked the size
+                |> Seq.toList
+
+            Blockchain.requestTransactions client peerId txHashes
+
+        connector, addressBook,publisher,ownAddress
     | InProcMessage.BlockRequest {peerId=peerId;blockHash=blockHash} ->
         match Hash.fromBytes blockHash with
         | Some blockHash ->
             Blockchain.requestBlock client peerId blockHash
         | None -> ()
 
-        connector, addressBook,ownAddress
+        connector, addressBook,publisher,ownAddress
     | InProcMessage.GetTip peerId ->
         Blockchain.requestTip client peerId
-        connector, addressBook,ownAddress
+        connector, addressBook,publisher,ownAddress
     | InProcMessage.Block {peerId=peerId;block=block} ->
         match Block.deserialize block with
         | Some block ->
             Blockchain.validateBlock client peerId block
-            connector,addressBook,ownAddress
+            connector,addressBook,publisher,ownAddress
         | None ->
             //TODO: log non-deserializable block
-            connector,addressBook,ownAddress
+            connector,addressBook,publisher,ownAddress
     | InProcMessage.Tip {peerId=peerId;blockHeader=blockHeader} ->
         match Header.deserialize blockHeader with
         | Some blockHeader ->
             Blockchain.handleTip client peerId blockHeader
-            connector,addressBook,ownAddress
+            connector,addressBook,publisher,ownAddress
         | None ->
             //TODO: log non-deserializable blockheader
-            connector,addressBook,ownAddress
+            connector,addressBook,publisher,ownAddress
     | InProcMessage.NewBlock {peerId=peerId;blockHeader=blockHeader} ->
         match Header.deserialize blockHeader with
         | Some blockHeader ->
             Blockchain.validateNewBlockHeader client peerId blockHeader
-            connector,addressBook,ownAddress
+            connector,addressBook,publisher,ownAddress
         | None ->
             //TODO: log non-deserializable blockheader
-            connector,addressBook,ownAddress
+            connector,addressBook,publisher,ownAddress
     | InProcMessage.HeadersRequest {peerId=peerId;from=from;endHash=endHash} ->
         let from =
             Array.chunkBySize Hash.Length from
@@ -191,7 +200,7 @@ let transportHandler transport seeds client msg (connector,addressBook,ownAddres
         | false, Some endHash -> Blockchain.requestHeaders client peerId from endHash
         | _ -> ()
 
-        connector,addressBook,ownAddress
+        connector,addressBook,publisher,ownAddress
     | InProcMessage.Headers {peerId=peerId;headers=headers} ->
         let headers =
             Array.chunkBySize Serialization.SerializedHeaderSize headers
@@ -200,17 +209,19 @@ let transportHandler transport seeds client msg (connector,addressBook,ownAddres
 
         Blockchain.handleHeaders client peerId headers
 
-        connector,addressBook,ownAddress
-    | InProcMessage.NewTransaction {peerId=peerId;txHash=txHash} ->
-        match Hash.fromBytes txHash with
-        | Some txHash ->
-            Blockchain.handleNewTransaction client peerId txHash
+        connector,addressBook,publisher,ownAddress
+    | InProcMessage.NewTransactions {peerId=peerId;txHashes=bytes} ->
+        if (Array.length bytes) % Hash.Length = 0 then
+            let txHashes =
+                Array.chunkBySize Hash.Length bytes
+                |> Seq.ofArray
+                |> Seq.map Hash.fromBytes
+                |> Seq.choose id // We know all should pass as we already checked the size
+                |> Seq.toList
 
-            connector,addressBook,ownAddress
-        | None -> connector,addressBook,ownAddress
-    | _ ->
-        // TODO: log unknown message
-        connector, addressBook,ownAddress
+            Blockchain.handleNewTransactions client peerId txHashes
+
+        connector,addressBook,publisher,ownAddress
 
 let commandHandler transport command (state:State) =
     match command with
@@ -220,12 +231,14 @@ let commandHandler transport command (state:State) =
             |> Array.concat
         Transport.sendMemPool transport peerId bytes
         state
-    | Command.GetTransaction (peerId, txHash) ->
-        Transport.getTransaction transport peerId (Hash.bytes txHash)
+    | Command.GetTransactions (peerId, txHashes) ->
+        let bytes = List.map Hash.bytes txHashes |> Array.concat
+
+        Transport.getTransactions transport peerId bytes
         state
-    | Command.SendTransaction (peerId, tx) ->
-        let bytes = Transaction.serialize Full tx
-        Transport.sendTransaction transport peerId bytes
+    | Command.SendTransactions (peerId, txs) ->
+        let bytes = Transactions.serialize Full txs
+        Transport.sendTransactions transport peerId (List.length txs |> uint32) bytes
         state
     | Command.SendBlock (peerId, block) ->
         let bytes = Block.serialize block
@@ -267,25 +280,30 @@ let commandHandler transport command (state:State) =
         Transport.getTipFromAllPeers transport
         state
 
-let handleIpAddressFound bind transport ipAddress (connector,addressBook,ownAddress) =
+let handleIpAddressFound bind transport ipAddress (connector,addressBook,publisher,ownAddress) =
     let port = Endpoint.getPort bind
     let address = sprintf "%s:%d" ipAddress port
     let ownAddress = Some address
 
     Transport.publishAddressToAll transport address
 
-    connector,addressBook,ownAddress
+    connector,addressBook,publisher,ownAddress
 
 let requestHandler (requestId:RequestId) request (state:State) =
     match request with
     | GetConnectionCount ->
-        let (connector,_,_) = state
+        let (connector,_,_,_) = state
 
         Connector.countConnected connector
         |> uint32
         |> requestId.reply
 
         state
+
+let handlePublisherTick transport (connector,addressBook,publisher,ownAddress) =
+    let publisher = TransactionPublisher.tick transport publisher
+
+    connector,addressBook,publisher,ownAddress
 
 let main busName chainParams externalIp listen bind seeds =
     Actor.create<Command, Request, Event, State> busName serviceName (fun poller sbObservable ebObservable ->
@@ -306,6 +324,8 @@ let main busName chainParams externalIp listen bind seeds =
         let connector =
             Connector.create seeds maxConnections
             |> Connector.connect transport addressBook
+
+        let publisher = TransactionPublisher.empty
 
         let client = ServiceBus.Client.create busName
 
@@ -336,11 +356,18 @@ let main busName chainParams externalIp listen bind seeds =
             else
                 FSharp.Control.Reactive.Observable.empty, Disposables.empty
 
+        let publisherObservable =
+            let timer = Timer.create 200<milliseconds>
+
+            Poller.addTimer poller timer
+            |> Observable.map (fun _ -> handlePublisherTick transport)
+
         let observable =
             Observable.merge sbObservable ebObservable
             |> Observable.merge transportObservable
             |> Observable.merge discoverIpObservable
-            |> Observable.scan (fun state handler -> handler state) (connector,addressBook,ownAddress)
+            |> Observable.merge publisherObservable
+            |> Observable.scan (fun state handler -> handler state) (connector,addressBook, publisher,ownAddress)
 
         Disposables.fromList [Disposables.toDisposable transport;discoverIpDisposable] ,observable
     )
