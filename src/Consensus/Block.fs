@@ -148,6 +148,9 @@ let createTemplate chain (parent:BlockHeader) timestamp (ema:EMA.T) acs transact
 
     let parentHash = hash parent
 
+    let median = EMA.earliest ema
+    let timestamp = if timestamp > median then timestamp else (median + 1UL)
+
     // TODO: add utxo commitments
     let commitments =
         createCommitments txMerkleRoot witnessMerkleRoot acsMerkleRoot []

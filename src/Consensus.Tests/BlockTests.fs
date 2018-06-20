@@ -174,6 +174,9 @@ let ``block timestamp too early``() =
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate chain parent timestamp ema acs [tx] Hash.zero
 
+    // createTemplate auto-correct to early timestamps, so we have to override the timestamp
+    let block = {block with header = {block.header with timestamp = timestamp}}
+
     let expected : BkResult = Error "block's timestamp is too early"
 
     (Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ContractCache.empty ema getContractState ContractStates.asDatabase block, expected)
