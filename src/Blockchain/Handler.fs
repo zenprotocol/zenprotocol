@@ -35,7 +35,8 @@ let handleCommand chainParams command session timestamp (state:State) =
          effectsWriter {
             let txs = List.choose (fun txHash -> MemPool.getTransaction txHash state.memoryState.mempool) txHashes
 
-            do! sendTransactions peerId txs
+            if not <| List.isEmpty txs then
+                do! sendTransactions peerId txs
 
             return state
          }
