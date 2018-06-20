@@ -34,7 +34,11 @@ let create (chain:ChainParameters) busName address =
 
         let difficulty = Difficulty.uncompress template.header.difficulty
 
-        let headerBytes = Serialization.Header.serialize template.header
+        let now = Timestamp.now()
+
+        let header = if now > template.header.timestamp then {template.header with timestamp = now } else template.header
+
+        let headerBytes = Serialization.Header.serialize header
         BigEndianBitConverter.putUInt64 n1 headerBytes 84
 
         while attemptsLeft > 0 && not found do
@@ -57,7 +61,7 @@ let create (chain:ChainParameters) busName address =
 
                 found <- true
 
-                let header = {template.header with nonce=n1,n2 }
+                let header = {header with nonce=n1,n2 }
                 let block = {template with header=header}
 
                 // We found a block
