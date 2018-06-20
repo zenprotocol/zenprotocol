@@ -88,7 +88,7 @@ let private wrapFStar errorResult outputFile fstarFn =
 #if DEBUG
         sprintf "%A\n%A" errorResult error)
 #else
-        errorResult
+        errorResult)
 #endif
     |> Result.map (fun _ -> File.ReadAllText outputFile)
 
