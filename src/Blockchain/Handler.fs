@@ -41,11 +41,11 @@ let handleCommand chainParams command session timestamp (state:State) =
                 return state
          }
     | HandleMemPool (peerId,txHashes) ->
+        eventX "Handling mempool message"
+        |> Log.info
+
         let handleTxHash txHash =
             effectsWriter {
-                eventX "Handling mempool message"
-                |> Log.info
-
                 if not (MemPool.containsTransaction txHash state.memoryState.mempool) then
                     do! getTransaction peerId txHash
                 else

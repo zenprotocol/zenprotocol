@@ -13,8 +13,8 @@ let version = 0ul;
 
 // TODO: those should come from configuration?
 // For now those are configured for fast unit testing
-let pingInterval = System.TimeSpan.FromSeconds(10.0)
-let pingTimeout = System.TimeSpan.FromSeconds(5.0)
+let pingInterval = System.TimeSpan.FromSeconds(60.0)
+let pingTimeout = System.TimeSpan.FromSeconds(20.0)
 let helloTimeout = System.TimeSpan.FromSeconds(5.0)
 
 type CloseReason =
@@ -173,7 +173,10 @@ let handleConnectingState socket next peer msg =
                 | _ -> ()
 
                 {peer with state=Active; ping=NoPing (getNow ())}
-        | _ ->
+        | msg ->
+            eventX "Expecting HelloAck but got {msg}"
+            >> setField "msg" (sprintf "%A" msg)
+            |> Log.info
             closePeer socket ExpectingHelloAck peer
 
 let handleActiveState socket next peer msg =
