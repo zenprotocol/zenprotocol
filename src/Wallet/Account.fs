@@ -211,7 +211,7 @@ let getUnspentOutputs dataAccess session view confirmations =
 let addBlock dataAccess session blockHash block =
     let account = DataAccess.Account.get dataAccess session
 
-    if account.blockHash = blockHash || block.header.blockNumber < block.header.blockNumber then
+    if account.blockHash = blockHash || block.header.blockNumber < account.blockNumber then
         // we already handled the block, skip
         ()
     elif account.blockHash <> block.header.parent then
@@ -272,8 +272,8 @@ let addBlock dataAccess session blockHash block =
 let undoBlock dataAccess session blockHash block =
     let account = DataAccess.Account.get dataAccess session
 
-    if account.blockHash = block.header.parent || account.blockNumber > block.header.blockNumber then
-        // we already udno this block, skipping
+    if account.blockHash = block.header.parent || block.header.blockNumber > account.blockNumber then
+        // we already undo this block, skipping
         ()
     elif account.blockHash <> blockHash then
         failwithf "trying to undo a block to account but account in different chain %A %A" (block.header.blockNumber) (account.blockNumber)
