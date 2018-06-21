@@ -61,9 +61,9 @@ let isOutputSpendable output =
     match output.lock with
     | PK _
     | Coinbase _
-    | Contract _
-    | HighVLock _ -> true
+    | Contract _ -> true
     | Fee
     | Destroy
     | ActivationSacrifice
     | ExtensionSacrifice _ -> false
+    | HighVLock (identifier,_) -> identifier % 2ul = 0ul

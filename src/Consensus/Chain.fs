@@ -56,7 +56,7 @@ let localParameters = {
         blockInterval=1000UL * 60UL;
         name="local"
         genesisHash =
-            get <| Hash.fromString "214ee1523da1b376a4e648fe6a0a29c481b70996995049ae6b3991d5619e5d72";
+            get <| Hash.fromString "6d678ab961c8b47046da8d19c0de5be07eb0fe1e1e82ad9a5b32145b5d4811c7";
         genesisTime=1515594186383UL
         networkId=1002ul
 }
