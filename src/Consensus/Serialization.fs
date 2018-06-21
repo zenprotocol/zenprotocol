@@ -543,17 +543,17 @@ module Serialization =
 
     module Lock =
         [<Literal>]
-        let private PKIdentifier = 1u
+        let private PKIdentifier = 2u
         [<Literal>]
-        let private ContractIdentifier = 2u
+        let private ContractIdentifier = 4u
         [<Literal>]
-        let private CoinbaseIdentifier = 3u
+        let private CoinbaseIdentifier = 6u
         [<Literal>]
-        let private FeeIdentifier = 4u
+        let private FeeIdentifier = 1u
         [<Literal>]
-        let private ActivationSacrificeIdentifier = 5u
+        let private ActivationSacrificeIdentifier = 3u
         [<Literal>]
-        let private ExtensionSacrificeIdentifier = 6u
+        let private ExtensionSacrificeIdentifier = 5u
         [<Literal>]
         let private DestroyIdentifier = 7u
 

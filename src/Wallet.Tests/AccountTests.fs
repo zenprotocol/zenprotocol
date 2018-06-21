@@ -752,7 +752,7 @@ let ``Typescript testvector``() =
 //    printfn "%A" (Transaction.toHex tx)
 
     let expectedTxHash =
-        (Hash.fromString "5d2f27698e1b82569f5aac6e3b17a445953f72d8543b4d0a965e01d04233500d")
+        (Hash.fromString "2df00d7cf448facbe9883a032dd435b08c74e40a18c9f91c1a43be583ea3ce4a")
         |> Infrastructure.Result.get
 
     Transaction.hash tx |> should equal expectedTxHash
