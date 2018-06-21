@@ -39,14 +39,14 @@ let mainParameters =
 let testParameters =
     {
         name="testnet"
-        proofOfWorkLimit=Difficulty.uncompress 0x1cffff00ul; //0x20fffffful;
+        proofOfWorkLimit=Difficulty.uncompress 0x1dfffffful;
         blockInterval=236682UL;
         smoothingFactor=28I;
         maxBlockWeight=1000_000_000I;
         sacrificePerByteBlock=1UL;
-        genesisHash= get <| Hash.fromString "9f139787dd7252fc73d2b9e82185ef84a7f695e96a959774a32cef3c7a64d82a";
-        genesisTime=1517828985040UL
-        networkId=2011ul
+        genesisHash= get <| Hash.fromString "df9bf3aea821e2fcb3b1a933a8b2d00da4f2598f8b00f545b7e1e1265317b27e";
+        genesisTime=1529578394435UL
+        networkId=2012ul
         contractSacrificePerBytePerBlock=ContractSacrificePerBytePerBlock
     }
 
