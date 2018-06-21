@@ -91,7 +91,7 @@ let private activateContract (chainParams : Chain.ChainParameters) contractPath 
                             let compile contract =
                                 Contract.compile contractPath contract
                                 |> Result.bind (fun _ -> Contract.load contractPath expiry contract.code contractId)
-                                |> Result.mapError (fun error -> 
+                                |> Result.mapError (fun error ->
                                     eventX "Contract activation failed: {error}"
                                     >> setField "error" (sprintf "%A" error)
                                     |> Log.info
@@ -159,7 +159,13 @@ let private checkMintsOnly tx =
         GeneralError "inputs consist of mints only"
     else
         Ok tx
-    
+
+let private checkVersion (tx:Transaction) =
+    if tx.version <> Version0 then
+        GeneralError "unsupported transaction version"
+    else
+        Ok tx
+
 let private checkStructure =
     let isInvalidSpend = fun { asset = (Asset (ContractId (version,cHash), subType)); amount = amount } ->
         cHash = Hash.zero && (subType <> Hash.zero || version <> Version0) ||
@@ -266,7 +272,8 @@ let private tryGetUtxos getUTXO utxoSet tx =
     )
 
 let validateBasic =
-    checkStructure
+    checkVersion
+    >=> checkStructure
     >=> checkNoCoinbaseLock
     >=> checkOutputsOverflow
     >=> checkDuplicateInputs
