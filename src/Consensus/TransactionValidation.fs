@@ -217,9 +217,11 @@ let private checkStructure =
 
     let checkWitnessesStructure = fun tx ->
         if List.isEmpty tx.witnesses || List.exists (function
-            | ContractWitness { command = command
-                                cost = cost } ->
-                isNull command || cost = 0UL
+            | ContractWitness cw ->
+                isNull cw.command || 
+                cw.cost = 0UL || 
+                (int cw.beginInputs > List.length tx.inputs - 1 && cw.inputsLength > 0u) ||
+                int cw.endInputs > List.length tx.inputs - 1
             | HighVWitness (identifier, bytes) ->
                 identifier <= 2u // last reserved identifier for witness types
                 || isEmptyArr bytes
@@ -262,6 +264,7 @@ let private checkActivationSacrifice tx =
         else
             GeneralError "tx with a contract must include an activation sacrifice"
 
+    
 let private tryGetUtxos getUTXO utxoSet tx =
     getUtxosResult getUTXO tx.inputs utxoSet
     |> Result.mapError (fun errors ->
