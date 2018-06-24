@@ -44,7 +44,7 @@ module Blockchain =
         | ExecuteContract of ContractId * string * Crypto.PublicKey option * data option * TxSkeleton.T
         | GetBlockTemplate of pkHash:Hash
         | GetTip
-        | GetBlock of Hash
+        | GetBlock of mainChain:bool * Hash
         | GetBlockByNumber of uint32
         | GetBlockHeader of Hash
         | GetActiveContracts
@@ -103,8 +103,8 @@ module Blockchain =
     let getBlockHeader client blockHash =
         Request.send<Request,BlockHeader option> client serviceName (GetBlockHeader blockHash)
 
-    let getBlock client blockHash =
-        Request.send<Request,Block option> client serviceName (GetBlock blockHash)
+    let getBlock client mainChain blockHash =
+        Request.send<Request,Block option> client serviceName (GetBlock (mainChain,blockHash))
 
     let getTransaction client txHash =
         Request.send<Request,(Transaction*uint32) option> client serviceName (GetTransaction txHash)

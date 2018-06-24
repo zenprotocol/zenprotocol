@@ -7,6 +7,8 @@ open Messaging.Services
 open Messaging.Events
 open Consensus
 open Blockchain
+open Blockchain
+open Blockchain
 open Blockchain.EffectsWriter
 open Consensus.Types
 open State
@@ -97,13 +99,15 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
         let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList chain session state timestamp
         Block.createTemplate chain state.tipState.tip.header timestamp state.tipState.ema memState.activeContractSet validatedTransactions pkHash
         |> requestId.reply<Block>
-    | GetBlock blockHash ->
+    | GetBlock (mainChain,blockHash) ->
+        let isValid (header:ExtendedBlockHeader.T) = (not mainChain) || header.status = ExtendedBlockHeader.MainChain
+
         match BlockRepository.tryGetHeader session blockHash with
-        | Some header ->
+        | Some header when isValid header  ->
             BlockRepository.getFullBlock session header
             |> Some
             |> requestId.reply<Types.Block option>
-        | None -> requestId.reply<Types.Block option> None
+        | _ -> requestId.reply<Types.Block option> None
     | GetBlockByNumber blockNumber ->
         if blockNumber > state.tipState.tip.header.blockNumber || blockNumber = 0ul then
             requestId.reply<Types.Block option> None

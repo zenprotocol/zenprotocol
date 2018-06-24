@@ -45,7 +45,7 @@ let eventHandler client event dataAccess session accountStatus =
 let private sync dataAccess session client =
     match Blockchain.getTip client with
     | Some (tipBlockHash,tipHeader) ->
-        Account.sync dataAccess session tipBlockHash tipHeader (Blockchain.getBlockHeader client >> Option.get) (Blockchain.getBlock client >> Option.get)
+        Account.sync dataAccess session tipBlockHash tipHeader (Blockchain.getBlockHeader client >> Option.get) (Blockchain.getBlock client false >> Option.get)
 
         eventX "Account synced to block #{blockNumber} {blockHash}"
         >> setField "blockNumber" tipHeader.blockNumber

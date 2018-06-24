@@ -220,7 +220,7 @@ let handleRequest chain client (request,reply) =
     | Post ("/wallet/transaction", Some body) ->
         match parseSendJson chain body with
         | Ok (outputs, password) ->
-            match Wallet.createTransaction client outputs password with 
+            match Wallet.createTransaction client outputs password with
             | Ok tx ->
                 tx
                 |> Transaction.serialize Full
@@ -290,7 +290,19 @@ let handleRequest chain client (request,reply) =
             replyError error
         | Ok block ->
             Blockchain.validateMinedBlock client block
-            reply StatusCode.OK NoContent
+
+            match Block.validate (Chain.getChainParameters chain) block with
+            | Ok _ ->
+                Block.hash block.header
+                |> Hash.toString
+                |> JsonValue.String
+                |> JsonContent
+                |> reply StatusCode.OK
+            | Error error ->
+                error
+                |> TextContent
+                |> reply StatusCode.BadRequest
+
     | Get ("/blockchain/blocktemplate", query) ->
         let pkHash =
             match Map.tryFind "address" query with
@@ -335,7 +347,7 @@ let handleRequest chain client (request,reply) =
                 TextContent (sprintf "couldn't decode hash")
                 |> reply StatusCode.BadRequest
             | Ok hash ->
-                match Blockchain.getBlock client hash with
+                match Blockchain.getBlock client true hash with
                 | None ->
                     TextContent (sprintf "block not found")
                     |> reply StatusCode.NotFound
