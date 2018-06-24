@@ -43,12 +43,11 @@ let handleRequest chain client (request,reply) =
     let replyError error =
         reply StatusCode.BadRequest (TextContent error)
 
-    let validateTx result =
+    let handleTxResult result =
         match result with
         | Error error ->
             replyError error
         | Ok tx ->
-            Blockchain.validateTransaction client tx
             reply StatusCode.OK NoContent
 
     match request with
@@ -213,14 +212,14 @@ let handleRequest chain client (request,reply) =
     | Post ("/wallet/send", Some body) ->
         match parseSendJson chain body with
         | Ok (outputs, password) ->
-            Wallet.createTransaction client outputs password
-            |> validateTx
+            Wallet.createTransaction client true outputs password
+            |> handleTxResult
         | Error error ->
             replyError error
-    | Post ("/wallet/transaction", Some body) ->
+    | Post ("/wallet/createrawtransaction", Some body) ->
         match parseSendJson chain body with
         | Ok (outputs, password) ->
-            match Wallet.createTransaction client outputs password with 
+            match Wallet.createTransaction client false outputs password with
             | Ok tx ->
                 tx
                 |> Transaction.serialize Full
@@ -254,7 +253,7 @@ let handleRequest chain client (request,reply) =
         match parseContractActivateJson body with
         | Error error -> replyError error
         | Ok (code, numberOfBlocks, password) ->
-            match Wallet.activateContract client code numberOfBlocks password with
+            match Wallet.activateContract client true code numberOfBlocks password with
             | Ok (tx, contractId) ->
                 let address =
                     Address.Contract contractId
@@ -268,7 +267,7 @@ let handleRequest chain client (request,reply) =
         match parseContractExtendJson chain body with
         | Error error -> replyError error
         | Ok (contractId, numberOfBlocks, password) ->
-            match Wallet.extendContract client contractId numberOfBlocks password with
+            match Wallet.extendContract client true contractId numberOfBlocks password with
             | Ok tx ->
                 Blockchain.validateTransaction client tx
                 reply StatusCode.OK NoContent
@@ -278,8 +277,8 @@ let handleRequest chain client (request,reply) =
         match parseContractExecuteJson chain body with
         | Error error -> replyError error
         | Ok (contractId, command, message, returnAddress, sign, spends, password) ->
-            Wallet.executeContract client contractId command message returnAddress sign spends password
-            |> validateTx
+            Wallet.executeContract client true  contractId command message returnAddress sign spends password
+            |> handleTxResult
     | Get ("/wallet/resync", _) ->
         Wallet.resyncAccount client
         reply StatusCode.OK NoContent
@@ -290,7 +289,19 @@ let handleRequest chain client (request,reply) =
             replyError error
         | Ok block ->
             Blockchain.validateMinedBlock client block
-            reply StatusCode.OK NoContent
+
+            match Block.validate (Chain.getChainParameters chain) block with
+            | Ok _ ->
+                Block.hash block.header
+                |> Hash.toString
+                |> JsonValue.String
+                |> JsonContent
+                |> reply StatusCode.OK
+            | Error error ->
+                error
+                |> TextContent
+                |> reply StatusCode.BadRequest
+
     | Get ("/blockchain/blocktemplate", query) ->
         let pkHash =
             match Map.tryFind "address" query with
@@ -335,7 +346,7 @@ let handleRequest chain client (request,reply) =
                 TextContent (sprintf "couldn't decode hash")
                 |> reply StatusCode.BadRequest
             | Ok hash ->
-                match Blockchain.getBlock client hash with
+                match Blockchain.getBlock client true hash with
                 | None ->
                     TextContent (sprintf "block not found")
                     |> reply StatusCode.NotFound

@@ -44,7 +44,7 @@ module Blockchain =
         | ExecuteContract of ContractId * string * Crypto.PublicKey option * data option * TxSkeleton.T
         | GetBlockTemplate of pkHash:Hash
         | GetTip
-        | GetBlock of Hash
+        | GetBlock of mainChain:bool * Hash
         | GetBlockByNumber of uint32
         | GetBlockHeader of Hash
         | GetActiveContracts
@@ -103,8 +103,8 @@ module Blockchain =
     let getBlockHeader client blockHash =
         Request.send<Request,BlockHeader option> client serviceName (GetBlockHeader blockHash)
 
-    let getBlock client blockHash =
-        Request.send<Request,Block option> client serviceName (GetBlock blockHash)
+    let getBlock client mainChain blockHash =
+        Request.send<Request,Block option> client serviceName (GetBlock (mainChain,blockHash))
 
     let getTransaction client txHash =
         Request.send<Request,(Transaction*uint32) option> client serviceName (GetTransaction txHash)
@@ -184,10 +184,10 @@ module Wallet =
         | GetTransactions of skip: int * take: int
         | GetBalance
         | ImportSeed of string list * password:string
-        | Send of outputs:List<Hash * Spend> * password:string
-        | ActivateContract of string * uint32 * password:string
-        | ExtendContract of ContractId * uint32 * password:string
-        | ExecuteContract of ContractId * string * data option * provideReturnAddress:bool * sign:string option * Map<Asset, uint64> * password:string
+        | Send of publish:bool*outputs:List<Hash * Spend> * password:string
+        | ActivateContract of publish:bool*string * uint32 * password:string
+        | ExtendContract of publish:bool*ContractId * uint32 * password:string
+        | ExecuteContract of publish:bool*ContractId * string * data option * provideReturnAddress:bool * sign:string option * Map<Asset, uint64> * password:string
         | AccountExists
         | CheckPassword of password:string
         | GetPublicKey of path:string * password:string
@@ -213,17 +213,17 @@ module Wallet =
     let getAddress client =
         send<string> client serviceName GetAddress
 
-    let createTransaction client outputs password =
-        send<Transaction> client serviceName (Send (outputs, password))
+    let createTransaction client publish outputs password =
+        send<Transaction> client serviceName (Send (publish, outputs, password))
 
-    let activateContract client code numberOfBlocks password =
-        send<ActivateContractResponse> client serviceName (ActivateContract (code, numberOfBlocks, password))
+    let activateContract client publish code numberOfBlocks password =
+        send<ActivateContractResponse> client serviceName (ActivateContract (publish, code, numberOfBlocks, password))
 
-    let extendContract client address numberOfBlocks password =
-        send<Transaction> client serviceName (ExtendContract (address, numberOfBlocks, password))
+    let extendContract client publish address numberOfBlocks password =
+        send<Transaction> client serviceName (ExtendContract (publish, address, numberOfBlocks, password))
 
-    let executeContract client address command messageBody provideReturnAddress sign spends password =
-        send<Transaction> client serviceName (ExecuteContract (address, command, messageBody, provideReturnAddress, sign, spends, password))
+    let executeContract client publish address command messageBody provideReturnAddress sign spends password =
+        send<Transaction> client serviceName (ExecuteContract (publish, address, command, messageBody, provideReturnAddress, sign, spends, password))
 
     let importSeed client words password =
         send<unit> client serviceName (ImportSeed (words, password))

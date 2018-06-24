@@ -45,7 +45,7 @@ let eventHandler client event dataAccess session accountStatus =
 let private sync dataAccess session client =
     match Blockchain.getTip client with
     | Some (tipBlockHash,tipHeader) ->
-        Account.sync dataAccess session tipBlockHash tipHeader (Blockchain.getBlockHeader client >> Option.get) (Blockchain.getBlock client >> Option.get)
+        Account.sync dataAccess session tipBlockHash tipHeader (Blockchain.getBlockHeader client >> Option.get) (Blockchain.getBlock client false >> Option.get)
 
         eventX "Account synced to block #{blockNumber} {blockHash}"
         >> setField "blockNumber" tipHeader.blockNumber
@@ -74,6 +74,20 @@ let commandHandler client command dataAccess session accountStatus =
 
 let private reply<'a> (requestId:RequestId) (value : Result<'a,string>) =
     requestId.reply value
+
+let publishTx dataAccess session client view publish tx =
+    match tx with
+    | Ok tx ->
+        if publish then
+            let txHash = Transaction.hash tx
+            let view = View.addMempoolTransaction dataAccess session txHash tx view
+
+            Blockchain.validateTransaction client tx
+
+            Exist view
+        else
+            Exist view
+    | _ -> Exist view
 
 let requestHandler chain client (requestId:RequestId) request dataAccess session accountStatus =
     match accountStatus with
@@ -207,29 +221,35 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             |> reply<unit> requestId
 
             accountStatus
-        | Send (outputs, password) ->
-            outputs
-            |> List.map (fun (hash, spend) -> { lock = PK hash; spend = spend })
-            |> TransactionCreator.createTransaction dataAccess session view password
-            |> reply<Transaction> requestId
+        | Send (publish, outputs, password) ->
+            let tx =
+                outputs
+                |> List.map (fun (hash, spend) -> { lock = PK hash; spend = spend })
+                |> TransactionCreator.createTransaction dataAccess session view password
 
-            accountStatus
-        | ActivateContract (code, numberOfBlocks, password) ->
-            TransactionCreator.createActivateContractTransaction dataAccess session view chainParams password code numberOfBlocks
-            <@> fun tx -> tx, Consensus.Contract.makeContractId Version0 code
-            |> reply<ActivateContractResponse> requestId
+            reply<Transaction> requestId tx
+            publishTx dataAccess session client view publish tx
 
-            accountStatus
-        | ExtendContract (contractId, numberOfBlocks, password) ->
-            TransactionCreator.createExtendContractTransaction dataAccess session view (Blockchain.getActiveContract client) chainParams password contractId numberOfBlocks
-            |> reply<Transaction> requestId
+        | ActivateContract (publish, code, numberOfBlocks, password) ->
+            let tx =
 
-            accountStatus
-        | ExecuteContract (contractId, command, data, provideReturnAddress, sign, spends, password) ->
-            TransactionCreator.createExecuteContractTransaction dataAccess session view (Blockchain.executeContract client) password contractId command data provideReturnAddress sign spends
-            |> reply<Transaction> requestId
+                TransactionCreator.createActivateContractTransaction dataAccess session view chainParams password code numberOfBlocks
+                <@> fun tx -> tx, Consensus.Contract.makeContractId Version0 code
 
-            accountStatus
+            reply<ActivateContractResponse> requestId tx
+            publishTx dataAccess session client view publish (Result.map fst tx)
+
+        | ExtendContract (publish, contractId, numberOfBlocks, password) ->
+            let tx = TransactionCreator.createExtendContractTransaction dataAccess session view (Blockchain.getActiveContract client) chainParams password contractId numberOfBlocks
+
+            reply<Transaction> requestId tx
+            publishTx dataAccess session client view publish tx
+
+        | ExecuteContract (publish, contractId, command, data, provideReturnAddress, sign, spends, password) ->
+            let tx = TransactionCreator.createExecuteContractTransaction dataAccess session view (Blockchain.executeContract client) password contractId command data provideReturnAddress sign spends
+
+            reply<Transaction> requestId tx
+            publishTx dataAccess session client view publish tx
         | AccountExists ->
             Ok true
             |> reply<bool> requestId
