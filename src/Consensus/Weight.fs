@@ -1,5 +1,6 @@
 module Consensus.Weight
 
+open System.Diagnostics.Eventing.Reader
 open Consensus.Types
 open TxSkeleton
 open Infrastructure
@@ -8,46 +9,13 @@ open Serialization
 
 let result = new ResultBuilder<string>()
 
-//Literal
 let activationFactor = 300000u
-
-
-//UNDONE: Alter this active pattern when Coinbase locks are generalised.
-let (|PKPair|_|) (pInput, witness) =
-    match pInput, witness with
-    | PointedOutput (_, {lock=(PK _ | Coinbase _)}), PKWitness _ ->
-        Some ()
-    | _ -> None
-
-let (|ContractPair|_|) (pInput, witness) =
-    match pInput, witness with
-    | PointedOutput (_, {lock=(Contract _)}), ContractWitness cWitness
-    | Mint _, ContractWitness cWitness ->
-        Some cWitness
-    | _ -> None
-
-[<Struct>]
-type Weights = {
-    pk : bigint * int * int;
-    contract : ContractWitness -> (bigint * int * int)
-    activation : Consensus.Types.Contract -> bigint
-    dataSize : bigint
-}
+let contractExecutionFactor = 100I
+let pkWitnessWeight = 100_000I
+let contractSignatureWeight = 80_000I
 
 // Returns outputs without mints. But they get added back from the inputs.
 let getOutputs = UtxoSet.tryGetOutputs
-
-let pkWitnessWeight : bigint * int * int = 100_000I, 1, 0
-
-let contractWitnessWeight (cWit:ContractWitness) =
-    let signatureWeight =
-        match cWit.signature with
-        | Some _ -> 80_000I
-        | None -> 0I
-
-    let costWeight = 100I * bigint (cWit.cost)
-
-    signatureWeight + costWeight, int cWit.inputsLength, int cWit.outputsLength
 
 let activationWeight contract =
     match contract with
@@ -55,97 +23,91 @@ let activationWeight contract =
         contract.queries * contract.rlimit / 100ul |> bigint
     | HighV _ -> 
         0I
-    
-let realWeights =
-    {   pk=pkWitnessWeight;
-        contract=contractWitnessWeight;
-        activation=activationWeight;
-        dataSize=0I         // Size of transaction not counted for now.
-    }
 
-        
-let updateSkeleton (skeleton, currentSkeleton) nInputs nOutputs =
-    if nInputs > List.length skeleton.pInputs || 
-       nOutputs > List.length skeleton.outputs
-    then
-       Error "invalid contract witness"
-    else
-        match (List.splitAt nInputs skeleton.pInputs,
-               List.splitAt nOutputs skeleton.outputs) with
-        | (inputsDone, inputs), (outputsDone, outputs) ->
-            Ok ({pInputs = inputs; outputs = outputs},
-             {pInputs = List.append currentSkeleton.pInputs inputsDone;
-              outputs = List.append currentSkeleton.outputs outputsDone})
+type State =
+    | Invalid of string
+    | NextInput of bigint * Witness list * Input list
+    | Valid of bigint
 
-let accumulateWeights weights fixedSkeleton =
-    let rec accumulateWeights0 (skeletonPair:Result<TxSkeleton.T * TxSkeleton.T, string>) (total:bigint) witnesses =
-        match skeletonPair with 
-        | Error error -> Error error
-        | Ok (skeleton, currentSkeleton) ->
-            match skeleton.pInputs, witnesses with
-            | [], [] -> Ok total    // Covers coinbase tranasctions
-            | [], _ -> Error "Too many witnesses"
-            | _, [] -> Error "Too few witnesses"
-            | pInput::_, witness::ws ->
-                let inputWeight =
-                    match pInput, witness with
-                    | PKPair -> Ok weights.pk
-                    | ContractPair cWitness ->
-                        Ok <| weights.contract cWitness
-                    | _ -> Error "Wrong witness type"
-                    
-                match inputWeight with
-                | Ok (weight, nInputs, nOutputs) ->
-                    accumulateWeights0 
-                        (updateSkeleton (skeleton, currentSkeleton) nInputs nOutputs)
-                        (total + weight) ws
-                | Error (error:string) -> Error error
-                          
-    accumulateWeights0 (Ok (fixedSkeleton, TxSkeleton.empty)) 0I
+let private accumulatePkWeight total witnesses pInputs =
+    match witnesses with
+    | (PKWitness _)::witnessesTail ->
+        NextInput (total + pkWitnessWeight, witnessesTail, List.tail pInputs)
+    | _ -> 
+        Invalid "expecting a public key witness"
 
-let txWeight weights getUTXO memUTXOs tx = result {
-    let! outputs = getOutputs getUTXO memUTXOs tx.inputs
-                   |> (|ResultOf|) "Output lookup error"
-    let! skeleton =
-        try
-            Ok <| TxSkeleton.fromTransaction tx outputs
-        with
-        | e -> Error "Couldn't make a transaction skeleton"
-    let! inputWeights = accumulateWeights weights skeleton tx.witnesses
-    let contractActivationWeight =
-        match tx.contract with
-        | None -> 0I
-        | Some contract -> weights.activation contract
-    let txSizeWeight =
-        if weights.dataSize = 0I then 0I
-        else
-            weights.dataSize *
-            (Transaction.serialize Full tx
-                |> Array.length |> bigint)
-    return inputWeights + contractActivationWeight + txSizeWeight
+let private accumulateContractWeight total witnesses pInputs =
+    match witnesses with
+    | [] -> Valid total
+    | (ContractWitness cw)::witnessesTail ->
+        let witnessesTail =
+            List.foldBack (fun witness witnesseses -> 
+                match witness with 
+                | ContractWitness cw when cw.inputsLength = 0u -> witnesseses
+                | _ -> witnesseses @ [ witness ]) witnessesTail []
+     
+        let signatureWeight =
+            match cw.signature with
+            | Some _ -> contractSignatureWeight
+            | None -> 0I
+        let costWeight = contractExecutionFactor * bigint cw.cost
+        let weight = signatureWeight + costWeight
+
+        NextInput (total + weight, witnessesTail, List.skip (int cw.inputsLength) pInputs)
+    | _ -> 
+        Invalid "expecting a contract 0 witness"
+
+let private accumulateWeights total witnesses pInputs =
+    match pInputs with 
+    | [] ->
+        accumulateContractWeight total witnesses pInputs
+    | PointedOutput (_, output) :: _ ->
+        match output.lock with
+        | Coinbase _
+        | PK _ ->
+            accumulatePkWeight total witnesses pInputs
+        | Contract _
+        | Destroy ->
+            accumulateContractWeight total witnesses pInputs
+        | _ -> failwith "unexpected output type"
+    | Mint _ :: _ ->
+        accumulateContractWeight total witnesses pInputs
+  
+let rec private validateNext state =
+    match state with
+    | Invalid err -> Invalid err
+    | NextInput (total, witnesses, inputs) ->
+        accumulateWeights total witnesses inputs
+        |> validateNext
+    | Valid totalWeight -> Valid totalWeight
+
+let transactionWeight tx txSkeleton = result {
+    let witnesses = tx.witnesses
+    let inputs = txSkeleton.pInputs
+
+    let result =
+        match validateNext (NextInput (0I, witnesses, inputs)) with
+        | Valid total -> Ok total
+        | Invalid error -> Error error
+        | NextInput _ -> failwith "unexpected"
+
+    return! result
 }
 
-let transactionWeight =
-    txWeight realWeights
-
-
-// HACK: Something is wrong with using utxoSet here. Need to work out what.
-// TODO: don't use utxo set here
-let bkWeight weights getUTXO utxoSet txs =
-    let inner (weight, memUTXOs) (txHash, tx) = result {
-        let! txWeight = txWeight weights getUTXO memUTXOs tx
-        let newMemUTXOs = UtxoSet.handleTransaction getUTXO txHash tx memUTXOs
-        return (weight+txWeight, newMemUTXOs)
-    }
-    let folder accResult next = result {
-        let! acc = accResult
-        return! inner acc next
-        }
-    List.fold
-        folder
-        (Ok (0I, utxoSet))
-        [ for tx in txs do yield Transaction.hash tx, tx ]
-    |> Result.map fst
-
-let blockWeight getUTXO utxoSet (block : Block) =
-    bkWeight realWeights getUTXO utxoSet (block.transactions)
+let blockWeight getUTXO block set =
+    block.transactions
+    |> List.fold (fun state tx -> 
+        state
+        >>= (fun (total, set) ->
+            UtxoSet.tryGetOutputs getUTXO set tx.inputs
+            |> Result.ofOption "could not get outputs"
+            <@> TxSkeleton.fromTransaction tx
+            >>= transactionWeight tx
+            >>= (fun weight ->
+                try //TODO: convert to result
+                    let set = UtxoSet.handleTransaction getUTXO (Transaction.hash tx) tx set
+                    Ok (weight + total, set)
+                with _ as ex when ex.Message = "Expected output to be unspent" ->
+                    Error "could not get outputs"
+        ))) (Ok (0I, set))
+  <@> fst
