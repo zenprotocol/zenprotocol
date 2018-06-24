@@ -372,8 +372,10 @@ let ``sign last input with FollowingWitnesses sighash and add another witness``(
         |> Transaction.sign [(secret, publicKey)] TxHash
 
     let witnesses = List.append signedTx.witnesses [signedTx.witnesses.[0]]
+    let inputs = List.append signedTx.inputs [signedTx.inputs.[0]]
+    let outputs = List.append signedTx.outputs [{lock = PK Hash.zero; spend = {asset = Asset.Zen; amount = 1UL}}]
 
-    let signedTx = {signedTx with witnesses = witnesses}
+    let signedTx = {signedTx with witnesses = witnesses; inputs = inputs; outputs = outputs}
 
     let txHash = Transaction.hash signedTx
 

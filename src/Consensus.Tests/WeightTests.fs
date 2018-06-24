@@ -20,6 +20,14 @@ let getUTXO _ = UtxoSet.NoOutput    // Not testing disk access
 let testInput1 = getInput 1uy 0ul
 let keys = getKeys 10
 
+
+let transactionWeight set tx =
+    match UtxoSet.tryGetOutputs getUTXO set tx.inputs with 
+    | None -> failwith ""
+    | Some outputs ->
+        let txSkel = TxSkeleton.fromTransaction tx outputs
+        Weight.transactionWeight tx txSkel
+
 [<Test>]
 let ``Transaction with one PK lock in inputs should have corresponding cost``() =
     let oneKeyPair = List.take 1 keys
@@ -35,9 +43,8 @@ let ``Transaction with one PK lock in inputs should have corresponding cost``() 
     }
     let utxos = Map.ofSeq [ testInput1, Unspent output ]
     let sTx = Transaction.sign oneKeyPair TxHash tx
-    let txWeight = transactionWeight getUTXO utxos sTx
-    let pkWeight, _, _ = pkWitnessWeight
-    shouldEqual (txWeight, (Ok pkWeight : Result<bigint,string>))
+    let txWeight = transactionWeight utxos sTx
+    shouldEqual (txWeight, (Ok pkWitnessWeight : Result<bigint,string>))
 
 [<Test>]
 let ``Transaction with many PK locks in inputs should have right cost``() =
@@ -52,9 +59,8 @@ let ``Transaction with many PK locks in inputs should have right cost``() =
     let tx = { version=Version0;inputs=inputs;witnesses=[];outputs=outputs;contract=None }
     let utxos = Map.ofList <| List.zip outpoints (List.map Unspent outputs)
     let sTx = Transaction.sign keys TxHash tx
-    let txWeight = transactionWeight getUTXO utxos sTx
-    let pkWeight, _, _ = pkWitnessWeight
-    shouldEqual (txWeight, (Ok (pkWeight * bigint (List.length keys)) : Result<bigint,string>))
+    let txWeight = transactionWeight utxos sTx
+    shouldEqual (txWeight, (Ok (pkWitnessWeight * bigint (List.length keys)) : Result<bigint,string>))
 
 // The weight of a contract witness is just computed from the cost to which
 // it commits. The cost is validated in TransactionValidation.
@@ -97,7 +103,7 @@ let ``Contract validated transaction should have the right cost``() =
         contract = None;
         witnesses = [ ContractWitness cWitness ]
     }
-    let txWeight = transactionWeight getUTXO utxos tx
+    let txWeight = transactionWeight utxos tx
     shouldEqual (txWeight,(Ok 20_000I : Result<bigint,string>))
 
 [<Test>]
@@ -146,7 +152,7 @@ let ``Two contracts in sequence should have the right cost``() =
         contract = None;
         witnesses = [ ContractWitness cWitness1; ContractWitness cWitness2 ]
     }
-    let txWeight = transactionWeight getUTXO utxos tx
+    let txWeight = transactionWeight utxos tx
     shouldEqual (txWeight, (Ok 25_000I : Result<bigint,string>))
 
 [<Test>]
@@ -164,8 +170,8 @@ let ``Transaction with too many witnesses should fail``() =
     }
     let utxos = Map.ofSeq [ testInput1, Unspent output ]
     let sTx = Transaction.sign twoKeyPairs TxHash tx
-    let txWeight = transactionWeight getUTXO utxos sTx
-    shouldEqual (txWeight, (Error "Too many witnesses" : Result<bigint,string>))
+    let txWeight = transactionWeight utxos sTx
+    shouldEqual (txWeight, (Error "expecting a contract 0 witness" : Result<bigint,string>))
 
 [<Test>]
 let ``Transaction with too few witnesses should fail``() =
@@ -180,8 +186,8 @@ let ``Transaction with too few witnesses should fail``() =
         contract = None
     }
     let utxos = Map.ofSeq [ testInput1, Unspent output ]
-    let txWeight = transactionWeight getUTXO utxos tx
-    shouldEqual (txWeight, (Error "Too few witnesses" : Result<bigint,string>))
+    let txWeight = transactionWeight utxos tx
+    shouldEqual (txWeight, (Error "expecting a public key witness" : Result<bigint,string>))
 
 [<Test>]
 let ``Contract activation weight should be positive``() =
@@ -231,5 +237,5 @@ let ``Transaction with large amount of inputs should not fail weight calculation
         contract = None
     }
     let signedTx = Transaction.sign keys TxHash tx
-    let txWeight = transactionWeight getUTXO utxos signedTx
+    let txWeight = transactionWeight utxos signedTx
     shouldEqual (txWeight, (Ok 500000000I : Result<bigint,string>))

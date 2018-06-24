@@ -47,7 +47,7 @@ Feature: Transaction validation with utxo-set context
 
     # duplidate key
     When tx2 results by re-signing tx1 with key1,key2,key2,key3,key3
-    Then tx2 validation should yield PK witness mismatch
+    Then tx2 validation should yield expecting a contract 0 witness
 
     # invalid order
     When tx2 results by re-signing tx1 with key2,key1,key3,key3
@@ -55,10 +55,10 @@ Feature: Transaction validation with utxo-set context
 
     # malleating the witness list
     When tx2 results by pushing witness 0 of tx1 at index 0
-    Then tx2 validation should yield PK witness mismatch
+    Then tx2 validation should yield expecting a contract 0 witness
 
     When tx2 results by pushing witness 1 of tx1 at index 0
-    Then tx2 validation should yield PK witness mismatch
+    Then tx2 validation should yield expecting a contract 0 witness
 
     # malleating the input list
     When tx2 results by pushing input 0 of tx1 at index 0
