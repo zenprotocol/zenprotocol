@@ -5,14 +5,14 @@ open Consensus.Types
 open Wallet.DataAccess
 open Wallet.Types
 
-type T = Map<Outpoint, Output>
+type T = Set<Hash.Hash> * Map<Outpoint, Output>
 
 // TODO: add transaction to mempool
 
-let empty = Map.empty
+let empty = Set.empty, Map.empty
 
 module Outputs =
-    let getAll view dataAccess session =
+    let getAll (_,view) dataAccess session =
         let outputs =
             Outputs.getAll dataAccess session
             |> List.map (fun output -> output.outpoint, output)
@@ -35,7 +35,7 @@ module Outputs =
             Outputs.contains dataAccess session outpoint
 
 module AddressOutputs =
-    let get view dataAcesss session key =
+    let get (_,view) dataAcesss session key =
         let outputs =
             AddressOutputs.get dataAcesss session key
             |> List.map (fun output -> output.outpoint, output)
@@ -47,36 +47,43 @@ module AddressOutputs =
         |> Seq.map snd
         |> List.ofSeq
 
-let addMempoolTransaction dataAccess session txHash tx view =
-    let view = List.fold (fun view input ->
+let addMempoolTransaction dataAccess session txHash tx (set, outputs) =
+    if Set.contains txHash set then
+        (set, outputs)
+    else
+
+    let outputs = List.fold (fun view input ->
         match input with
         | Outpoint outpoint ->
             match Outputs.tryGet view dataAccess session outpoint with
             | Some output -> Map.add outpoint {output with status = Spent (txHash,Unconfirmed)} view
             | None -> view
-        | _ -> view) view tx.inputs
+        | _ -> view) outputs tx.inputs
 
-    tx.outputs
-    |> List.mapi (fun index output -> uint32 index,output)
-    |> List.choose (fun (index,output) ->
-        match output.lock with
-        | Coinbase (_,pkHash)
-        | PK pkHash when (DataAccess.Addresses.contains dataAccess session pkHash) ->
-            Some (pkHash,index,output)
-        | _ -> None)
-    |> List.fold (fun view (pkHash,index,output) ->
-        let outpoint = {txHash=txHash; index=index}
+    let outputs =
+        tx.outputs
+        |> List.mapi (fun index output -> uint32 index,output)
+        |> List.choose (fun (index,output) ->
+            match output.lock with
+            | Coinbase (_,pkHash)
+            | PK pkHash when (DataAccess.Addresses.contains dataAccess session pkHash) ->
+                Some (pkHash,index,output)
+            | _ -> None)
+        |> List.fold (fun view (pkHash,index,output) ->
+            let outpoint = {txHash=txHash; index=index}
 
-        let output = {
-            pkHash = pkHash
-            spend = output.spend
-            lock = output.lock
-            outpoint = outpoint
-            status = Unspent
-            confirmationStatus = Unconfirmed
-        }
+            let output = {
+                pkHash = pkHash
+                spend = output.spend
+                lock = output.lock
+                outpoint = outpoint
+                status = Unspent
+                confirmationStatus = Unconfirmed
+            }
 
-        Map.add outpoint output view) view
+            Map.add outpoint output view) outputs
 
-let fromMempool dataAccess session transactions =
+    Set.add txHash set, outputs
+
+let fromMempool dataAccess session transactions : T =
     List.fold (fun view (txHash,tx) -> addMempoolTransaction dataAccess session txHash tx view) empty transactions
