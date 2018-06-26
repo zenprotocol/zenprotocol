@@ -1,6 +1,7 @@
 module Blockchain.BlockTemplateBuilder
 
 open Infrastructure
+open Result
 open Consensus.ValidationError
 open Consensus.TransactionValidation
 open Blockchain.State
@@ -15,20 +16,21 @@ let getContractState = ContractStateRepository.get
 // There's no need to update the UTXO set when adding the weights -- the only
 // use of the UTXOs is to dereference all the outputs.
 let weights session state =
-    let resMap =
-        MemPool.toList state.memoryState.mempool
-        |> List.map
-            (fun (txHash,tx) ->
-                txHash,tx, Weight.transactionWeight (getUTXO session) state.memoryState.utxoSet tx)
-
-    resMap
+    MemPool.toList state.memoryState.mempool
+    |> List.map
+        (fun (txHash,tx) -> 
+            UtxoSet.tryGetOutputs (getUTXO session) state.memoryState.utxoSet tx.inputs
+            |> Result.ofOption "could not get outputs"
+            <@> TxSkeleton.fromTransaction tx
+            >>= Weight.transactionWeight tx
+            <@> fun weight -> txHash,tx, weight)
     |> fun sq ->
-            [
-            for (txHash, tx, wtRes) in sq do
-                match wtRes with
-                | Ok wt -> yield (txHash, tx, wt)
-                | _ -> ()
-            ]
+        [
+        for value in sq do
+            match value with
+            | Ok (txHash, tx, wt) -> yield (txHash, tx, wt)
+            | _ -> ()
+        ]
 
 let selectOrderedTransactions (chain:Chain.ChainParameters) (session:DatabaseContext.Session) blockNumber timestamp acs contractCache transactions =
     let contractPath = session.context.contractPath
@@ -73,5 +75,5 @@ let selectOrderedTransactions (chain:Chain.ChainParameters) (session:DatabaseCon
 
 
 let makeTransactionList chain (session:DatabaseContext.Session) (state:State) timestamp =
-    let txs = weights session state |> List.sortBy (fun (_,_,wt) -> -wt)
+    let txs = weights session state |> List.sortBy (fun (_,_,wt) -> wt)
     selectOrderedTransactions chain session state.tipState.tip.header.blockNumber timestamp state.tipState.activeContractSet state.memoryState.contractCache txs

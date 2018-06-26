@@ -340,19 +340,19 @@ let connect chain getUTXO contractsPath (parent:BlockHeader) timestamp utxoSet a
         else
             Error "commitments mismatch"
 
-    let checkWeight (block,set,acs,ema,contractCache,contractStates) = result {
-        let! weight = Weight.blockWeight getUTXO utxoSet block
+    let checkWeight (block,nextEma) = result {
+        let! weight = Weight.blockWeight getUTXO block utxoSet
         let maxWeight = chain.maxBlockWeight
         if weight <= maxWeight
         then
-            return block,set,acs,ema,contractCache,contractStates
+            return block,nextEma
         else
             return! Error "block weight exceeds maximum"
     }
 
     checkBlockNumber
     >=> checkDifficulty
-    >=> checkTxInputs
     >=> checkWeight
+    >=> checkTxInputs
     >=> checkCoinbase
     >=> checkCommitments

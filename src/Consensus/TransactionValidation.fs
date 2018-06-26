@@ -1,6 +1,7 @@
 module Consensus.TransactionValidation
 
 open Consensus
+open Chain
 open Types
 open UtxoSet
 open Crypto
@@ -141,6 +142,15 @@ let private checkAmounts (txSkeleton:TxSkeleton.T) =
         GeneralError "invalid amounts"
     else
         Ok ()
+
+let checkWeight chain tx txSkeleton = 
+    Weight.transactionWeight tx txSkeleton
+    >>= (fun txWeight ->
+        if txWeight <= chain.maxBlockWeight then
+            Ok()
+        else
+            Error "transaction weight exceeds maximum")
+    |> Result.mapError General
 
 let private checkOutputsOverflow tx =
     if tx.outputs
@@ -330,6 +340,8 @@ let validateCoinbase blockNumber =
 let validateInContext chainParams getUTXO contractPath blockNumber timestamp acs contractCache set getContractState contractState txHash tx = result {
     let! outputs = tryGetUtxos getUTXO set tx
     let txSkel = TxSkeleton.fromTransaction tx outputs
+
+    do! checkWeight chainParams tx txSkel
 
     do! checkAmounts txSkel
     let! contractStates = InputValidation.StateMachine.validate blockNumber timestamp acs outputs getContractState contractState txHash tx txSkel
