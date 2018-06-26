@@ -1,4 +1,4 @@
-chain: main
+chain: test
 
 dataPath: ./data
 
@@ -7,9 +7,6 @@ listen: true
 bind: "*:29555"
 seeds:
   - 52.36.171.220:29555
-  - 18.217.138.100:29555
-  - 18.216.202.176:29555
-  - 18.188.175.222:29555
 
 api:
   enabled: true

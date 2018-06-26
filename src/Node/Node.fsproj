@@ -52,6 +52,9 @@
     </Content>
     <Content Include="paket.references" />
     <Content Include="scheme.yaml" />
+    <Content Include="test.yaml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="zen-cli">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

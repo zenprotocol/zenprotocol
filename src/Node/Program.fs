@@ -82,9 +82,26 @@ let main argv =
     eventX "Node running... press CTRL+C to exit"
     |> Log.info
 
+    // if a chain was specified, we want to override config before 
+    // we handle rest of switches, which may override config again 
     List.iter (fun arg ->
         match arg with
-        | Chain chain -> config.chain <- chain
+        | Chain chain -> 
+            let file = sprintf "%s.yaml" chain
+            if System.IO.File.Exists(file) then
+                config.Load(file)
+            else
+                eventX "Config file {configFile} not found, using default"
+                >> setField "configFile" file
+                |> Log.warning
+        | _ -> ()
+    ) (results.GetAllResults())
+
+    List.iter (fun arg ->
+        match arg with
+        | Chain chain -> 
+            config.chain <- chain
+#if DEBUG
         | Localhost ->
             config.chain <- "local"
             config.externalIp <- "127.0.0.1"
@@ -111,6 +128,7 @@ let main argv =
             config.api.bind <- "127.0.0.1:36001"
             config.seeds.Clear()
             config.seeds.Add "127.0.0.1:29555"
+#endif
         | Api address ->
             config.api.enabled <- true
             config.api.bind <- address
