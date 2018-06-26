@@ -49,11 +49,31 @@ let ``PK address encode-decode roundtrip should produce same result``(chain:Chai
 [<Property>]
 let ``Decoding Contract address of PK encoded address results in error``(chain:Chain) (ValidHash hash) =
     let address = Address.encode chain (PK hash)
-    (Address.decodeContract chain address, msgC "address type mismatch, Contract expected")
+    (Address.decodeContract chain address, msgC "invalid HRP")
     |> shouldEqual
 
 [<Property>]
 let ``Decoding PK address of Contract encoded address results in error``(chain:Chain) version (ValidHash hash) =
     let address = Address.encode chain (Contract <| ContractId (version,hash))
-    (Address.decodePK chain address, msg "address type mismatch, Public Key expected")
+    (Address.decodePK chain address, msg "invalid HRP")
     |> shouldEqual
+
+[<Property>]
+let ``Encoded Mainnet PK address should start with zen``(ValidHash hash) =
+    let address = Address.encode Main (PK hash)
+    address.StartsWith("zen")
+
+[<Property>]
+let ``Encoded Testnet PK address should start with tzn``(ValidHash hash) =
+    let address = Address.encode Test (PK hash)
+    address.StartsWith("tzn")
+    
+[<Property>]
+let ``Encoded Mainnet Contract address should start with czen``version (ValidHash hash) =
+    let address = Address.encode Main (Contract <| ContractId (version,hash))
+    address.StartsWith("czen")
+
+[<Property>]
+let ``Encoded Testnet Contract address should start with ctzn``version (ValidHash hash) =
+    let address = Address.encode Test (Contract <| ContractId (version,hash))
+    address.StartsWith("ctzn")

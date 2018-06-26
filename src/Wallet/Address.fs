@@ -10,20 +10,22 @@ open Infrastructure
 [<Literal>]
 let AddressVersion = 0uy
 
+type AddressType =
+    | PKAddressType
+    | ContractAddressType
+
 type Address =
     | PK of Hash
     | Contract of ContractId
 
-let private getChainType =
-    function
-    | Main -> 'z'
-    | Local
-    | Test -> 't'
+[<Literal>]
+let private contractAddressIdentifier = "c"
 
-let private getAddressType =
-    function
-    | PK _ -> 'p'
-    | Contract _ -> 'c'
+[<Literal>]
+let private mainChainIdentifier = "zen"
+
+[<Literal>]
+let private testChainIdentifier = "tzn"
 
 let encode chain address =
     let bytes =
@@ -31,37 +33,97 @@ let encode chain address =
         | PK hash -> Hash.bytes hash
         | Contract contractId -> ContractId.toBytes contractId
 
-    let hrp = System.String.Concat(Array.ofList([ getChainType chain; getAddressType address ]))
+    let getChainType =
+        function
+        | Main -> mainChainIdentifier
+        | Local
+        | Test -> testChainIdentifier
+    
+    let getAddressType =
+        function
+        | PK _ -> ""
+        | Contract _ -> contractAddressIdentifier
+    
+    let hrp = String.concat "" [ getAddressType address; getChainType chain ]
     let words = Bech32.toWords bytes
     let data = Array.append [|AddressVersion|] words
     Bech32.encode hrp data
 
-let decode chain address =
-    match Bech32.decode address with
+type State =
+    | Invalid of string
+    | DecodeHrp of string * expectedChain:Chain * expectedAddressType:AddressType * byte[]
+    | DecodeHrpNext of AddressType * expectedChain:Chain * string * byte[]
+    | DecodeData of AddressType * byte[]
+    | Valid of Address
+
+let private decodeHrp hrp expectedChain expectedAddressType data =
+    let hrpLen = String.length hrp
+
+    if hrpLen = 3 && 
+       expectedAddressType = PKAddressType then
+        DecodeHrpNext (PKAddressType, expectedChain, hrp, data)
+    else if hrpLen = 4 && 
+            hrp.[0] = contractAddressIdentifier.[0] && 
+            expectedAddressType = ContractAddressType then
+        DecodeHrpNext (ContractAddressType, expectedChain, hrp.[1..], data)
+    else
+        Invalid "invalid HRP"
+
+let private decodeHrpNext addressType expectedChain hrp data =
+    if hrp = mainChainIdentifier && 
+       expectedChain = Main then
+        DecodeData (addressType, data)
+    else if hrp = testChainIdentifier && 
+            (expectedChain = Test || expectedChain = Local) then
+        DecodeData (addressType, data)
+    else
+        Invalid "invalid HRP"
+        
+let private decodeData addressType (data:byte[]) =
+    if data.[0] <> AddressVersion then
+        Invalid "address version mismatch"
+    else
+        match Bech32.fromWords data.[1..] with
+        | None ->
+            Invalid "invalid address"
+        | Some data ->
+            match addressType with
+            | PKAddressType ->
+                Hash.fromBytes data
+                |> Option.map PK
+            | ContractAddressType ->
+                ContractId.fromBytes data
+                |> Option.map Contract 
+            |> function
+            | Some address -> Valid address
+            | None -> Invalid "invalid address data"
+ 
+let rec private decodeNext state =
+    match state with
+    | Invalid err -> Invalid err
+    | DecodeHrp (hrp, expectedChain, expectedAddressType, data) ->
+        decodeHrp hrp expectedChain expectedAddressType data
+        |> decodeNext
+    | DecodeHrpNext (addressType, expectedChain, hrp, data) ->
+        decodeHrpNext addressType expectedChain hrp data
+        |> decodeNext
+    | DecodeData (addressType, data) ->
+        decodeData addressType data
+        |> decodeNext
+    | Valid address -> Valid address
+
+let private decode chain addressType bytes = 
+    match Bech32.decode bytes with
     | None ->
         Error "could not decode address"
-    | Some (hrp, words) ->
-        let hrp = Seq.toArray hrp
-        if Seq.length hrp <> 2 then
-            Error "invalid HRP"
-        else if hrp.[0] <> getChainType chain then
-            Error "invalid chain"
-        else if Array.isEmpty words then
-            Error "missing address data"
-        else if words.[0] <> AddressVersion then
-            Error "address version mismatch"
-        else
-            match Bech32.fromWords words.[1..] with
-            | None ->
-                Error "invalid address"
-            | Some data ->
-                match hrp.[1] with
-                | 'p' -> Hash.fromBytes data |> Option.map PK |> Result.ofOption "invalid address data"
-                | 'c' -> ContractId.fromBytes data |> Option.map Contract |> Result.ofOption "invalid address data"
-                | _ -> Error "invaid address type"
+    | Some (hrp, data) ->
+        match decodeNext (DecodeHrp (hrp, chain, addressType, data)) with
+        | Valid address -> Ok address
+        | Invalid error -> Error error
+        | _ -> failwith "unexpected"
 
-let decodeContract chain address  =
-    decode chain address
+let decodeContract chain address =
+    decode chain ContractAddressType address
     |> Result.bind (function
         | Contract contractId ->
             Ok contractId
@@ -69,7 +131,7 @@ let decodeContract chain address  =
             Error "address type mismatch, Contract expected")
 
 let decodePK chain address =
-    decode chain address
+    decode chain PKAddressType address
     |> Result.bind (function
         | PK hash ->
             Ok hash
