@@ -316,6 +316,8 @@ __pycache__/
 
 # Zulib
 src/Zulib/fsharp/Extracted
+src/Zulib/fstar/*.hints
+src/Zulib/fstar/*.checked
 .DS_Store
 
 # OpenCover UI analysis results

@@ -622,9 +622,6 @@ module Serialization =
         }
 
     module Data =
-        open Consensus
-        open System.Collections.ObjectModel
-
         [<Literal>]
         let private I64Data = 1uy
         [<Literal>]
@@ -1111,6 +1108,7 @@ module Header =
 module Block =
     let serialize bk =
         Block.write counters bk 0ul
+
         |> int32
         |> create
         |> Block.write serializers bk

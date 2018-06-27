@@ -109,9 +109,7 @@ let setUp = fun () ->
         RT.ofOption "not enough Zens" result'
 
     let cf _ _ _ _ _ wallet _ =
-        64 + (W.size wallet * 128 + 192) + 0 + 22
-        |> cast nat
-        |> C.ret
+        C.ret (64 + (W.size wallet * 128 + 192) + 0 + 22 <: nat)
     """ account session state
     |> function
     | Ok (state', cHash') ->

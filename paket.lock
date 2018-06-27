@@ -15,7 +15,7 @@ NUGET
       FSharp.Core
     FsCheck (3.0.0-alpha3)
       FSharp.Core (>= 4.0.0.1)
-    FsCheck.Nunit (3.0.0-alpha3)
+    FsCheck.NUnit (3.0.0-alpha3)
       FsCheck (3.0.0-alpha3)
       NUnit (>= 3.8.1 < 4.0)
     FSharp.Compatibility.OCaml (0.1.14)
@@ -131,7 +131,7 @@ NUGET
     zen_z3_linux (4.5.1.8-v1f29cebd4df)
     zen_z3_osx (4.5.1.8-v1f29cebd4df6)
     zen_z3_windows (4.5.1.7-v1f29cebd4df)
-    Zulib (0.3.35)
+    Zulib (0.3.36)
       BouncyCastle
       FAKE (>= 4.0 < 5.0)
       FsBech32 (>= 0.1.0.7)
