@@ -67,7 +67,7 @@ type ArbitraryGenerators =
 let acs = ActiveContractSet.empty
 
 let getSignedTx tx keys =
-    let signedTx = Transaction.sign keys tx
+    let signedTx = Transaction.sign keys TxHash tx
     let txHash = Transaction.hash signedTx
 
     signedTx, txHash

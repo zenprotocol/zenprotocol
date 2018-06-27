@@ -26,7 +26,7 @@ let main txSkeleton _ contractId command sender messageBody wallet state =
 
   RT.ok @ { tx = txSkeleton; message = None; state = NoChange}
 
-let cf _ _ _ _ _ _ _ = 
+let cf _ _ _ _ _ _ _ =
     64 + (64 + 64 + 0) + 22
     |> cast nat
     |> C.ret
@@ -77,8 +77,8 @@ let sampleOutputTx, _ =
 
 let sampleExpectedResult =
     Transaction.fromTxSkeleton sampleOutputTx
-    |> Transaction.addWitnesses [ ContractWitness <| TxSkeleton.getContractWitness sampleContractId "" None NotCommitted sampleInputTx sampleOutputTx 214L ]
-    |> Transaction.sign [ sampleKeyPair ]
+    |> Transaction.pushWitnesses [ ContractWitness <| TxSkeleton.getContractWitness sampleContractId "" None NotCommitted sampleInputTx sampleOutputTx 214L ]
+    |> Transaction.sign [ sampleKeyPair ] TxHash
 
 let getSampleUtxoset utxos =
     Map.add sampleInput (UtxoSet.Unspent sampleOutput) utxos

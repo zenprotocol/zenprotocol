@@ -13,7 +13,7 @@ open ZFStar
 open Crypto
 open Types
 open System
-open Blockchain.State
+open State
 open System.IO
 open FsUnit
 open Messaging.Events
@@ -62,7 +62,7 @@ let clean() =
 
 [<Binding>]
 module Binding =
-    open Blockchain.BlockState
+    open Consensus.Serialization
 
     type TestingState = {
         blocks : Map<string, BlockHeader>
@@ -70,6 +70,7 @@ module Binding =
         contracts : Map<string, ContractId * ContractV0>
         keys : Map<string, KeyPair>
         txs : Map<string, Transaction>
+        txLists : Map<string, Transaction list>
         data : Map<string, Zen.Types.Data.data>
     }
 
@@ -79,6 +80,7 @@ module Binding =
         contracts = Map.empty
         keys = Map.empty
         txs = Map.empty
+        txLists = Map.empty
         data = Map.empty
     }
 
@@ -113,7 +115,6 @@ module Binding =
     let mutable state : Blockchain.State.State = getEmptyState()
     let mutable contractExecutionCache : Map<ContractId, Contract.T> = Map.empty
 
-
     let getUTXO = UtxoSetRepository.get
     let getContractState = ContractStateRepository.get
 
@@ -132,6 +133,8 @@ module Binding =
         tx
 
     let tryFindTx txLabel = Map.tryFind txLabel testingState.txs
+    
+    let tryFindTxList txLabel = Map.tryFind txLabel testingState.txLists
 
     let tryFindContract contractLabel = Map.tryFind contractLabel testingState.contracts
 
@@ -142,17 +145,63 @@ module Binding =
 
     let findBlock blockLabel = Map.find blockLabel testingState.blocks
 
+    let getContractId contractLabel =
+        let path = Path.GetDirectoryName (System.Reflection.Assembly.GetExecutingAssembly().Location)
+        let path = Path.Combine (path, "Contracts")
+        let contract = Path.ChangeExtension (contractLabel,".fst")
+        let code = Path.Combine (path, contract) |> File.ReadAllText
+        let contractId = Contract.makeContractId Version0 code
+        contractId, code
+        
+    let getContractRecord contractLabel =
+        match Map.tryFind contractLabel testingState.contracts with
+        | Some value -> value
+        | None ->
+            let contractId, code = getContractId contractLabel
+            
+            let hints =
+                match Contract.recordHints code with
+                | Ok hints -> hints
+                | Error error -> failwith error
+
+            let queries =
+                match Infrastructure.ZFStar.totalQueries hints with
+                | Ok queries -> queries
+                | Error error -> failwith error
+
+            let contract = {
+               code = code
+               hints = hints
+               rlimit = rlimit
+               queries = queries
+            }
+
+            testingState <-
+                { testingState with contracts = Map.add contractLabel (contractId, contract) testingState.contracts }
+
+            contractId, contract
+            
+    let getContractFunction contractLabel =
+        let contractId, contract =
+            getContractRecord contractLabel
+
+        match Map.tryFind contractId contractExecutionCache with
+        | Some contract -> contract
+        | None ->
+            Contract.compile session.context.contractPath contract
+            |> Result.bind (fun _ -> Contract.load session.context.contractPath 1ul contract.code contractId)
+            |> Result.map (fun contract -> contractExecutionCache <- Map.add contractId contract contractExecutionCache
+                                           contract)
+            |> Infrastructure.Result.get
+            
     let getAsset value =
         if value = "Zen" then Asset.Zen
         else
-            match tryFindContract value with
-            | Some (contractId, _) ->
-                Asset (contractId, Hash.zero)
-            | None ->
-                failwithf "Unrecognized asset: %A" value
+            let contractId, _ = getContractRecord value
+            Asset (contractId, Hash.zero)
 
     let getAmount asset amount =
-        if asset = "Zen" then
+        if asset = Asset.Zen then
             amount * 100_000_000UL
         else
             amount
@@ -176,38 +225,6 @@ module Binding =
         | None ->
             { inputs = []; witnesses = []; outputs = []; version = Version0; contract = None }
             |> updateTx txLabel
-
-    let getContractRecord contractLabel =
-        match Map.tryFind contractLabel testingState.contracts with
-        | Some value -> value
-        | None ->
-            let path = Path.GetDirectoryName (System.Reflection.Assembly.GetExecutingAssembly().Location)
-            let path = Path.Combine (path, "Contracts")
-            let contract = Path.ChangeExtension (contractLabel,".fst")
-            let code = Path.Combine (path, contract) |> File.ReadAllText
-
-            let hints =
-                match Contract.recordHints code with
-                | Ok hints -> hints
-                | Error error -> failwith error
-
-            let queries =
-                match Infrastructure.ZFStar.totalQueries hints with
-                | Ok queries -> queries
-                | Error error -> failwith error
-
-            let contractId = Contract.makeContractId Version0 code
-            let contract = {
-               code = code
-               hints = hints
-               rlimit = rlimit
-               queries = queries
-            }
-
-            testingState <-
-                { testingState with contracts = Map.add contractLabel (contractId, contract) testingState.contracts }
-
-            contractId, contract
 
     let initKey keyLabel =
         let context = Native.secp256k1_context_create (Native.SECP256K1_CONTEXT_SIGN ||| Native.SECP256K1_CONTEXT_VERIFY)
@@ -307,6 +324,7 @@ module Binding =
             contracts = testingState.contracts
             keys = Map.empty
             txs = Map.empty
+            txLists = Map.empty
             data = Map.empty
         }
         let contractCache = state.memoryState.contractCache
@@ -325,7 +343,7 @@ module Binding =
             let amount = row.GetInt64 "Amount" |> uint64
 
             let tx = initTx txLabel
-            let output = getOutput (getAmount asset amount) asset keyLabel
+            let output = getOutput (getAmount (getAsset asset) amount) asset keyLabel
             let tx = { tx with outputs = Infrastructure.List.add output tx.outputs }
                      |> updateTx txLabel
 
@@ -347,13 +365,7 @@ module Binding =
         state <- { state with memoryState = { state.memoryState with utxoSet = utxoSet } }
 
     let executeContract contractLabel inputTxLabel outputTxLabel command sender messageBody =
-        let contractId, contract =
-            getContractRecord contractLabel
-        let contract =
-            Contract.compile session.context.contractPath contract
-            |> Result.bind (fun _ -> Contract.load session.context.contractPath 1ul contract.code contractId)
-            |> Infrastructure.Result.get
-
+        let contract = getContractFunction contractLabel
         let tx = initTx inputTxLabel
         let outputs =
             match UtxoSet.tryGetOutputs (getUTXO session) state.memoryState.utxoSet tx.inputs with
@@ -362,8 +374,7 @@ module Binding =
 
         let inputTx = TxSkeleton.fromTransaction tx outputs
 
-        contractExecutionCache <- Map.add contractId contract contractExecutionCache
-        let state' = { state with memoryState = { state.memoryState with activeContractSet = ActiveContractSet.add contractId contract state.memoryState.activeContractSet } }
+        let state' = { state with memoryState = { state.memoryState with activeContractSet = ActiveContractSet.add contract.contractId contract state.memoryState.activeContractSet } }
 
         match TransactionHandler.executeContract session inputTx 0UL contract.contractId command sender messageBody state' false with
         | Ok tx -> updateTx outputTxLabel tx
@@ -423,7 +434,7 @@ module Binding =
                     |> foldOutputs
                 inputsTotal - outputsTotal
             else
-                getAmount asset (UInt64.Parse amount)
+                getAmount (getAsset asset) (UInt64.Parse amount)
 
         let output = getOutput amount asset keyLabel
         { tx with outputs = Infrastructure.List.add output tx.outputs }
@@ -481,6 +492,46 @@ module Binding =
             let index = row.GetInt64 "Index" |> uint32
             addInput txLabel refTxLabel index
 
+    // Constructs an array of transactinos 
+    let [<Given>] ``(.*) is array of (.*) from (.*)`` txLabel count refTxLabel =
+        let mutable txs = []
+        let refTx = findTx refTxLabel
+        
+        if List.length refTx.inputs > 1 ||
+           List.length refTx.outputs > 1 ||
+           List.length refTx.witnesses > 1 then
+            failwithf "Transaction array base tx should have a single input and a single output with amount dividable by tx count"
+
+        let spend = { refTx.outputs.[0].spend with amount = refTx.outputs.[0].spend.amount (* / count *) }
+
+        let findKeyByLock lock =
+            testingState.keys
+            |> Map.toSeq
+            |> Seq.map snd
+            |> Seq.find (fun keyPair -> 
+                match lock with
+                | PK pkHash -> PublicKey.hash (snd keyPair) = pkHash
+                | _ -> false)
+
+        let mutable keyPair = findKeyByLock refTx.outputs.[0].lock
+        let mutable input = { txHash = Transaction.hash refTx; index = 0ul }
+        
+        for _ in [ 1UL .. count ] do
+            let newKeyPair = KeyPair.create()
+
+            let output = { lock = snd newKeyPair |> PublicKey.hash |> PK ; spend = spend }
+
+            let tx =
+                { inputs = [ Outpoint input ]; witnesses = []; outputs = [ output ]; version = Version0; contract = None }
+                |> Transaction.sign [ keyPair ] TxHash
+                                
+            input <- { txHash = Transaction.hash tx; index = 0ul }
+            keyPair <- newKeyPair
+            
+            txs <- List.append txs [ tx ]
+
+        testingState <- { testingState with txLists = Map.add txLabel txs testingState.txLists }
+
     let constructData dataType value =
         match dataType with
         | Regex @"(.+) (.+)" [ dataType; collectionType ] ->
@@ -515,27 +566,25 @@ module Binding =
         |> Zen.Types.Data.Collection
         |> initData dataLabel
 
-    // Signs a tx
-    let [<Given>] ``(.*) is signed with (.*)`` txLabel keyLabels =
-        let tx = findTx txLabel
+    let sign txLabel keyLabels tx =
         let keyPairs =
             keyLabels
             |> split
             |> List.map findKey
-        let tx = Transaction.sign keyPairs tx
-        updateTx txLabel tx
+        tx
+        |> Transaction.sign keyPairs TxHash
+        |> updateTx txLabel
         |> ignore
+        
+    // Signs a tx
+    let [<Given>] ``(.*) is signed with (.*)`` txLabel keyLabels =
+        findTx txLabel
+        |> sign txLabel keyLabels
 
     // Signs a tx
     let [<When>] ``signing (.*) with (.*)`` txLabel keyLabels =
-        let tx = findTx txLabel
-        let keyPairs =
-            keyLabels
-            |> split
-            |> List.map findKey
-        let tx = Transaction.sign keyPairs tx
-        updateTx txLabel tx
-        |> ignore
+        findTx txLabel
+        |> sign txLabel keyLabels
 
     // Initializes a chain with a genesis block
     let [<Given>] ``genesis has (.*)`` rootTxLabels =
@@ -561,13 +610,8 @@ module Binding =
 
         state <- state'
 
-    let extendChain newBlockLabel txLabels parentBlockLabel =
+    let extendChain' newBlockLabel txs parentBlockLabel =
         let createBlock state =
-            let txs =
-                txLabels
-                |> split
-                |> List.map findTx
-
             let parent =
                 if parentBlockLabel = "tip" then
                     state.tipState.tip.header
@@ -583,16 +627,18 @@ module Binding =
 
             let newAcs =
                 List.fold (fun acs tx ->
-                    match TransactionValidation.validateInContext chain (fun outpoint ->
-                        let outputStatus = getUTXO session outpoint
-                        match outputStatus with
-                        | UtxoSet.OutputStatus.NoOutput -> failwithf "no output: constructing block %A" newBlockLabel
-                        | UtxoSet.OutputStatus.Spent output ->  UtxoSet.OutputStatus.Unspent output
-                        | UtxoSet.OutputStatus.Unspent output ->  UtxoSet.OutputStatus.Unspent output) session.context.contractPath (parent.blockNumber + 1ul) timestamp
-                        acs state.memoryState.contractCache Map.empty (getContractState session) ContractStates.asDatabase (Transaction.hash tx) tx with
-                    | Ok (_,acs,_,_) -> acs
-                    | Error err -> failwithf "Tx failed validation: %A %A constructing block %A" (Transaction.hash tx) err newBlockLabel
-
+                    try
+                        match TransactionValidation.validateInContext chain (fun outpoint ->
+                            let outputStatus = getUTXO session outpoint
+                            match outputStatus with
+                            | UtxoSet.OutputStatus.NoOutput -> failwithf "no output: constructing block %A" newBlockLabel
+                            | UtxoSet.OutputStatus.Spent output ->  UtxoSet.OutputStatus.Unspent output
+                            | UtxoSet.OutputStatus.Unspent output ->  UtxoSet.OutputStatus.Unspent output) session.context.contractPath (parent.blockNumber + 1ul) timestamp
+                            acs state.memoryState.contractCache Map.empty (getContractState session) ContractStates.asDatabase (Transaction.hash tx) tx with
+                        | Ok (_,acs,_,_) -> acs
+                        | Error err -> failwithf "Tx failed validation: %A %A constructing block %A" (Transaction.hash tx) err newBlockLabel
+                    with _ as ex ->
+                        acs
                 ) parentAcs txs
 
             let rawblock = Block.createTemplate chain parent (timestamp + (uint64 parent.blockNumber)*1_000_000UL) state.tipState.ema newAcs txs Hash.zero
@@ -625,6 +671,17 @@ module Binding =
 
         state <- state'
         block
+        
+    let extendChain newBlockLabel txLabels parentBlockLabel =
+        let txs =
+            match tryFindTxList txLabels with
+            | Some txList -> txList
+            | None ->
+                txLabels
+                |> split
+                |> List.map findTx
+            
+        extendChain' newBlockLabel txs parentBlockLabel
 
     // Extend a chain
     let [<When>] ``validating a block containing (.*) extending (.*)`` txLabels parentBlockLabel =
@@ -638,14 +695,14 @@ module Binding =
     let [<When>] ``validating an empty block (.*) extending (.*)`` newBlockLabel parentBlockLabel =
         extendChain (Some newBlockLabel) "" parentBlockLabel
 
-    // Checks that tx passes in-context validation
-    let [<Then>] ``(.*) should pass validation`` txLabel =
+    let validate txLabel =
         let tx = findTx txLabel
 
         let acs =
             Map.fold (fun acs contractId contract -> ActiveContractSet.add contractId contract acs) ActiveContractSet.empty contractExecutionCache
 
-        match TransactionValidation.validateInContext
+        TransactionValidation.validateBasic tx
+        >>= (TransactionValidation.validateInContext
             chain
             (getUTXO session)
             session.context.contractPath
@@ -656,11 +713,21 @@ module Binding =
             state.memoryState.utxoSet
             (getContractState session)
             ContractStates.asDatabase
-            (Transaction.hash tx)
-            tx with
+            (Transaction.hash tx))
+
+    // Checks that tx passes validation
+    let [<Then>] ``(.*) should pass validation`` txLabel =
+        match validate txLabel with 
         | Ok _ -> ()
         | Error e -> failwithf "Validation result: %A" e
 
+    // Checks that tx doesn't passes validation
+    let [<Then>] ``(.*) validation should yield (.*)`` txLabel (message:string) =
+        match validate txLabel with 
+        | Ok _ -> failwithf "Unexpected Ok validation result"
+        | Error (ValidationError.General error) -> message ?= error
+        | Error error  -> message ?= (error.ToString())
+        
     //Checks that a tx is locking an asset to an address or a contract
     let [<Then>] ``(.*) should lock (.*) (.*) to (.*)`` txLabel (expected:uint64) asset keyLabel =
         let tx = findTx txLabel
@@ -727,3 +794,70 @@ module Binding =
         | Some contract ->
             printfn "%A is active for %A blocks" contractLabel (contract.expiry - state.tipState.tip.header.blockNumber)
         | None -> ()
+
+    let malleateTx destTxLabel sourceTxLabel malleateTxFn =
+        sourceTxLabel
+        |> findTx 
+        |> malleateTxFn
+        |> updateTx destTxLabel
+        |> ignore
+
+    let malleateListItem (list:List<'a>) malleateFn index =
+        list.[ index + 1 .. Seq.length list - 1 ]
+        |> (@) [ malleateFn list.[index] ]
+        |> (@) list.[ 0..index - 1 ]
+
+    let malleateList (list:List<'a>) (sourceIndex:int) (destIndex:int) =
+        let prefix = list.[ 0 .. destIndex - 1 ]
+        let suffix = list.[ destIndex .. Seq.length list - 1 ]
+        let item = list.[sourceIndex]
+        List.concat [ prefix; [ item ]; suffix ]
+            
+    let malleateTxOutput malleateFn index tx =
+        { tx with outputs = malleateListItem tx.outputs malleateFn index }
+
+    let malleateTxWitnessItem malleateFn index tx =
+        { tx with witnesses = malleateListItem tx.witnesses malleateFn index }
+
+    // re-signs a tx
+    let [<When>] ``(.*) results by re-signing (.*) with (.*)`` destTxLabel sourceTxLabel keyLabels =
+        { findTx sourceTxLabel with witnesses = [] }
+        |> sign destTxLabel keyLabels
+
+    let [<When>] ``(.*) results by changing asset of (.*) output (.*) to (.*)`` destTxLabel sourceTxLabel index value =
+        let fn = fun output -> { output with spend = { output.spend with asset = getAsset value } }
+        malleateTx destTxLabel sourceTxLabel (malleateTxOutput fn index)
+        
+    let [<When>] ``(.*) results by changing amount of (.*) output (.*) to (.*)`` destTxLabel sourceTxLabel index value =
+        let fn = fun output -> { output with spend = { output.spend with amount = getAmount output.spend.asset value } }
+        malleateTx destTxLabel sourceTxLabel (malleateTxOutput fn index)
+
+    let [<When>] ``(.*) results by pushing (.*) (.*) of (.*) at index (.*)`` destTxLabel list sourceIndex sourceTxLabel destIndex =
+        match list with
+        | "witness" -> malleateTx destTxLabel sourceTxLabel (fun tx -> { tx with witnesses = malleateList tx.witnesses sourceIndex destIndex })
+        | "output" -> malleateTx destTxLabel sourceTxLabel (fun tx -> { tx with outputs = malleateList tx.outputs sourceIndex destIndex })
+        | "input" -> malleateTx destTxLabel sourceTxLabel (fun tx -> { tx with inputs = malleateList tx.inputs sourceIndex destIndex })
+        | other -> failwithf "unexpected list %A" other
+       
+    let [<When>] ``(.*) results by changing (.*) of (.*) contract witness (.*) to (.*)`` destTxLabel field sourceTxLabel index value =
+        let fn = fun (w:ContractWitness) -> 
+            match field with
+            | "contractId"    -> { w with contractId = getContractId value |> fst }
+            | "command"       -> { w with command = value }
+            | "beginInputs"   -> { w with beginInputs = uint32 value }
+            | "beginOutputs"  -> { w with beginOutputs = uint32 value }
+            | "inputsLength"  -> { w with inputsLength = uint32 value }
+            | "outputsLength" -> { w with outputsLength = uint32 value }
+            | "cost"          -> { w with cost = uint64 value }
+            // TODO:
+            // messageBody: data option
+            // stateCommitment: StateCommitment
+            // signature: (PublicKey * Signature) option
+            | other           -> failwithf "unexpected field %A" other
+            
+        let fn =
+            function 
+            | ContractWitness w -> fn w |> ContractWitness
+            | _ -> failwithf "unexpected witness type for index %A" index
+        malleateTx destTxLabel sourceTxLabel (malleateTxWitnessItem fn index)
+       

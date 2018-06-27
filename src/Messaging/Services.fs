@@ -28,7 +28,7 @@ module Blockchain =
     type Command =
         | ValidateTransaction of Types.Transaction
         | RequestMemPool of peerId:byte[]
-        | RequestTransaction of peerId:byte[] * txHash:Hash
+        | RequestTransactions of peerId:byte[] * txHashes:Hash list
         | RequestBlock of peerId:byte[] * blockHash:Hash
         | RequestTip of peerId:byte[]
         | HandleMemPool of peerId:byte[] * Hash list
@@ -38,13 +38,13 @@ module Blockchain =
         | ValidateMinedBlock of Types.Block
         | RequestHeaders of peerId:byte[] * startBlockHashes:Hash list * endBlockHash :Hash
         | HandleHeaders of peerId:byte[] * BlockHeader list
-        | HandleNewTransaction of peerId:byte[] * txHash:Hash
+        | HandleNewTransactions of peerId:byte[] * txHashes:Hash list
 
     type Request =
         | ExecuteContract of ContractId * string * Crypto.PublicKey option * data option * TxSkeleton.T
         | GetBlockTemplate of pkHash:Hash
         | GetTip
-        | GetBlock of Hash
+        | GetBlock of mainChain:bool * Hash
         | GetBlockByNumber of uint32
         | GetBlockHeader of Hash
         | GetActiveContracts
@@ -62,8 +62,8 @@ module Blockchain =
     let requestMemPool client peerId =
         Command.send client serviceName (RequestMemPool peerId)
 
-    let requestTransaction client peerId txHash =
-        Command.send client serviceName (RequestTransaction (peerId,txHash))
+    let requestTransactions client peerId txHashes =
+        Command.send client serviceName (RequestTransactions (peerId,txHashes))
 
     let handleMemPool client peerId txHashes =
         Command.send client serviceName (HandleMemPool (peerId,txHashes))
@@ -103,8 +103,8 @@ module Blockchain =
     let getBlockHeader client blockHash =
         Request.send<Request,BlockHeader option> client serviceName (GetBlockHeader blockHash)
 
-    let getBlock client blockHash =
-        Request.send<Request,Block option> client serviceName (GetBlock blockHash)
+    let getBlock client mainChain blockHash =
+        Request.send<Request,Block option> client serviceName (GetBlock (mainChain,blockHash))
 
     let getTransaction client txHash =
         Request.send<Request,(Transaction*uint32) option> client serviceName (GetTransaction txHash)
@@ -136,17 +136,17 @@ module Blockchain =
     let getMempool client =
         GetMempool |> Request.send<Request, (Hash.Hash * Transaction) list> client serviceName
 
-    let handleNewTransaction client peerId txHash =
-        HandleNewTransaction (peerId,txHash)
+    let handleNewTransactions client peerId txHashes =
+        HandleNewTransactions (peerId,txHashes)
         |> Command.send client serviceName
 
 module Network =
     type Command =
         | SendMemPool of peerId:byte[] * Hash list
-        | SendTransaction of peerId:byte[] * Transaction
+        | SendTransactions of peerId:byte[] * Transaction list
         | SendTip of peerId:byte[] * BlockHeader
         | SendBlock of peerId:byte[] * Block
-        | GetTransaction of peerId:byte[] * Hash
+        | GetTransactions of peerId:byte[] * Hash list
         | GetBlock of Hash
         | GetBlockFrom of peerId:byte[] * Hash
         | PublishBlock of BlockHeader
@@ -184,10 +184,10 @@ module Wallet =
         | GetTransactions of skip: int * take: int
         | GetBalance
         | ImportSeed of string list * password:string
-        | Send of outputs:List<Hash * Spend> * password:string
-        | ActivateContract of string * uint32 * password:string
-        | ExtendContract of ContractId * uint32 * password:string
-        | ExecuteContract of ContractId * string * data option * provideReturnAddress:bool * sign:string option * Map<Asset, uint64> * password:string
+        | Send of publish:bool*outputs:List<Hash * Spend> * password:string
+        | ActivateContract of publish:bool*string * uint32 * password:string
+        | ExtendContract of publish:bool*ContractId * uint32 * password:string
+        | ExecuteContract of publish:bool*ContractId * string * data option * provideReturnAddress:bool * sign:string option * Map<Asset, uint64> * password:string
         | AccountExists
         | CheckPassword of password:string
         | GetPublicKey of path:string * password:string
@@ -213,17 +213,17 @@ module Wallet =
     let getAddress client =
         send<string> client serviceName GetAddress
 
-    let createTransaction client outputs password =
-        send<Transaction> client serviceName (Send (outputs, password))
+    let createTransaction client publish outputs password =
+        send<Transaction> client serviceName (Send (publish, outputs, password))
 
-    let activateContract client code numberOfBlocks password =
-        send<ActivateContractResponse> client serviceName (ActivateContract (code, numberOfBlocks, password))
+    let activateContract client publish code numberOfBlocks password =
+        send<ActivateContractResponse> client serviceName (ActivateContract (publish, code, numberOfBlocks, password))
 
-    let extendContract client address numberOfBlocks password =
-        send<Transaction> client serviceName (ExtendContract (address, numberOfBlocks, password))
+    let extendContract client publish address numberOfBlocks password =
+        send<Transaction> client serviceName (ExtendContract (publish, address, numberOfBlocks, password))
 
-    let executeContract client address command messageBody provideReturnAddress sign spends password =
-        send<Transaction> client serviceName (ExecuteContract (address, command, messageBody, provideReturnAddress, sign, spends, password))
+    let executeContract client publish address command messageBody provideReturnAddress sign spends password =
+        send<Transaction> client serviceName (ExecuteContract (publish, address, command, messageBody, provideReturnAddress, sign, spends, password))
 
     let importSeed client words password =
         send<unit> client serviceName (ImportSeed (words, password))

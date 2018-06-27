@@ -11,13 +11,19 @@ open TestsInfrastructure.Constraints
 open Consensus.Tests.Helper
 open Infrastructure
 open Messaging.Services.Wallet
+open Wallet.Serialization
+open Wallet.Types
+open Infrastructure.Result
 
 let chain = Chain.Local
 let chainParams = Chain.localParameters
 
 let ema = EMA.create chainParams
 
-let databaseContext = DataAccess.createContext "test"
+let tempDir () = System.IO.Path.Combine
+                    [| System.IO.Path.GetTempPath(); System.IO.Path.GetRandomFileName() |]
+
+let databaseContext = DataAccess.createContext (tempDir())
 let dataAccess = DataAccess.init databaseContext
 let password = "1234"
 
@@ -79,7 +85,7 @@ let ``received tokens - block``() =
 
     let tx = {version=Version0;inputs=[];outputs=[output];witnesses=[];contract=None}
 
-    let block = Block.createTemplate chainParams Block.genesisParent 1UL ema ActiveContractSet.empty [tx] Hash.zero
+    let block = Block.createGenesis chainParams [tx] (0UL,0UL)
 
     Account.addBlock dataAccess session (Block.hash block.header) block
 
@@ -113,7 +119,7 @@ let ``tokens spent - block``() =
 
     let tx' = {version=Version0;inputs=[ Outpoint {txHash=txHash; index=0ul}];outputs=[];witnesses=[];contract=None}
 
-    let block = Block.createTemplate chainParams Block.genesisParent 1UL ema ActiveContractSet.empty [tx;tx'] Hash.zero
+    let block = Block.createGenesis chainParams [tx;tx'] (0UL,0UL)
     Account.addBlock dataAccess session (Block.hash block.header) block
 
     balanceShouldBe session Asset.Zen 10UL View.empty
@@ -258,6 +264,12 @@ let ``create execute contract transaction``() =
 
     tx.inputs |> should haveLength 1
 
+    // last pkwitness should use FollowingWitnesses
+    List.findBack (function | PKWitness _ -> true | _ -> false) tx.witnesses
+    |> function PKWitness (sigHash,_,_) -> sigHash
+    |> should equal FollowingWitnesses
+
+
 [<Test>]
 let ``create execute contract transaction without explicitly spending any Zen should allocate fee``() =
     use session = DataAccess.DatabaseContext.createSession databaseContext
@@ -290,6 +302,12 @@ let ``create execute contract transaction without explicitly spending any Zen sh
 
     tx.inputs |> should haveLength 1
 
+    // last pkwitness should use FollowingWitnesses
+    List.findBack (function | PKWitness _ -> true | _ -> false) tx.witnesses
+    |> function PKWitness (sigHash,_,_) -> sigHash
+    |> should equal FollowingWitnesses
+
+
 
 [<Test>]
 let ``account sync up``() =
@@ -304,6 +322,7 @@ let ``account sync up``() =
         difficulty = 0ul
         nonce = 0UL,0UL
     }
+    let startBlockHash = Block.hash startBlockHeader
 
     let account = DataAccess.Account.get dataAccess session
 
@@ -334,7 +353,14 @@ let ``account sync up``() =
 
     let blockHash = Block.hash block.header
 
-    Account.sync dataAccess session blockHash block.header (fun _ -> startBlockHeader) (fun _ -> block)
+    Account.sync dataAccess session blockHash block.header (fun hash ->
+        if hash = startBlockHash then
+            startBlockHeader
+        elif hash = blockHash then
+            header
+        else
+            failwithf "invalid block %A" hash
+        ) (fun _ -> block)
 
     let account = DataAccess.Account.get dataAccess session
 
@@ -644,6 +670,10 @@ let ``sign contract wintess``() =
     use session = DataAccess.DatabaseContext.createSession databaseContext
     let view = fundAccount session
 
+    let contractId = ContractId (Version0,Hash.zero)
+    let command = ""
+    let messageBody = None
+
     let executeContract _ _ _ _ txSkeleton =
         let tx =
             txSkeleton
@@ -652,9 +682,9 @@ let ``sign contract wintess``() =
 
         let tx = {tx with witnesses=[
                                         ContractWitness {
-                                            contractId = ContractId (Version0,Hash.zero)
-                                            command = ""
-                                            messageBody = None
+                                            contractId = contractId
+                                            command = command
+                                            messageBody = messageBody
                                             stateCommitment = NotCommitted
                                             beginInputs=1ul
                                             beginOutputs = 0ul
@@ -676,6 +706,17 @@ let ``sign contract wintess``() =
     let tx:Transaction = Result.get result
 
     let txHash = Transaction.hash tx
+    let messageHash =
+        {
+            recipient = contractId
+            command = ""
+            body = None
+        }
+        |> Serialization.Message.hash
+
+    let msg =
+        [ txHash; messageHash ]
+        |> Hash.joinHashes
 
     let publicKey = ExtendedKey.derivePath "m/0'" privateKey |> Result.get |> ExtendedKey.getPublicKey |> Result.get
 
@@ -685,8 +726,33 @@ let ``sign contract wintess``() =
     | ContractWitness cw ->
         match cw.signature with
         | Some (publicKey',signature) ->
-            Crypto.verify publicKey signature txHash |> should equal Crypto.Valid
+            Crypto.verify publicKey signature msg |> should equal Crypto.Valid
             publicKey' |> should equal publicKey
         | None ->
             failwith "expected signature"
     | _ -> failwith "expected contract witness"
+
+[<Test>]
+let ``Typescript testvector``() =
+    let mnemonic = "one one one one one one one one one one one one one one one one one one one one one one one one"
+    let keyPair =
+        ExtendedKey.fromMnemonicPhrase mnemonic
+        >>= ExtendedKey.derivePath "m/44'/258'/0'/0/0"
+        >>= ExtendedKey.getKeyPair
+        |> get
+
+    let input = {txHash = Hash.zero; index=0ul}
+    let output = {lock = PK (Hash.zero);spend= {amount=100UL;asset=Asset.Zen}}
+
+    let tx =
+        {version=Version0;inputs=[Outpoint input];outputs=[output];contract=None;witnesses=[]}
+        |> Transaction.sign [keyPair] TxHash
+
+//    printfn "%A" (Transaction.hash tx)
+//    printfn "%A" (Transaction.toHex tx)
+
+    let expectedTxHash =
+        (Hash.fromString "2df00d7cf448facbe9883a032dd435b08c74e40a18c9f91c1a43be583ea3ce4a")
+        |> Infrastructure.Result.get
+
+    Transaction.hash tx |> should equal expectedTxHash

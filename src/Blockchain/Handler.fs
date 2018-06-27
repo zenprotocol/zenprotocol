@@ -7,6 +7,8 @@ open Messaging.Services
 open Messaging.Events
 open Consensus
 open Blockchain
+open Blockchain
+open Blockchain
 open Blockchain.EffectsWriter
 open Consensus.Types
 open State
@@ -31,32 +33,25 @@ let handleCommand chainParams command session timestamp (state:State) =
             do! sendMemPool peerId txHashes
             return state
         }
-    | RequestTransaction (peerId, txHash) ->
+    | RequestTransactions (peerId, txHashes) ->
          effectsWriter {
-            match MemPool.getTransaction txHash state.memoryState.mempool with
-            | Some tx ->
-                do! sendTransaction peerId tx
-                return state
-            | None ->
-                return state
+            let txs = List.choose (fun txHash -> MemPool.getTransaction txHash state.memoryState.mempool) txHashes
+
+            if not <| List.isEmpty txs then
+                do! sendTransactions peerId txs
+
+            return state
          }
-    | HandleMemPool (peerId,txHashes) ->
-        let handleTxHash txHash =
-            effectsWriter {
-                eventX "Handling mempool message"
-                |> Log.info
+    | HandleMemPool (peerId,txHashes)
+    | HandleNewTransactions (peerId, txHashes) ->
+        effectsWriter {
+            let missingTxHashes = List.filter (fun txHash -> not <| MemPool.containsTransaction txHash state.memoryState.mempool) txHashes
 
-                if not (MemPool.containsTransaction txHash state.memoryState.mempool) then
-                    do! getTransaction peerId txHash
-                else
-                    return ()
-            }
+            if not <| List.isEmpty missingTxHashes then
+                do! getTransactions peerId missingTxHashes
 
-        let writer =
-            List.map handleTxHash txHashes
-            |> List.fold (fun state writer -> Writer.bind state (fun () -> writer)) (Writer.ret ())
-
-        Writer.bind writer (fun () -> Writer.ret state)
+            return state
+        }
     | ValidateBlock (peerId,block) ->
         BlockHandler.validateBlock chainParams contractPath session timestamp (Some peerId) block false state
     | ValidateMinedBlock block ->
@@ -94,13 +89,6 @@ let handleCommand chainParams command session timestamp (state:State) =
            let! initialBlockDownload = InitialBlockDownload.processHeaders chainParams session timestamp peerId headers state.initialBlockDownload
            return {state with initialBlockDownload = initialBlockDownload}
        }
-    | HandleNewTransaction (peerId, txHash) ->
-        effectsWriter {
-            if not (MemPool.containsTransaction txHash state.memoryState.mempool) then
-                do! getTransaction peerId txHash
-
-            return state
-        }
 
 let handleRequest chain (requestId:RequestId) request session timestamp state =
     match request with
@@ -111,13 +99,15 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
         let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList chain session state timestamp
         Block.createTemplate chain state.tipState.tip.header timestamp state.tipState.ema memState.activeContractSet validatedTransactions pkHash
         |> requestId.reply<Block>
-    | GetBlock blockHash ->
+    | GetBlock (mainChain,blockHash) ->
+        let isValid (header:ExtendedBlockHeader.T) = (not mainChain) || header.status = ExtendedBlockHeader.MainChain
+
         match BlockRepository.tryGetHeader session blockHash with
-        | Some header ->
+        | Some header when isValid header  ->
             BlockRepository.getFullBlock session header
             |> Some
             |> requestId.reply<Types.Block option>
-        | None -> requestId.reply<Types.Block option> None
+        | _ -> requestId.reply<Types.Block option> None
     | GetBlockByNumber blockNumber ->
         if blockNumber > state.tipState.tip.header.blockNumber || blockNumber = 0ul then
             requestId.reply<Types.Block option> None

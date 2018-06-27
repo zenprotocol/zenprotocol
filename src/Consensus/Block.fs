@@ -148,6 +148,9 @@ let createTemplate chain (parent:BlockHeader) timestamp (ema:EMA.T) acs transact
 
     let parentHash = hash parent
 
+    let median = EMA.earliest ema
+    let timestamp = if timestamp > median then timestamp else (median + 1UL)
+
     // TODO: add utxo commitments
     let commitments =
         createCommitments txMerkleRoot witnessMerkleRoot acsMerkleRoot []
@@ -168,6 +171,8 @@ let createTemplate chain (parent:BlockHeader) timestamp (ema:EMA.T) acs transact
 
 let validateHeader chain header  =
     let h = hash header
+
+    if h = chain.genesisHash then Ok header else
 
     let difficulty = Difficulty.uncompress header.difficulty
     let proofOfWorkLimit = chain.proofOfWorkLimit
@@ -335,19 +340,19 @@ let connect chain getUTXO contractsPath (parent:BlockHeader) timestamp utxoSet a
         else
             Error "commitments mismatch"
 
-    let checkWeight (block,set,acs,ema,contractCache,contractStates) = result {
-        let! weight = Weight.blockWeight getUTXO utxoSet block
+    let checkWeight (block,nextEma) = result {
+        let! weight = Weight.blockWeight getUTXO block utxoSet
         let maxWeight = chain.maxBlockWeight
         if weight <= maxWeight
         then
-            return block,set,acs,ema,contractCache,contractStates
+            return block,nextEma
         else
             return! Error "block weight exceeds maximum"
     }
 
     checkBlockNumber
     >=> checkDifficulty
-    >=> checkTxInputs
     >=> checkWeight
+    >=> checkTxInputs
     >=> checkCoinbase
     >=> checkCommitments

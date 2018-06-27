@@ -141,14 +141,14 @@ let ``Pong size fits stream ``() =
     messageSize |> should equal offset
 
 [<Test>]
-let ``send and recv NewTransaction``() =
-    let msg = NewTransaction (Array.create 32 123uy)
+let ``send and recv NewTransactions``() =
+    let msg = NewTransactions ("Captcha Diem"B)
 
     use server = Socket.dealer ()
-    Socket.bind server "inproc://NewTransaction.test"
+    Socket.bind server "inproc://NewTransactions.test"
 
     use client = Socket.dealer ()
-    Socket.connect client "inproc://NewTransaction.test"
+    Socket.connect client "inproc://NewTransactions.test"
 
     Network.Message.send server msg
 
@@ -157,29 +157,32 @@ let ``send and recv NewTransaction``() =
     msg' |> should equal (Some msg)
 
 [<Test>]
-let ``NewTransaction size fits stream ``() =
-    let newtransaction:NewTransaction =
-        Array.create 32 123uy
+let ``NewTransactions size fits stream ``() =
+    let newtransactions:NewTransactions =
+        "Captcha Diem"B
 
-    let messageSize = NewTransaction.getMessageSize newtransaction
+    let messageSize = NewTransactions.getMessageSize newtransactions
 
     let stream =
         Stream.create messageSize
-        |> NewTransaction.write newtransaction
+        |> NewTransactions.write newtransactions
 
     let offset = Stream.getOffset stream
 
     messageSize |> should equal offset
 
 [<Test>]
-let ``send and recv Transaction``() =
-    let msg = Transaction ("Captcha Diem"B)
+let ``send and recv Transactions``() =
+    let msg = Transactions {
+        count = 123ul;
+        txs = "Captcha Diem"B;
+    }
 
     use server = Socket.dealer ()
-    Socket.bind server "inproc://Transaction.test"
+    Socket.bind server "inproc://Transactions.test"
 
     use client = Socket.dealer ()
-    Socket.connect client "inproc://Transaction.test"
+    Socket.connect client "inproc://Transactions.test"
 
     Network.Message.send server msg
 
@@ -188,15 +191,17 @@ let ``send and recv Transaction``() =
     msg' |> should equal (Some msg)
 
 [<Test>]
-let ``Transaction size fits stream ``() =
-    let transaction:Transaction =
-        "Captcha Diem"B
+let ``Transactions size fits stream ``() =
+    let transactions:Transactions = {
+        count = 123ul;
+        txs = "Captcha Diem"B;
+    }
 
-    let messageSize = Transaction.getMessageSize transaction
+    let messageSize = Transactions.getMessageSize transactions
 
     let stream =
         Stream.create messageSize
-        |> Transaction.write transaction
+        |> Transactions.write transactions
 
     let offset = Stream.getOffset stream
 
@@ -330,14 +335,14 @@ let ``MemPool size fits stream ``() =
     messageSize |> should equal offset
 
 [<Test>]
-let ``send and recv GetTransaction``() =
-    let msg = GetTransaction (Array.create 32 123uy)
+let ``send and recv GetTransactions``() =
+    let msg = GetTransactions ("Captcha Diem"B)
 
     use server = Socket.dealer ()
-    Socket.bind server "inproc://GetTransaction.test"
+    Socket.bind server "inproc://GetTransactions.test"
 
     use client = Socket.dealer ()
-    Socket.connect client "inproc://GetTransaction.test"
+    Socket.connect client "inproc://GetTransactions.test"
 
     Network.Message.send server msg
 
@@ -346,15 +351,15 @@ let ``send and recv GetTransaction``() =
     msg' |> should equal (Some msg)
 
 [<Test>]
-let ``GetTransaction size fits stream ``() =
-    let gettransaction:GetTransaction =
-        Array.create 32 123uy
+let ``GetTransactions size fits stream ``() =
+    let gettransactions:GetTransactions =
+        "Captcha Diem"B
 
-    let messageSize = GetTransaction.getMessageSize gettransaction
+    let messageSize = GetTransactions.getMessageSize gettransactions
 
     let stream =
         Stream.create messageSize
-        |> GetTransaction.write gettransaction
+        |> GetTransactions.write gettransactions
 
     let offset = Stream.getOffset stream
 
@@ -645,4 +650,4 @@ let ``malformed message return None``() =
 
     let msg = Network.Message.recv client
     msg |> should equal None
- 
+

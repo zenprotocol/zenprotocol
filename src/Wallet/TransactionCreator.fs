@@ -1,16 +1,16 @@
 module Wallet.TransactionCreator
 
 open Consensus
-open Consensus.Chain
-open Consensus.Crypto
-open Consensus.Types
-open Consensus.Hash
+open Chain
+open Crypto
+open Types
+open Hash
 open Wallet
 open Infrastructure
-open Infrastructure.Result
+open Result
 open Wallet
-open Wallet
-open Wallet.Types
+open Types
+open Serialization
 
 module ZData = Zen.Types.Data
 module Cost = Zen.Cost.Realized
@@ -138,7 +138,7 @@ let createTransactionFromOutputs dataAccess session view password contract outpu
         contract = contract
     }
 
-    return Transaction.sign keys transaction
+    return Transaction.sign keys TxHash transaction
 }
 
 let createTransaction dataAccess session view password outputs =
@@ -169,18 +169,29 @@ let private signFirstWitness signKey tx = result {
                 match witness with
                 | ContractWitness _ -> true
                 | _ -> false) tx.witnesses
-            |> ofOption "missing contact witness"
-        let! wintess =
+            |> ofOption "missing contract witness"
+        let! witness =
             match tx.witnesses.[witnessIndex] with
             | ContractWitness cw -> Ok cw
-            | _ -> Error "missing contact witness"
+            | _ -> Error "missing contract witness"
 
         let txHash = Transaction.hash tx
-
-        let! signature = ExtendedKey.sign txHash signKey
+        let messageHash = 
+            {
+                recipient = witness.contractId
+                command = witness.command
+                body = witness.messageBody
+            }            
+            |> Serialization.Message.hash
+            
+        let msg = 
+            [ txHash; messageHash ]
+            |> Hash.joinHashes
+            
+        let! signature = ExtendedKey.sign msg signKey
         let! publicKey = ExtendedKey.getPublicKey signKey
 
-        let witness = {wintess with signature=Some (publicKey,signature)}
+        let witness = {witness with signature=Some (publicKey,signature)}
         let witnesses = List.update witnessIndex (ContractWitness witness) tx.witnesses
 
         return {tx with witnesses = witnesses}
@@ -270,7 +281,7 @@ let createExecuteContractTransaction dataAccess session view executeContract pas
 
     let! unsignedTx = executeContract contractId command sender data txSkeleton
 
-    let sign tx = signFirstWitness signKey tx <@> Transaction.sign keys
+    let sign tx = signFirstWitness signKey tx <@> Transaction.sign keys FollowingWitnesses
 
     return! sign unsignedTx
 }

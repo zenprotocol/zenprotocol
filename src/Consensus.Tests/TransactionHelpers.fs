@@ -9,7 +9,7 @@ open TransactionValidation
 let getContractState _ = None
 
 let getSignedTx tx keys =
-    let signedTx = Transaction.sign keys tx
+    let signedTx = Transaction.sign keys TxHash tx
     let txHash = Transaction.hash signedTx
     signedTx, txHash
 
@@ -17,7 +17,7 @@ let contractPath =
     System.IO.Path.Combine
         [| System.IO.Path.GetTempPath(); System.IO.Path.GetRandomFileName() |]
 
-let private inputsValidation blockNumber timestamp acs utxos signedTx txHash =
+let inputsValidation blockNumber timestamp acs utxos signedTx txHash =
     let getUTXO _ = UtxoSet.NoOutput
 
     validateInContext Chain.localParameters getUTXO contractPath blockNumber timestamp acs Map.empty utxos getContractState ContractStates.asDatabase txHash signedTx

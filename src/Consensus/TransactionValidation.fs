@@ -1,6 +1,7 @@
 module Consensus.TransactionValidation
 
 open Consensus
+open Chain
 open Types
 open UtxoSet
 open Crypto
@@ -91,7 +92,7 @@ let private activateContract (chainParams : Chain.ChainParameters) contractPath 
                             let compile contract =
                                 Contract.compile contractPath contract
                                 |> Result.bind (fun _ -> Contract.load contractPath expiry contract.code contractId)
-                                |> Result.mapError (fun error -> 
+                                |> Result.mapError (fun error ->
                                     eventX "Contract activation failed: {error}"
                                     >> setField "error" (sprintf "%A" error)
                                     |> Log.info
@@ -142,6 +143,15 @@ let private checkAmounts (txSkeleton:TxSkeleton.T) =
     else
         Ok ()
 
+let checkWeight chain tx txSkeleton = 
+    Weight.transactionWeight tx txSkeleton
+    >>= (fun txWeight ->
+        if txWeight <= chain.maxBlockWeight then
+            Ok()
+        else
+            Error "transaction weight exceeds maximum")
+    |> Result.mapError General
+
 let private checkOutputsOverflow tx =
     if tx.outputs
         |> List.map (fun o -> o.spend)
@@ -159,7 +169,13 @@ let private checkMintsOnly tx =
         GeneralError "inputs consist of mints only"
     else
         Ok tx
-    
+
+let private checkVersion (tx:Transaction) =
+    if tx.version <> Version0 then
+        GeneralError "unsupported transaction version"
+    else
+        Ok tx
+
 let private checkStructure =
     let isInvalidSpend = fun { asset = (Asset (ContractId (version,cHash), subType)); amount = amount } ->
         cHash = Hash.zero && (subType <> Hash.zero || version <> Version0) ||
@@ -211,9 +227,11 @@ let private checkStructure =
 
     let checkWitnessesStructure = fun tx ->
         if List.isEmpty tx.witnesses || List.exists (function
-            | ContractWitness { command = command
-                                cost = cost } ->
-                isNull command || cost = 0UL
+            | ContractWitness cw ->
+                isNull cw.command || 
+                cw.cost = 0UL || 
+                (int cw.beginInputs > List.length tx.inputs - 1 && cw.inputsLength > 0u) ||
+                int cw.endInputs > List.length tx.inputs - 1
             | HighVWitness (identifier, bytes) ->
                 identifier <= 2u // last reserved identifier for witness types
                 || isEmptyArr bytes
@@ -256,6 +274,7 @@ let private checkActivationSacrifice tx =
         else
             GeneralError "tx with a contract must include an activation sacrifice"
 
+    
 let private tryGetUtxos getUTXO utxoSet tx =
     getUtxosResult getUTXO tx.inputs utxoSet
     |> Result.mapError (fun errors ->
@@ -266,7 +285,8 @@ let private tryGetUtxos getUTXO utxoSet tx =
     )
 
 let validateBasic =
-    checkStructure
+    checkVersion
+    >=> checkStructure
     >=> checkNoCoinbaseLock
     >=> checkOutputsOverflow
     >=> checkDuplicateInputs
@@ -320,6 +340,8 @@ let validateCoinbase blockNumber =
 let validateInContext chainParams getUTXO contractPath blockNumber timestamp acs contractCache set getContractState contractState txHash tx = result {
     let! outputs = tryGetUtxos getUTXO set tx
     let txSkel = TxSkeleton.fromTransaction tx outputs
+
+    do! checkWeight chainParams tx txSkel
 
     do! checkAmounts txSkel
     let! contractStates = InputValidation.StateMachine.validate blockNumber timestamp acs outputs getContractState contractState txHash tx txSkel

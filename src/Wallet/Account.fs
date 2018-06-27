@@ -209,6 +209,15 @@ let getUnspentOutputs dataAccess session view confirmations =
     |> List.map (fun output -> output.outpoint,{lock=output.lock;spend=output.spend})
 
 let addBlock dataAccess session blockHash block =
+    let account = DataAccess.Account.get dataAccess session
+
+    if account.blockHash = blockHash || block.header.blockNumber < account.blockNumber then
+        // we already handled the block, skip
+        ()
+    elif account.blockHash <> block.header.parent then
+        failwithf "trying to add a block to account but account in different chain %A %A" (block.header.blockNumber) (account.blockNumber)
+    else
+
     block.transactions
     |> List.mapi (fun index tx -> index,tx)
     |> List.iter (fun (blockIndex, tx) ->
@@ -233,7 +242,8 @@ let addBlock dataAccess session blockHash block =
         |> List.mapi (fun index output -> uint32 index,output)
         |> List.choose (fun (index,output) ->
             match output.lock with
-            | Coinbase (_,pkHash)
+            | Coinbase (_,pkHash) when (DataAccess.Addresses.contains dataAccess session pkHash) ->
+                Some (pkHash,index,output)
             | PK pkHash when (DataAccess.Addresses.contains dataAccess session pkHash) ->
                 Some (pkHash,index,output)
             | _ -> None)
@@ -256,15 +266,22 @@ let addBlock dataAccess session blockHash block =
         )
     )
 
-    let account = DataAccess.Account.get dataAccess session
-
     {account with blockNumber = block.header.blockNumber; blockHash = blockHash}
     |> DataAccess.Account.put dataAccess session
 
-let undoBlock dataAccess session block =
+let undoBlock dataAccess session blockHash block =
+    let account = DataAccess.Account.get dataAccess session
+
+    if account.blockHash = block.header.parent || block.header.blockNumber > account.blockNumber then
+        // we already undo this block, skipping
+        ()
+    elif account.blockHash <> blockHash then
+        failwithf "trying to undo a block to account but account in different chain %A %A" (block.header.blockNumber) (account.blockNumber)
+    else
+
     List.rev block.transactions
     |> List.iter (fun tx ->
-        // Unmark outputs as spent
+        // Unmark outputs as spentg
         List.iter (fun input ->
             match input with
             | Outpoint outpoint ->
@@ -294,13 +311,11 @@ let undoBlock dataAccess session block =
         )
     )
 
-    let account = DataAccess.Account.get dataAccess session
-
     {account with blockNumber = block.header.blockNumber - 1ul; blockHash = block.header.parent}
     |> DataAccess.Account.put dataAccess session
 
 type private SyncAction =
-    | Undo of Block
+    | Undo of Block * Hash
     | Add of Block * Hash
 
 let sync dataAccess session tipBlockHash (tipHeader:BlockHeader) (getHeader:Hash -> BlockHeader) (getBlock:Hash -> Block) =
@@ -317,9 +332,9 @@ let sync dataAccess session tipBlockHash (tipHeader:BlockHeader) (getHeader:Hash
             locate (((getHeader x).parent, i-1ul), (y,j)) (Add (getBlock x, x) :: acc)
         elif i < j
         then
-            locate ((x,i), ((getHeader y).parent, j-1ul)) (Undo (getBlock y) :: acc)
+            locate ((x,i), ((getHeader y).parent, j-1ul)) (Undo (getBlock y, y) :: acc)
         else
-            locate (((getHeader x).parent, i-1ul), ((getHeader y).parent, j-1ul)) (Add (getBlock x, x) :: Undo (getBlock y) :: acc)
+            locate (((getHeader x).parent, i-1ul), ((getHeader y).parent, j-1ul)) (Add (getBlock x, x) :: Undo (getBlock y,y) :: acc)
 
     let actions = locate ((tipBlockHash, tipHeader.blockNumber), (account.blockHash, account.blockNumber)) []
 
@@ -329,7 +344,7 @@ let sync dataAccess session tipBlockHash (tipHeader:BlockHeader) (getHeader:Hash
 
     sortedActions
     |> List.iter (function
-        | Undo block -> undoBlock dataAccess session block
+        | Undo (block,hash) -> undoBlock dataAccess session hash block
         | Add (block,hash) -> addBlock dataAccess session hash block)
 
 

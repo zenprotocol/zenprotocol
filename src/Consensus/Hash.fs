@@ -34,6 +34,10 @@ let computeMultiple (bytes: byte array seq) =
 
 let bytes (Hash hash) = hash
 
+let joinHashes : Hash seq -> _ = 
+    Seq.map bytes
+    >> computeMultiple
+
 let fromBytes bytes =
     match Array.length bytes with
     | Length -> Some (Hash bytes)

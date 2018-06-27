@@ -49,10 +49,15 @@ let tx = {
     witnesses = []
 }
 
-let block = Block.createGenesis (getChainParameters Chain.Test) [tx] (getRandomNonce (),getRandomNonce())
+let genesisTime = Timestamp.now()
 
-//printfn "Current timestamp %A" <| Timestamp.now()
+let testParameters = { testParameters with genesisTime = genesisTime}
 
+let block = Block.createGenesis testParameters [tx] (getRandomNonce (),getRandomNonce())
+
+
+
+printfn "Block timestamp is: %A" <| genesisTime
 printf "Block hash is \n%A\n\n" <| Block.hash block.header
 
 printfn "---------Block------------"

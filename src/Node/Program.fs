@@ -82,9 +82,26 @@ let main argv =
     eventX "Node running... press CTRL+C to exit"
     |> Log.info
 
+    // if a chain was specified, we want to override config before 
+    // we handle rest of switches, which may override config again 
     List.iter (fun arg ->
         match arg with
-        | Chain chain -> config.chain <- chain
+        | Chain chain -> 
+            let file = sprintf "%s.yaml" chain
+            if System.IO.File.Exists(file) then
+                config.Load(file)
+            else
+                eventX "Config file {configFile} not found, using default"
+                >> setField "configFile" file
+                |> Log.warning
+        | _ -> ()
+    ) (results.GetAllResults())
+
+    List.iter (fun arg ->
+        match arg with
+        | Chain chain -> 
+            config.chain <- chain
+#if DEBUG
         | Localhost ->
             config.chain <- "local"
             config.externalIp <- "127.0.0.1"
@@ -111,6 +128,7 @@ let main argv =
             config.api.bind <- "127.0.0.1:36001"
             config.seeds.Clear()
             config.seeds.Add "127.0.0.1:29555"
+#endif
         | Api address ->
             config.api.enabled <- true
             config.api.bind <- address
@@ -172,7 +190,7 @@ let main argv =
 //        printfn "%A" (Serialization.Block.serialize block |> FsBech32.Base16.encode)
 
         let block =
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000197b2351c0f56e8d40f3ca37e344f06c00d75ce11c25b52141638be2c0761120a00000160e073fe8f20ffffff00000000000000000000000000000000030a3cecb5bae5b4eb8f6e18870674baa0987baf73c7bcf9a97d4c3456e00b638ced41d04d7002f9c0eb00f1b688fa5947b88ce1102eedfaeba1d4dff83c0694aabe653064be80f760b9d471dc9afbac2b24236c9f2eb0f08b7427942852dc780201000000000001012030759b07ca01caf8e524fc279946a1e96afc3546ee5f1fd4a1cfaf644763c2b4002c010000"
+            "000000000000000000000000000000000000000000000000000000000000000000000000000000013ca83bcc8483b5a8706a8fed28e4ec64952d7d6b65624c8e8026f48cf177176700000160e073fe8f20ffffff0000000000000000000000000000000003b01098756bcf637bef2a161bd49412cad0a10adf12e64a694c41f9c5b971642029f0999def953f2a14ad6c143e2a0ebf3b4f794d8b17fc1203c12365427c09d3be653064be80f760b9d471dc9afbac2b24236c9f2eb0f08b7427942852dc780201000000000001022030759b07ca01caf8e524fc279946a1e96afc3546ee5f1fd4a1cfaf644763c2b4002c010000"
             |> FsBech32.Base16.decode
             >>= Serialization.Block.deserialize
             |> Option.get

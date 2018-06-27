@@ -25,7 +25,7 @@ type ChainParameters =
 let mainParameters =
     {
         name="main"
-        proofOfWorkLimit=Difficulty.uncompress 0x1d00fffful;
+        proofOfWorkLimit=Difficulty.uncompress 0x1cffff00ul;
         blockInterval=236682UL;
         smoothingFactor=28I;
         maxBlockWeight=1000_000_000I;
@@ -39,14 +39,14 @@ let mainParameters =
 let testParameters =
     {
         name="testnet"
-        proofOfWorkLimit=Difficulty.uncompress 0x1d00fffful; //0x20fffffful;
+        proofOfWorkLimit=Difficulty.uncompress 0x1dfffffful;
         blockInterval=236682UL;
         smoothingFactor=28I;
         maxBlockWeight=1000_000_000I;
         sacrificePerByteBlock=1UL;
-        genesisHash= get <| Hash.fromString "9f139787dd7252fc73d2b9e82185ef84a7f695e96a959774a32cef3c7a64d82a";
-        genesisTime=1517828985040UL
-        networkId=2010ul
+        genesisHash= get <| Hash.fromString "57b925330faf7d08f1d9799147258bf8fbb6bfea63795c5162221766321215c6";
+        genesisTime=1529579777092UL
+        networkId=2012ul
         contractSacrificePerBytePerBlock=ContractSacrificePerBytePerBlock
     }
 
@@ -56,7 +56,7 @@ let localParameters = {
         blockInterval=1000UL * 60UL;
         name="local"
         genesisHash =
-            get <| Hash.fromString "214ee1523da1b376a4e648fe6a0a29c481b70996995049ae6b3991d5619e5d72";
+            get <| Hash.fromString "6d678ab961c8b47046da8d19c0de5be07eb0fe1e1e82ad9a5b32145b5d4811c7";
         genesisTime=1515594186383UL
         networkId=1002ul
 }

@@ -179,7 +179,7 @@ module Serialization =
         }
 
     module Seq =
-        let private writeBody ops writerFn =
+        let writeBody ops writerFn =
             let write writerFn seq stream =
                 let aux stream item = writerFn ops item stream
                 seq |> Seq.fold aux stream
@@ -188,10 +188,14 @@ module Serialization =
         let write ops writerFn seq =
             VarInt.write ops (Seq.length seq |> uint32)
             >> writeBody ops writerFn seq
-        let read readerFn = reader {
-            let! length = VarInt.read
+
+        let readBody length readerFn = reader {
             for _ in [1..int length] do
                 yield! readerFn
+        }
+        let read readerFn = reader {
+            let! length = VarInt.read
+            return! readBody length readerFn
         }
 
     module List =
@@ -539,17 +543,17 @@ module Serialization =
 
     module Lock =
         [<Literal>]
-        let private PKIdentifier = 1u
+        let private PKIdentifier = 2u
         [<Literal>]
-        let private ContractIdentifier = 2u
+        let private ContractIdentifier = 4u
         [<Literal>]
-        let private CoinbaseIdentifier = 3u
+        let private CoinbaseIdentifier = 6u
         [<Literal>]
-        let private FeeIdentifier = 4u
+        let private FeeIdentifier = 1u
         [<Literal>]
-        let private ActivationSacrificeIdentifier = 5u
+        let private ActivationSacrificeIdentifier = 3u
         [<Literal>]
-        let private ExtensionSacrificeIdentifier = 6u
+        let private ExtensionSacrificeIdentifier = 5u
         [<Literal>]
         let private DestroyIdentifier = 7u
 
@@ -819,9 +823,22 @@ module Serialization =
         [<Literal>]
         let private ContractIdentifier = 2u
 
+        [<Literal>]
+        let private SigHashTxHash = 1uy
+
+        [<Literal>]
+        let private SigHashFollowingWitnesses = 3uy
+
         let private writerFn ops = function
-            | PKWitness (publicKey, signature) ->
-                PublicKey.write ops publicKey
+            | PKWitness (sigHash, publicKey, signature) ->
+                let sigHashByte =
+                    match sigHash with
+                    | TxHash -> SigHashTxHash
+                    | FollowingWitnesses -> SigHashFollowingWitnesses
+                    | UnknownSigHash x -> x
+
+                Byte.write ops sigHashByte
+                >> PublicKey.write ops publicKey
                 >> Signature.write ops signature
             | ContractWitness cw ->
                 ContractId.write ops cw.contractId
@@ -857,9 +874,17 @@ module Serialization =
             let! value = reader {
                 match identifier with
                 | PKIdentifier ->
+                    let! sigHashByte = Byte.read
+
+                    let sigHash =
+                        match sigHashByte with
+                        | SigHashTxHash -> TxHash
+                        | SigHashFollowingWitnesses -> FollowingWitnesses
+                        | x -> UnknownSigHash x
+
                     let! publicKey = PublicKey.read
                     let! signature = Signature.read
-                    return PKWitness (publicKey, signature)
+                    return PKWitness (sigHash, publicKey, signature)
                 | ContractIdentifier ->
                     let! contractId = ContractId.read
                     let! command = String.read
@@ -1040,6 +1065,7 @@ module Serialization =
                 transactions = transactions
             }
         }
+open Serialization
 
 open Serialization
 
@@ -1053,6 +1079,19 @@ module Transaction =
     let deserialize mode bytes =
         Stream (bytes, 0)
         |> run (Transaction.read mode)
+
+module Transactions =
+    let serialize mode txs =
+        Seq.writeBody counters (Transaction.write mode) txs 0ul
+        |> int32
+        |> create
+        |> Seq.writeBody serializers (Transaction.write mode) txs
+        |> getBuffer
+
+    let deserialize mode count bytes =
+        Stream (bytes, 0)
+        |> run (Seq.readBody count (Transaction.read mode))
+        |> Option.map List.ofSeq
 
 module Header =
     let serialize header =
@@ -1088,3 +1127,26 @@ module Data =
     let deserialize bytes =
         Stream (bytes, 0)
         |> run Data.read
+
+module Witnesses  =
+    let hash witnesses =
+        List.write counters Witness.write witnesses 0ul
+        |> int32
+        |> create
+        |> List.write serializers Witness.write witnesses
+        |> getBuffer
+        |> Hash.compute
+
+module Message =
+    let private write ops = fun c ->
+        ContractId.write ops c.recipient
+        >> String.write ops c.command
+        >> Option.write ops Data.write c.body
+
+    let hash contractCommitment =
+        write counters contractCommitment 0ul
+        |> int32
+        |> create
+        |> write serializers contractCommitment
+        |> getBuffer
+        |> Hash.Hash

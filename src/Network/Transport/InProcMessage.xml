@@ -25,8 +25,9 @@
         <field name="address" type="longstr">Address</field>
     </message>
 
-    <message name="Transaction" id="10">
-        <field name="tx" type="chunk">Tx</field>
+    <message name="Transactions" id="10">
+        <field name="count" type="number" size="4">Count</field>
+        <field name="txs" type="chunk">Transactions</field>
     </message>
 
     <message name="Send Address" id="11">
@@ -60,14 +61,15 @@
         <field name="txs" type="chunk">Transactions</field>
     </message>
 
-    <message name="Get Transaction" id="18">
+    <message name="Get Transactions" id="18">
         <field name="peerId" type="octets" size="4">Peer Id</field>
-        <field name="txHash" type="octets" size="32">TransactionHash</field>
+        <field name="txHashes" type="chunk">TransactionHash</field>
     </message>
 
-    <message name="Send Transaction" id="19">
+    <message name="Send Transactions" id="19">
         <field name="peerId" type="octets" size="4">Peer Id</field>
-        <field name="tx" type="chunk">Tx</field>
+        <field name="count" type="number" size="4">Count</field>
+        <field name="txs" type="chunk">Tx</field>
     </message>
 
     <message name="Block" id="20">
@@ -147,13 +149,13 @@
         <field name="peerId" type="octets" size="4">Peer Id</field>
     </message>
 
-    <message name="Publish Transaction" id="36">
-        <field name="txHash" type="octets" size="32">Transaction Hash</field>
+    <message name="Publish Transactions" id="36">
+        <field name="txHashes" type="chunk">Transaction Hashes</field>
     </message>
 
-    <message name="New Transaction" id="37">
+    <message name="New Transactions" id="37">
         <field name="peerId" type="octets" size="4">Peer Id</field>
-        <field name="txHash" type="octets" size="32">Transaction Hash</field>
+        <field name="txHashes" type="chunk">Transaction Hashes</field>
     </message>
 
     <message name="Get Tip From All Peers" id="38">

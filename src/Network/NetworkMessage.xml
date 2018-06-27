@@ -27,12 +27,13 @@
         <field name = "nonce" type = "number" size="4" >Nonce</field>
     </message>
 
-    <message name="New Transaction" id="5">
-        <field name="txHash" type="octets" size="32">Transaction Hash</field>
+    <message name="New Transactions" id="5">
+        <field name="txHashes" type="chunk">Transaction Hashes</field>
     </message>
 
-    <message name="Transaction" id="6">
-        <field name="tx" type="chunk">Tx</field>
+    <message name="Transactions" id="6">
+        <field name="count" type="number" size="4">Count</field>
+        <field name="txs" type="chunk">Transactions</field>
     </message>
 
     <message name="Address" id="7">
@@ -51,11 +52,11 @@
     </message>
 
     <message name="Mem Pool" id="11">
-        <field name="txs" type="chunk">Transactions</field>
+        <field name="txHashes" type="chunk">Transactions Hashes</field>
     </message>
 
-    <message name="Get Transaction" id="12">
-        <field name="txHash" type="octets" size="32">TransactionHash</field>
+    <message name="Get Transactions" id="12">
+        <field name="txHashes" type="chunk">Transactions Hashes</field>
     </message>
 
     <message name="Get Block" id="13">

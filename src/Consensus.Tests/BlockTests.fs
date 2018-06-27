@@ -174,6 +174,9 @@ let ``block timestamp too early``() =
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate chain parent timestamp ema acs [tx] Hash.zero
 
+    // createTemplate auto-correct to early timestamps, so we have to override the timestamp
+    let block = {block with header = {block.header with timestamp = timestamp}}
+
     let expected : BkResult = Error "block's timestamp is too early"
 
     (Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ContractCache.empty ema getContractState ContractStates.asDatabase block, expected)
@@ -294,7 +297,7 @@ let ``block with invalid contract failed connecting``() =
 
     let tx =
         { version = Version0; contract = Some (V0 { code="ada";hints=goodHints;rlimit=0u;queries=goodTotalQueries }); inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
-        |> Transaction.sign [ rootKeyPair ]
+        |> Transaction.sign [ rootKeyPair ] TxHash
 
     let contract : Contract.T =
         {
@@ -321,7 +324,7 @@ let ``block with invalid contract failed connecting``() =
 let ``block with coinbase lock within a regular transaction should fail``() =
     let publicKey = Crypto.PublicKey <| Array.create 64 1uy
     let signature = Crypto.Signature <| Array.create 64 1uy
-    let witness = PKWitness (publicKey, signature)
+    let witness = PKWitness (TxHash, publicKey, signature)
     let tx =
         {
             version = Version0

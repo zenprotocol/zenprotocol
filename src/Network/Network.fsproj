@@ -50,6 +50,7 @@
     <Content Include="Transport\InProcMessage.xml" />
     <Compile Include="AddressBook.fs" />
     <Compile Include="Connector.fs" />
+    <Compile Include="TransactionPublisher.fs" />
     <Compile Include="Main.fs" />
     <Content Include="paket.references" />
     <Content Include="NetworkMessage.xml" />

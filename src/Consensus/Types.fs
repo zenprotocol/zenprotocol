@@ -75,7 +75,7 @@ type Message = {
     body: data option
 }
 
-type StateCommitment = 
+type StateCommitment =
     | NoState
     | State of Hash.Hash
     | NotCommitted
@@ -97,8 +97,13 @@ type ContractWitness =
         member x.endOutputs = x.beginOutputs + x.outputsLength - 1ul
         member x.endInputs = x.beginInputs + x.inputsLength - 1ul
 
+type SigHash =
+    | TxHash
+    | FollowingWitnesses
+    | UnknownSigHash of uint8
+
 type Witness =
-    | PKWitness of PublicKey * Signature
+    | PKWitness of SigHash * PublicKey * Signature
     | ContractWitness of ContractWitness
     | HighVWitness of identifier:uint32 * byte[]
 
