@@ -316,11 +316,12 @@ let handleRequest chain client (request,reply) =
             // 100 bytes are the header
             let header,body = Array.splitAt Block.HeaderSize bytes
 
+            let parent = Hash.toString block.header.parent
             let target = Difficulty.uncompress block.header.difficulty |> Hash.toString
             let header = FsBech32.Base16.encode header
             let body = FsBech32.Base16.encode body
 
-            new BlockTemplateJson.Root(header, body, target)
+            new BlockTemplateJson.Root(header, body, target, parent, block.header.blockNumber |> int)
             |> fun x -> x.JsonValue
             |> JsonContent
             |> reply StatusCode.OK
