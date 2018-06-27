@@ -7,7 +7,8 @@ open Result
 open Serialization
 open Chain
 
-let pickler = Pickler.auto<Block>
+[<Literal>]
+let HeaderSize = 100
 
 let TwoPow256 = bigint.Pow (2I, 256)
 
@@ -25,7 +26,6 @@ let private computeCommitmentsRoot = MerkleTree.computeRoot
 let hash =
     Header.serialize
     >> Hash.compute
-
 
 let toHex = Block.serialize >> FsBech32.Base16.encode
 

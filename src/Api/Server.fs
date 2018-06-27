@@ -310,11 +310,18 @@ let handleRequest chain client (request,reply) =
 
         match pkHash with
         | FSharp.Core.Ok pkHash ->
-            let block =
-                Blockchain.getBlockTemplate client pkHash
-                |> Block.toHex
+            let block = Blockchain.getBlockTemplate client pkHash
+            let bytes = Block.serialize block
 
-            JsonValue.String block
+            // 100 bytes are the header
+            let header,body = Array.splitAt Block.HeaderSize bytes
+
+            let target = Difficulty.uncompress block.header.difficulty |> Hash.toString
+            let header = FsBech32.Base16.encode header
+            let body = FsBech32.Base16.encode body
+
+            new BlockTemplateJson.Root(header, body, target)
+            |> fun x -> x.JsonValue
             |> JsonContent
             |> reply StatusCode.OK
         | FSharp.Core.Error _ ->

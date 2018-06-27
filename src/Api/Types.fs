@@ -220,3 +220,11 @@ type AddressOutputJson = JsonProvider<"""
     "spent":true
 }
 """>
+
+type BlockTemplateJson = JsonProvider<"""
+{
+    "header": "abcdef012346789",
+    "body": "abcdef012346789",
+    "target": "abcdef012346789"
+}
+""">
