@@ -24,6 +24,8 @@ let compute bytes =
     sha3.DoFinal(hash, 0) |> ignore
     Hash hash
 
+let computeOfHash (Hash bytes) = compute bytes
+
 let computeMultiple (bytes: byte array seq) =
     let hash = Array.zeroCreate Length
     let sha3 = new Sha3Digest(256)
@@ -34,7 +36,7 @@ let computeMultiple (bytes: byte array seq) =
 
 let bytes (Hash hash) = hash
 
-let joinHashes : Hash seq -> _ = 
+let joinHashes : Hash seq -> _ =
     Seq.map bytes
     >> computeMultiple
 

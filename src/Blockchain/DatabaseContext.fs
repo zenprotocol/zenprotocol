@@ -18,6 +18,7 @@ type T =
     {
         databaseContext:DataAccess.DatabaseContext
         tip:SingleValue<Hash.Hash>
+        genesis:SingleValue<Hash.Hash>
         utxoSet:Collection<Outpoint, OutputStatus>
         contractStates:Collection<ContractId, Zen.Types.Data.data>
         activeContractSet:Collection<Hash.Hash,ActiveContractSet.ContractKey>
@@ -64,6 +65,7 @@ let create dataPath =
     use session = DatabaseContext.createSession databaseContext
 
     let tip = SingleValue.create databaseContext "tip" Hash.bytes (Hash.Hash >> Some)
+    let genesis = SingleValue.create databaseContext "genesisHash" Hash.bytes (Hash.Hash >> Some)
 
     let blocks =
         Collection.create session "blocks" Hash.bytes
@@ -134,6 +136,7 @@ let create dataPath =
     {
         databaseContext = databaseContext
         tip=tip
+        genesis=genesis
         utxoSet=utxoSet
         activeContractSet=activeContractSet
         contractStates=contractStates

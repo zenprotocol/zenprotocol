@@ -1,6 +1,7 @@
 module Blockchain.BlockHandler
 
 open Blockchain
+open Blockchain
 open Consensus
 open Types
 open Infrastructure
@@ -322,6 +323,7 @@ let private handleGenesisBlock chainParams contractPath session timestamp (state
             BlockRepository.saveBlockState session blockHash acsUndoData contractStatesUndoData ema
 
             BlockRepository.updateTip session extendedHeader.hash
+            BlockRepository.saveGenesisHash session extendedHeader.hash
 
             UtxoSetRepository.save session utxoSet
             ContractStateRepository.save session contractStates

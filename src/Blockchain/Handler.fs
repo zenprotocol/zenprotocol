@@ -158,7 +158,7 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
         let rec getHeaders tip headers =
             let header = BlockRepository.getHeader session tip
 
-            if tip = chain.genesisHash then
+            if header.header.blockNumber = 1ul then
                 header.header :: headers
             else
                 getHeaders header.header.parent (header.header :: headers)

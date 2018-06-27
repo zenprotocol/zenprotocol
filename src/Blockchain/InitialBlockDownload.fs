@@ -251,7 +251,7 @@ let getHeaders (chainParams:Chain.ChainParameters) session peerId from endHash =
             | Some child -> getHeaders child toHash (left - 1) (child.header :: acc)
 
     let fromGenesis toHash = effectsWriter {
-        match BlockRepository.tryGetHeader session chainParams.genesisHash with
+        match BlockRepository.tryGetGenesisHeader session with
         | None ->
             // we don't have genesis, send nothing
             return ()
