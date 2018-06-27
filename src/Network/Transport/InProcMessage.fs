@@ -19,7 +19,7 @@ let TransactionsMessageId = 10uy
 [<LiteralAttribute>]
 let SendAddressMessageId = 11uy
 [<LiteralAttribute>]
-let AddressMessageId = 12uy
+let PublishAddressesMessageId = 12uy
 [<LiteralAttribute>]
 let GetAddressesMessageId = 13uy
 [<LiteralAttribute>]
@@ -72,6 +72,8 @@ let PublishTransactionsMessageId = 36uy
 let NewTransactionsMessageId = 37uy
 [<LiteralAttribute>]
 let GetTipFromAllPeersMessageId = 38uy
+[<LiteralAttribute>]
+let UpdateAddressTimestampMessageId = 39uy
 
 type Connect =
         string
@@ -94,21 +96,26 @@ type Transactions = {
 
 type SendAddress = {
         peerId : byte[]
-        address : string
+        addressTimestamp : byte[]
     }
 
-type Address =
-        string
+type PublishAddresses = {
+        count : uint32
+        addresses : byte[]
+    }
 
 type GetAddresses =
         byte[]
 
-type Addresses =
-        string list
+type Addresses = {
+        count : uint32
+        addresses : byte[]
+    }
 
 type SendAddresses = {
         peerId : byte[]
-        addresses : string list
+        count : uint32
+        addresses : byte[]
     }
 
 type GetMemPool =
@@ -175,7 +182,7 @@ type GetTip =
         byte[]
 
 type PublishAddressToAll =
-        string
+        byte[]
 
 type GetHeaders = {
         peerId : byte[]
@@ -211,6 +218,9 @@ type NewTransactions = {
     }
 
 
+type UpdateAddressTimestamp =
+        string
+
 type T =
     | Connect of Connect
     | Connected of Connected
@@ -218,7 +228,7 @@ type T =
     | Disconnected of Disconnected
     | Transactions of Transactions
     | SendAddress of SendAddress
-    | Address of Address
+    | PublishAddresses of PublishAddresses
     | GetAddresses of GetAddresses
     | Addresses of Addresses
     | SendAddresses of SendAddresses
@@ -245,6 +255,7 @@ type T =
     | PublishTransactions of PublishTransactions
     | NewTransactions of NewTransactions
     | GetTipFromAllPeers
+    | UpdateAddressTimestamp of UpdateAddressTimestamp
 
 module Connect =
     let getMessageSize (msg:Connect) =
@@ -349,38 +360,51 @@ module SendAddress =
     let getMessageSize (msg:SendAddress) =
         0 +
             4 +
-            4 + String.length msg.address +
+            4 + Array.length msg.addressTimestamp +
             0
 
     let write (msg:SendAddress) stream =
         stream
         |> Stream.writeBytes msg.peerId 4
-        |> Stream.writeLongString msg.address
+        |> Stream.writeNumber4 (uint32 (Array.length msg.addressTimestamp))
+        |> Stream.writeBytes msg.addressTimestamp (Array.length msg.addressTimestamp)
 
     let read =
         reader {
             let! peerId = Stream.readBytes 4
-            let! address = Stream.readLongString
+            let! addressTimestampLength = Stream.readNumber4
+            let! addressTimestamp = Stream.readBytes (int addressTimestampLength)
 
             return ({
                         peerId = peerId;
-                        address = address;
+                        addressTimestamp = addressTimestamp;
                     }: SendAddress)
         }
 
-module Address =
-    let getMessageSize (msg:Address) =
-            4 + String.length msg
 
-    let write (msg:Address) stream =
+module PublishAddresses =
+    let getMessageSize (msg:PublishAddresses) =
+        0 +
+            4 +
+            4 + Array.length msg.addresses +
+            0
+
+    let write (msg:PublishAddresses) stream =
         stream
-        |> Stream.writeLongString msg
+        |> Stream.writeNumber4 msg.count
+        |> Stream.writeNumber4 (uint32 (Array.length msg.addresses))
+        |> Stream.writeBytes msg.addresses (Array.length msg.addresses)
 
     let read =
         reader {
-            let! msg = Stream.readLongString
+            let! count = Stream.readNumber4
+            let! addressesLength = Stream.readNumber4
+            let! addresses = Stream.readBytes (int addressesLength)
 
-            return msg
+            return ({
+                        count = count;
+                        addresses = addresses;
+                    }: PublishAddresses)
         }
 
 module GetAddresses =
@@ -399,19 +423,30 @@ module GetAddresses =
             return msg
         }
 
+
 module Addresses =
     let getMessageSize (msg:Addresses) =
-            List.fold (fun state (value:string) -> state + 4 + Encoding.UTF8.GetByteCount (value)) 4 msg
+        0 +
+            4 +
+            4 + Array.length msg.addresses +
+            0
 
     let write (msg:Addresses) stream =
         stream
-        |> Stream.writeStrings msg
+        |> Stream.writeNumber4 msg.count
+        |> Stream.writeNumber4 (uint32 (Array.length msg.addresses))
+        |> Stream.writeBytes msg.addresses (Array.length msg.addresses)
 
     let read =
         reader {
-            let! msg = Stream.readStrings
+            let! count = Stream.readNumber4
+            let! addressesLength = Stream.readNumber4
+            let! addresses = Stream.readBytes (int addressesLength)
 
-            return msg
+            return ({
+                        count = count;
+                        addresses = addresses;
+                    }: Addresses)
         }
 
 
@@ -420,21 +455,27 @@ module SendAddresses =
     let getMessageSize (msg:SendAddresses) =
         0 +
             4 +
-            List.fold (fun state (value:string) -> state + 4 + Encoding.UTF8.GetByteCount (value)) 4 msg.addresses +
+            4 +
+            4 + Array.length msg.addresses +
             0
 
     let write (msg:SendAddresses) stream =
         stream
         |> Stream.writeBytes msg.peerId 4
-        |> Stream.writeStrings msg.addresses
+        |> Stream.writeNumber4 msg.count
+        |> Stream.writeNumber4 (uint32 (Array.length msg.addresses))
+        |> Stream.writeBytes msg.addresses (Array.length msg.addresses)
 
     let read =
         reader {
             let! peerId = Stream.readBytes 4
-            let! addresses = Stream.readStrings
+            let! count = Stream.readNumber4
+            let! addressesLength = Stream.readNumber4
+            let! addresses = Stream.readBytes (int addressesLength)
 
             return ({
                         peerId = peerId;
+                        count = count;
                         addresses = addresses;
                     }: SendAddresses)
         }
@@ -774,15 +815,17 @@ module GetTip =
 
 module PublishAddressToAll =
     let getMessageSize (msg:PublishAddressToAll) =
-            4 + String.length msg
+            4 + Array.length msg
 
     let write (msg:PublishAddressToAll) stream =
         stream
-        |> Stream.writeLongString msg
+        |> Stream.writeNumber4 (uint32 (Array.length msg))
+        |> Stream.writeBytes msg (Array.length msg)
 
     let read =
         reader {
-            let! msg = Stream.readLongString
+            let! msgLength = Stream.readNumber4
+            let! msg = Stream.readBytes (int msgLength)
 
             return msg
         }
@@ -965,6 +1008,21 @@ module NewTransactions =
                     }: NewTransactions)
         }
 
+module UpdateAddressTimestamp =
+    let getMessageSize (msg:UpdateAddressTimestamp) =
+            4 + String.length msg
+
+    let write (msg:UpdateAddressTimestamp) stream =
+        stream
+        |> Stream.writeLongString msg
+
+    let read =
+        reader {
+            let! msg = Stream.readLongString
+
+            return msg
+        }
+
 
 let private decode stream =
     let readMessage messageId stream =
@@ -993,10 +1051,10 @@ let private decode stream =
             match SendAddress.read stream with
             | None,stream -> None,stream
             | Some msg, stream -> Some (SendAddress msg), stream
-        | AddressMessageId ->
-            match Address.read stream with
+        | PublishAddressesMessageId ->
+            match PublishAddresses.read stream with
             | None,stream -> None,stream
-            | Some msg, stream -> Some (Address msg), stream
+            | Some msg, stream -> Some (PublishAddresses msg), stream
         | GetAddressesMessageId ->
             match GetAddresses.read stream with
             | None,stream -> None,stream
@@ -1099,6 +1157,10 @@ let private decode stream =
             | Some msg, stream -> Some (NewTransactions msg), stream
         | GetTipFromAllPeersMessageId ->
             Some GetTipFromAllPeers, stream
+        | UpdateAddressTimestampMessageId ->
+            match UpdateAddressTimestamp.read stream with
+            | None,stream -> None,stream
+            | Some msg, stream -> Some (UpdateAddressTimestamp msg), stream
         | _ -> None, stream
 
     let r = reader {
@@ -1136,7 +1198,7 @@ let send socket msg =
         | Disconnected msg -> Disconnected.write msg
         | Transactions msg -> Transactions.write msg
         | SendAddress msg -> SendAddress.write msg
-        | Address msg -> Address.write msg
+        | PublishAddresses msg -> PublishAddresses.write msg
         | GetAddresses msg -> GetAddresses.write msg
         | Addresses msg -> Addresses.write msg
         | SendAddresses msg -> SendAddresses.write msg
@@ -1163,6 +1225,7 @@ let send socket msg =
         | PublishTransactions msg -> PublishTransactions.write msg
         | NewTransactions msg -> NewTransactions.write msg
         | GetTipFromAllPeers -> id
+        | UpdateAddressTimestamp msg -> UpdateAddressTimestamp.write msg
 
     let messageId =
         match msg with
@@ -1172,7 +1235,7 @@ let send socket msg =
         | Disconnected _ -> DisconnectedMessageId
         | Transactions _ -> TransactionsMessageId
         | SendAddress _ -> SendAddressMessageId
-        | Address _ -> AddressMessageId
+        | PublishAddresses _ -> PublishAddressesMessageId
         | GetAddresses _ -> GetAddressesMessageId
         | Addresses _ -> AddressesMessageId
         | SendAddresses _ -> SendAddressesMessageId
@@ -1199,6 +1262,7 @@ let send socket msg =
         | PublishTransactions _ -> PublishTransactionsMessageId
         | NewTransactions _ -> NewTransactionsMessageId
         | GetTipFromAllPeers _ -> GetTipFromAllPeersMessageId
+        | UpdateAddressTimestamp _ -> UpdateAddressTimestampMessageId
 
     let messageSize =
         match msg with
@@ -1208,7 +1272,7 @@ let send socket msg =
         | Disconnected msg -> Disconnected.getMessageSize msg
         | Transactions msg -> Transactions.getMessageSize msg
         | SendAddress msg -> SendAddress.getMessageSize msg
-        | Address msg -> Address.getMessageSize msg
+        | PublishAddresses msg -> PublishAddresses.getMessageSize msg
         | GetAddresses msg -> GetAddresses.getMessageSize msg
         | Addresses msg -> Addresses.getMessageSize msg
         | SendAddresses msg -> SendAddresses.getMessageSize msg
@@ -1235,6 +1299,7 @@ let send socket msg =
         | PublishTransactions msg -> PublishTransactions.getMessageSize msg
         | NewTransactions msg -> NewTransactions.getMessageSize msg
         | GetTipFromAllPeers -> 0
+        | UpdateAddressTimestamp msg -> UpdateAddressTimestamp.getMessageSize msg
 
     //  Signature + message ID + message size
     let frameSize = 2 + 1 + messageSize

@@ -175,7 +175,7 @@ let ``Transactions size fits stream ``() =
 let ``send and recv SendAddress``() =
     let msg = SendAddress {
         peerId = Array.create 4 123uy;
-        address = "Life is short but Now lasts for ever";
+        addressTimestamp = "Captcha Diem"B;
     }
 
     use server = Socket.dealer ()
@@ -194,7 +194,7 @@ let ``send and recv SendAddress``() =
 let ``SendAddress size fits stream ``() =
     let sendaddress:SendAddress = {
         peerId = Array.create 4 123uy;
-        address = "Life is short but Now lasts for ever";
+        addressTimestamp = "Captcha Diem"B;
     }
 
     let messageSize = SendAddress.getMessageSize sendaddress
@@ -208,14 +208,17 @@ let ``SendAddress size fits stream ``() =
     messageSize |> should equal offset
 
 [<Test>]
-let ``send and recv Address``() =
-    let msg = Address "Life is short but Now lasts for ever"
+let ``send and recv PublishAddresses``() =
+    let msg = PublishAddresses {
+        count = 123ul;
+        addresses = "Captcha Diem"B;
+    }
 
     use server = Socket.dealer ()
-    Socket.bind server "inproc://Address.test"
+    Socket.bind server "inproc://PublishAddresses.test"
 
     use client = Socket.dealer ()
-    Socket.connect client "inproc://Address.test"
+    Socket.connect client "inproc://PublishAddresses.test"
 
     Network.Transport.InProcMessage.send server msg
 
@@ -224,15 +227,17 @@ let ``send and recv Address``() =
     msg' |> should equal (Some msg)
 
 [<Test>]
-let ``Address size fits stream ``() =
-    let address:Address =
-        "Life is short but Now lasts for ever"
+let ``PublishAddresses size fits stream ``() =
+    let publishaddresses:PublishAddresses = {
+        count = 123ul;
+        addresses = "Captcha Diem"B;
+    }
 
-    let messageSize = Address.getMessageSize address
+    let messageSize = PublishAddresses.getMessageSize publishaddresses
 
     let stream =
         Stream.create messageSize
-        |> Address.write address
+        |> PublishAddresses.write publishaddresses
 
     let offset = Stream.getOffset stream
 
@@ -271,7 +276,10 @@ let ``GetAddresses size fits stream ``() =
 
 [<Test>]
 let ``send and recv Addresses``() =
-    let msg = Addresses ["Name: Brutus";"Age: 43"]
+    let msg = Addresses {
+        count = 123ul;
+        addresses = "Captcha Diem"B;
+    }
 
     use server = Socket.dealer ()
     Socket.bind server "inproc://Addresses.test"
@@ -287,8 +295,10 @@ let ``send and recv Addresses``() =
 
 [<Test>]
 let ``Addresses size fits stream ``() =
-    let addresses:Addresses =
-        ["Name: Brutus";"Age: 43"]
+    let addresses:Addresses = {
+        count = 123ul;
+        addresses = "Captcha Diem"B;
+    }
 
     let messageSize = Addresses.getMessageSize addresses
 
@@ -304,7 +314,8 @@ let ``Addresses size fits stream ``() =
 let ``send and recv SendAddresses``() =
     let msg = SendAddresses {
         peerId = Array.create 4 123uy;
-        addresses = ["Name: Brutus";"Age: 43"];
+        count = 123ul;
+        addresses = "Captcha Diem"B;
     }
 
     use server = Socket.dealer ()
@@ -323,7 +334,8 @@ let ``send and recv SendAddresses``() =
 let ``SendAddresses size fits stream ``() =
     let sendaddresses:SendAddresses = {
         peerId = Array.create 4 123uy;
-        addresses = ["Name: Brutus";"Age: 43"];
+        count = 123ul;
+        addresses = "Captcha Diem"B;
     }
 
     let messageSize = SendAddresses.getMessageSize sendaddresses
@@ -824,7 +836,7 @@ let ``GetTip size fits stream ``() =
 
 [<Test>]
 let ``send and recv PublishAddressToAll``() =
-    let msg = PublishAddressToAll "Life is short but Now lasts for ever"
+    let msg = PublishAddressToAll ("Captcha Diem"B)
 
     use server = Socket.dealer ()
     Socket.bind server "inproc://PublishAddressToAll.test"
@@ -841,7 +853,7 @@ let ``send and recv PublishAddressToAll``() =
 [<Test>]
 let ``PublishAddressToAll size fits stream ``() =
     let publishaddresstoall:PublishAddressToAll =
-        "Life is short but Now lasts for ever"
+        "Captcha Diem"B
 
     let messageSize = PublishAddressToAll.getMessageSize publishaddresstoall
 
@@ -1115,6 +1127,37 @@ let ``send and recv GetTipFromAllPeers``() =
 
     msg' |> should equal (Some msg)
 
+
+[<Test>]
+let ``send and recv UpdateAddressTimestamp``() =
+    let msg = UpdateAddressTimestamp "Life is short but Now lasts for ever"
+
+    use server = Socket.dealer ()
+    Socket.bind server "inproc://UpdateAddressTimestamp.test"
+
+    use client = Socket.dealer ()
+    Socket.connect client "inproc://UpdateAddressTimestamp.test"
+
+    Network.Transport.InProcMessage.send server msg
+
+    let msg' = Network.Transport.InProcMessage.recv client
+
+    msg' |> should equal (Some msg)
+
+[<Test>]
+let ``UpdateAddressTimestamp size fits stream ``() =
+    let updateaddresstimestamp:UpdateAddressTimestamp =
+        "Life is short but Now lasts for ever"
+
+    let messageSize = UpdateAddressTimestamp.getMessageSize updateaddresstimestamp
+
+    let stream =
+        Stream.create messageSize
+        |> UpdateAddressTimestamp.write updateaddresstimestamp
+
+    let offset = Stream.getOffset stream
+
+    messageSize |> should equal offset
 
 [<Test>]
 let ``malformed message return None``() =

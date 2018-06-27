@@ -7,7 +7,8 @@ open Result
 open Serialization
 open Chain
 
-let pickler = Pickler.auto<Block>
+[<Literal>]
+let HeaderSize = 100
 
 let TwoPow256 = bigint.Pow (2I, 256)
 
@@ -26,7 +27,6 @@ let hash =
     Header.serialize
     >> Hash.compute
 
-
 let toHex = Block.serialize >> FsBech32.Base16.encode
 
 let fromHex hex =
@@ -34,9 +34,11 @@ let fromHex hex =
     |> Option.bind Block.deserialize
 
 let isGenesis (chain:Chain.ChainParameters) block =
-    let blockHash = hash block.header
+    let blockHashHash =
+        hash block.header
+        |> Hash.computeOfHash
 
-    chain.genesisHash = blockHash
+    chain.genesisHashHash = blockHashHash
 
 let getChainWork (prevWork:bigint) header =
     let target =
@@ -170,14 +172,15 @@ let createTemplate chain (parent:BlockHeader) timestamp (ema:EMA.T) acs transact
     {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot;witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot}
 
 let validateHeader chain header  =
-    let h = hash header
+    let blockHash = hash header
+    let blockHashHash = Hash.computeOfHash blockHash
 
-    if h = chain.genesisHash then Ok header else
+    if blockHashHash = chain.genesisHashHash then Ok header else
 
     let difficulty = Difficulty.uncompress header.difficulty
     let proofOfWorkLimit = chain.proofOfWorkLimit
 
-    if difficulty <= proofOfWorkLimit && h <= difficulty then Ok header else Error "proof of work failed"
+    if difficulty <= proofOfWorkLimit && blockHash <= difficulty then Ok header else Error "proof of work failed"
 
 // TODO: Refactor to avoid chained state-passing style
 let validate chain =

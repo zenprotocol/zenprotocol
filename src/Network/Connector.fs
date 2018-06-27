@@ -19,7 +19,7 @@ type T = {
 }
 
 [<LiteralAttribute>]
-let MaxAttemps = 10
+let MaxAttempts = 10
 
 let create seeds maxConnection =
     {maxConnections=maxConnection; connections = Map.empty;seeds=Seq.toList seeds}
@@ -34,17 +34,21 @@ let disconnected connector address =
     let connections =
         match Map.tryFind address connector.connections with
         | Some Connected ->
+            eventX "Disconnected from {address}"
+            >> setField "address" address
+            |> Log.info
             Map.remove address connector.connections
         | Some (Connecting attempts) ->
-            if List.contains address connector.seeds then
-                Map.remove address connector.connections
-            elif attempts = MaxAttemps then
+            if attempts >= MaxAttempts then
                 eventX "Address {address} was suspended due to too many failed attempts"
                 >> setField "address" address
-                |> Log.info
+                |> Log.debug
                 Map.add address (Suspended DateTime.UtcNow) connector.connections
             else
-                Map.add address (Failed attempts) connector.connections
+                if List.contains address connector.seeds then
+                    Map.add address (Failed 0) connector.connections // We never suspend seeds
+                else
+                    Map.add address (Failed attempts) connector.connections
         | _ -> failwith "Expecting connected of connecting address"
 
     {connector with connections = connections;}
@@ -69,8 +73,8 @@ let connect transport addressBook connector =
     let connectInternal transport addressBook connector exclude =
         let connectionsToOpen = connector.maxConnections - (countConnectingOrConnected connector)
 
-        let exclude = exclude |> Map.toSeq |> Seq.map fst |> Set.ofSeq
-        let addresses = AddressBook.take addressBook exclude connectionsToOpen
+        let addressesToExclude = exclude |> Map.toSeq |> Seq.map fst |> Set.ofSeq
+        let addresses = AddressBook.take addressesToExclude connectionsToOpen connector.seeds addressBook
 
         // Connect to new addresses
         Seq.iter (Transport.connect transport) addresses
@@ -85,26 +89,6 @@ let connect transport addressBook connector =
 
         {connector with connections = connections}
 
-    let connectToSeed transport connector =
-        let connectionsToOpen = connector.maxConnections - (countConnectingOrConnected connector)
-
-        let addresses =
-            connector.seeds
-            |> List.filter (fun address -> not <| Map.containsKey address connector.connections)
-            |> fun list ->
-                if List.length list > connectionsToOpen then
-                    List.take connectionsToOpen list
-                else
-                    list
-
-        // Connect to new addresses
-        List.iter (Transport.connect transport) addresses
-
-        // Add the new addresses to the connections set, we don't count attemps for seeds
-        let connections = List.fold (fun connections address -> Map.add address (Connecting 0) connections) connector.connections addresses
-
-        {connector with connections = connections}
-
     // Try first without failed one
     let connector = connectInternal transport addressBook connector connector.connections
 
@@ -116,4 +100,3 @@ let connect transport addressBook connector =
             | _ -> true) connector.connections
 
     connectInternal transport addressBook connector (includeFailing connector)
-    |> connectToSeed transport

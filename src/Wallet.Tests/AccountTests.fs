@@ -315,7 +315,7 @@ let ``account sync up``() =
 
     let startBlockHeader = {
         version = 0ul
-        parent = chainParams.genesisHash
+        parent = localGenesisHash
         blockNumber = 2ul
         commitments = Hash.zero
         timestamp = 0UL
@@ -376,7 +376,7 @@ let ``sync up from empty wallet``() =
 
     let header = {
         version = 0ul
-        parent = chainParams.genesisHash
+        parent = localGenesisHash
         blockNumber = 2ul
         commitments = Hash.zero
         timestamp = 0UL
@@ -399,12 +399,12 @@ let ``sync up from empty wallet``() =
     let genesisHeader = genesisBlock.header
 
     let getHeader = function
-    | h when h = chainParams.genesisHash -> genesisHeader
+    | h when h = localGenesisHash -> genesisHeader
     | h when h = blockHash -> header
     | h -> failwithf "unexpected block hash %A" h
 
     let getBlock = function
-    | h when h = chainParams.genesisHash -> genesisBlock
+    | h when h = localGenesisHash -> genesisBlock
     | h when h = blockHash -> block
     | h -> failwithf "unexpected block hash %A" h
 
@@ -423,7 +423,7 @@ let ``account reorg``() =
 
     let startBlockHeader = {
         version = 0ul
-        parent = (Chain.getChainParameters chain).genesisHash
+        parent = localGenesisHash
         blockNumber = 2ul
         commitments = Hash.zero
         timestamp = 0UL
@@ -602,7 +602,7 @@ let ``Should get expected history``() =
 
     let header = {
         version = 0ul
-        parent = chainParams.genesisHash
+        parent = localGenesisHash
         blockNumber = 2ul
         commitments = Hash.zero
         timestamp = 0UL
@@ -625,12 +625,12 @@ let ``Should get expected history``() =
     let genesisHeader = genesisBlock.header
 
     let getHeader = function
-    | h when h = chainParams.genesisHash -> genesisHeader
+    | h when h = localGenesisHash -> genesisHeader
     | h when h = blockHash -> header
     | h -> failwithf "unexpected block hash %A" h
 
     let getBlock = function
-    | h when h = chainParams.genesisHash -> genesisBlock
+    | h when h = localGenesisHash -> genesisBlock
     | h when h = blockHash -> block
     | h -> failwithf "unexpected block hash %A" h
 

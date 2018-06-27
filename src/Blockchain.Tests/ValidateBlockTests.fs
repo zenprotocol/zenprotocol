@@ -146,6 +146,9 @@ let ``genesis block accepted``() =
     |> should equal (Some (state'.tipState.tip,
                            state'.tipState.ema))
 
+    BlockRepository.tryGetGenesisHeader session
+    |> should equal (Some (state'.tipState.tip))
+
     let acs = ActiveContractSetRepository.get session
 
     state'.tipState.tip.status |> should equal ExtendedBlockHeader.MainChain

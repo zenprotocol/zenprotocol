@@ -161,7 +161,7 @@ let main argv =
     use blockchainActor = Blockchain.Main.main dataPath chainParams busName wipe
 
     use networkActor =
-        Network.Main.main busName chainParams config.externalIp config.listen config.bind config.seeds
+        Network.Main.main dataPath busName chainParams config.externalIp config.listen config.bind config.seeds wipe
 
     use walletActor =
         if wipeFull then Wallet.Main.Full elif wipe then Wallet.Main.Reset else Wallet.Main.NoWipe
