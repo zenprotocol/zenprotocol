@@ -32,11 +32,12 @@
 
     <message name="Send Address" id="11">
         <field name="peerId" type="octets" size="4">Peer Id</field>
-        <field name="address" type="longstr">Address</field>
+        <field name="addressTimestamp" type="chunk">Address</field>
     </message>
 
-    <message name="Address" id="12">
-        <field name="address" type="longstr">Address</field>
+    <message name="Publish Addresses" id="12">
+        <field name="count" type="number" size="4" />
+        <field name="addresses" type="chunk" />
     </message>
 
     <message name="Get Addresses" id="13">
@@ -44,12 +45,14 @@
     </message>
 
     <message name="Addresses" id="14">
-        <field name="addresses" type="strings"/>
+        <field name="count" type="number" size="4" />
+        <field name="addresses" type="chunk" />
     </message>
 
     <message name="Send Addresses" id="15">
         <field name="peerId" type="octets" size="4">Peer Id</field>
-        <field name="addresses" type="strings"/>
+        <field name="count" type="number" size="4" />
+        <field name="addresses" type="chunk"/>
     </message>
 
     <message name="Get Mem Pool" id="16">
@@ -120,7 +123,7 @@
     </message>
 
     <message name="Publish Address To All" id="30">
-        <field name="address" type="longstr">Address</field>
+        <field name="addressTimestamp" type="chunk">Address</field>
     </message>
 
     <message name="Get Headers" id="31">
@@ -160,5 +163,9 @@
 
     <message name="Get Tip From All Peers" id="38">
 
+    </message>
+
+    <message name="Update Address Timestamp" id="39">
+        <field name="address" type="longstr">Address</field>
     </message>
 </class>

@@ -42,6 +42,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="Types.fs" />
+    <Compile Include="Serialization.fs" />
     <Compile Include="DiscoverIP.fs" />
     <Compile Include="NetworkMessage.fs" />
     <Compile Include="Transport\InProcMessage.fs" />
@@ -57,6 +59,10 @@
     <ProjectReference Include="..\Consensus\Consensus.fsproj">
       <Project>{5ec4457b-615a-4bbd-b3d5-d0e311b9d5e9}</Project>
       <Name>Consensus</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\DataAccess\DataAccess.fsproj">
+      <Project>{cd83f0e5-0e3b-4582-924a-18da50f4d7c7}</Project>
+      <Name>DataAccess</Name>
     </ProjectReference>
     <ProjectReference Include="..\Infrastructure\Infrastructure.fsproj">
       <Project>{81161f64-d019-422c-a3cf-321cde6ca209}</Project>

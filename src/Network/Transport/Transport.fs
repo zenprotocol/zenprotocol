@@ -104,7 +104,7 @@ let private handleInprocMessage socket inproc networkId msg (peers:Peers) =
             let routingId = Peer.routingId peer
 
             Map.add routingId peer peers
-        | InProcMessage.Address address ->
+        | InProcMessage.PublishAddresses addresses ->
             // we only want to publish to 2 peers and want to pick them randomly
             let today = System.DateTime.Now.Day
 
@@ -115,16 +115,16 @@ let private handleInprocMessage socket inproc networkId msg (peers:Peers) =
                 |> Seq.take 2
                 |> Seq.map fst
 
-            sendToPeers socket inproc peers selectedPeers (Message.Address address)
-        | InProcMessage.SendAddress {address=address;peerId=peerId} ->
+            sendToPeers socket inproc peers selectedPeers (Message.Addresses {count=addresses.count;addresses=addresses.addresses})
+        | InProcMessage.SendAddress {addressTimestamp=address;peerId=peerId} ->
             let routingId = RoutingId.fromBytes peerId
-            sendToPeer socket inproc peers routingId (Message.Address address)
+            sendToPeer socket inproc peers routingId (Message.Addresses {count=1ul;addresses=address})
         | InProcMessage.GetAddresses peerId ->
             let routingId = RoutingId.fromBytes peerId
             sendToPeer socket inproc peers routingId Message.GetAddresses
-        | InProcMessage.SendAddresses {addresses=addresses;peerId=peerId} ->
+        | InProcMessage.SendAddresses {count=count;addresses=addresses;peerId=peerId} ->
             let routingId = RoutingId.fromBytes peerId
-            sendToPeer socket inproc peers routingId (Message.Addresses addresses)
+            sendToPeer socket inproc peers routingId (Message.Addresses {count=count;addresses=addresses})
         | InProcMessage.GetMemPool peerId ->
             let routingId = RoutingId.fromBytes peerId
             sendToPeer socket inproc peers routingId Message.GetMemPool
@@ -154,7 +154,7 @@ let private handleInprocMessage socket inproc networkId msg (peers:Peers) =
             let routingId = RoutingId.fromBytes peerId
             sendToPeer socket inproc peers routingId (Message.Tip blockHeader)
         | InProcMessage.PublishAddressToAll address ->
-            publishMessage socket inproc peers (Message.Address address)
+            publishMessage socket inproc peers (Message.Addresses {count=1ul;addresses=address})
         | InProcMessage.GetHeaders request ->
             let routingId = RoutingId.fromBytes request.peerId
             sendToPeer socket inproc peers routingId (Message.GetHeaders {from=request.from;endHash=request.endHash})
@@ -192,16 +192,16 @@ let publishTransactions transport txHashes =
     InProcMessage.send transport.inproc (InProcMessage.PublishTransactions txHashes)
 
 let sendAddress transport peerId address =
-    InProcMessage.send transport.inproc (InProcMessage.SendAddress {address=address;peerId=peerId})
+    InProcMessage.send transport.inproc (InProcMessage.SendAddress {addressTimestamp=address;peerId=peerId})
 
 let getAddresses transport peerId =
     InProcMessage.send transport.inproc (InProcMessage.GetAddresses peerId)
 
-let sendAddresses transport peerId addresses=
-    InProcMessage.send transport.inproc (InProcMessage.SendAddresses {addresses=addresses;peerId=peerId})
+let sendAddresses transport peerId count addresses =
+    InProcMessage.send transport.inproc (InProcMessage.SendAddresses {count=count;addresses=addresses;peerId=peerId})
 
-let publishAddress transport address =
-    InProcMessage.send transport.inproc (InProcMessage.Address address)
+let publishAddresses transport count addresses =
+    InProcMessage.send transport.inproc (InProcMessage.PublishAddresses {count=count;addresses=addresses})
 
 let getMemPool transport peerId =
     InProcMessage.send transport.inproc (InProcMessage.GetMemPool peerId)

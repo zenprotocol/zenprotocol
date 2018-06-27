@@ -90,7 +90,7 @@ let private disconnect socket peer =
 let closePeer socket reason peer =
     eventX "Closing peer because of {reason}"
     >> setField "reason" (reason.ToString())
-    |> Log.info
+    |> Log.debug
 
     disconnect socket peer |> ignore
     withState peer (Dead reason)
@@ -106,12 +106,19 @@ let send socket peer msg =
 let private create mode routingId networkId state =
     {mode=mode; routingId = routingId; state = state; networkId=networkId; ping = NoPing (getNow ())}
 
+let sendUpdateTimestamp next peer =
+    match peer.mode with
+    | Connector address ->
+        InProcMessage.UpdateAddressTimestamp address
+        |> next
+    | _ -> ()
+
 let connect socket networkId address =
     let routingId = Peer.connect socket (sprintf "tcp://%s" address)
 
     eventX "Connecting to {address}"
     >> setField "address" address
-    |> Log.info
+    |> Log.debug
 
     let peer = create (Connector address) routingId networkId (Connecting (getNow ()))
 
@@ -163,7 +170,8 @@ let handleConnectingState socket next peer msg =
             else
                 // TODO: save version
 
-                eventX "Connected to peer"
+                eventX "Connected to {address}"
+                >> setField "address" (match peer.mode with | Connector address -> address)
                 |> Log.info
 
                 match peer.mode with
@@ -176,7 +184,7 @@ let handleConnectingState socket next peer msg =
         | msg ->
             eventX "Expecting HelloAck but got {msg}"
             >> setField "msg" (sprintf "%A" msg)
-            |> Log.info
+            |> Log.debug
             closePeer socket ExpectingHelloAck peer
 
 let handleActiveState socket next peer msg =
@@ -191,32 +199,32 @@ let handleActiveState socket next peer msg =
         match msg with
         | Message.UnknownPeer _ ->
             eventX "Reconnecting to peer"
-            |> Log.info
+            |> Log.debug
 
             // NetMQ reconnection, just sending Hello again
             let peer = withState peer (Connecting (getNow ()))
             send socket peer (Message.Hello {version=version;network=peer.networkId})
         | Message.Ping nonce ->
             // TODO: should we check when we last answer a ping? the other peer might try to spoof us
+            sendUpdateTimestamp next peer
             send socket peer (Message.Pong nonce)
         | Message.Pong nonce ->
             match peer.ping with
             | NoPing _ -> peer
-            | WaitingForPong (nonce,_) ->
-                match nonce = nonce with
-                | true -> {peer with ping=NoPing (getNow ())}
+            | WaitingForPong (nonce',_) ->
+                match nonce' = nonce with
+                | true ->
+                    sendUpdateTimestamp next peer
+                    {peer with ping=NoPing (getNow ())}
                 | false -> peer
         | Message.Transactions msg ->
             next (InProcMessage.Transactions {count=msg.count;txs=msg.txs})
-            peer
-        | Message.Address address ->
-            next (InProcMessage.Address address)
             peer
         | Message.GetAddresses ->
             next (InProcMessage.GetAddresses (RoutingId.toBytes peer.routingId))
             peer
         | Message.Addresses addresses ->
-            next (InProcMessage.Addresses addresses)
+            next (InProcMessage.Addresses {count=addresses.count;addresses=addresses.addresses})
             peer
         | Message.GetMemPool ->
             next (InProcMessage.GetMemPool (RoutingId.toBytes peer.routingId))
@@ -238,6 +246,7 @@ let handleActiveState socket next peer msg =
             peer
         | Message.NewBlock blockHeader ->
             next (InProcMessage.NewBlock {peerId=(RoutingId.toBytes peer.routingId); blockHeader=blockHeader})
+            sendUpdateTimestamp next peer
             peer
         | Message.GetTip ->
             next (InProcMessage.GetTip (RoutingId.toBytes peer.routingId))
@@ -254,6 +263,7 @@ let handleActiveState socket next peer msg =
             peer
         | Message.NewTransactions txHashes ->
             next (InProcMessage.NewTransactions {peerId=(RoutingId.toBytes peer.routingId);txHashes=txHashes})
+            sendUpdateTimestamp next peer
             peer
         | msg ->
             // TODO: unexpected msg, close peer

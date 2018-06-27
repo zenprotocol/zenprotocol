@@ -21,8 +21,14 @@ let create =
       File.create (File.Naming ("{datetime}", "log") |> File.FileConf.create System.Environment.CurrentDirectory) "file"
     ] >>
     withRules [
+
+#if DEBUG
       Rule.createForTarget "console"
       Rule.createForTarget "file"
+#else
+      Rule.createForTarget "console" |> Rule.setLevel LogLevel.Info
+      Rule.createForTarget "file" |> Rule.setLevel LogLevel.Info
+#endif
     ]
   )
   |> run

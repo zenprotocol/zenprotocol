@@ -4,8 +4,11 @@ open Network
 open Network.Transport
 open FsNetMQ
 
+let tempDir () = System.IO.Path.Combine
+                    [| System.IO.Path.GetTempPath(); System.IO.Path.GetRandomFileName() |]
+
 let address = "127.0.0.1:5556"
-let addressBook = AddressBook.empty
+let addressBook = AddressBook.create (tempDir ())
 
 let startHost () =
     let transport = Transport.create true address 0ul
@@ -53,7 +56,9 @@ let waitForAcceptedMessage peer timeout =
 
 let tryRecvAddress peer timeout =
     match Transport.tryRecv peer timeout with
-        | Some (InProcMessage.Address address) -> Some address
+        | Some (InProcMessage.Addresses addresses) ->
+            Serialization.Addresses.deserialize addresses.count addresses.addresses
+            |> Option.map List.head
         | Some _
         | None ->
             None
@@ -69,7 +74,8 @@ let recvGetAddresses peer timeout =
 let recvAddresses peer timeout =
     match Transport.tryRecv peer timeout with
     | Some (InProcMessage.Addresses addresses) ->
-        addresses
+        Serialization.Addresses.deserialize addresses.count addresses.addresses
+        |> Option.get
     | Some _
     | None ->
         failwith "recvAddresses failed"
