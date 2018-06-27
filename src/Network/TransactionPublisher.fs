@@ -12,11 +12,12 @@ let add txHash (publisher:T) =
     txHash :: publisher
 
 let tick transport (publisher:T) : T =
-    let txHashes =
-        List.rev publisher
-        |> List.map Hash.bytes
-        |> Array.concat
+    if not <| List.isEmpty publisher then
+        let txHashes =
+            List.rev publisher
+            |> List.map Hash.bytes
+            |> Array.concat
 
-    Transport.Transport.publishTransactions transport txHashes
+        Transport.Transport.publishTransactions transport txHashes
 
     []

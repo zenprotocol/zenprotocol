@@ -70,22 +70,23 @@ let ``relay address relay only to two peers``() =
     waitForConnectedMessage peer2 100<milliseconds>
     waitForConnectedMessage peer3 100<milliseconds>
 
-    Transport.publishAddress host "127.0.0.1:5555"
+    Transport.publishAddresses host 1ul (Serialization.Address.serialize ("127.0.0.1:5555",0UL))
 
     let a1 = tryRecvAddress peer1 100<milliseconds>
     let a2 = tryRecvAddress peer2 100<milliseconds>
     let a3 = tryRecvAddress peer3 100<milliseconds>
 
     let addresses =
-        seq {yield a1;yield a2;yield a3}
+        [a1;a2;a3]
         |> Seq.choose id
         |> List.ofSeq
 
-    addresses |> should equal ["127.0.0.1:5555";"127.0.0.1:5555"]
+
+    addresses |> should equal ["127.0.0.1:5555",0UL;"127.0.0.1:5555",0UL]
 
 [<Test>]
 let ``sending and receiving address book``() =
-    let addresses = [ "127.0.0.1:6666"; "127.0.0.1:6667"]
+    let addresses = [ "127.0.0.1:6666",0UL; "127.0.0.1:6667",0UL]
 
     use host = startHost ()
     use peer = startPeer ()
@@ -96,7 +97,7 @@ let ``sending and receiving address book``() =
     Transport.getAddresses peer hostId
 
     let peerId = recvGetAddresses host 100<milliseconds>
-    Transport.sendAddresses host peerId addresses
+    Transport.sendAddresses host peerId 2ul (Serialization.Addresses.serialize addresses)
 
     let addresses' = recvAddresses peer 100<milliseconds>
 

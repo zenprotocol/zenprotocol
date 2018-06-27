@@ -49,6 +49,10 @@
     <Compile Include="TransportHelper.fs" />
     <Compile Include="TransportTests.fs" />
     <Content Include="paket.references" />
+    <ProjectReference Include="..\Infrastructure\Infrastructure.fsproj">
+      <Project>{81161f64-d019-422c-a3cf-321cde6ca209}</Project>
+      <Name>Infrastructure</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Network\Network.fsproj">
       <Project>{8471efe5-4b38-4969-ac2a-0bf64a031eba}</Project>
       <Name>Network</Name>

@@ -19,31 +19,29 @@ let NewTransactionsMessageId = 5uy
 [<LiteralAttribute>]
 let TransactionsMessageId = 6uy
 [<LiteralAttribute>]
-let AddressMessageId = 7uy
+let GetAddressesMessageId = 7uy
 [<LiteralAttribute>]
-let GetAddressesMessageId = 8uy
+let AddressesMessageId = 8uy
 [<LiteralAttribute>]
-let AddressesMessageId = 9uy
+let GetMemPoolMessageId = 9uy
 [<LiteralAttribute>]
-let GetMemPoolMessageId = 10uy
+let MemPoolMessageId = 10uy
 [<LiteralAttribute>]
-let MemPoolMessageId = 11uy
+let GetTransactionsMessageId = 11uy
 [<LiteralAttribute>]
-let GetTransactionsMessageId = 12uy
+let GetBlockMessageId = 12uy
 [<LiteralAttribute>]
-let GetBlockMessageId = 13uy
+let BlockMessageId = 13uy
 [<LiteralAttribute>]
-let BlockMessageId = 14uy
+let GetTipMessageId = 14uy
 [<LiteralAttribute>]
-let GetTipMessageId = 15uy
+let TipMessageId = 15uy
 [<LiteralAttribute>]
-let TipMessageId = 16uy
+let NewBlockMessageId = 16uy
 [<LiteralAttribute>]
-let NewBlockMessageId = 17uy
+let GetHeadersMessageId = 17uy
 [<LiteralAttribute>]
-let GetHeadersMessageId = 18uy
-[<LiteralAttribute>]
-let HeadersMessageId = 19uy
+let HeadersMessageId = 18uy
 [<LiteralAttribute>]
 let UnknownPeerMessageId = 100uy
 [<LiteralAttribute>]
@@ -75,12 +73,11 @@ type Transactions = {
         txs : byte[]
     }
 
-type Address =
-        string
 
-
-type Addresses =
-        string list
+type Addresses = {
+        count : uint32
+        addresses : byte[]
+    }
 
 
 type MemPool =
@@ -122,7 +119,6 @@ type T =
     | Pong of Pong
     | NewTransactions of NewTransactions
     | Transactions of Transactions
-    | Address of Address
     | GetAddresses
     | Addresses of Addresses
     | GetMemPool
@@ -260,34 +256,30 @@ module Transactions =
                     }: Transactions)
         }
 
-module Address =
-    let getMessageSize (msg:Address) =
-            4 + String.length msg
-
-    let write (msg:Address) stream =
-        stream
-        |> Stream.writeLongString msg
-
-    let read =
-        reader {
-            let! msg = Stream.readLongString
-
-            return msg
-        }
 
 module Addresses =
     let getMessageSize (msg:Addresses) =
-            List.fold (fun state (value:string) -> state + 4 + Encoding.UTF8.GetByteCount (value)) 4 msg
+        0 +
+            4 +
+            4 + Array.length msg.addresses +
+            0
 
     let write (msg:Addresses) stream =
         stream
-        |> Stream.writeStrings msg
+        |> Stream.writeNumber4 msg.count
+        |> Stream.writeNumber4 (uint32 (Array.length msg.addresses))
+        |> Stream.writeBytes msg.addresses (Array.length msg.addresses)
 
     let read =
         reader {
-            let! msg = Stream.readStrings
+            let! count = Stream.readNumber4
+            let! addressesLength = Stream.readNumber4
+            let! addresses = Stream.readBytes (int addressesLength)
 
-            return msg
+            return ({
+                        count = count;
+                        addresses = addresses;
+                    }: Addresses)
         }
 
 module MemPool =
@@ -476,10 +468,6 @@ let private decode stream =
             match Transactions.read stream with
             | None,stream -> None,stream
             | Some msg, stream -> Some (Transactions msg), stream
-        | AddressMessageId ->
-            match Address.read stream with
-            | None,stream -> None,stream
-            | Some msg, stream -> Some (Address msg), stream
         | GetAddressesMessageId ->
             Some GetAddresses, stream
         | AddressesMessageId ->
@@ -567,7 +555,6 @@ let send socket msg =
         | Pong msg -> Pong.write msg
         | NewTransactions msg -> NewTransactions.write msg
         | Transactions msg -> Transactions.write msg
-        | Address msg -> Address.write msg
         | GetAddresses -> id
         | Addresses msg -> Addresses.write msg
         | GetMemPool -> id
@@ -592,7 +579,6 @@ let send socket msg =
         | Pong _ -> PongMessageId
         | NewTransactions _ -> NewTransactionsMessageId
         | Transactions _ -> TransactionsMessageId
-        | Address _ -> AddressMessageId
         | GetAddresses _ -> GetAddressesMessageId
         | Addresses _ -> AddressesMessageId
         | GetMemPool _ -> GetMemPoolMessageId
@@ -617,7 +603,6 @@ let send socket msg =
         | Pong msg -> Pong.getMessageSize msg
         | NewTransactions msg -> NewTransactions.getMessageSize msg
         | Transactions msg -> Transactions.getMessageSize msg
-        | Address msg -> Address.getMessageSize msg
         | GetAddresses -> 0
         | Addresses msg -> Addresses.getMessageSize msg
         | GetMemPool -> 0

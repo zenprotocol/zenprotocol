@@ -438,6 +438,6 @@ let getHistory dataAccess session view skip take =
             y2 - x2
 
     List.sortWith comparer all
-    |> List.skip skip
-    |> fun xs -> if List.length xs < take then xs else List.take take xs
+    |> fun xs -> if List.length xs <= skip then [] else List.skip skip xs
+    |> List.truncate take
     |> List.map (fun (txHash,direction,spend,confirmations,_) -> txHash,direction,spend,confirmations)

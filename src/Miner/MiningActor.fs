@@ -36,7 +36,7 @@ let create (chain:ChainParameters) busName address =
 
         let now = Timestamp.now()
 
-        let header = if now > template.header.timestamp then {template.header with timestamp = now } else template.header
+        let header = if now > template.header.timestamp then {template.header with timestamp = uint64 now } else template.header
 
         let headerBytes = Serialization.Header.serialize header
         BigEndianBitConverter.putUInt64 n1 headerBytes 84
