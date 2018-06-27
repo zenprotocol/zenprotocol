@@ -133,7 +133,7 @@ module Binding =
         tx
 
     let tryFindTx txLabel = Map.tryFind txLabel testingState.txs
-    
+
     let tryFindTxList txLabel = Map.tryFind txLabel testingState.txLists
 
     let tryFindContract contractLabel = Map.tryFind contractLabel testingState.contracts
@@ -152,13 +152,13 @@ module Binding =
         let code = Path.Combine (path, contract) |> File.ReadAllText
         let contractId = Contract.makeContractId Version0 code
         contractId, code
-        
+
     let getContractRecord contractLabel =
         match Map.tryFind contractLabel testingState.contracts with
         | Some value -> value
         | None ->
             let contractId, code = getContractId contractLabel
-            
+
             let hints =
                 match Contract.recordHints code with
                 | Ok hints -> hints
@@ -180,7 +180,7 @@ module Binding =
                 { testingState with contracts = Map.add contractLabel (contractId, contract) testingState.contracts }
 
             contractId, contract
-            
+
     let getContractFunction contractLabel =
         let contractId, contract =
             getContractRecord contractLabel
@@ -193,7 +193,7 @@ module Binding =
             |> Result.map (fun contract -> contractExecutionCache <- Map.add contractId contract contractExecutionCache
                                            contract)
             |> Infrastructure.Result.get
-            
+
     let getAsset value =
         if value = "Zen" then Asset.Zen
         else
@@ -492,11 +492,11 @@ module Binding =
             let index = row.GetInt64 "Index" |> uint32
             addInput txLabel refTxLabel index
 
-    // Constructs an array of transactinos 
+    // Constructs an array of transactinos
     let [<Given>] ``(.*) is array of (.*) from (.*)`` txLabel count refTxLabel =
         let mutable txs = []
         let refTx = findTx refTxLabel
-        
+
         if List.length refTx.inputs > 1 ||
            List.length refTx.outputs > 1 ||
            List.length refTx.witnesses > 1 then
@@ -508,14 +508,14 @@ module Binding =
             testingState.keys
             |> Map.toSeq
             |> Seq.map snd
-            |> Seq.find (fun keyPair -> 
+            |> Seq.find (fun keyPair ->
                 match lock with
                 | PK pkHash -> PublicKey.hash (snd keyPair) = pkHash
                 | _ -> false)
 
         let mutable keyPair = findKeyByLock refTx.outputs.[0].lock
         let mutable input = { txHash = Transaction.hash refTx; index = 0ul }
-        
+
         for _ in [ 1UL .. count ] do
             let newKeyPair = KeyPair.create()
 
@@ -524,10 +524,10 @@ module Binding =
             let tx =
                 { inputs = [ Outpoint input ]; witnesses = []; outputs = [ output ]; version = Version0; contract = None }
                 |> Transaction.sign [ keyPair ] TxHash
-                                
+
             input <- { txHash = Transaction.hash tx; index = 0ul }
             keyPair <- newKeyPair
-            
+
             txs <- List.append txs [ tx ]
 
         testingState <- { testingState with txLists = Map.add txLabel txs testingState.txLists }
@@ -575,7 +575,7 @@ module Binding =
         |> Transaction.sign keyPairs TxHash
         |> updateTx txLabel
         |> ignore
-        
+
     // Signs a tx
     let [<Given>] ``(.*) is signed with (.*)`` txLabel keyLabels =
         findTx txLabel
@@ -598,7 +598,7 @@ module Binding =
 
         testingState <- { testingState with blocks = Map.add "genesis" genesisBlock.header testingState.blocks }
 
-        let chain = { chain with genesisHash = genesisHash }
+        let chain = { chain with genesisHashHash = Hash.computeOfHash genesisHash }
         let state' = { state with tipState = { state.tipState with ema = EMA.create chain }}
 
         let events, state' =
@@ -671,7 +671,7 @@ module Binding =
 
         state <- state'
         block
-        
+
     let extendChain newBlockLabel txLabels parentBlockLabel =
         let txs =
             match tryFindTxList txLabels with
@@ -680,7 +680,7 @@ module Binding =
                 txLabels
                 |> split
                 |> List.map findTx
-            
+
         extendChain' newBlockLabel txs parentBlockLabel
 
     // Extend a chain
@@ -717,17 +717,17 @@ module Binding =
 
     // Checks that tx passes validation
     let [<Then>] ``(.*) should pass validation`` txLabel =
-        match validate txLabel with 
+        match validate txLabel with
         | Ok _ -> ()
         | Error e -> failwithf "Validation result: %A" e
 
     // Checks that tx doesn't passes validation
     let [<Then>] ``(.*) validation should yield (.*)`` txLabel (message:string) =
-        match validate txLabel with 
+        match validate txLabel with
         | Ok _ -> failwithf "Unexpected Ok validation result"
         | Error (ValidationError.General error) -> message ?= error
         | Error error  -> message ?= (error.ToString())
-        
+
     //Checks that a tx is locking an asset to an address or a contract
     let [<Then>] ``(.*) should lock (.*) (.*) to (.*)`` txLabel (expected:uint64) asset keyLabel =
         let tx = findTx txLabel
@@ -797,7 +797,7 @@ module Binding =
 
     let malleateTx destTxLabel sourceTxLabel malleateTxFn =
         sourceTxLabel
-        |> findTx 
+        |> findTx
         |> malleateTxFn
         |> updateTx destTxLabel
         |> ignore
@@ -812,7 +812,7 @@ module Binding =
         let suffix = list.[ destIndex .. Seq.length list - 1 ]
         let item = list.[sourceIndex]
         List.concat [ prefix; [ item ]; suffix ]
-            
+
     let malleateTxOutput malleateFn index tx =
         { tx with outputs = malleateListItem tx.outputs malleateFn index }
 
@@ -827,7 +827,7 @@ module Binding =
     let [<When>] ``(.*) results by changing asset of (.*) output (.*) to (.*)`` destTxLabel sourceTxLabel index value =
         let fn = fun output -> { output with spend = { output.spend with asset = getAsset value } }
         malleateTx destTxLabel sourceTxLabel (malleateTxOutput fn index)
-        
+
     let [<When>] ``(.*) results by changing amount of (.*) output (.*) to (.*)`` destTxLabel sourceTxLabel index value =
         let fn = fun output -> { output with spend = { output.spend with amount = getAmount output.spend.asset value } }
         malleateTx destTxLabel sourceTxLabel (malleateTxOutput fn index)
@@ -838,9 +838,9 @@ module Binding =
         | "output" -> malleateTx destTxLabel sourceTxLabel (fun tx -> { tx with outputs = malleateList tx.outputs sourceIndex destIndex })
         | "input" -> malleateTx destTxLabel sourceTxLabel (fun tx -> { tx with inputs = malleateList tx.inputs sourceIndex destIndex })
         | other -> failwithf "unexpected list %A" other
-       
+
     let [<When>] ``(.*) results by changing (.*) of (.*) contract witness (.*) to (.*)`` destTxLabel field sourceTxLabel index value =
-        let fn = fun (w:ContractWitness) -> 
+        let fn = fun (w:ContractWitness) ->
             match field with
             | "contractId"    -> { w with contractId = getContractId value |> fst }
             | "command"       -> { w with command = value }
@@ -854,10 +854,9 @@ module Binding =
             // stateCommitment: StateCommitment
             // signature: (PublicKey * Signature) option
             | other           -> failwithf "unexpected field %A" other
-            
+
         let fn =
-            function 
+            function
             | ContractWitness w -> fn w |> ContractWitness
             | _ -> failwithf "unexpected witness type for index %A" index
         malleateTx destTxLabel sourceTxLabel (malleateTxWitnessItem fn index)
-       

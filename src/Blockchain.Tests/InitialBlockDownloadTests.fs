@@ -311,7 +311,9 @@ let ``getting headers from genesis``() =
     use session = DatabaseContext.createSession databaseContext
 
     let headers = createHeaders 1ul 2000ul
-    let chain = {chain with genesisHash = List.head headers |> Block.hash}
+
+    List.head headers |> Block.hash
+    |> BlockRepository.saveGenesisHash session
 
     List.iter (fun header ->
         {
@@ -340,7 +342,8 @@ let ``getting headers from unknown hash``() =
     use session = DatabaseContext.createSession databaseContext
 
     let headers = createHeaders 1ul 2000ul
-    let chain = {chain with genesisHash = List.head headers |> Block.hash}
+    List.head headers |> Block.hash
+    |> BlockRepository.saveGenesisHash session
 
     List.iter (fun header ->
         {
@@ -369,7 +372,8 @@ let ``getting headers from none main chain hash``() =
     use session = DatabaseContext.createSession databaseContext
 
     let headers = createHeaders 1ul 2000ul
-    let chain = {chain with genesisHash = List.head headers |> Block.hash}
+    List.head headers |> Block.hash
+    |> BlockRepository.saveGenesisHash session
 
     List.iter (fun header ->
         {
@@ -411,7 +415,8 @@ let ``getting headers from middle``() =
     use session = DatabaseContext.createSession databaseContext
 
     let headers = createHeaders 1ul 2000ul
-    let chain = {chain with genesisHash = List.head headers |> Block.hash}
+    List.head headers |> Block.hash
+    |> BlockRepository.saveGenesisHash session
 
     List.iter (fun header ->
         {
@@ -440,7 +445,8 @@ let ``getting headers from multiple hashes``() =
     use session = DatabaseContext.createSession databaseContext
 
     let headers = createHeaders 1ul 2000ul
-    let chain = {chain with genesisHash = List.head headers |> Block.hash}
+    List.head headers |> Block.hash
+    |> BlockRepository.saveGenesisHash session
 
     List.iter (fun header ->
         {

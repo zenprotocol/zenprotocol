@@ -69,6 +69,16 @@ let getBlockState session blockHash =
 let getBlockChildren session (block:ExtendedBlockHeader.T) =
     Index.getAll session.context.blockChildrenIndex session.session block.hash
 
+let saveGenesisHash session genesisHash =
+    SingleValue.put session.context.genesis session.session genesisHash
+
+let tryGetGenesisHeader session =
+    match SingleValue.tryGet session.context.genesis session.session with
+    | Some blockHash ->
+        let header = getHeader session blockHash
+        Some header
+    | None -> None
+
 let tryGetTip session =
     match SingleValue.tryGet session.context.tip session.session with
     | Some blockHash ->
