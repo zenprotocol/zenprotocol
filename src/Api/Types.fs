@@ -225,6 +225,8 @@ type BlockTemplateJson = JsonProvider<"""
 {
     "header": "abcdef012346789",
     "body": "abcdef012346789",
-    "target": "abcdef012346789"
+    "target": "abcdef012346789",
+    "parent": "abcdef012346789",
+    "blockNumber": 1
 }
 """>
