@@ -125,11 +125,36 @@ let parseContractExtendJson chain json =
 
 let parsePublishBlockJson json =
     try
-        let json = PublishBlockJson.Parse json
+        match JsonValue.Parse json with
+        | JsonValue.String block ->
+            match Block.fromHex block with
+            | Some block -> Ok block
+            | None -> Error "invalid block"
+        | JsonValue.Record record ->
+            let tryFind name =
+                Array.tryFind (fun (name',value) -> name' = name) record
+                |> Option.bind (function
+                    | _, JsonValue.String s -> Some s
+                    | _ -> None)
 
-        match Block.fromHex json.Block with
-        | Some block -> Ok block
-        | None -> Error "invalid block"
+            let block = tryFind "block"
+            let header = tryFind "header"
+            let body = tryFind "body"
+
+            match block,header,body with
+            | Some block,None,None ->
+                match Block.fromHex block with
+                | Some block -> Ok block
+                | None -> Error "invalid block"
+            | None, Some header, Some body ->
+                if String.length header <> Block.HeaderSize * 2 then
+                    Error "invalid header size"
+                else
+                    match Block.fromHex (header + body) with
+                    | Some block -> Ok block
+                    | None -> Error "invalid block"
+            | _ -> Error "Json is invalid"
+        | _ -> Error "Json is invalid"
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
 
