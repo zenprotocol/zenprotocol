@@ -69,7 +69,7 @@ let main argv =
     let errorHandler = ProcessExiter(colorizer = function ErrorCode.HelpText -> None | _ -> Some ConsoleColor.Red)
 
     let config = new Config()
-    config.Load("config.yaml")
+    config.Load("test.yaml")
 
     let parser = ArgumentParser.Create<Argument>(programName = "zen-node.exe", errorHandler = errorHandler)
     let results = parser.Parse argv
@@ -82,11 +82,11 @@ let main argv =
     eventX "Node running... press CTRL+C to exit"
     |> Log.info
 
-    // if a chain was specified, we want to override config before 
-    // we handle rest of switches, which may override config again 
+    // if a chain was specified, we want to override config before
+    // we handle rest of switches, which may override config again
     List.iter (fun arg ->
         match arg with
-        | Chain chain -> 
+        | Chain chain ->
             let file = sprintf "%s.yaml" chain
             if System.IO.File.Exists(file) then
                 config.Load(file)
@@ -99,7 +99,7 @@ let main argv =
 
     List.iter (fun arg ->
         match arg with
-        | Chain chain -> 
+        | Chain chain ->
             config.chain <- chain
 #if DEBUG
         | Localhost ->
