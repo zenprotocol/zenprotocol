@@ -19,14 +19,14 @@ let ``peers connecting to each other`` () =
     Socket.bind hostSocket "tcp://127.0.0.1:9876"
 
     use clientSocket = Socket.peer ()
-    let client = Peer.connect clientSocket 0ul "127.0.0.1:9876"
+    let client = Peer.connect clientSocket 0ul "127.0.0.1:9876" 1ul
 
     isConnecting client |> should be True
 
     let routingId = RoutingId.get hostSocket
     let msg = Message.recv hostSocket
 
-    let host = Peer.newPeer hostSocket 0ul (fun _ -> ()) routingId msg
+    let host = Peer.newPeer hostSocket 0ul (fun _ -> ()) routingId msg 2ul
 
     Peer.state host |> should equal Peer.Active
 
@@ -35,6 +35,6 @@ let ``peers connecting to each other`` () =
 
     let next _ = ()
 
-    let client' = Peer.handleMessage clientSocket next client msg'
+    let client' = Peer.handleMessage clientSocket next client msg' 1ul
 
     Peer.state client' |> should equal Peer.Active

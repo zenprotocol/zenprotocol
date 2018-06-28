@@ -11,6 +11,7 @@ let ``send and recv Hello``() =
     let msg = Hello {
         network = 123ul;
         version = 123ul;
+        nonce = 123ul;
     }
 
     use server = Socket.dealer ()
@@ -30,6 +31,7 @@ let ``Hello size fits stream ``() =
     let hello:Hello = {
         network = 123ul;
         version = 123ul;
+        nonce = 123ul;
     }
 
     let messageSize = Hello.getMessageSize hello

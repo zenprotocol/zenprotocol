@@ -49,7 +49,7 @@ let testParameters =
             |> get
             |> Hash.computeOfHash
         genesisTime=1529579777092UL
-        networkId=2013ul
+        networkId=2014ul
         contractSacrificePerBytePerBlock=ContractSacrificePerBytePerBlock
     }
 

@@ -12,6 +12,7 @@
     <message name = "Hello" id = "1">
         <field name="network" type="number" size="4">Network</field>
         <field name = "version" type = "number" size="4" >Version</field>
+        <field name = "nonce" type = "number" size="4" >Nonce</field>
     </message>
 
     <message name = "Hello Ack" id = "2">
