@@ -27,6 +27,13 @@ let transactionWeight set tx =
     | Some outputs ->
         let txSkel = TxSkeleton.fromTransaction tx outputs
         Weight.transactionWeight tx txSkel
+        
+let private transactionSizeWeight =
+    Serialization.Transaction.serialize Consensus.Serialization.TransactionSerializationMode.Full 
+    >> Seq.length
+    >> uint32
+    >> (*) sizeFactor
+    >> bigint
 
 [<Test>]
 let ``Transaction with one PK lock in inputs should have corresponding cost``() =
@@ -44,7 +51,7 @@ let ``Transaction with one PK lock in inputs should have corresponding cost``() 
     let utxos = Map.ofSeq [ testInput1, Unspent output ]
     let sTx = Transaction.sign oneKeyPair TxHash tx
     let txWeight = transactionWeight utxos sTx
-    shouldEqual (txWeight, (Ok pkWitnessWeight : Result<bigint,string>))
+    shouldEqual (txWeight, (Ok (transactionSizeWeight sTx + pkWitnessWeight) : Result<bigint,string>))
 
 [<Test>]
 let ``Transaction with many PK locks in inputs should have right cost``() =
@@ -60,7 +67,7 @@ let ``Transaction with many PK locks in inputs should have right cost``() =
     let utxos = Map.ofList <| List.zip outpoints (List.map Unspent outputs)
     let sTx = Transaction.sign keys TxHash tx
     let txWeight = transactionWeight utxos sTx
-    shouldEqual (txWeight, (Ok (pkWitnessWeight * bigint (List.length keys)) : Result<bigint,string>))
+    shouldEqual (txWeight, (Ok (transactionSizeWeight sTx + (pkWitnessWeight * bigint (List.length keys))) : Result<bigint,string>))
 
 // The weight of a contract witness is just computed from the cost to which
 // it commits. The cost is validated in TransactionValidation.
@@ -104,7 +111,7 @@ let ``Contract validated transaction should have the right cost``() =
         witnesses = [ ContractWitness cWitness ]
     }
     let txWeight = transactionWeight utxos tx
-    shouldEqual (txWeight,(Ok 20_000I : Result<bigint,string>))
+    shouldEqual (txWeight,(Ok (transactionSizeWeight tx + 20_000I) : Result<bigint,string>))
 
 [<Test>]
 let ``Two contracts in sequence should have the right cost``() =
@@ -153,7 +160,7 @@ let ``Two contracts in sequence should have the right cost``() =
         witnesses = [ ContractWitness cWitness1; ContractWitness cWitness2 ]
     }
     let txWeight = transactionWeight utxos tx
-    shouldEqual (txWeight, (Ok 25_000I : Result<bigint,string>))
+    shouldEqual (txWeight, (Ok (transactionSizeWeight tx + 25_000I) : Result<bigint,string>))
 
 [<Test>]
 let ``Transaction with too many witnesses should fail``() =
@@ -238,4 +245,4 @@ let ``Transaction with large amount of inputs should not fail weight calculation
     }
     let signedTx = Transaction.sign keys TxHash tx
     let txWeight = transactionWeight utxos signedTx
-    shouldEqual (txWeight, (Ok 500000000I : Result<bigint,string>))
+    shouldEqual (txWeight, (Ok (transactionSizeWeight signedTx + 500000000I) : Result<bigint,string>))

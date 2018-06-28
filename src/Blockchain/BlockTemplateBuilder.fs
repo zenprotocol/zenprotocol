@@ -1,14 +1,18 @@
 module Blockchain.BlockTemplateBuilder
 
+open Consensus
+
 open Infrastructure
+open ValidationError
 open Result
-open Consensus.ValidationError
 open Consensus.TransactionValidation
 open Blockchain.State
 open Consensus
 
 let getUTXO = UtxoSetRepository.get
 let getContractState = ContractStateRepository.get
+
+let result = new Result.ResultBuilder<string>()
 
 // We pre-compute the weights of all transactions in the mempool.
 // It may be better to compute the weights when transactions are inserted, but
@@ -17,21 +21,13 @@ let getContractState = ContractStateRepository.get
 // use of the UTXOs is to dereference all the outputs.
 let weights session state =
     MemPool.toList state.memoryState.mempool
-    |> List.map
-        (fun (txHash,tx) -> 
-            UtxoSet.tryGetOutputs (getUTXO session) state.memoryState.utxoSet tx.inputs
-            |> Result.ofOption "could not get outputs"
-            <@> TxSkeleton.fromTransaction tx
-            >>= Weight.transactionWeight tx
-            <@> fun weight -> txHash,tx, weight)
-    |> fun sq ->
-        [
-        for value in sq do
-            match value with
-            | Ok (txHash, tx, wt) -> yield (txHash, tx, wt)
-            | _ -> ()
-        ]
-
+    |> Result.traverseResultM (fun (txHash,tx) -> 
+        UtxoSet.tryGetOutputs (getUTXO session) state.memoryState.utxoSet tx.inputs
+        |> Result.ofOption "could not get outputs"
+        <@> TxSkeleton.fromTransaction tx
+        >>= Weight.transactionWeight tx
+        <@> fun weight -> txHash,tx, weight)
+    
 let selectOrderedTransactions (chain:Chain.ChainParameters) (session:DatabaseContext.Session) blockNumber timestamp acs contractCache transactions =
     let contractPath = session.context.contractPath
     let maxWeight = chain.maxBlockWeight
@@ -74,6 +70,8 @@ let selectOrderedTransactions (chain:Chain.ChainParameters) (session:DatabaseCon
     foldUntilUnchanged initialState transactions
 
 
-let makeTransactionList chain (session:DatabaseContext.Session) (state:State) timestamp =
-    let txs = weights session state |> List.sortBy (fun (_,_,wt) -> wt)
-    selectOrderedTransactions chain session state.tipState.tip.header.blockNumber timestamp state.tipState.activeContractSet state.memoryState.contractCache txs
+let makeTransactionList chain (session:DatabaseContext.Session) (state:State) timestamp = result {
+    let! txs = weights session state 
+    let txs = List.sortBy (fun (_,_,wt) -> wt) txs
+    return selectOrderedTransactions chain session state.tipState.tip.header.blockNumber timestamp state.tipState.activeContractSet state.memoryState.contractCache txs
+}

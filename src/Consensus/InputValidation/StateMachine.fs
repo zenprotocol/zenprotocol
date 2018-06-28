@@ -9,21 +9,21 @@ open State
 let private validateInputs blockNumber timestamp acs getContractState contractStates (txHash:Hash.Hash) tx witnesses (inputs:TxSkeleton.Input list) =
     match inputs with
     | [] -> Valid contractStates
-    | head :: tail ->
+    | Lock head :: tail ->
         match head with
-        | Lock (Contract contractId) ->
+        | Contract contractId ->
             if ContractId.version contractId <> Version0 then
                 Invalid <| General "contract version not supported"
             else
                 ContractV0.validate blockNumber timestamp acs getContractState contractStates txHash tx witnesses inputs
-        | Lock (PK pkHash) -> PK.validate contractStates txHash witnesses pkHash tail
-        | Lock (Coinbase (coinbaseBlockNumber, pkHash)) ->
+        | PK pkHash -> PK.validate contractStates txHash witnesses pkHash tail
+        | Coinbase (coinbaseBlockNumber, pkHash) ->
             Coinbase.validate blockNumber contractStates txHash witnesses pkHash coinbaseBlockNumber tail
-        | Lock Fee
-        | Lock ActivationSacrifice
-        | Lock (ExtensionSacrifice _)
-        | Lock Destroy
-        | Lock (HighVLock _) -> Invalid <| General "input is not spendable"
+        | Fee
+        | ActivationSacrifice
+        | ExtensionSacrifice _
+        | Destroy
+        | HighVLock _ -> Invalid <| General "input is not spendable"
 
 let rec private validateNext blockNumber timestamp acs (txHash:Hash.Hash) tx getContractState state =
     match state with
@@ -39,7 +39,7 @@ let rec private validateNext blockNumber timestamp acs (txHash:Hash.Hash) tx get
             |> validateNext blockNumber timestamp acs txHash tx getContractState
     | Valid contractState -> Valid contractState
 
-let validate blockNumber timestamp acs pInputs getContractState contractState txHash tx txSkeleton =
+let validate blockNumber timestamp acs getContractState contractState txHash tx txSkeleton =
     let witnesses = tx.witnesses
     let inputs = txSkeleton.pInputs
 

@@ -865,7 +865,7 @@ let ``Template builder uses two transactions in the same block which depend on e
     let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction secondTx) session (timestamp+1UL) updatedState
     let timestamp = genesisBlock.header.timestamp
     let ema' = EMA.add chain timestamp ema
-    let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList chain session updatedState (timestamp + 100_000UL)
+    let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList chain session updatedState (timestamp + 100_000UL) |> Result.get
 
     let twoTxBlock = Block.createTemplate chain genesisBlock.header (timestamp+1UL) ema' memState.activeContractSet validatedTransactions Hash.zero
     let oldHash = genesisState.tipState.tip.hash

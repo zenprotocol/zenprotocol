@@ -13,6 +13,7 @@ let activationFactor = 300000u
 let contractExecutionFactor = 100I
 let pkWitnessWeight = 100_000I
 let contractSignatureWeight = 80_000I
+let sizeFactor = 100u
 
 // Returns outputs without mints. But they get added back from the inputs.
 let getOutputs = UtxoSet.tryGetOutputs
@@ -31,7 +32,7 @@ type State =
 
 let private accumulatePkWeight total witnesses pInputs =
     match witnesses with
-    | (PKWitness _)::witnessesTail ->
+    | PKWitness _::witnessesTail ->
         NextInput (total + pkWitnessWeight, witnessesTail, List.tail pInputs)
     | _ -> 
         Invalid "expecting a public key witness"
@@ -39,21 +40,12 @@ let private accumulatePkWeight total witnesses pInputs =
 let private accumulateContractWeight total witnesses pInputs =
     match witnesses with
     | [] -> Valid total
-    | (ContractWitness cw)::witnessesTail ->
-        let witnessesTail =
-            List.foldBack (fun witness witnesseses -> 
-                match witness with 
-                | ContractWitness cw when cw.inputsLength = 0u -> witnesseses
-                | _ -> witnesseses @ [ witness ]) witnessesTail []
-     
-        let signatureWeight =
-            match cw.signature with
-            | Some _ -> contractSignatureWeight
-            | None -> 0I
-        let costWeight = contractExecutionFactor * bigint cw.cost
-        let weight = signatureWeight + costWeight
-
-        NextInput (total + weight, witnessesTail, List.skip (int cw.inputsLength) pInputs)
+    | ContractWitness cw::witnessesTail ->
+        NextInput (total
+        + contractExecutionFactor * bigint cw.cost
+        + (match cw.signature with
+           | Some _ -> contractSignatureWeight
+           | None -> 0I), witnessesTail, List.skip (int cw.inputsLength) pInputs)
     | _ -> 
         Invalid "expecting a contract 0 witness"
 
@@ -66,8 +58,7 @@ let private accumulateWeights total witnesses pInputs =
         | Coinbase _
         | PK _ ->
             accumulatePkWeight total witnesses pInputs
-        | Contract _
-        | Destroy ->
+        | Contract _ ->
             accumulateContractWeight total witnesses pInputs
         | _ -> failwith "unexpected output type"
     | Mint _ :: _ ->
@@ -81,17 +72,21 @@ let rec private validateNext state =
         |> validateNext
     | Valid totalWeight -> Valid totalWeight
 
+let private transactionSizeWeight =
+    Transaction.serialize Full 
+    >> Seq.length
+    >> uint32
+    >> (*) sizeFactor
+    >> bigint
+    
 let transactionWeight tx txSkeleton = result {
     let witnesses = tx.witnesses
     let inputs = txSkeleton.pInputs
 
-    let result =
-        match validateNext (NextInput (0I, witnesses, inputs)) with
-        | Valid total -> Ok total
-        | Invalid error -> Error error
-        | NextInput _ -> failwith "unexpected"
-
-    return! result
+    return! match validateNext (NextInput (transactionSizeWeight tx, witnesses, inputs)) with
+            | Valid total -> Ok total
+            | Invalid error -> Error error
+            | NextInput _ -> failwith "unexpected"
 }
 
 let blockWeight getUTXO block set =
@@ -110,4 +105,4 @@ let blockWeight getUTXO block set =
                 with _ as ex when ex.Message = "Expected output to be unspent" ->
                     Error "could not get outputs"
         ))) (Ok (0I, set))
-  <@> fst
+    <@> fst

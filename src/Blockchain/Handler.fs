@@ -1,20 +1,18 @@
 module Blockchain.Handler
 
 open Infrastructure
-open Infrastructure.Writer
-open Infrastructure.ServiceBus.Agent
+open Result
+open Writer
+open ServiceBus.Agent
 open Messaging.Services
 open Messaging.Events
 open Consensus
 open Blockchain
-open Blockchain
-open Blockchain
-open Blockchain.EffectsWriter
+open EffectsWriter
 open Consensus.Types
 open State
 open DatabaseContext
 open Logary.Message
-
 
 let handleCommand chainParams command session timestamp (state:State) =
     let contractPath = session.context.contractPath
@@ -95,9 +93,11 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
     | ExecuteContract (contractId, command, sender, messageBody, txSkeleton) ->
         TransactionHandler.executeContract session txSkeleton timestamp contractId command sender messageBody state false
         |> requestId.reply<Result<Transaction, string>>
-    | GetBlockTemplate pkHash ->
-        let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList chain session state timestamp
-        Block.createTemplate chain state.tipState.tip.header timestamp state.tipState.ema memState.activeContractSet validatedTransactions pkHash
+    | GetBlockTemplate pkHash -> 
+        BlockTemplateBuilder.makeTransactionList chain session state timestamp
+        <@> fun (memState, validatedTransactions) ->
+            Block.createTemplate chain state.tipState.tip.header timestamp state.tipState.ema memState.activeContractSet validatedTransactions pkHash
+        |> Result.get
         |> requestId.reply<Block>
     | GetBlock (mainChain,blockHash) ->
         let isValid (header:ExtendedBlockHeader.T) = (not mainChain) || header.status = ExtendedBlockHeader.MainChain
