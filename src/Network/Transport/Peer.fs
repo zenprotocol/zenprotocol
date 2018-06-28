@@ -28,6 +28,7 @@ type CloseReason =
     | NoPong
     | IncorrectNetwork
     | BlockchainRequest
+    | ConnectToSelf
 
 type State =
     | Connecting of sent:System.DateTime
@@ -113,7 +114,7 @@ let sendUpdateTimestamp next peer =
         |> next
     | _ -> ()
 
-let connect socket networkId address =
+let connect socket networkId address randomPeerNonce =
     let routingId = Peer.connect socket (sprintf "tcp://%s" address)
 
     eventX "Connecting to {address}"
@@ -123,9 +124,9 @@ let connect socket networkId address =
     let peer = create (Connector address) routingId networkId (Connecting (getNow ()))
 
     // TODO: use correct values for this
-    send socket peer (Message.Hello {version=version; network = networkId;})
+    send socket peer (Message.Hello {version=version; network = networkId;nonce=randomPeerNonce})
 
-let newPeer socket networkId next routingId msg =
+let newPeer socket networkId next routingId msg randomPeerNonce =
     let createPeer = create Listener routingId networkId
 
     match msg with
@@ -139,6 +140,9 @@ let newPeer socket networkId next routingId msg =
             if hello.network <> networkId then
                 let peer = createPeer (Dead IncorrectNetwork)
                 send socket peer (Message.IncorrectNetwork)
+                |> disconnect socket
+            else if hello.nonce = randomPeerNonce then
+                createPeer (Dead ConnectToSelf)
                 |> disconnect socket
             else
                 eventX "Peer accepted"
@@ -187,7 +191,7 @@ let handleConnectingState socket next peer msg =
             |> Log.debug
             closePeer socket ExpectingHelloAck peer
 
-let handleActiveState socket next peer msg =
+let handleActiveState socket next peer msg randomPeerNonce =
     match msg with
     | None ->
         eventX "Received malformed message from peer"
@@ -203,7 +207,7 @@ let handleActiveState socket next peer msg =
 
             // NetMQ reconnection, just sending Hello again
             let peer = withState peer (Connecting (getNow ()))
-            send socket peer (Message.Hello {version=version;network=peer.networkId})
+            send socket peer (Message.Hello {version=version;network=peer.networkId;nonce=randomPeerNonce})
         | Message.Ping nonce ->
             // TODO: should we check when we last answer a ping? the other peer might try to spoof us
             sendUpdateTimestamp next peer
@@ -270,10 +274,10 @@ let handleActiveState socket next peer msg =
 
             peer
 
-let handleMessage socket next peer msg =
+let handleMessage socket next peer msg randomPeerNonce =
    match state peer with
    | Connecting _ -> handleConnectingState socket next peer msg
-   | Active -> handleActiveState socket next peer msg
+   | Active -> handleActiveState socket next peer msg randomPeerNonce
    | _ -> failwith "Dead peer should not receive any messages"
 
 let handleTick socket peer =

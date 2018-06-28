@@ -52,6 +52,7 @@ let IncorrectNetworkMessageId = 102uy
 type Hello = {
         network : uint32
         version : uint32
+        nonce : uint32
     }
 
 type HelloAck = {
@@ -141,21 +142,25 @@ module Hello =
         0 +
             4 +
             4 +
+            4 +
             0
 
     let write (msg:Hello) stream =
         stream
         |> Stream.writeNumber4 msg.network
         |> Stream.writeNumber4 msg.version
+        |> Stream.writeNumber4 msg.nonce
 
     let read =
         reader {
             let! network = Stream.readNumber4
             let! version = Stream.readNumber4
+            let! nonce = Stream.readNumber4
 
             return ({
                         network = network;
                         version = version;
+                        nonce = nonce;
                     }: Hello)
         }
 

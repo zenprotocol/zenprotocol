@@ -12,6 +12,8 @@ open Logary.Message
 let random = (new System.Random()).Next()
 let timerInterval = 1 * 1000<milliseconds>
 
+let randomPeerNonce = (new System.Random()).Next() |> uint32
+
 type T =
     {
         inproc: Socket.T;
@@ -87,8 +89,8 @@ let private handleMessage socket inproc networkId routingId msg (peers:Peers) =
 
     let peer =
         match Map.tryFind routingId peers with
-        | Some peer -> Peer.handleMessage socket next peer msg
-        | None -> Peer.newPeer socket networkId next routingId msg
+        | Some peer -> Peer.handleMessage socket next peer msg randomPeerNonce
+        | None -> Peer.newPeer socket networkId next routingId msg randomPeerNonce
 
     let peers = Map.add routingId peer peers
 
@@ -100,7 +102,7 @@ let private handleInprocMessage socket inproc networkId msg (peers:Peers) =
     | Some msg ->
         match msg with
         | InProcMessage.Connect address ->
-            let peer = Peer.connect socket networkId address
+            let peer = Peer.connect socket networkId address randomPeerNonce
             let routingId = Peer.routingId peer
 
             Map.add routingId peer peers
