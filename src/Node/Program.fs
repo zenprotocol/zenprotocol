@@ -76,6 +76,7 @@ let main argv =
 
     let mutable wipe = false
     let mutable wipeFull = false
+    let mutable seed = false
 
     use logary = Log.create
 
@@ -147,6 +148,7 @@ let main argv =
             | Some threads -> config.miner.threads <- threads
             | None -> ()
         | Seed ->
+            seed <- true
             config.listen <- true
             config.seeds.Clear ()
         | Data_Path dataPath ->
@@ -161,7 +163,7 @@ let main argv =
     use blockchainActor = Blockchain.Main.main dataPath chainParams busName wipe
 
     use networkActor =
-        Network.Main.main dataPath busName chainParams config.externalIp config.listen config.bind config.seeds wipe
+        Network.Main.main dataPath busName chainParams config.externalIp config.listen config.bind config.seeds wipe seed
 
     use walletActor =
         if wipeFull then Wallet.Main.Full elif wipe then Wallet.Main.Reset else Wallet.Main.NoWipe

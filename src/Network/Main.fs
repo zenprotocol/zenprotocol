@@ -308,7 +308,7 @@ let handleOneDayTick transport now (connector,publisher,ownAddress) =
 
     connector,publisher,ownAddress
 
-let main dataPath busName chainParams externalIp listen bind seeds wipe =
+let main dataPath busName chainParams externalIp listen bind seeds wipe seed =
     let dataPath = Platform.combine dataPath "networkdb"
 
     if wipe then
@@ -323,7 +323,7 @@ let main dataPath busName chainParams externalIp listen bind seeds wipe =
         let addressBook = AddressBook.create dataPath
 
         let ownAddress =
-            if not (System.String.IsNullOrEmpty externalIp) && listen then
+            if not (System.String.IsNullOrEmpty externalIp) && listen && not seed then
                 let port = Endpoint.getPort bind
 
                 eventX "External IP is {ip}"
