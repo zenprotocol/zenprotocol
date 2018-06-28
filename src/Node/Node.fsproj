@@ -47,7 +47,7 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Program.fs" />
-    <Content Include="config.yaml">
+    <Content Include="main.yaml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="paket.references" />

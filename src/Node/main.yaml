@@ -1,0 +1,20 @@
+chain: main
+
+dataPath: ./data
+
+externalIp: null
+listen: true
+bind: "*:9555"
+seeds:
+  - 52.36.171.220:9555
+  - 18.217.138.100:9555
+  - 18.216.202.176:9555
+  - 18.188.175.222:9555
+
+api:
+  enabled: true
+  bind: 127.0.0.1:11567
+
+miner:
+  enabled: false
+  threads: 1
