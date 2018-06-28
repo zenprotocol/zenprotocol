@@ -12,8 +12,6 @@ open Logary.Message
 let random = (new System.Random()).Next()
 let timerInterval = 1 * 1000<milliseconds>
 
-let randomPeerNonce = (new System.Random()).Next() |> uint32
-
 type T =
     {
         inproc: Socket.T;
@@ -84,7 +82,7 @@ let private handleTimer socket inproc (peers:Peers) =
 
     cleanDeadPeers inproc peers
 
-let private handleMessage socket inproc networkId routingId msg (peers:Peers) =
+let private handleMessage socket inproc networkId routingId msg randomPeerNonce (peers:Peers)  =
     let next msg = InProcMessage.send inproc msg
 
     let peer =
@@ -96,7 +94,7 @@ let private handleMessage socket inproc networkId routingId msg (peers:Peers) =
 
     cleanDeadPeers inproc peers
 
-let private handleInprocMessage socket inproc networkId msg (peers:Peers) =
+let private handleInprocMessage socket inproc networkId msg randomPeerNonce (peers:Peers) =
     match msg with
     | None -> failwith "invalid inproc msg"
     | Some msg ->
@@ -271,6 +269,8 @@ let addToPoller poller transport =
 let create listen bind networkId =
     let user,inproc = Pair.createPairs ()
 
+    let randomPeerNonce = (new System.Random()).Next() |> uint32
+
     let actor = FsNetMQ.Actor.create (fun shim ->
         use poller = Poller.create ()
         use observer = Poller.registerEndMessage poller shim
@@ -291,7 +291,7 @@ let create listen bind networkId =
             |> Observable.map (fun _ ->
                 let routingId = RoutingId.get socket
                 let msg =  Message.recv socket
-                handleMessage socket inproc networkId routingId msg)
+                handleMessage socket inproc networkId routingId msg randomPeerNonce)
 
         let timer = Timer.create timerInterval
         let timerObservable =
@@ -302,7 +302,7 @@ let create listen bind networkId =
             Poller.addSocket poller inproc
             |> Observable.map (fun _ ->
                 let msg = InProcMessage.recv inproc
-                handleInprocMessage socket inproc networkId msg)
+                handleInprocMessage socket inproc networkId msg randomPeerNonce)
 
         use observer =
             Observable.merge socketObservable timerObservable
