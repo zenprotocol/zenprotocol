@@ -323,7 +323,7 @@ let main dataPath busName chainParams externalIp listen bind seeds wipe seed =
         let addressBook = AddressBook.create dataPath
 
         let ownAddress =
-            if not (System.String.IsNullOrEmpty externalIp) && listen && not seed then
+            if not (System.String.IsNullOrEmpty externalIp) && listen then
                 let port = Endpoint.getPort bind
 
                 eventX "External IP is {ip}"
@@ -357,7 +357,7 @@ let main dataPath busName chainParams externalIp listen bind seeds wipe seed =
             |> Observable.map (transportHandler transport seeds client addressBook (Timestamp.now ()))
 
         let discoverIpObservable, discoverIpDisposable =
-            if Option.isNone ownAddress && listen then
+            if Option.isNone ownAddress && listen && not seed then
                 let discoverIp = DiscoverIP.create ()
                 let observable =
                     DiscoverIP.addToPoller poller discoverIp
