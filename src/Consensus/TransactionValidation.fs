@@ -105,7 +105,8 @@ let private activateContract (chainParams : Chain.ChainParameters) contractPath 
                     }
                     return ActiveContractSet.add contract.contractId contract acs, contractCache
             | HighV _ ->
-                return acs, contractCache
+                //return acs, contractCache
+                yield! GeneralError "High version contracts not supported"
         | None ->
             return acs, contractCache
     }
