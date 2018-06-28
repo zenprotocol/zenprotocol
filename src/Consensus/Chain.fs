@@ -25,13 +25,13 @@ type ChainParameters =
 let mainParameters =
     {
         name="main"
-        proofOfWorkLimit=Difficulty.uncompress 0x1cffff00ul;
+        proofOfWorkLimit=Difficulty.uncompress 0x1c1ddec6ul;
         blockInterval=236682UL;
         smoothingFactor=28I;
-        maxBlockWeight=1000_000_000I;
+        maxBlockWeight=2000_000_000I;
         sacrificePerByteBlock=1UL;
         genesisHashHash=Hash.zero
-        genesisTime=0UL
+        genesisTime= new System.DateTime(2018,6,30,17,0,0,System.DateTimeKind.Utc) |> Infrastructure.Timestamp.fromDateTime // 1530378000000UL
         networkId=1000ul
         contractSacrificePerBytePerBlock=ContractSacrificePerBytePerBlock
     }
