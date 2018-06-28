@@ -98,6 +98,7 @@ let take exclude length seeds book =
     Collection.getAll book.addresses session
     |> List.map fst
     |> List.append seeds
+    |> List.distinct
     |> List.shuffle
     |> List.filter (fun address -> not <| Set.contains address exclude)
     |> List.truncate length
