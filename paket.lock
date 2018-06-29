@@ -38,9 +38,9 @@ NUGET
     FSharpx.Extras (2.2.1)
       FSharpx.Async
       FSharpx.Collections
-    FsNetMQ (0.2.7)
+    FsNetMQ (0.2.8)
       FSharp.Core
-      NetMQ (>= 4.0.0.156-pre)
+      NetMQ (>= 4.0.0.175-pre)
     FsPickler (5.2)
       FSharp.Core (>= 3.1.2)
     FsUnit (3.1)
