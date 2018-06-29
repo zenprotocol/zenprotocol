@@ -105,7 +105,7 @@ let errorToString err =
 
 let checkErrorCode result =
     if result <> 0 then
-        failwith (errorToString result)
+        failwithf "%d %s" result (errorToString result)
 
 type PinnedByteArray =
     | PinnedByteArray of GCHandle*byte[]
