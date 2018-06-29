@@ -10,6 +10,8 @@ open Wallet
 open Wallet.DataAccess
 open Wallet.Types
 open Messaging.Services.Wallet
+open Logary.Message
+open Infrastructure
 
 // TODO: handle history
 
@@ -217,6 +219,10 @@ let addBlock dataAccess session blockHash block =
     elif account.blockHash <> block.header.parent then
         failwithf "trying to add a block to account but account in different chain %A %A" (block.header.blockNumber) (account.blockNumber)
     else
+
+    eventX "Account adding block #{blockNumber}"
+    >> setField "blockNumber" block.header.blockNumber
+    |> Log.info
 
     block.transactions
     |> List.mapi (fun index tx -> index,tx)
