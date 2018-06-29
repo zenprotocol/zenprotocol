@@ -103,7 +103,7 @@
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
       <ItemGroup>
         <Reference Include="FsCheck.NUnit">
-          <HintPath>..\..\packages\FsCheck.NUnit\lib\net452\FsCheck.NUnit.dll</HintPath>
+          <HintPath>..\..\packages\FsCheck.Nunit\lib\net452\FsCheck.NUnit.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
