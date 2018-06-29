@@ -181,6 +181,11 @@ let rec private addBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:Extende
             |> BlockRepository.saveHeader session
 
             let fullBlock = BlockRepository.getFullBlock session block
+
+            eventX "BlockHandler: BlockAdded #{blockNumber}"
+            >> setField "blockNumber" block.header.blockNumber
+            |> Log.info
+
             do! publish (BlockAdded (block.hash, fullBlock))
 
         return ()
@@ -385,6 +390,11 @@ let private handleMainChain chain contractPath session timestamp (state:State) (
             ContractStateRepository.save session contractStates
             ActiveContractSetRepository.save session acs
             let acs = ActiveContractSet.clearChanges acs
+
+            eventX "BlockHandler: BlockAdded #{blockNumber}"
+            >> setField "blockNumber" block.header.blockNumber
+            |> Log.info
+
 
             // Pulishing event of the new block
             do! publish (BlockAdded (blockHash, block))
