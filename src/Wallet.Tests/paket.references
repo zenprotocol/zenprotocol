@@ -8,3 +8,4 @@ FSharp.Compiler.Tools
 Base58Check
 NBitcoin
 Zulib
+Logary
