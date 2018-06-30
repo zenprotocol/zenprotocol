@@ -50,7 +50,8 @@ type NoArgs =
         member arg.Usage = "get address"
 
 type Arguments =
-    | [<UniqueAttribute>] Port of port:uint16
+    | [<AltCommandLine("-p");UniqueAttribute>] Port of port:uint16
+    | [<AltCommandLine("-c");UniqueAttribute>] Chain of string
 #if DEBUG
     | [<AltCommandLine("-l1")>] Local1
     | [<AltCommandLine("-l2")>] Local2
@@ -73,6 +74,7 @@ type Arguments =
         member arg.Usage =
             match arg with
             | Port _ -> "port of zen-node API"
+            | Chain _ -> "select port by specify the chain (main/test/local). Default is main"
 #if DEBUG
             | Local1 -> "use port of local1 testing node"
             | Local2 -> "use port of local2 testing node"
@@ -99,11 +101,15 @@ let main argv =
 
     let results = parser.ParseCommandLine argv
 
-    let mutable port = 31567us
+    let mutable port = 11567us
+    //let mutable port = 31567us
 
     List.iter (fun arg ->
         match arg with
         | Port p -> port <- p
+        | Chain chain when chain = "main" -> port <- 11567us
+        | Chain chain when chain = "test" -> port <- 31567us
+        | Chain chain when chain = "local" -> port <- 31567us
 #if DEBUG
         | Local1 -> port <- 36000us
         | Local2 -> port <- 36001us
