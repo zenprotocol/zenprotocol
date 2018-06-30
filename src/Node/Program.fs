@@ -150,7 +150,6 @@ let main argv =
         | Seed ->
             seed <- true
             config.listen <- true
-            config.seeds.Clear ()
         | Data_Path dataPath ->
             config.dataPath <- dataPath
     ) (results.GetAllResults())
