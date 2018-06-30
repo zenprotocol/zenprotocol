@@ -57,3 +57,12 @@ let ``uncompressed is larger when third MSB is lower``(LeadingZerosHash original
         
         hash < uncompressed
     )
+    
+[<Property>]
+let ``should clamp difficulty exponent to an upper bound``(exp) =
+    (exp > 32) ==> lazy(
+        exp <<< 24
+        |> uint32
+        |> Difficulty.uncompress
+        |> (=) Hash.zero
+    )
