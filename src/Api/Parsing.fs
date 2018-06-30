@@ -158,6 +158,16 @@ let parsePublishBlockJson json =
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
 
+let parseSubmitBlockHeaderJson json =
+    try
+        let json = SubmitBlockHeaderJson.Parse json
+
+        match BlockHeader.fromHex json.Header with
+        | Some header -> Ok header
+        | None -> Error "invalid header"
+    with _ as ex ->
+        Error ("Json is invalid: " + ex.Message)
+
 let parseImportSeedJson json =
     try
         let json = ImportSeedJson.Parse json
