@@ -1,4 +1,5 @@
 module Consensus.Chain
+open Infrastructure
 open Infrastructure.Result
 
 let ContractSacrificePerBytePerBlock = 1UL
@@ -20,6 +21,7 @@ type ChainParameters =
         genesisTime:uint64
         networkId:uint32;
         contractSacrificePerBytePerBlock:uint64
+        versionExpiry:Timestamp.Timestamp
     }
 
 let mainParameters =
@@ -34,6 +36,7 @@ let mainParameters =
         genesisTime= new System.DateTime(2018,6,30,17,0,0,System.DateTimeKind.Utc) |> Infrastructure.Timestamp.fromDateTime // 1530378000000UL
         networkId=1000ul
         contractSacrificePerBytePerBlock=ContractSacrificePerBytePerBlock
+        versionExpiry= new System.DateTime(2019,2,1,0,0,0,System.DateTimeKind.Utc) |> Infrastructure.Timestamp.fromDateTime
     }
 
 let testParameters =
@@ -51,6 +54,7 @@ let testParameters =
         genesisTime=1529579777092UL
         networkId=2014ul
         contractSacrificePerBytePerBlock=ContractSacrificePerBytePerBlock
+        versionExpiry= new System.DateTime(2200,1,1,0,0,0,System.DateTimeKind.Utc) |> Infrastructure.Timestamp.fromDateTime
     }
 
 let localGenesisHash = Hash.fromString "6d678ab961c8b47046da8d19c0de5be07eb0fe1e1e82ad9a5b32145b5d4811c7" |> get
@@ -65,6 +69,7 @@ let localParameters = {
             |> Hash.computeOfHash
         genesisTime=1515594186383UL
         networkId=1002ul
+        versionExpiry=System.UInt64.MaxValue
 }
 
 let getChainParameters = function

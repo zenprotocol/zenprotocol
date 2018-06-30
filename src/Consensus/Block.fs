@@ -171,7 +171,11 @@ let createTemplate chain (parent:BlockHeader) timestamp (ema:EMA.T) acs transact
 
     {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot;witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot}
 
-let validateHeader chain header  =
+let validateHeader chain (header:BlockHeader) =
+    if header.timestamp > chain.versionExpiry then
+        Error "expired node version, please upgrade"
+    else
+
     let blockHash = hash header
     let blockHashHash = Hash.computeOfHash blockHash
 
