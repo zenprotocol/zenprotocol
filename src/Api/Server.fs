@@ -302,6 +302,26 @@ let handleRequest chain client (request,reply) =
                 |> TextContent
                 |> reply StatusCode.BadRequest
 
+    | Post ("/blockchain/submitheader", Some body) ->
+        match parseSubmitBlockHeaderJson body with
+        | Error error ->
+            printfn "error parsing header"
+            replyError error
+        | Ok header ->
+            let pkHash = Wallet.getAddressPKHash client
+            match pkHash with
+            | FSharp.Core.Ok pkHash ->
+                Blockchain.validateMinedBlockHeader client header pkHash
+                match Block.validateHeader (Chain.getChainParameters chain) header with
+                | Ok header ->
+                    reply StatusCode.OK NoContent
+                | Error error ->
+                    error
+                    |> TextContent
+                    |> reply StatusCode.OK
+            | FSharp.Core.Error _ ->
+                TextContent (sprintf "address not found")
+                |> reply StatusCode.BadRequest
     | Get ("/blockchain/blocktemplate", query) ->
         let pkHash =
             match Map.tryFind "address" query with
