@@ -71,6 +71,12 @@ type PublishBlockJson = JsonProvider<"""
 }
 """>
 
+type SubmitBlockHeaderJson = JsonProvider<"""
+{
+    "header": "somehex"
+}
+""">
+
 type ActiveContractsResponseJson = JsonProvider<"""
 [
     {

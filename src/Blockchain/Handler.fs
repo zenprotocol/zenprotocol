@@ -54,6 +54,13 @@ let handleCommand chainParams command session timestamp (state:State) =
         BlockHandler.validateBlock chainParams contractPath session timestamp (Some peerId) block false state
     | ValidateMinedBlock block ->
         BlockHandler.validateBlock chainParams contractPath session timestamp None block true state
+    | ValidateMinedBlockHeader (header, pkHash) ->
+        BlockTemplateBuilder.makeTransactionList chainParams session state timestamp
+        <@> fun (memState, validatedTransactions) ->
+            let template = Block.createTemplate chainParams state.tipState.tip.header timestamp state.tipState.ema memState.activeContractSet validatedTransactions pkHash
+            let block = {template with header=header}
+            BlockHandler.validateBlock chainParams contractPath session timestamp None block true state
+        |> Result.get
     | HandleTip (peerId,header) ->
         BlockHandler.handleTip chainParams session timestamp peerId header state
     | ValidateNewBlockHeader (peerId, header) ->
