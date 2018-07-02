@@ -465,6 +465,21 @@ let handleRequest chain client (request,reply) =
                 |> reply StatusCode.OK
             | Error error -> reply StatusCode.BadRequest (TextContent error)
         | _ -> reply StatusCode.BadRequest (TextContent "address is missing")
+    | Get("/address/decode", query) ->
+        match Map.tryFind "address" query with
+        | None -> reply StatusCode.BadRequest (TextContent "address is missing")
+        | Some address ->
+            match Address.decodeAny chain address with
+            | Ok (Address.Contract contractId) ->
+                JsonValue.Record [| "contractId", JsonValue.String <| ContractId.toString contractId|]
+                |> JsonContent
+                |> reply StatusCode.OK
+            | Ok (Address.PK pkHash) ->
+                JsonValue.Record [| "pkHash", JsonValue.String <| Hash.toString pkHash|]
+                |> JsonContent
+                |> reply StatusCode.OK
+            | Error error ->
+                reply StatusCode.BadRequest (TextContent error)
     | Get("/wallet/addressbalance", query) ->
         let get confirmations =
             match Map.tryFind "address" query with
