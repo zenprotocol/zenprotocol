@@ -19,7 +19,7 @@ type T = {
 let create dataPath =
     let databaseContext =
         Platform.combine dataPath "addressbook"
-        |> DatabaseContext.create
+        |> DatabaseContext.create DatabaseContext.Small
 
     use session = DatabaseContext.createSession databaseContext
 

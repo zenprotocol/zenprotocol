@@ -61,7 +61,7 @@ let createSession context : Session =
     }
 
 let create dataPath =
-    let databaseContext = DataAccess.DatabaseContext.create (Platform.combine dataPath "blockchain")
+    let databaseContext = DataAccess.DatabaseContext.create DataAccess.DatabaseContext.Large (Platform.combine dataPath "blockchain")
     use session = DatabaseContext.createSession databaseContext
 
     let tip = SingleValue.create databaseContext "tip" Hash.bytes (Hash.Hash >> Some)

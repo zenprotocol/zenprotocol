@@ -25,7 +25,7 @@ type T = {
 
 let createContext dataPath =
     Platform.combine dataPath "wallet"
-    |> DatabaseContext.create
+    |> DatabaseContext.create DatabaseContext.Medium
 
 let init databaseContext =
     use session = DatabaseContext.createSession databaseContext
