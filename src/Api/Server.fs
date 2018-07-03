@@ -411,23 +411,22 @@ let handleRequest chain client (request,reply) =
         | None ->
             reply StatusCode.BadRequest NoContent
     | Post ("/blockchain/publishtransaction", Some tx) ->
-        match JsonValue.TryParse tx with
-        | Some (JsonValue.String tx) ->
-            match Transaction.fromHex tx with
-            | Some tx ->
-                Blockchain.validateTransaction client tx
-                reply StatusCode.OK NoContent
-            | None ->
-                reply StatusCode.BadRequest NoContent
+        match Parsing.parseTxHexJson tx with
+        | Ok tx ->
+            Blockchain.validateTransaction client tx
+            reply StatusCode.OK NoContent
         | _ ->
             reply StatusCode.BadRequest NoContent
-    | Post ("/wallet/importwatchonlyaddress", Some address) ->
-        match JsonValue.TryParse address with
-        | Some (JsonValue.String address) ->
+    | Post ("/wallet/importwatchonlyaddress", Some json) ->
+        printfn "HERE %A" json
+
+        match Parsing.parseAddress json with
+        | Ok address ->
             match Wallet.importWatchOnlyAddress client address with
             | Ok () -> reply StatusCode.OK NoContent
             | Error error -> reply StatusCode.BadRequest (TextContent error)
-        | _ -> reply StatusCode.BadRequest NoContent
+        | Error error ->
+            reply StatusCode.BadRequest <| TextContent error
     | Post ("/wallet/getnewaddress", _) ->
         match Wallet.getNewAddress client with
         | Ok (address,index) ->
