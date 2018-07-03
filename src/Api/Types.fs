@@ -236,3 +236,15 @@ type BlockTemplateJson = JsonProvider<"""
     "blockNumber": 1
 }
 """>
+
+type AddressJson = JsonProvider<"""
+{
+    "address":"address"
+}
+""">
+
+type TxHexJson = JsonProvider<"""
+{
+    "tx":"abcde1234"
+}
+""">

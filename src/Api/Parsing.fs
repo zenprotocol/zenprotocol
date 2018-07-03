@@ -236,3 +236,22 @@ let parseTransactionsRequestJson query =
         | _ ->
             Error "Invalid values"
     | _ -> Error "Invalid values"
+
+let parseAddress json =
+    try
+        let address = AddressJson.Parse json
+
+        address.Address |> Ok
+    with _ as ex ->
+        Error ("Json is invalid: " + ex.Message)
+
+
+let parseTxHexJson json =
+    try
+        let hex = TxHexJson.Parse json
+
+        Transaction.fromHex hex.Tx
+        |> Infrastructure.Result.ofOption "invalid transaction"
+
+    with _ as ex ->
+        Error ("Json is invalid: " + ex.Message)
