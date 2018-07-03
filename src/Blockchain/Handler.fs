@@ -8,11 +8,14 @@ open Messaging.Services
 open Messaging.Events
 open Consensus
 open Blockchain
+open Blockchain
+open Blockchain
 open EffectsWriter
 open Consensus.Types
 open State
 open DatabaseContext
 open Logary.Message
+open Infrastructure.Result
 
 let handleCommand chainParams command session timestamp (state:State) =
     let contractPath = session.context.contractPath
@@ -100,7 +103,7 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
     | ExecuteContract (contractId, command, sender, messageBody, txSkeleton) ->
         TransactionHandler.executeContract session txSkeleton timestamp contractId command sender messageBody state false
         |> requestId.reply<Result<Transaction, string>>
-    | GetBlockTemplate pkHash -> 
+    | GetBlockTemplate pkHash ->
         BlockTemplateBuilder.makeTransactionList chain session state timestamp
         <@> fun (memState, validatedTransactions) ->
             Block.createTemplate chain state.tipState.tip.header timestamp state.tipState.ema memState.activeContractSet validatedTransactions pkHash
@@ -230,6 +233,24 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
                 |> requestId.reply<(Transaction*uint32) option>
             | None ->
                 requestId.reply<(Transaction*uint32) option> None
+
+    | CheckTransaction transaction ->
+        let txHash = Transaction.hash transaction
+
+        TransactionValidation.validateBasic transaction
+        >>= TransactionValidation.validateInContext chain
+                (TransactionHandler.getUTXO session)
+                session.context.contractPath
+                (state.tipState.tip.header.blockNumber + 1ul)
+                timestamp
+                state.memoryState.activeContractSet
+                state.memoryState.contractCache
+                state.memoryState.utxoSet
+                (TransactionHandler.getContractState session)
+                state.memoryState.contractStates
+                txHash
+        <@> (fun _ -> txHash)
+        |> requestId.reply<Result<Hash.Hash,ValidationError.ValidationError>>
 
     ret state
 

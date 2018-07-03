@@ -413,13 +413,35 @@ let handleRequest chain client (request,reply) =
     | Post ("/blockchain/publishtransaction", Some tx) ->
         match Parsing.parseTxHexJson tx with
         | Ok tx ->
-            Blockchain.validateTransaction client tx
-            reply StatusCode.OK NoContent
-        | _ ->
-            reply StatusCode.BadRequest NoContent
-    | Post ("/wallet/importwatchonlyaddress", Some json) ->
-        printfn "HERE %A" json
+            let txHash = Transaction.hash tx
 
+            Blockchain.validateTransaction client tx
+
+            match Blockchain.getTransaction client txHash with
+            | Some (_,0ul) ->
+                Hash.toString txHash
+                |> JsonValue.String
+                |> JsonContent
+                |> reply StatusCode.OK
+            | Some _ ->
+                "transaction already exists"
+                |> TextContent
+                |> reply StatusCode.Found
+            | _ ->
+                match Blockchain.checkTransaction client tx with
+                | Ok _ ->
+                    Hash.toString txHash
+                    |> JsonValue.String
+                    |> JsonContent
+                    |> reply StatusCode.OK
+                | Error error ->
+                    sprintf "%A" error
+                    |> TextContent
+                    |> reply StatusCode.BadRequest
+
+        | Error error ->
+            reply StatusCode.BadRequest <| TextContent error
+    | Post ("/wallet/importwatchonlyaddress", Some json) ->
         match Parsing.parseAddress json with
         | Ok address ->
             match Wallet.importWatchOnlyAddress client address with
