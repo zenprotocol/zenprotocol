@@ -54,6 +54,7 @@ module Blockchain =
         | GetHeaders
         | GetMempool
         | GetTransaction of Hash
+        | CheckTransaction of Transaction
 
     type Response = unit
 
@@ -144,6 +145,10 @@ module Blockchain =
     let handleNewTransactions client peerId txHashes =
         HandleNewTransactions (peerId,txHashes)
         |> Command.send client serviceName
+
+    let checkTransaction client transaction =
+        CheckTransaction transaction
+        |> Request.send<Request, Result<Hash,ValidationError.ValidationError>> client serviceName
 
 module Network =
     type Command =
