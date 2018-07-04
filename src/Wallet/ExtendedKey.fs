@@ -8,6 +8,8 @@ open Infrastructure.BigInteger
 open Consensus
 open Crypto
 open NBitcoin
+open Logary.Message
+open Infrastructure
 
 let private result = new ResultBuilder<string>()
 
@@ -74,7 +76,12 @@ let derive (i:int) parent =
             |> ExtendedPublicKey
             |> Ok
     with
-    | _ -> Error "cannot derive"
+    | ex -> 
+        eventX "failed to derive key\n{ex}"
+        >> setField "ex" ex
+        |> Log.error         
+        
+        Error "cannot derive"
 
 let neuter key =
     try
