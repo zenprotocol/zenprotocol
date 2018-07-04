@@ -66,6 +66,43 @@ let getChain (config:Config) =
 
 [<EntryPoint>]
 let main argv =
+    use logary = Log.create
+
+    eventX "Node running... press CTRL+C to exit"
+    |> Log.info
+
+    match Platform.runNative ZFStar.z3Name ["--help"] with
+    | Ok _ ->
+        eventX "Z3 check passed"
+        |> Log.info
+    | Error error ->
+        eventX "Failed to run z3. Exit node.\n{error}"
+        >> setField "error" error
+        |> Log.error
+
+        System.Environment.FailFast(sprintf "Failed to run z3.exe\n%s" error, null)
+
+    // Check if 64bit machine
+    if Platform.platform = PlatformID.Win32NT && not Platform.is64bit  then
+        System.Environment.FailFast("Zen-node can only run on 64 bit OS", null)
+
+    if Platform.isUnix then
+        match Platform.monoVersion with
+        | None ->
+            eventX "Please install mono."
+            |> Log.error
+
+            System.Environment.FailFast("Please install mono", null)
+        | Some (major,minor,_) ->
+            if major >= 5 && minor >= 10 then
+                eventX "Mono check passed"
+                |> Log.info
+            else
+                eventX "Old version of mono, please upgrade"
+                |> Log.error
+
+                System.Environment.FailFast("Please install mono", null)
+
     let errorHandler = ProcessExiter(colorizer = function ErrorCode.HelpText -> None | _ -> Some ConsoleColor.Red)
 
     let config = new Config()
@@ -77,11 +114,6 @@ let main argv =
     let mutable wipe = false
     let mutable wipeFull = false
     let mutable seed = false
-
-    use logary = Log.create
-
-    eventX "Node running... press CTRL+C to exit"
-    |> Log.info
 
     // if a chain was specified, we want to override config before
     // we handle rest of switches, which may override config again

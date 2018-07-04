@@ -68,13 +68,13 @@ let private elaborate input_filepath output_target =
         |> Log.info
         Error "elaborate"
 
-let private fstar outDir inputFile args =
-    let z3Name =
-        match Platform.platform with
-        | PlatformID.MacOSX -> "z3-osx"
-        | PlatformID.Unix -> "z3-linux"
-        | _ -> "z3.exe"
+let z3Name =
+    match Platform.platform with
+    | PlatformID.MacOSX -> "z3-osx"
+    | PlatformID.Unix -> "z3-linux"
+    | _ -> "z3.exe"
 
+let private fstar outDir inputFile args =
     [ "--smt"; Platform.workingDirectory / z3Name
       "--prims"; "zulib" / "prims.fst"
       "--include"; "zulib"
