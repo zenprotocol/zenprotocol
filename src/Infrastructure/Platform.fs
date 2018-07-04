@@ -14,6 +14,8 @@ extern uint16 GetShortPathName(
     StringBuilder lpszShortPath,
     uint16 cchBuffer)
 
+let is64bit = Environment.Is64BitOperatingSystem
+
 let platform =
     let platform = Environment.OSVersion.Platform
     if (platform = PlatformID.Unix
@@ -24,7 +26,7 @@ let platform =
             then PlatformID.MacOSX
     else platform
 
-let private isUnix =
+let isUnix =
     match platform with
     | PlatformID.Unix
     | PlatformID.MacOSX ->
@@ -67,13 +69,12 @@ let private monoM =
 let private mono =
     match monoM with
     | Some mono -> mono
-    | _ -> failwith "Cannot find mono"
+    | _ -> "mono"
 
 let getExeSuffix =
     (+) (if isUnix then "" else ".exe")
 
-let run exe args =
-    let exe, args = if isUnix then mono, exe :: args else exe, args
+let runNative exe args =
     let p = new Process();
     p.StartInfo <-
         new ProcessStartInfo(
@@ -103,21 +104,43 @@ let run exe args =
             if p.ExitCode = 0 then
                 Ok ()
             else
+                let output = output.ToString()
+                if output.Length > 0 then
+                    eventX "{output}"
+                    >> setField "output" output
+                    |> Log.info
+
                 let error = error.ToString()
                 if error.Length > 0 then
                     eventX "{error}"
                     >> setField "error" error
                     |> Log.info
-                let output = output.ToString()
-                if output.Length > 0 then
-                    eventX "{output}"
-                    >> setField "output" error
-                    |> Log.verbose
-                Error error
+
+                Error (if String.IsNullOrEmpty error then output else error)
         else
             Error "failed to start process"
     with _ as ex ->
         Exception.toError "run" ex
+
+let run exe args =
+    let exe, args = if isUnix then mono, exe :: args else exe, args
+    runNative exe args
+
+[<System.Runtime.InteropServices.DllImport("__Internal", EntryPoint="mono_get_runtime_build_info")>]
+extern string GetMonoVersion();
+
+let monoVersion =
+    match isUnix,monoM with
+    | true, Some _ ->
+        let version = GetMonoVersion()
+        let numbers = version.Split('.',' ')
+
+        (System.Convert.ToInt32 numbers.[0],
+            System.Convert.ToInt32 numbers.[1],
+            System.Convert.ToInt32 numbers.[2])
+        |> Some
+
+    | _ -> None
 
 let removeDirectory path =
     if Directory.Exists path then
