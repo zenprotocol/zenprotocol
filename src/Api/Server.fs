@@ -48,7 +48,11 @@ let handleRequest chain client (request,reply) =
         | Error error ->
             replyError error
         | Ok tx ->
-            reply StatusCode.OK NoContent
+            Transaction.hash tx
+            |> Hash.toString
+            |> JsonValue.String
+            |> JsonContent
+            |> reply StatusCode.OK
 
     match request with
     | Get ("/network/connections/count", _) ->
