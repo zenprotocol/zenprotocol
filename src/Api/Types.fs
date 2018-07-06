@@ -166,10 +166,10 @@ type BlockHeaderJson = JsonProvider<"""
 type LockJson = JsonProvider<"""
 [
     {
-        "PK": {"hash": "12..34"}
+        "PK": {"hash": "12..34","address":"zen1adb"}
     },
     {
-        "Contract": {"id":"c234234"}
+        "Contract": {"id":"c234234","address":"czen1adb"}
     },
     {
         "Coinbase": {"blockNumber":100, "pkHash":"12..34"}
