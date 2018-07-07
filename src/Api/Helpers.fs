@@ -32,14 +32,14 @@ let inputEncoder (input:Input) =
         SpendJson.Root (spend.asset.AsString, (int64)spend.amount)
         |> fun j -> JsonValue.Record [| ("mint", j.JsonValue) |]
 
-let lockEncoder (lock:Lock) =
+let lockEncoder chain (lock:Lock) =
     match lock with
     | PK hash ->
-        let pkJson = LockJson.Pk hash.AsString
+        let pkJson = LockJson.Pk(hash.AsString, Address.encode chain (Address.PK hash))
         LockJson.Record (Some pkJson,None,None,None,None)
         |> LockJson.Root
     | Contract cId ->
-        let cJson = LockJson.Contract (cId.AsString)
+        let cJson = LockJson.Contract (cId.AsString, Address.encode chain (Address.Contract cId))
         LockJson.Record (None, Some cJson, None, None, None)
         |> LockJson.Root
     | Coinbase (blockNumber, pkHash) ->
@@ -49,7 +49,7 @@ let lockEncoder (lock:Lock) =
     | Fee -> LockJson.Root "Fee"
     | ActivationSacrifice -> LockJson.Root "ActivationSacrifice"
     | ExtensionSacrifice cId ->
-        let esJson = LockJson.Contract (cId.AsString)
+        let esJson = LockJson.ExtensionSacrifice (cId.AsString)
         LockJson.Record (None, None, None, Some esJson, None)
         |> LockJson.Root
     | Destroy -> LockJson.Root "Destroy"
@@ -59,18 +59,18 @@ let lockEncoder (lock:Lock) =
         |> LockJson.Root
     |> fun json -> json.JsonValue
 
-let outputEncoder (output:Output) =
+let outputEncoder chain (output:Output) =
     JsonValue.Record [|
-        ("lock", lockEncoder output.lock);
+        ("lock", lockEncoder chain output.lock);
         ("spend", spendEncoder output.spend)
     |]
 
-let transactionEncoder (tx:Transaction) =
+let transactionEncoder chain (tx:Transaction) =
     JsonValue.Record
         [|
             ("version",JsonValue.Number ((decimal) tx.version));
             ("inputs", JsonValue.Array [| for i in tx.inputs -> inputEncoder i |]);
-            ("outputs", JsonValue.Array [| for op in tx.outputs -> outputEncoder op |])
+            ("outputs", JsonValue.Array [| for op in tx.outputs -> outputEncoder chain op |])
             // witnesses and contracts not yet sent
         |]
     |> omitNullFields
@@ -86,13 +86,13 @@ let blockHeaderEncoder (bh:BlockHeader) =
         commitments=bh.commitments.AsString
     ) |> fun j -> j.JsonValue
 
-let blockEncoder (bk:Block) =
+let blockEncoder chain (bk:Block) =
     let txs = bk.transactions
     let txHashes = List.map (Consensus.Transaction.hash >> Consensus.Hash.toString) txs
     let txsJson =
         JsonValue.Record
             [| for (h,tx) in List.zip txHashes txs do
-                yield (h, transactionEncoder tx)
+                yield (h, transactionEncoder chain tx)
             |]
     JsonValue.Record
         [|

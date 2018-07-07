@@ -48,7 +48,11 @@ let handleRequest chain client (request,reply) =
         | Error error ->
             replyError error
         | Ok tx ->
-            reply StatusCode.OK NoContent
+            Transaction.hash tx
+            |> Hash.toString
+            |> JsonValue.String
+            |> JsonContent
+            |> reply StatusCode.OK
 
     match request with
     | Get ("/network/connections/count", _) ->
@@ -363,7 +367,7 @@ let handleRequest chain client (request,reply) =
                           TextContent (sprintf "block not found")
                           |> reply StatusCode.NotFound
                       | Some block ->
-                          reply StatusCode.OK (JsonContent <| blockEncoder block)
+                          reply StatusCode.OK (JsonContent <| blockEncoder chain block)
               | None ->
                   TextContent (sprintf "hash or blockNumber are missing")
                   |> reply StatusCode.BadRequest
@@ -379,7 +383,7 @@ let handleRequest chain client (request,reply) =
                     TextContent (sprintf "block not found")
                     |> reply StatusCode.NotFound
                 | Some block ->
-                    reply StatusCode.OK (JsonContent <| blockEncoder block)
+                    reply StatusCode.OK (JsonContent <| blockEncoder chain block)
 
     | Get ("/blockchain/transaction", query) ->
         match Map.tryFind "hash" query with
@@ -399,7 +403,7 @@ let handleRequest chain client (request,reply) =
                     |> JsonContent
                     |> reply StatusCode.OK
                 else
-                    let tx = transactionEncoder tx
+                    let tx = transactionEncoder chain tx
 
                     [| "tx", tx; confirmations |]
                     |> JsonValue.Record
