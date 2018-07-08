@@ -18,6 +18,7 @@ open Api.Helpers
 open FSharp.Data
 open Hopac.Extensions.Seq
 open FsBech32
+open Hash
 
 type T =
     {
@@ -38,8 +39,9 @@ let parseConfirmations query reply get =
         | true, confirmations -> get confirmations
         | _ -> reply StatusCode.BadRequest (TextContent "invalid confirmations")
 
+type BlocksCache = (Hash (* BlockHeader commitments *) * Types.Block) list 
 
-let handleRequest chain client (request,reply) =
+let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
     let replyError error =
         reply StatusCode.BadRequest (TextContent error)
 
@@ -53,6 +55,20 @@ let handleRequest chain client (request,reply) =
             |> JsonValue.String
             |> JsonContent
             |> reply StatusCode.OK
+            
+    let validateBlock block =
+        Blockchain.validateMinedBlock client block
+        match Block.validate (Chain.getChainParameters chain) block with
+        | Ok _ ->
+            Block.hash block.header
+            |> Hash.toString
+            |> JsonValue.String
+            |> JsonContent
+            |> reply StatusCode.OK
+        | Error error ->
+            error
+            |> TextContent
+            |> reply StatusCode.BadRequest
 
     match request with
     | Get ("/network/connections/count", _) ->
@@ -292,40 +308,21 @@ let handleRequest chain client (request,reply) =
             printfn "error deserializing block"
             replyError error
         | Ok block ->
-            Blockchain.validateMinedBlock client block
-
-            match Block.validate (Chain.getChainParameters chain) block with
-            | Ok _ ->
-                Block.hash block.header
-                |> Hash.toString
-                |> JsonValue.String
-                |> JsonContent
-                |> reply StatusCode.OK
-            | Error error ->
-                error
-                |> TextContent
-                |> reply StatusCode.BadRequest
-
+            validateBlock block
     | Post ("/blockchain/submitheader", Some body) ->
         match parseSubmitBlockHeaderJson body with
         | Error error ->
             printfn "error parsing header"
             replyError error
         | Ok header ->
-            let pkHash = Wallet.getAddressPKHash client
-            match pkHash with
-            | FSharp.Core.Ok pkHash ->
-                Blockchain.validateMinedBlockHeader client header pkHash
-                match Block.validateHeader (Chain.getChainParameters chain) header with
-                | Ok header ->
-                    reply StatusCode.OK NoContent
-                | Error error ->
-                    error
-                    |> TextContent
-                    |> reply StatusCode.OK
-            | FSharp.Core.Error _ ->
-                TextContent (sprintf "address not found")
-                |> reply StatusCode.BadRequest
+            match Wallet.getAddressPKHash client with
+            | Ok pkHash ->
+                match List.tryFind (fun (commitments, _) -> header.commitments = commitments) !blocksCache with
+                | Some (_, block) ->
+                    validateBlock block
+                | None ->
+                    TextContent (sprintf "block not found")
+                    |> reply StatusCode.BadRequest
     | Get ("/blockchain/blocktemplate", query) ->
         let pkHash =
             match Map.tryFind "address" query with
@@ -344,7 +341,9 @@ let handleRequest chain client (request,reply) =
             let target = Difficulty.uncompress block.header.difficulty |> Hash.toString
             let header = FsBech32.Base16.encode header
             let body = FsBech32.Base16.encode body
-
+            
+            blocksCache := ((block.header.commitments, block) :: !blocksCache |> List.chunkBySize 10).[0]
+            
             new BlockTemplateJson.Root(header, body, target, parent, block.header.blockNumber |> int)
             |> fun x -> x.JsonValue
             |> JsonContent
@@ -535,12 +534,13 @@ let create chain poller busName bind =
     |> Log.info
 
     let client = Client.create busName
+    let blocksCache = ref ([] : BlocksCache)
 
     let observable =
         Http.Server.observable httpAgent
         |> Observable.map (fun request ->
             fun (server:T) ->
-                handleRequest chain client request
+                handleRequest chain client request blocksCache
                 server
         )
 
