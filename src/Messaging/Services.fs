@@ -36,7 +36,6 @@ module Blockchain =
         | ValidateNewBlockHeader of peerId:byte[] * Types.BlockHeader
         | ValidateBlock of peerId:byte[] * Types.Block
         | ValidateMinedBlock of Types.Block
-        | ValidateMinedBlockHeader of Types.BlockHeader * pkHash:Hash
         | RequestHeaders of peerId:byte[] * startBlockHashes:Hash list * endBlockHash :Hash
         | HandleHeaders of peerId:byte[] * BlockHeader list
         | HandleNewTransactions of peerId:byte[] * txHashes:Hash list
@@ -80,10 +79,6 @@ module Blockchain =
 
     let validateMinedBlock client block =
         ValidateMinedBlock block
-        |> Command.send client serviceName
-
-    let validateMinedBlockHeader client header pkHash =
-        ValidateMinedBlockHeader (header, pkHash)
         |> Command.send client serviceName
 
     let handleTip client peerId header =
