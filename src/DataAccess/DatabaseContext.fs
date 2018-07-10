@@ -39,8 +39,6 @@ let create size pathToFolder : DatabaseContext =
 
     if not fileInfo.Directory.Exists then
         fileInfo.Directory.Create ()
-        
-    let pathToFolder = Platform.normalizeNameToFileSystem pathToFolder        
 
     mdb_env_create(&environment)
     |> checkErrorCode
@@ -57,7 +55,10 @@ let create size pathToFolder : DatabaseContext =
     mdb_env_set_mapsize(environment, maxDbSize |> IntPtr)
     |> checkErrorCode
 
-    mdb_env_open(environment,pathToFolder,MDB_NOSUBDIR,MDB_DEFAULT_MODE)
+    let pathBytes = 
+        Array.append (System.Text.Encoding.UTF8.GetBytes(pathToFolder)) [|0uy|] 
+
+    mdb_env_open(environment,pathBytes,MDB_NOSUBDIR,MDB_DEFAULT_MODE)
     |> checkErrorCode
 
     let mutable tx = IntPtr.Zero
