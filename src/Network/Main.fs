@@ -22,7 +22,7 @@ open Network
 
 type State = Connector.T * TransactionPublisher.T * string option
 
-let maxConnections = 20
+let maxConnections = 10
 
 let eventHandler transport event (connector,publisher,ownAddress) =
     match event with

@@ -5,6 +5,7 @@ open System
 open System.IO
 open System.Text
 open Lmdb
+open Infrastructure
 
 [<Literal>]
 let MegaByte = 1048576L
@@ -38,6 +39,8 @@ let create size pathToFolder : DatabaseContext =
 
     if not fileInfo.Directory.Exists then
         fileInfo.Directory.Create ()
+        
+    let pathToFolder = Platform.normalizeNameToFileSystem pathToFolder        
 
     mdb_env_create(&environment)
     |> checkErrorCode
