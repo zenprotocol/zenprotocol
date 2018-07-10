@@ -72,7 +72,7 @@ let transportHandler transport seeds client addressBook now msg (connector,publi
         connector,publisher,ownAddress
     | InProcMessage.Disconnected address ->
         let connector = Connector.disconnected connector address
-        (Connector.connect transport addressBook connector),publisher,ownAddress
+        (Connector.connect transport addressBook now connector),publisher,ownAddress
     | InProcMessage.GetAddresses peerId ->
         let addresses = AddressBook.getValidAddresses now addressBook
 
@@ -89,6 +89,7 @@ let transportHandler transport seeds client addressBook now msg (connector,publi
 
             connector, publisher,ownAddress // TODO: we should punish the sending node
         | Some addresses ->
+
             match List.map fst addresses |> List.forall Endpoint.isValid with
             | false ->
                 eventX "Received invalid addresses from peer"
@@ -114,7 +115,7 @@ let transportHandler transport seeds client addressBook now msg (connector,publi
                         Transport.publishAddresses transport count addresses
 
                 AddressBook.addList now addresses addressBook
-                let connector = Connector.connect transport addressBook connector
+                let connector = Connector.connect transport addressBook now connector
 
                 connector,publisher,ownAddress
     | InProcMessage.GetMemPool peerId ->
@@ -334,7 +335,7 @@ let main dataPath busName chainParams externalIp listen bind seeds wipe seed =
 
         let connector =
             Connector.create seeds maxConnections
-            |> Connector.connect transport addressBook
+            |> Connector.connect transport addressBook (Timestamp.now ())
 
         let publisher = TransactionPublisher.empty
 

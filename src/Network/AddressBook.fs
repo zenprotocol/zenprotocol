@@ -49,6 +49,7 @@ let create dataPath =
     }
 
 let ValidAddressTimespan = Second * 60UL * 60UL * 3UL // 3 hours
+let MaxSeenTimeTimestamp = Second * 60UL * 60UL * 24UL * 3UL // Three days
 
 // TODO: only return addresses from the last 3 hours?
 let getValidAddresses (now:Timestamp) (book:T) =
@@ -92,10 +93,11 @@ let haveEnoughAddresses book =
     // TODO: check if we need more addresses
     false
 
-let take exclude length seeds book =
+let take now exclude length seeds book =
     use session = DatabaseContext.createSession book.databaseContext
 
     Collection.getAll book.addresses session
+    |> List.filter (fun (_,timestamp) -> now - timestamp <= MaxSeenTimeTimestamp) 
     |> List.map fst
     |> List.append seeds
     |> List.distinct
