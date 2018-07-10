@@ -68,13 +68,13 @@ let countConnected connector =
             | _ -> false) connector.connections
     |> Map.count
 
-let connect transport addressBook connector =
+let connect transport addressBook now connector =
 
     let connectInternal transport addressBook connector exclude =
         let connectionsToOpen = connector.maxConnections - (countConnectingOrConnected connector)
 
         let addressesToExclude = exclude |> Map.toSeq |> Seq.map fst |> Set.ofSeq
-        let addresses = AddressBook.take addressesToExclude connectionsToOpen connector.seeds addressBook
+        let addresses = AddressBook.take now addressesToExclude connectionsToOpen connector.seeds addressBook
 
         // Connect to new addresses
         Seq.iter (Transport.connect transport) addresses

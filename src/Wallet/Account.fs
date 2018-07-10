@@ -218,11 +218,7 @@ let addBlock dataAccess session blockHash block =
         ()
     elif account.blockHash <> block.header.parent then
         failwithf "trying to add a block to account but account in different chain %A %A" (block.header.blockNumber) (account.blockNumber)
-    else
-
-    eventX "Account adding block #{blockNumber}"
-    >> setField "blockNumber" block.header.blockNumber
-    |> Log.info
+    else   
 
     block.transactions
     |> List.mapi (fun index tx -> index,tx)

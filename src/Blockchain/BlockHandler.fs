@@ -652,10 +652,6 @@ let handleTip chain session timestamp peerId (header:BlockHeader) (state:State) 
         elif InitialBlockDownload.shouldStartInitialBlockDownload state.tipState.tip.header header then
             let! initialBlockDownload = InitialBlockDownload.start timestamp state.tipState.tip.hash state.tipState.tip.header peerId header
             return {state with initialBlockDownload = initialBlockDownload;}
-        else
-            eventX "Handling tip #{blockNumber}"
-            >> setField "blockNumber" header.blockNumber
-            |> Log.info
-
+        else          
             return! handleHeader chain session timestamp (getBlockFrom peerId) header state
     }

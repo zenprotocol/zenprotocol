@@ -50,7 +50,7 @@ let ``peer reconnect when other peer is down``()=
     use host2 = startHost ()
 
     Connector.disconnected connector address
-    |> Connector.connect peer addressBook
+    |> Connector.connect peer addressBook 1UL
     |> ignore
 
     waitForConnectedMessage peer 25000<milliseconds>
