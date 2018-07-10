@@ -19,7 +19,7 @@ type T = {
 }
 
 [<LiteralAttribute>]
-let MaxAttempts = 10
+let MaxAttempts = 5
 
 let create seeds maxConnection =
     {maxConnections=maxConnection; connections = Map.empty;seeds=Seq.toList seeds}
