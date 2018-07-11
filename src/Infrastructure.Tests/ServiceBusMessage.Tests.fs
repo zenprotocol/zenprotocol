@@ -1,4 +1,4 @@
-﻿module Infrastructure.ServiceBusMessage.Tests
+module Infrastructure.ServiceBusMessage.Tests
 
 open NUnit.Framework
 open FsUnit
@@ -8,9 +8,7 @@ open Infrastructure.ServiceBusMessage
 
 [<Test>]
 let ``send and recv Register``() =
-    let msg = Register {
-        service = "Life is short but Now lasts for ever";
-    }
+    let msg = Register "Life is short but Now lasts for ever"
 
     use server = Socket.dealer ()
     Socket.bind server "inproc://Register.test"
@@ -26,9 +24,8 @@ let ``send and recv Register``() =
 
 [<Test>]
 let ``Register size fits stream ``() =
-    let register:Register = {
-        service = "Life is short but Now lasts for ever";
-    }
+    let register:Register =
+        "Life is short but Now lasts for ever"
 
     let messageSize = Register.getMessageSize register
 
@@ -78,9 +75,7 @@ let ``Command size fits stream ``() =
 
 [<Test>]
 let ``send and recv RelayCommand``() =
-    let msg = RelayCommand {
-        payload = "Captcha Diem"B;
-    }
+    let msg = RelayCommand ("Captcha Diem"B)
 
     use server = Socket.dealer ()
     Socket.bind server "inproc://RelayCommand.test"
@@ -96,9 +91,8 @@ let ``send and recv RelayCommand``() =
 
 [<Test>]
 let ``RelayCommand size fits stream ``() =
-    let relaycommand:RelayCommand = {
-        payload = "Captcha Diem"B;
-    }
+    let relaycommand:RelayCommand =
+        "Captcha Diem"B
 
     let messageSize = RelayCommand.getMessageSize relaycommand
 
@@ -220,9 +214,7 @@ let ``Response size fits stream ``() =
 
 [<Test>]
 let ``send and recv RelayResponse``() =
-    let msg = RelayResponse {
-        payload = "Captcha Diem"B;
-    }
+    let msg = RelayResponse ("Captcha Diem"B)
 
     use server = Socket.dealer ()
     Socket.bind server "inproc://RelayResponse.test"
@@ -238,9 +230,8 @@ let ``send and recv RelayResponse``() =
 
 [<Test>]
 let ``RelayResponse size fits stream ``() =
-    let relayresponse:RelayResponse = {
-        payload = "Captcha Diem"B;
-    }
+    let relayresponse:RelayResponse =
+        "Captcha Diem"B
 
     let messageSize = RelayResponse.getMessageSize relayresponse
 
@@ -254,9 +245,7 @@ let ``RelayResponse size fits stream ``() =
 
 [<Test>]
 let ``send and recv Ack``() =
-    let msg = Ack {
-        dummy = 123uy;
-    }
+    let msg = Ack
 
     use server = Socket.dealer ()
     Socket.bind server "inproc://Ack.test"
@@ -270,21 +259,6 @@ let ``send and recv Ack``() =
 
     msg' |> should equal (Some msg)
 
-[<Test>]
-let ``Ack size fits stream ``() =
-    let ack:Ack = {
-        dummy = 123uy;
-    }
-
-    let messageSize = Ack.getMessageSize ack
-
-    let stream =
-        Stream.create messageSize
-        |> Ack.write ack
-
-    let offset = Stream.getOffset stream
-
-    messageSize |> should equal offset
 
 [<Test>]
 let ``malformed message return None``() =
@@ -298,4 +272,4 @@ let ``malformed message return None``() =
 
     let msg = Infrastructure.ServiceBusMessage.recv client
     msg |> should equal None
- 
+

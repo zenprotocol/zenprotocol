@@ -26,7 +26,6 @@
         <field name = "service" type="string">Service</field>
         <field name = "payload" type = "chunk">Payload</field>
     </message>
-    
     <message name="Relay Request" id="5">
         <field name="sender" type="chunk">Sender</field>
         <field name = "payload" type = "chunk">Payload</field>
@@ -42,6 +41,5 @@
     </message>
 
     <message name="Ack" id="8">
-        <field name="dummy" type="number" size="1">Dummy</field>
     </message>
 </class>

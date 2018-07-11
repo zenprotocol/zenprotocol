@@ -45,7 +45,7 @@ module Broker =
     let create poller name =
         let sendAck server routingId =
             Frame.sendMore server routingId
-            Message.send server (Message.Ack {dummy=1uy})
+            Message.send server ServiceBusMessage.Ack
 
         let sendToService server services serviceName msg =
             match Map.tryFind serviceName services with
@@ -64,10 +64,10 @@ module Broker =
                 Map.add serviceName service services
 
         let processMessage server services routingId = function
-            | Message.Register r ->
+            | Message.Register service ->
                 sendAck server routingId
 
-                match Map.tryFind r.service services with
+                match Map.tryFind service services with
                 | None -> ()
                 | Some service ->
                     service.pendingMessages
@@ -75,19 +75,19 @@ module Broker =
                         Frame.sendMore server routingId
                         Message.send server msg)
 
-                Map.add r.service {routingId=Some routingId; pendingMessages=[]} services
+                Map.add service {routingId=Some routingId; pendingMessages=[]} services
 
             | Message.Command c ->
                 sendAck server routingId
 
-                sendToService server services c.service (Message.RelayCommand {payload=c.payload})
+                sendToService server services c.service (Message.RelayCommand c.payload)
 
             | Message.Request r ->
                 sendToService server services r.service (Message.RelayRequest {sender=routingId;payload=r.payload})
 
             | Message.Response r ->
                 Frame.sendMore server r.sender
-                Message.send server (Message.RelayResponse {payload=r.payload})
+                Message.send server (Message.RelayResponse r.payload)
                 services
 
             | _ -> services
@@ -147,7 +147,7 @@ module Agent =
         Options.setSendHighWatermark socket 0 |> ignore
         Socket.connect socket (getBrokerAddress name)
 
-        Message.send socket (Message.Register {service=service})
+        Message.send socket (Message.Register service)
         waitForAck socket
 
         let observable =
@@ -156,7 +156,7 @@ module Agent =
             |> Observable.choose (fun msg ->
                 match msg with
                 | Message.RelayCommand c ->
-                    Some (Command (binarySerializer.UnPickle<'command> c.payload))
+                    Some (Command (binarySerializer.UnPickle<'command> c))
                 | Message.RelayRequest r ->
                     let payload = binarySerializer.UnPickle<'request> r.payload
                     Some (Request (new RequestId(socket, r.sender), payload))
@@ -202,5 +202,19 @@ module Client =
             | None -> failwith "malformed response"
             | Some r ->
                 match r with
-                | Message.RelayResponse r -> binarySerializer.UnPickle<'response> r.payload
+                | Message.RelayResponse r -> binarySerializer.UnPickle<'response> r
+                | x -> failwithf "expecting RelayResponse, got %A" x
+
+        let trySend<'request,'response> client service (request:'request) =
+            let payload = binarySerializer.Pickle request
+
+            Message.send client (Message.Request {service=service; payload = payload})
+
+            let response = Message.tryRecv client 10000<milliseconds>
+
+            match response with
+            | None -> failwithf "timedout %s %A" service request
+            | Some r ->
+                match r with
+                | Message.RelayResponse r -> binarySerializer.UnPickle<'response> r
                 | x -> failwithf "expecting RelayResponse, got %A" x
