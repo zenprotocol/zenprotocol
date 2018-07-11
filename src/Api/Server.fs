@@ -102,7 +102,10 @@ let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
 
     | Get ("/blockchain/info", _) ->
         match Blockchain.tryGetBlockChainInfo client with 
-        | None -> 
+        | None ->             
+            eventX "GetBlockChainInfo timedout"
+            |> Log.warning
+
             reply StatusCode.RequestTimeout NoContent
         | Some info ->
             let json = (
@@ -339,6 +342,10 @@ let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
         | FSharp.Core.Ok pkHash ->
             match  Blockchain.tryGetBlockTemplate client pkHash with 
             | None ->
+                        
+                eventX "GetBlockTemplate timedout"
+                |> Log.warning
+                
                 reply StatusCode.RequestTimeout NoContent
             | Some block ->
                 let bytes = Block.serialize block
