@@ -523,6 +523,21 @@ let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
 
 
         parseConfirmations query reply get
+    | Get("/blockchain/blockreward", query) -> 
+        match Map.tryFind "blockNumber" query with
+        | None -> reply StatusCode.BadRequest (TextContent "blockNumber is missing")             
+        | Some blockNumber -> 
+            let success,blockNumber = System.UInt32.TryParse blockNumber
+            
+            if success then 
+                Block.blockReward blockNumber
+                |> decimal
+                |> JsonValue.Number
+                |> JsonContent
+                |> reply StatusCode.OK                 
+            else
+                reply StatusCode.BadRequest (TextContent "invalid blockNumber")
+                
     | _ ->
         reply StatusCode.NotFound NoContent
 
