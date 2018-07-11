@@ -33,26 +33,29 @@ module Server =
                 (x.listener :> System.IDisposable).Dispose()
 
     let private getBody (request : System.Net.HttpListenerRequest) =
-        async {
-            match request.HasEntityBody with
-            | false -> return Ok None
-            | true ->
-                let! bytes = request.InputStream.AsyncRead(int request.ContentLength64)
+        match request.HasEntityBody with
+        | false -> Ok None
+        | true ->
+            let bytes = Array.zeroCreate <| int request.ContentLength64
+            request.InputStream.Read(bytes,0, Array.length bytes) |> ignore // TODO: read all
 
-                if request.ContentType.StartsWith HttpContentTypes.Json then
-                   return Ok(Some(request.ContentEncoding.GetString(bytes)))
-                else
-                   return Error(sprintf "only %s ContentType is supported" HttpContentTypes.Json)
-        }
+            if request.ContentType.StartsWith HttpContentTypes.Json then
+               Ok(Some(request.ContentEncoding.GetString(bytes)))
+            else
+               Error(sprintf "only %s ContentType is supported" HttpContentTypes.Json)
+    
 
     let private writeTextResponse (response : System.Net.HttpListenerResponse) (code : StatusCode) (text : string) =
         response.StatusCode <- int code
         response.ContentType <- HttpContentTypes.Text
         response.ContentLength64 <- int64 (System.Text.Encoding.UTF8.GetByteCount(text))
-        async {
-            do! response.OutputStream.AsyncWrite(System.Text.Encoding.UTF8.GetBytes(text))
+        
+        try 
+            let bytes = System.Text.Encoding.UTF8.GetBytes(text)
+            response.OutputStream.Write(bytes, 0, Array.length bytes)
             response.OutputStream.Close()
-        }
+        with 
+        | _ -> ()
 
     let private writeJsonResponse (response : System.Net.HttpListenerResponse) (code : StatusCode) (json : JsonValue) =
         let stringWriter = new System.IO.StringWriter(System.Globalization.CultureInfo.InvariantCulture)
@@ -61,23 +64,27 @@ module Server =
         response.StatusCode <- int code
         response.ContentType <- HttpContentTypes.Json
         response.ContentLength64 <- int64 (System.Text.Encoding.UTF8.GetByteCount(text))
-        async {
-            do! response.OutputStream.AsyncWrite(System.Text.Encoding.UTF8.GetBytes(text))
+        
+        try 
+            let bytes = System.Text.Encoding.UTF8.GetBytes(text)
+            response.OutputStream.Write(bytes, 0, Array.length bytes)
             response.OutputStream.Close()
-        }
+        with 
+        | _ -> ()
+
 
     let private writeEmptyResponse (response : System.Net.HttpListenerResponse) (code : StatusCode) =
-        async {
+        try 
             response.StatusCode <- int code
             response.OutputStream.Close()
-            return ()
-        }
-
+        with 
+        | _ -> ()
+        
     let private writeResponse (response : System.Net.HttpListenerResponse) statusCode =
         function
-        | TextContent text -> Async.Start(writeTextResponse response statusCode text) |> ignore
-        | JsonContent json -> Async.Start(writeJsonResponse response statusCode json) |> ignore
-        | NoContent -> Async.Start(writeEmptyResponse response statusCode)
+        | TextContent text -> writeTextResponse response statusCode text 
+        | JsonContent json ->  writeJsonResponse response statusCode json
+        | NoContent ->  writeEmptyResponse response statusCode
 
     let private invokeOnNext (FsNetMQ.Poller.Poller poller) (observer : System.IObserver<_>) context =
         poller.Run(fun () -> observer.OnNext(context))
@@ -89,38 +96,43 @@ module Server =
     let private subscribe poller (listener:System.Net.HttpListener) observer =
         let source = new System.Threading.CancellationTokenSource()
 
-        let async =
-            async {
-                while true do
-                    let! context = Async.AwaitTask(listener.GetContextAsync())
+        let async () =
+            while not source.IsCancellationRequested do
+                let context = listener.GetContext()
 
-                    let path = removePostfixSlash context.Request.Url.AbsolutePath
+                let path = removePostfixSlash context.Request.Url.AbsolutePath
 
-                    let reply = writeResponse context.Response
+                let reply = writeResponse context.Response
 
-                    match context.Request.HttpMethod with
-                    | "GET" ->
-                        let nameValueCollection = System.Web.HttpUtility.ParseQueryString context.Request.Url.Query
-                        let queryParameters =
-                            nameValueCollection.AllKeys
-                            |> Seq.map (fun key -> key, nameValueCollection.Get(key))
-                            |> Map.ofSeq
+                match context.Request.HttpMethod with
+                | "GET" ->
+                    let nameValueCollection = System.Web.HttpUtility.ParseQueryString context.Request.Url.Query
+                    let queryParameters =
+                        nameValueCollection.AllKeys
+                        |> Seq.map (fun key -> key, nameValueCollection.Get(key))
+                        |> Map.ofSeq
 
+                    invokeOnNext poller observer
+                        (Get (path, queryParameters), reply)
+                | "POST" ->
+                    let body = getBody context.Request
+                    match body with
+                    | Ok body ->
                         invokeOnNext poller observer
-                            (Get (path, queryParameters), reply)
-                    | "POST" ->
-                        let! body = getBody context.Request
-                        match body with
-                        | Ok body ->
-                            invokeOnNext poller observer
-                                (Post(path, body), reply)
-                        | Error error ->
-                            do! writeTextResponse context.Response
-                                 StatusCode.UnsupportedMediaType error
-                    | _ ->
-                        do! writeEmptyResponse context.Response StatusCode.MethodNotAllowed
-            }
-        Async.Start(async, source.Token)
+                            (Post(path, body), reply)
+                    | Error error ->
+                        writeTextResponse context.Response StatusCode.UnsupportedMediaType error
+                | _ ->
+                        writeEmptyResponse context.Response StatusCode.MethodNotAllowed
+        
+        let task = new System.Threading.Tasks.Task(async, System.Threading.Tasks.TaskCreationOptions.LongRunning)
+        task.Start()
+        task.ContinueWith(fun task ->
+            if task.IsFaulted then 
+                System.Environment.FailFast("http thread crashed", task.Exception.Flatten().InnerException) 
+            ) |> ignore
+    
+             
         { new System.IDisposable with
            member this.Dispose() = source.Cancel() }
 
