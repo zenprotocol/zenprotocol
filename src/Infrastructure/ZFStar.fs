@@ -75,7 +75,7 @@ let z3Name =
     | _ -> "z3.exe"
 
 let private fstar outDir inputFile args =
-    [ "--smt"; Platform.workingDirectory / z3Name
+    [ "--smt"; z3Name
       "--prims"; "zulib" / "prims.fst"
       "--include"; "zulib"
       "--no_default_includes"; inputFile;
