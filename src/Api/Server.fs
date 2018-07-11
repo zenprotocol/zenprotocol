@@ -101,19 +101,21 @@ let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
         reply StatusCode.OK (JsonContent json)
 
     | Get ("/blockchain/info", _) ->
-        let info = Blockchain.tryGetBlockChainInfo client
-
-        let json = (
-            new BlockChainInfoJson.Root(
-                info.chain,
-                info.blocks|> int,
-                info.headers |> int,
-                info.difficulty |> decimal,
-                info.medianTime |> int64,
-                info.initialBlockDownload,
-                info.tipBlockHash |> Hash.toString)).JsonValue
-
-        reply StatusCode.OK (JsonContent json)
+        match Blockchain.tryGetBlockChainInfo client with 
+        | None -> 
+            reply StatusCode.RequestTimeout NoContent
+        | Some info ->
+            let json = (
+                new BlockChainInfoJson.Root(
+                    info.chain,
+                    info.blocks|> int,
+                    info.headers |> int,
+                    info.difficulty |> decimal,
+                    info.medianTime |> int64,
+                    info.initialBlockDownload,
+                    info.tipBlockHash |> Hash.toString)).JsonValue
+        
+            reply StatusCode.OK (JsonContent json)
 
     | Get ("/contract/active", _) ->
         let activeContracts = Blockchain.getActiveContracts client
@@ -335,23 +337,26 @@ let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
 
         match pkHash with
         | FSharp.Core.Ok pkHash ->
-            let block = Blockchain.getBlockTemplate client pkHash
-            let bytes = Block.serialize block
-
-            // 100 bytes are the header
-            let header,body = Array.splitAt Block.HeaderSize bytes
-
-            let parent = Hash.toString block.header.parent
-            let target = Difficulty.uncompress block.header.difficulty |> Hash.toString
-            let header = FsBech32.Base16.encode header
-            let body = FsBech32.Base16.encode body
-            
-            blocksCache := ((block.header.commitments, block) :: !blocksCache |> List.chunkBySize 10).[0]
-            
-            new BlockTemplateJson.Root(header, body, target, parent, block.header.blockNumber |> int)
-            |> fun x -> x.JsonValue
-            |> JsonContent
-            |> reply StatusCode.OK
+            match  Blockchain.tryGetBlockTemplate client pkHash with 
+            | None ->
+                reply StatusCode.RequestTimeout NoContent
+            | Some block ->
+                let bytes = Block.serialize block
+    
+                // 100 bytes are the header
+                let header,body = Array.splitAt Block.HeaderSize bytes
+    
+                let parent = Hash.toString block.header.parent
+                let target = Difficulty.uncompress block.header.difficulty |> Hash.toString
+                let header = FsBech32.Base16.encode header
+                let body = FsBech32.Base16.encode body
+                
+                blocksCache := ((block.header.commitments, block) :: !blocksCache |> List.chunkBySize 10).[0]
+                
+                new BlockTemplateJson.Root(header, body, target, parent, block.header.blockNumber |> int)
+                |> fun x -> x.JsonValue
+                |> JsonContent
+                |> reply StatusCode.OK
         | FSharp.Core.Error _ ->
             TextContent (sprintf "invalid address %A" query)
             |> reply StatusCode.BadRequest

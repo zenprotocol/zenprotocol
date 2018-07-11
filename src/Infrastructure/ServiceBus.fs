@@ -213,8 +213,8 @@ module Client =
             let response = Message.tryRecv client 10000<milliseconds>
 
             match response with
-            | None -> failwithf "timedout %s %A" service request
+            | None -> None
             | Some r ->
                 match r with
-                | Message.RelayResponse r -> binarySerializer.UnPickle<'response> r
+                | Message.RelayResponse r -> binarySerializer.UnPickle<'response> r |> Some
                 | x -> failwithf "expecting RelayResponse, got %A" x
