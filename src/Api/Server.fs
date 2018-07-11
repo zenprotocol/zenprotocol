@@ -70,6 +70,10 @@ let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
             |> TextContent
             |> reply StatusCode.BadRequest
 
+    eventX "Api Request {request} started"
+    >> setField "request" (sprintf "%A" request)
+    |> Log.info
+
     match request with
     | Get ("/network/connections/count", _) ->
         let count = Network.getConnectionCount client
@@ -97,7 +101,7 @@ let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
         reply StatusCode.OK (JsonContent json)
 
     | Get ("/blockchain/info", _) ->
-        let info = Blockchain.getBlockChainInfo client
+        let info = Blockchain.tryGetBlockChainInfo client
 
         let json = (
             new BlockChainInfoJson.Root(
@@ -540,6 +544,11 @@ let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
                 
     | _ ->
         reply StatusCode.NotFound NoContent
+        
+    eventX "Api Request {request} finished"
+    >> setField "request" (sprintf "%A" request)
+    |> Log.info
+
 
 let create chain poller busName bind =
     let httpAgent = Http.Server.create poller bind

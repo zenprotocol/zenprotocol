@@ -101,6 +101,10 @@ module Blockchain =
         GetBlockTemplate pkHash
         |> Request.send<Request,Block> client serviceName
 
+    let tryGetBlockTemplate client pkHash =
+        GetBlockTemplate pkHash
+        |> Request.trySend<Request,Block> client serviceName
+
     let getBlockHeader client blockHash =
         Request.send<Request,BlockHeader option> client serviceName (GetBlockHeader blockHash)
 
@@ -124,6 +128,10 @@ module Blockchain =
 
     let getBlockChainInfo client =
         Request.send<Request,BlockchainInfo> client serviceName GetBlockChainInfo
+
+    let tryGetBlockChainInfo client =
+        Request.trySend<Request,BlockchainInfo> client serviceName GetBlockChainInfo
+
 
     let requestHeaders client peerId startBlockHash endBlockHash=
         RequestHeaders (peerId,startBlockHash,endBlockHash) |> Command.send client serviceName

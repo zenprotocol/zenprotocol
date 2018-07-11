@@ -23,18 +23,16 @@ let RelayResponseMessageId = 7uy
 [<LiteralAttribute>]
 let AckMessageId = 8uy
 
-type Register = {
-        service : string
-    }
+type Register =
+        string
 
 type Command = {
         service : string
         payload : byte[]
     }
 
-type RelayCommand = {
-        payload : byte[]
-    }
+type RelayCommand =
+        byte[]
 
 type Request = {
         service : string
@@ -51,13 +49,9 @@ type Response = {
         payload : byte[]
     }
 
-type RelayResponse = {
-        payload : byte[]
-    }
+type RelayResponse =
+        byte[]
 
-type Ack = {
-        dummy : byte
-    }
 
 type T =
     | Register of Register
@@ -67,26 +61,23 @@ type T =
     | RelayRequest of RelayRequest
     | Response of Response
     | RelayResponse of RelayResponse
-    | Ack of Ack
+    | Ack
 
 module Register =
     let getMessageSize (msg:Register) =
-        0 +
-            1 + String.length msg.service +
-            0
+            1 + String.length msg
 
     let write (msg:Register) stream =
         stream
-        |> Stream.writeString msg.service
+        |> Stream.writeString msg
 
     let read =
         reader {
-            let! service = Stream.readString
+            let! msg = Stream.readString
 
-            return ({
-                        service = service;
-                    }: Register)
+            return msg
         }
+
 
 module Command =
     let getMessageSize (msg:Command) =
@@ -115,24 +106,21 @@ module Command =
 
 module RelayCommand =
     let getMessageSize (msg:RelayCommand) =
-        0 +
-            4 + Array.length msg.payload +
-            0
+            4 + Array.length msg
 
     let write (msg:RelayCommand) stream =
         stream
-        |> Stream.writeNumber4 (uint32 (Array.length msg.payload))
-        |> Stream.writeBytes msg.payload (Array.length msg.payload)
+        |> Stream.writeNumber4 (uint32 (Array.length msg))
+        |> Stream.writeBytes msg (Array.length msg)
 
     let read =
         reader {
-            let! payloadLength = Stream.readNumber4
-            let! payload = Stream.readBytes (int payloadLength)
+            let! msgLength = Stream.readNumber4
+            let! msg = Stream.readBytes (int msgLength)
 
-            return ({
-                        payload = payload;
-                    }: RelayCommand)
+            return msg
         }
+
 
 module Request =
     let getMessageSize (msg:Request) =
@@ -158,6 +146,7 @@ module Request =
                         payload = payload;
                     }: Request)
         }
+
 
 module RelayRequest =
     let getMessageSize (msg:RelayRequest) =
@@ -185,6 +174,7 @@ module RelayRequest =
                         payload = payload;
                     }: RelayRequest)
         }
+
 
 module Response =
     let getMessageSize (msg:Response) =
@@ -215,51 +205,23 @@ module Response =
 
 module RelayResponse =
     let getMessageSize (msg:RelayResponse) =
-        0 +
-            4 + Array.length msg.payload +
-            0
+            4 + Array.length msg
 
     let write (msg:RelayResponse) stream =
         stream
-        |> Stream.writeNumber4 (uint32 (Array.length msg.payload))
-        |> Stream.writeBytes msg.payload (Array.length msg.payload)
+        |> Stream.writeNumber4 (uint32 (Array.length msg))
+        |> Stream.writeBytes msg (Array.length msg)
 
     let read =
         reader {
-            let! payloadLength = Stream.readNumber4
-            let! payload = Stream.readBytes (int payloadLength)
+            let! msgLength = Stream.readNumber4
+            let! msg = Stream.readBytes (int msgLength)
 
-            return ({
-                        payload = payload;
-                    }: RelayResponse)
-        }
-
-module Ack =
-    let getMessageSize (msg:Ack) =
-        0 +
-            1 +
-            0
-
-    let write (msg:Ack) stream =
-        stream
-        |> Stream.writeNumber1 msg.dummy
-
-    let read =
-        reader {
-            let! dummy = Stream.readNumber1
-
-            return ({
-                        dummy = dummy;
-                    }: Ack)
+            return msg
         }
 
 
-let recv socket =
-    let stream, more = Stream.recv socket
-
-    // Drop the rest if any
-    if more then Multipart.skip socket
-
+let private decode stream =
     let readMessage messageId stream =
         match messageId with
         | RegisterMessageId ->
@@ -291,9 +253,7 @@ let recv socket =
             | None,stream -> None,stream
             | Some msg, stream -> Some (RelayResponse msg), stream
         | AckMessageId ->
-            match Ack.read stream with
-            | None,stream -> None,stream
-            | Some msg, stream -> Some (Ack msg), stream
+            Some Ack, stream
         | _ -> None, stream
 
     let r = reader {
@@ -306,6 +266,23 @@ let recv socket =
 
     run r stream
 
+let recv socket =
+    let stream, more = Stream.recv socket
+
+    // Drop the rest if any
+    if more then Multipart.skip socket
+
+    decode stream
+
+let tryRecv socket timeout =
+    match Stream.tryRecv socket timeout with
+    | None -> None
+    | Some (stream, more) ->
+        // Drop the rest if any
+        if more then Multipart.skip socket
+
+        decode stream
+
 let send socket msg =
     let writeMessage = function
         | Register msg -> Register.write msg
@@ -315,7 +292,7 @@ let send socket msg =
         | RelayRequest msg -> RelayRequest.write msg
         | Response msg -> Response.write msg
         | RelayResponse msg -> RelayResponse.write msg
-        | Ack msg -> Ack.write msg
+        | Ack -> id
 
     let messageId =
         match msg with
@@ -337,7 +314,7 @@ let send socket msg =
         | RelayRequest msg -> RelayRequest.getMessageSize msg
         | Response msg -> Response.getMessageSize msg
         | RelayResponse msg -> RelayResponse.getMessageSize msg
-        | Ack msg -> Ack.getMessageSize msg
+        | Ack -> 0
 
     //  Signature + message ID + message size
     let frameSize = 2 + 1 + messageSize
