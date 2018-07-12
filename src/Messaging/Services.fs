@@ -190,6 +190,7 @@ module Wallet =
 
     type Command =
         | Resync
+        | RestoreNewAddresses of int32
 
     type Request =
         | GetAddressPKHash
@@ -267,6 +268,10 @@ module Wallet =
 
     let getNewAddress client =
         Request.send<Request, Result<string * int,string>> client serviceName GetNewAddress
+
+    let restoreNewAddresses client maxIndex =
+        RestoreNewAddresses maxIndex
+        |> Command.send client serviceName
 
     let getReceivedByAddress client confirmations =
         Request.send<Request, Result<Map<(string*Asset), uint64>,string>> client serviceName (GetReceivedByAddress confirmations)

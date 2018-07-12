@@ -553,7 +553,12 @@ let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
                 |> reply StatusCode.OK                 
             else
                 reply StatusCode.BadRequest (TextContent "invalid blockNumber")
-                
+    | Post("/wallet/restorenewaddresses", Some json) ->
+        match parseRestoreNewAddress json with 
+        | Error error -> reply StatusCode.BadRequest (TextContent error)             
+        | Ok max -> 
+            Wallet.restoreNewAddresses client max
+            reply StatusCode.OK NoContent
     | _ ->
         reply StatusCode.NotFound NoContent
         

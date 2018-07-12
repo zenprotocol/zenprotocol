@@ -100,6 +100,13 @@ let getNewPKHash dataAccess session =
 
         pkHash, index)
 
+let restoreNewAddresses dataAccess session maxIndex =
+    let account = DataAccess.Account.get dataAccess session
+    let minIndex = account.counter
+            
+    [minIndex..maxIndex]
+    |> Seq.iter (fun _ -> getNewPKHash dataAccess session |> ignore)
+
 let getNewAddress dataAccess session chain =
     getNewPKHash dataAccess session
     |> Result.map (fun (pkHash, index) -> Address.encode chain (Address.PK pkHash),index)
