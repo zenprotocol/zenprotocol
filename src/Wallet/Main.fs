@@ -71,7 +71,11 @@ let commandHandler client command dataAccess session accountStatus =
         | Resync ->
             Account.reset dataAccess session
             sync dataAccess session client
-
+        | RestoreNewAddresses maxIndex -> 
+            Account.restoreNewAddresses dataAccess session maxIndex
+            Account.reset dataAccess session
+            sync dataAccess session client
+            
 let private reply<'a> (requestId:RequestId) (value : Result<'a,string>) =
     requestId.reply value
 

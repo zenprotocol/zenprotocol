@@ -248,3 +248,9 @@ type TxHexJson = JsonProvider<"""
     "tx":"abcde1234"
 }
 """>
+
+type RestoreNewAddressesJson = JsonProvider<"""
+{
+    "max":1234
+}
+""">

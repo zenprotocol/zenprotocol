@@ -210,7 +210,7 @@ module Client =
 
             Message.send client (Message.Request {service=service; payload = payload})
 
-            let response = Message.tryRecv client 10000<milliseconds>
+            let response = Message.tryRecv client 30000<milliseconds>
 
             match response with
             | None -> None

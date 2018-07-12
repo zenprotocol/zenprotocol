@@ -255,3 +255,11 @@ let parseTxHexJson json =
 
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
+        
+let parseRestoreNewAddress json = 
+    try
+        let json = RestoreNewAddressesJson.Parse json
+        json.Max |> Ok
+    with _ as ex ->
+        Error ("Json is invalid: " + ex.Message)
+        
