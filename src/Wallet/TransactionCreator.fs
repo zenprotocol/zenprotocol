@@ -11,6 +11,7 @@ open Result
 open Wallet
 open Types
 open Serialization
+open Logary.Message
 
 module ZData = Zen.Types.Data
 module Cost = Zen.Cost.Realized
@@ -70,6 +71,11 @@ let private collectInputs dataAccess session view account assetAmounts =
         |> Map.ofSeq
 
     if Map.count inputs <> Map.count assetAmounts then
+        eventX "Not enough tokens {inputs} {assetAmounts}"
+        >> setField "inputs" (sprintf "%A" inputs)
+        >> setField "assetAmounts" (sprintf "%A" assetAmounts)
+        |> Log.warning
+
         Error "Not enough tokens"
     else
         Ok inputs
