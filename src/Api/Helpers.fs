@@ -86,7 +86,7 @@ let blockHeaderEncoder (bh:BlockHeader) =
         commitments=bh.commitments.AsString
     ) |> fun j -> j.JsonValue
 
-let blockEncoder chain (bk:Block) =
+let blockEncoder chain blockHash (bk:Block) =
     let txs = bk.transactions
     let txHashes = List.map (Consensus.Transaction.hash >> Consensus.Hash.toString) txs
     let txsJson =
@@ -96,6 +96,7 @@ let blockEncoder chain (bk:Block) =
             |]
     JsonValue.Record
         [|
+            ("hash", blockHash |> Consensus.Hash.toString  |> JsonValue.String)
             ("header", blockHeaderEncoder bk.header);
             ("transactions", txsJson)
         |]
