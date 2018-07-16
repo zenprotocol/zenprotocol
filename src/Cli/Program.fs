@@ -44,10 +44,15 @@ type PasswordArgs =
     interface IArgParserTemplate with
         member arg.Usage = ""
 
+type ImportPublicKeyArgs = 
+    | [<MainCommand("COMMAND");ExactlyOnce>] ImportPublicKey_Arguments of publicKey:string    
+    interface IArgParserTemplate with
+        member arg.Usage = ""
+    
 type NoArgs =
     | [<Hidden>] NoArg
     interface IArgParserTemplate with
-        member arg.Usage = "get address"
+        member arg.Usage = "get address"              
 
 type Arguments =
     | [<AltCommandLine("-p");UniqueAttribute>] Port of port:uint16
@@ -70,6 +75,10 @@ type Arguments =
     | [<CliPrefix(CliPrefix.None)>] AccountExists of ParseResults<NoArgs>
     | [<CliPrefix(CliPrefix.None)>] CheckPassword of ParseResults<PasswordArgs>
     | [<CliPrefix(CliPrefix.None)>] MnemonicPhrase of ParseResults<PasswordArgs>
+    | [<CliPrefix(CliPrefix.None)>] ExportZenPublicKey of ParseResults<NoArgs>
+    | [<CliPrefix(CliPrefix.None)>] ImportZenPublicKey of ParseResults<ImportPublicKeyArgs>
+    | [<CliPrefix(CliPrefix.None)>] RemoveWallet of ParseResults<PasswordArgs>
+    
     interface IArgParserTemplate with
         member arg.Usage =
             match arg with
@@ -93,6 +102,9 @@ type Arguments =
             | AccountExists _ -> "check for an existing account"
             | CheckPassword _ -> "check a password"
             | MnemonicPhrase _ -> "get the mnemonic phrase"
+            | ExportZenPublicKey _ -> "export zen extended public key"
+            | ImportZenPublicKey _ -> "import zen extended public key and create watch-only account"
+            | RemoveWallet _ -> "remove wallet" 
 
 [<EntryPoint>]
 let main argv =
@@ -268,6 +280,25 @@ let main argv =
             |> (new CheckPasswordJson.Root(password))
                 .JsonValue.Request
             |> printResponse
+        | Some (ImportZenPublicKey args) ->
+            let publicKey = args.GetResult <@ ImportPublicKey_Arguments @>
+            "wallet/importzenpublickey"
+            |> getUri
+            |> (new ImportZenPublicKey.Root(publicKey)).JsonValue.Request
+            |> printResponse
+        | Some (ExportZenPublicKey args) ->
+            "wallet/zenpublickey"
+            |> getUri
+            |> Http.Request
+            |> printResponse
+        | Some (RemoveWallet args) ->
+            let password = args.GetResult <@ Password_Arguments @>
+        
+            "wallet/remove"
+            |> getUri
+            |> (new CheckPasswordJson.Root(password))
+                .JsonValue.Request
+            |> printResponse                 
         | _ -> ()
     with
     | :? Net.WebException as ex ->

@@ -14,4 +14,6 @@ let tryGet<'value> (singleValue:SingleValue<'value>) (session:Session) =
         
 let put<'value> (singleValue:SingleValue<'value>) (session:Session) value = 
     Collection.put singleValue.collection session singleValue.name (singleValue.serializer value)     
-     
+
+let delete<'value> (singleValue:SingleValue<'value>) (session:Session) = 
+    Collection.delete singleValue.collection session singleValue.name     

@@ -14,6 +14,8 @@ open Result
 open System
 open Logary.Message
 open Wallet
+open Wallet
+open Wallet
 
 type AccountStatus =
     | Exist of View.T
@@ -124,6 +126,31 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             | Error error ->
                 reply<unit> requestId (Error error)
                 NoAccount
+                
+        | ImportZenPublicKey b58 ->
+            match ExtendedKey.fromString chain b58 with 
+            | Error error ->
+                reply<unit> requestId (Error error)
+                NoAccount
+            | Ok publicKey ->
+                let tipHash, tipBlockNumber =
+                    match Blockchain.getTip client with
+                    | Some (blockHash,header) -> blockHash, header.blockNumber
+                    | None -> Hash.zero, 0ul
+            
+                match Account.fromZenPublicKey dataAccess session tipHash tipBlockNumber publicKey with 
+                | Error error ->
+                    reply<unit> requestId (Error error)
+                    NoAccount
+                | Ok () ->
+                    eventX "Account imported from zen public key"
+                    |> Log.info
+    
+                    reply<unit> requestId (Ok ())
+    
+                    Blockchain.getMempool client
+                    |> View.fromMempool dataAccess session
+                    |> Exist                                     
         | GetBalance ->
             error
             |> reply<BalanceResponse> requestId
@@ -192,6 +219,14 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             error
             |> reply<Map<Asset, uint64>> requestId
             NoAccount
+        | ExportZenPublicKey ->
+            error 
+            |> reply<string> requestId
+            NoAccount
+        | RemoveAccount _ ->
+            error 
+            |> reply<unit> requestId
+            NoAccount                        
     | Exist view ->
         let chainParams = Consensus.Chain.getChainParameters chain
         match request with
@@ -220,11 +255,12 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             |> reply<TransactionsResponse> requestId
 
             accountStatus
+        | ImportZenPublicKey _       
         | ImportSeed (_, _) ->
             Error "account already exist"
             |> reply<unit> requestId
 
-            accountStatus
+            accountStatus                    
         | Send (publish, outputs, password) ->
             let tx =
                 outputs
@@ -312,7 +348,29 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             |> reply<Map<Asset, uint64>> requestId
 
             accountStatus
-
+        | ExportZenPublicKey ->
+            Account.getZenExtendedPublicKey dataAccess session
+            |> ExtendedKey.toString chain
+            |> Ok
+            |> reply<string> requestId
+            
+            accountStatus  
+        | RemoveAccount password ->                    
+            match Account.checkPassword dataAccess session password with
+            | Ok _ ->
+                Account.delete dataAccess session
+                
+                Ok ()
+                |> reply<unit> requestId
+                
+                NoAccount
+            | Error error -> 
+                Error error
+                |> reply<unit> requestId
+                
+                accountStatus
+        
+            
 type Wipe =
     | Full
     | Reset

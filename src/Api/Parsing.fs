@@ -263,3 +263,9 @@ let parseRestoreNewAddress json =
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
         
+let parseImportZenPublicKey json = 
+    try
+        let json = ImportZenPublicKey.Parse json
+        json.PublicKey |> Ok
+    with _ as ex ->
+        Error ("Json is invalid: " + ex.Message)            

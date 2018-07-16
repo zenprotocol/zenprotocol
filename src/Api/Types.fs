@@ -254,3 +254,8 @@ type RestoreNewAddressesJson = JsonProvider<"""
     "max":1234
 }
 """>
+
+type ImportZenPublicKey = JsonProvider<"""
+{
+    "publicKey":"abcd1234"    
+}""">

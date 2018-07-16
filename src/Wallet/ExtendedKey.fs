@@ -107,3 +107,22 @@ let sign msg extendedKey = result {
 
     return Crypto.sign secretKey msg
 }
+
+let toString chain extendedKey =
+    let network = if chain = Chain.Main then Network.Main else Network.TestNet
+ 
+    match extendedKey with 
+    | ExtendedPrivateKey key -> key.ToString(network)        
+    | ExtendedPublicKey key -> key.ToString(network)     
+ 
+let fromString chain b58 = 
+    let network = if chain = Chain.Main then Network.Main else Network.TestNet
+
+    try
+        ExtPubKey.Parse(b58,network)
+        |> ExtendedPublicKey
+        |> Ok
+                                  
+    with 
+    | ex -> Error ex.Message           
+               

@@ -70,10 +70,6 @@ let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
             |> TextContent
             |> reply StatusCode.BadRequest
 
-    eventX "Api Request {request} started"
-    >> setField "request" (sprintf "%A" request)
-    |> Log.info
-
     match request with
     | Get ("/network/connections/count", _) ->
         let count = Network.getConnectionCount client
@@ -308,7 +304,8 @@ let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
         | Ok (contractId, command, message, returnAddress, sign, spends, password) ->
             Wallet.executeContract client true  contractId command message returnAddress sign spends password
             |> handleTxResult
-    | Get ("/wallet/resync", _) ->
+    | Get ("/wallet/resync", _)
+    | Post ("/wallet/resync", _) ->
         Wallet.resyncAccount client
         reply StatusCode.OK NoContent
     | Post ("/blockchain/publishblock", Some body) ->
@@ -559,13 +556,33 @@ let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
         | Ok max -> 
             Wallet.restoreNewAddresses client max
             reply StatusCode.OK NoContent
+    | Get("/wallet/zenpublickey", _) ->
+        match Wallet.exportZenPublicKey client with
+        | Ok publicKey ->
+            JsonValue.String publicKey
+            |> JsonContent
+            |> reply StatusCode.OK
+        | Error error ->
+            TextContent error
+            |> reply StatusCode.BadRequest
+    | Post("/wallet/importzenpublickey", Some json) ->
+        match parseImportZenPublicKey json with
+        | Error error -> reply StatusCode.BadRequest (TextContent error)            
+        | Ok publicKey ->
+            match Wallet.importZenPublicKey client publicKey with 
+            | Ok _ ->
+                reply StatusCode.OK NoContent
+            | Error error -> reply StatusCode.BadRequest (TextContent error)
+    | Post("/wallet/remove", Some json) ->
+        match parseCheckPasswordJson json with
+        | Ok password ->
+            match Wallet.removeAccount client password with
+            | Ok _ -> reply StatusCode.OK NoContent                                                
+            | Error error -> replyError error
+        | Error error ->
+            replyError error            
     | _ ->
-        reply StatusCode.NotFound NoContent
-        
-    eventX "Api Request {request} finished"
-    >> setField "request" (sprintf "%A" request)
-    |> Log.info
-
+        reply StatusCode.NotFound NoContent        
 
 let create chain poller busName bind =
     let httpAgent = Http.Server.create poller bind
