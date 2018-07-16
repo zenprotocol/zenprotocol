@@ -10,7 +10,9 @@ open Logary.Message
 
 let treshhold = 500ul
 
-let timeout = 3UL * Second
+let LastTickTimeout = 3UL * Second 
+
+let NoResponseTimeout = 10UL * Second
 
 let maxDownloading = 20
 
@@ -200,13 +202,13 @@ let invalid timestamp blockHash ibd = effectsWriter {
 }
 
 let tick now ibd = effectsWriter {
-    let isTimedOut timestamp = now > timestamp + timeout
+    let isTimedOut timeout timestamp = now > timestamp + timeout
 
     match ibd with
     | Inactive -> return ibd
     | GettingHeaders (syncing, timestamp, lastTickTime) ->
         // We cannot trust the timestamp check if the lastTick time is the one timed out
-        if not <| isTimedOut lastTickTime &&  isTimedOut timestamp then
+        if not <| isTimedOut LastTickTimeout lastTickTime  && isTimedOut NoResponseTimeout timestamp then
             do! disconnectPeer syncing.peerId
             do! getTipsFromAllPeers
 
@@ -217,10 +219,10 @@ let tick now ibd = effectsWriter {
         else
             return GettingHeaders(syncing, timestamp, now)
     | DownloadingBlocks (syncing, downloading, lastTickTime) ->
-        if isTimedOut lastTickTime then
+        if isTimedOut LastTickTimeout lastTickTime then
             return DownloadingBlocks (syncing, downloading, now)
         else
-            let anyTimedout = List.exists (snd >> isTimedOut) downloading.inprogress
+            let anyTimedout = List.exists (snd >> isTimedOut NoResponseTimeout) downloading.inprogress
 
             // TODO: instead of timed out we might want to try again
 
