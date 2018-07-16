@@ -308,7 +308,8 @@ let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
         | Ok (contractId, command, message, returnAddress, sign, spends, password) ->
             Wallet.executeContract client true  contractId command message returnAddress sign spends password
             |> handleTxResult
-    | Get ("/wallet/resync", _) ->
+    | Get ("/wallet/resync", _)
+    | Post ("/wallet/resync", _) ->
         Wallet.resyncAccount client
         reply StatusCode.OK NoContent
     | Post ("/blockchain/publishblock", Some body) ->
