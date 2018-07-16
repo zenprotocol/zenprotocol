@@ -70,8 +70,7 @@ let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
             |> TextContent
             |> reply StatusCode.BadRequest
 
-    eventX "Api Request {request} started"
-    >> setField "request" (sprintf "%A" request)
+    eventX "Api Request started"
     |> Log.info
 
     match request with
@@ -560,6 +559,23 @@ let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
         | Ok max -> 
             Wallet.restoreNewAddresses client max
             reply StatusCode.OK NoContent
+    | Get("/wallet/zenpublickey", _) ->
+        match Wallet.exportZenPublicKey client with
+        | Ok publicKey ->
+            JsonValue.String publicKey
+            |> JsonContent
+            |> reply StatusCode.OK
+        | Error error ->
+            TextContent error
+            |> reply StatusCode.BadRequest
+    | Post("/wallet/importzenpublickey", Some json) ->
+        match parseImportZenPublicKey json with
+        | Error error -> reply StatusCode.BadRequest (TextContent error)            
+        | Ok publicKey ->
+            match Wallet.importZenPublicKey client publicKey with 
+            | Ok _ ->
+                reply StatusCode.OK NoContent
+            | Error error -> reply StatusCode.BadRequest (TextContent error)
     | _ ->
         reply StatusCode.NotFound NoContent
         

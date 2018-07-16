@@ -30,6 +30,7 @@ let deriveChange index key =
 let deriveExternal index key =
     ExtendedKey.derive 0 key
     >>= ExtendedKey.derive index
+     
 
 let import dataAccess session mnemonicPhrase password tipHash tipBlockNumber = result {
     let mnemonicPhrase = (String.concat " " mnemonicPhrase)
@@ -71,6 +72,42 @@ let import dataAccess session mnemonicPhrase password tipHash tipBlockNumber = r
 
     return ()
 }
+
+let fromZenPublicKey dataAccess session tipHash tipBlockNumber publicKey = result { 
+    let! externalPKHash =
+            deriveExternal 0 publicKey
+            >>= ExtendedKey.getPublicKey
+            <@> PublicKey.hash
+    
+    {pkHash=externalPKHash; addressType=External 0}
+    |> DataAccess.Addresses.put dataAccess session externalPKHash
+
+    let! changePKHash =
+        deriveChange 0 publicKey
+        >>= ExtendedKey.getPublicKey
+        <@> PublicKey.hash
+
+    {pkHash=changePKHash; addressType=Change 0}
+    |> DataAccess.Addresses.put dataAccess session changePKHash
+   
+    let account = {
+        blockHash = tipHash
+        blockNumber = tipBlockNumber
+        counter = 0
+        publicKey = publicKey
+        secureMnemonicPhrase = Array.empty
+        changePKHash = changePKHash
+        externalPKHash = externalPKHash
+    }
+
+    DataAccess.Account.put dataAccess session account
+
+    return ()    
+}
+
+let getZenExtendedPublicKey dataAccess session = 
+    let account = DataAccess.Account.get dataAccess session
+    account.publicKey    
 
 let getAddress dataAccess session chain =
     let account = DataAccess.Account.get dataAccess session
