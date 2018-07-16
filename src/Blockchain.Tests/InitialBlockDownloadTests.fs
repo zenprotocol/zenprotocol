@@ -258,9 +258,13 @@ let ``timeout on get headers request``() =
 
     isActive ibd |> should equal true
     effects |> should equal []
+    
+    let _, ibd =
+        tick 9000UL ibd
+        |> Writer.unwrap
 
     let effects, ibd =
-        tick 3001UL ibd
+        tick 10001UL ibd
         |> Writer.unwrap
 
     effects |> should equal [
@@ -288,14 +292,14 @@ let ``timeout on downloading``() =
         |> Writer.unwrap
 
     let effects, ibd =
-        tick 3000UL ibd
+        tick 11000UL ibd
         |> Writer.unwrap
 
     isActive ibd |> should equal true
     effects |> should equal []
 
     let effects, ibd =
-        tick 5001UL ibd
+        tick 12001UL ibd
         |> Writer.unwrap
 
     effects |> should equal [
@@ -304,6 +308,7 @@ let ``timeout on downloading``() =
     ]
 
     isActive ibd |> should equal false
+
 
 [<Test>]
 let ``getting headers from genesis``() =
