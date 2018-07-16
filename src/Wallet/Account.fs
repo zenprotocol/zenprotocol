@@ -393,7 +393,12 @@ let sync dataAccess session tipBlockHash (tipHeader:BlockHeader) (getHeader:Hash
         | Undo (block,hash) -> undoBlock dataAccess session hash block
         | Add (block,hash) -> addBlock dataAccess session hash block)
 
-
+let delete dataAccess session = 
+    DataAccess.Outputs.truncate dataAccess session
+    DataAccess.AddressOutputs.truncate dataAccess session
+    DataAccess.Addresses.truncate dataAccess session
+    DataAccess.Account.delete dataAccess session
+            
 let reset dataAccess session =
     let account = DataAccess.Account.get dataAccess session
 

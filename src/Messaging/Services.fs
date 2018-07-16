@@ -190,7 +190,7 @@ module Wallet =
 
     type Command =
         | Resync
-        | RestoreNewAddresses of int32        
+        | RestoreNewAddresses of int32          
 
     type Request =
         | GetAddressPKHash
@@ -214,6 +214,7 @@ module Wallet =
         | GetAddressBalance of address:string * confirmations:uint32
         | ExportZenPublicKey
         | ImportZenPublicKey of string
+        | RemoveAccount of password:string
 
     let serviceName = "wallet"
 
@@ -290,3 +291,7 @@ module Wallet =
     let importZenPublicKey client publicKey =
         ImportZenPublicKey publicKey
         |> Request.send<Request,Result<unit,string>> client serviceName
+        
+    let removeAccount client password = 
+        RemoveAccount password        
+        |> Request.send<Request,Result<unit,string>> client serviceName        

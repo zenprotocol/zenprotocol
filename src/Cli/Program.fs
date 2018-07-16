@@ -77,6 +77,7 @@ type Arguments =
     | [<CliPrefix(CliPrefix.None)>] MnemonicPhrase of ParseResults<PasswordArgs>
     | [<CliPrefix(CliPrefix.None)>] ExportZenPublicKey of ParseResults<NoArgs>
     | [<CliPrefix(CliPrefix.None)>] ImportZenPublicKey of ParseResults<ImportPublicKeyArgs>
+    | [<CliPrefix(CliPrefix.None)>] RemoveWallet of ParseResults<PasswordArgs>
     
     interface IArgParserTemplate with
         member arg.Usage =
@@ -102,7 +103,8 @@ type Arguments =
             | CheckPassword _ -> "check a password"
             | MnemonicPhrase _ -> "get the mnemonic phrase"
             | ExportZenPublicKey _ -> "export zen extended public key"
-            | ImportZenPublicKey _ -> "import zen extended public key and create watch-only account" 
+            | ImportZenPublicKey _ -> "import zen extended public key and create watch-only account"
+            | RemoveWallet _ -> "remove wallet" 
 
 [<EntryPoint>]
 let main argv =
@@ -288,7 +290,15 @@ let main argv =
             "wallet/zenpublickey"
             |> getUri
             |> Http.Request
-            |> printResponse                        
+            |> printResponse
+        | Some (RemoveWallet args) ->
+            let password = args.GetResult <@ Password_Arguments @>
+        
+            "wallet/remove"
+            |> getUri
+            |> (new CheckPasswordJson.Root(password))
+                .JsonValue.Request
+            |> printResponse                 
         | _ -> ()
     with
     | :? Net.WebException as ex ->

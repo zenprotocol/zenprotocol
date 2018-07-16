@@ -223,7 +223,10 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             error 
             |> reply<string> requestId
             NoAccount
-            
+        | RemoveAccount _ ->
+            error 
+            |> reply<unit> requestId
+            NoAccount                        
     | Exist view ->
         let chainParams = Consensus.Chain.getChainParameters chain
         match request with
@@ -351,9 +354,23 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             |> Ok
             |> reply<string> requestId
             
-            accountStatus      
-                     
-
+            accountStatus  
+        | RemoveAccount password ->                    
+            match Account.checkPassword dataAccess session password with
+            | Ok _ ->
+                Account.delete dataAccess session
+                
+                Ok ()
+                |> reply<unit> requestId
+                
+                NoAccount
+            | Error error -> 
+                Error error
+                |> reply<unit> requestId
+                
+                accountStatus
+        
+            
 type Wipe =
     | Full
     | Reset

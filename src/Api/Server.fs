@@ -70,9 +70,6 @@ let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
             |> TextContent
             |> reply StatusCode.BadRequest
 
-    eventX "Api Request started"
-    |> Log.info
-
     match request with
     | Get ("/network/connections/count", _) ->
         let count = Network.getConnectionCount client
@@ -576,13 +573,16 @@ let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
             | Ok _ ->
                 reply StatusCode.OK NoContent
             | Error error -> reply StatusCode.BadRequest (TextContent error)
+    | Post("/wallet/remove", Some json) ->
+        match parseCheckPasswordJson json with
+        | Ok password ->
+            match Wallet.removeAccount client password with
+            | Ok _ -> reply StatusCode.OK NoContent                                                
+            | Error error -> replyError error
+        | Error error ->
+            replyError error            
     | _ ->
-        reply StatusCode.NotFound NoContent
-        
-    eventX "Api Request {request} finished"
-    >> setField "request" (sprintf "%A" request)
-    |> Log.info
-
+        reply StatusCode.NotFound NoContent        
 
 let create chain poller busName bind =
     let httpAgent = Http.Server.create poller bind

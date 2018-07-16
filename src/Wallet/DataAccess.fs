@@ -62,13 +62,15 @@ module Account =
     let put t = SingleValue.put t.account
     let tryGet t = SingleValue.tryGet t.account
     let get t session = tryGet t session |> Option.get
+    let delete t = SingleValue.delete t.account
 
 module Addresses =
     let contains t = Collection.containsKey t.addresses
     let getAll t = Collection.getAll t.addresses
     let get t = Collection.get t.addresses
     let put t  = Collection.put t.addresses
-
+    let truncate t = Collection.truncate t.addresses
+    
 module Outputs =
     let getAll t = Collection.getAll t.outputs
 
