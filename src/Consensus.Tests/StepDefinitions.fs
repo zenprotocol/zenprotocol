@@ -1,11 +1,12 @@
 module Consensus.Tests.StepDefinitions
 
+open Infrastructure
 open TechTalk.SpecFlow
 open NUnit.Framework
 open TechTalk.SpecFlow.BindingSkeletons
 open TechTalk.SpecFlow.Assist
-open Infrastructure.Platform
-open Infrastructure.Result
+open Platform
+open Result
 open System.Text.RegularExpressions
 open Blockchain
 open Consensus
@@ -20,14 +21,14 @@ open Messaging.Events
 
 let private result = new ResultBuilder<string>()
 
-let private (?=) expected actual = actual |> should equal expected
-//let private (?=) expected actual = printfn "\nActual: %A\nExpected: %A" actual expected
+let private (?=) expected actual = 
+    actual |> should equal expected
+    //printfn "\nActual: %A\nExpected: %A" actual expected
 
 [<Literal>]
 let rlimit = 2723280u
 
-let timestamp = 1515594186383UL + 1UL
-let chain = { Chain.getChainParameters Chain.Local with proofOfWorkLimit = Difficulty.uncompress 553648127u; genesisTime = timestamp - 1_000_000UL }
+let chain = { Chain.getChainParameters Chain.Local with proofOfWorkLimit = Difficulty.uncompress 553648127u; genesisTime = (Timestamp.now()) - 1_000_000UL }
 
 let tempDir () =
     Path.Combine
@@ -145,6 +146,10 @@ module Binding =
 
     let findBlock blockLabel = Map.find blockLabel testingState.blocks
 
+    let findBlockLabel block = 
+        testingState.blocks
+        |> Map.tryFindKey (fun _ block' -> block = block')
+    
     let getContractId contractLabel =
         let path = Path.GetDirectoryName (System.Reflection.Assembly.GetExecutingAssembly().Location)
         let path = Path.Combine (path, "Contracts")
@@ -602,7 +607,7 @@ module Binding =
         let state' = { state with tipState = { state.tipState with ema = EMA.create chain }}
 
         let events, state' =
-            BlockHandler.validateBlock chain session.context.contractPath session (timestamp + 1000_000_000UL) None genesisBlock false state'
+            BlockHandler.validateBlock chain session.context.contractPath session (Timestamp.now() + 1000_000_000UL) None genesisBlock false state'
             |> Infrastructure.Writer.unwrap
 
         events |> should contain (EffectsWriter.EventEffect (BlockAdded (genesisHash, genesisBlock)))
@@ -633,7 +638,7 @@ module Binding =
                             match outputStatus with
                             | UtxoSet.OutputStatus.NoOutput -> failwithf "no output: constructing block %A" newBlockLabel
                             | UtxoSet.OutputStatus.Spent output ->  UtxoSet.OutputStatus.Unspent output
-                            | UtxoSet.OutputStatus.Unspent output ->  UtxoSet.OutputStatus.Unspent output) session.context.contractPath (parent.blockNumber + 1ul) timestamp
+                            | UtxoSet.OutputStatus.Unspent output ->  UtxoSet.OutputStatus.Unspent output) session.context.contractPath (parent.blockNumber + 1ul) (Timestamp.now())
                             acs state.memoryState.contractCache Map.empty (getContractState session) ContractStates.asDatabase (Transaction.hash tx) tx with
                         | Ok (_,acs,_,_) -> acs
                         | Error err -> failwithf "Tx failed validation: %A %A constructing block %A" (Transaction.hash tx) err newBlockLabel
@@ -641,7 +646,7 @@ module Binding =
                         acs
                 ) parentAcs txs
 
-            let rawblock = Block.createTemplate chain parent (timestamp + (uint64 parent.blockNumber)*1_000_000UL) state.tipState.ema newAcs txs Hash.zero
+            let rawblock = Block.createTemplate chain parent (Timestamp.now() + (uint64 parent.blockNumber)*1_000_000UL) state.tipState.ema newAcs txs Hash.zero
 
             let rec addPow bk ctr =
                 if ctr > 20 then failwith "You're testing with a real blockchain difficulty. Try setting the proofOfWorkLimit to the lowest value."
@@ -664,7 +669,7 @@ module Binding =
         | _ -> ()
 
         let _, state' =
-            BlockHandler.validateBlock chain session.context.contractPath session (timestamp + 100_000_000UL) None block false state
+            BlockHandler.validateBlock chain session.context.contractPath session (Timestamp.now() + 100_000_000UL) None block false state
             |> Infrastructure.Writer.unwrap
 
       //  events |> should contain (EffectsWriter.EventEffect (BlockAdded (Block.hash block.header, block)))
@@ -764,12 +769,10 @@ module Binding =
         checkContractState contractLabel None
 
     // Checks the tip
-    let [<Then>] ``tip should be (.*)`` blockLabel =
-        let expected = findBlock blockLabel
-
-        let actual = state.tipState.tip.header
-
-        expected ?= actual
+    let [<Then>] ``tip should be (.*)`` (blockLabel : string) =
+        match findBlockLabel state.tipState.tip.header with 
+        | Some actualBlockLabel -> blockLabel ?= actualBlockLabel
+        | _ -> failwithf "cannot resolve block: %A" blockLabel
 
     // Asserts that a contract is active
     let [<Then>] ``(.*) should be active for (.*) block(?:|s)`` contractLabel (blocks:uint32) =
