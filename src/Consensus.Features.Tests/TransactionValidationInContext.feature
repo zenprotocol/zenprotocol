@@ -18,7 +18,7 @@ Feature: Transaction validation with utxo-set context
     Then tx1 should pass validation
 
     When tx3 results by pushing input 0 of tx1 at index 0
-    Then tx1 should pass validation
+    Then tx3 validation should yield inputs duplicated
 
     # additional invalid amount output
     Given tx10 has inputs
