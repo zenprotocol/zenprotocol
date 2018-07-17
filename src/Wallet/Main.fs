@@ -385,7 +385,7 @@ let main dataPath busName chain (wipe:Wipe) =
         if System.IO.Directory.Exists dataPath then
                 System.IO.Directory.Delete (dataPath,true)
 
-    Actor.create<Command,Request,Event, AccountStatus> busName serviceName (fun poller sbObservable ebObservable ->
+    Actor.create<Command,Request,Event, AccountStatus> busName serviceName (fun _ sbObservable ebObservable ->
         let databaseContext = DataAccess.createContext dataPath
         let dataAccess = DataAccess.init databaseContext
 

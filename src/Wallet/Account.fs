@@ -327,7 +327,7 @@ let undoBlock dataAccess session blockHash block =
 
     List.rev block.transactions
     |> List.iter (fun tx ->
-        // Unmark outputs as spentg
+        // Unmark outputs as spent
         List.iter (fun input ->
             match input with
             | Outpoint outpoint ->
