@@ -20,11 +20,72 @@ open Hopac.Extensions.Seq
 open FsBech32
 open Hash
 
+[<Literal>]
+let BlockTemplateCacheSize = 500
+
+type BlockTemplateCache(client) =
+    let mutable templateList : (Hash * Types.Block * Content) list = []
+    let mutable newBlockSeen = true
+    let getTemplate hash =
+        match Blockchain.tryGetBlockTemplate client hash with
+        | None ->
+            eventX "GetBlockTemplate timedout"
+            |> Log.warning
+            None
+        | Some block ->
+            let bytes = Block.serialize block
+
+            // 100 bytes are the header
+            let header,body = Array.splitAt Block.HeaderSize bytes
+
+            let parent = Hash.toString block.header.parent
+            let target = Difficulty.uncompress block.header.difficulty |> Hash.toString
+            let header = FsBech32.Base16.encode header
+            let body = FsBech32.Base16.encode body
+
+            let newResponse =
+                BlockTemplateJson.Root(header, body, target, parent, block.header.blockNumber |> int)
+                |> fun x -> x.JsonValue
+                |> JsonContent
+
+            Some (block, newResponse)
+    member this.templates
+        with get() = templateList
+    static member val timestamp : Timestamp.Timestamp = Timestamp.now()
+        with get, set
+    member this.stale
+        with get() =
+            newBlockSeen || (Timestamp.now() - BlockTemplateCache.timestamp > 10_000UL)
+    member this.response(hash:Hash) =
+        if this.stale
+        then
+            match getTemplate hash with
+            | Some (block, response) ->
+                templateList <- [(hash, block, response)]
+                newBlockSeen <- false
+                BlockTemplateCache.timestamp <- Timestamp.now()
+                Some response
+            | None ->
+                templateList <- []
+                None
+        else
+            match List.tryFind (fun (h,_,_) -> h = hash) templateList with
+            | None ->
+                match getTemplate hash with
+                | Some (block, response) ->
+                    templateList <- List.truncate BlockTemplateCacheSize <| (hash, block, response) :: templateList
+                    Some response
+                | None -> None
+            | Some (_, _, response ) -> Some response
+    member this.newTip() =
+        newBlockSeen <- true
+
 type T =
     {
         client: Client.T
         agent: Server.T
         observable: System.IObservable<T->T>
+        templateCache: BlockTemplateCache
     }
     interface System.IDisposable with
         member x.Dispose() =
@@ -39,9 +100,7 @@ let parseConfirmations query reply get =
         | true, confirmations -> get confirmations
         | _ -> reply StatusCode.BadRequest (TextContent "invalid confirmations")
 
-type BlocksCache = (Hash (* BlockHeader commitments *) * Types.Block) list 
-
-let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
+let handleRequest chain client (request,reply) (templateCache : BlockTemplateCache) =
     let replyError error =
         reply StatusCode.BadRequest (TextContent error)
 
@@ -55,7 +114,7 @@ let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
             |> JsonValue.String
             |> JsonContent
             |> reply StatusCode.OK
-            
+
     let validateBlock block =
         Blockchain.validateMinedBlock client block
         match Block.validate (Chain.getChainParameters chain) block with
@@ -97,8 +156,8 @@ let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
         reply StatusCode.OK (JsonContent json)
 
     | Get ("/blockchain/info", _) ->
-        match Blockchain.tryGetBlockChainInfo client with 
-        | None ->             
+        match Blockchain.tryGetBlockChainInfo client with
+        | None ->
             eventX "GetBlockChainInfo timedout"
             |> Log.warning
 
@@ -113,7 +172,7 @@ let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
                     info.medianTime |> int64,
                     info.initialBlockDownload,
                     info.tipBlockHash |> Hash.toString)).JsonValue
-        
+
             reply StatusCode.OK (JsonContent json)
 
     | Get ("/contract/active", _) ->
@@ -262,7 +321,7 @@ let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
                 let json =
                     txs
                     |> List.map (fun (txHash,direction, spend, confirmations) ->
-                        let amount = if direction = TransactionDirection.In then spend.amount |> int64 else spend.amount |> int64 |> (*) -1L
+                        let amount = (if direction = TransactionDirection.In then 1L else -1L) * int64 spend.amount
 
                         (new TransactionsResponseJson.Root(Hash.toString txHash, Asset.toString spend.asset, amount, int confirmations)).JsonValue)
                     |> List.toArray
@@ -321,14 +380,14 @@ let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
             printfn "error parsing header"
             replyError error
         | Ok header ->
-            match Wallet.getAddressPKHash client with
-            | Ok pkHash ->
-                match List.tryFind (fun (commitments, _) -> header.commitments = commitments) !blocksCache with
-                | Some (_, block) ->
-                    validateBlock block
-                | None ->
-                    TextContent (sprintf "block not found")
-                    |> reply StatusCode.BadRequest
+            match
+                List.tryFind
+                    (fun (_, block : Types.Block, _) ->
+                        {header with timestamp = 0UL; nonce = (0UL,0UL)} = {block.header with timestamp = 0UL; nonce = (0UL,0UL)})
+                    templateCache.templates with
+            | Some (_, bk, _) ->
+                validateBlock {bk with header = header}
+            | _ -> TextContent (sprintf "block not found") |> reply StatusCode.BadRequest
     | Get ("/blockchain/blocktemplate", query) ->
         let pkHash =
             match Map.tryFind "address" query with
@@ -337,30 +396,11 @@ let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
 
         match pkHash with
         | FSharp.Core.Ok pkHash ->
-            match  Blockchain.tryGetBlockTemplate client pkHash with 
+            match templateCache.response(pkHash) with
             | None ->
-                        
-                eventX "GetBlockTemplate timedout"
-                |> Log.warning
-                
                 reply StatusCode.RequestTimeout NoContent
-            | Some block ->
-                let bytes = Block.serialize block
-    
-                // 100 bytes are the header
-                let header,body = Array.splitAt Block.HeaderSize bytes
-    
-                let parent = Hash.toString block.header.parent
-                let target = Difficulty.uncompress block.header.difficulty |> Hash.toString
-                let header = FsBech32.Base16.encode header
-                let body = FsBech32.Base16.encode body
-                
-                blocksCache := ((block.header.commitments, block) :: !blocksCache |> List.chunkBySize 10).[0]
-                
-                new BlockTemplateJson.Root(header, body, target, parent, block.header.blockNumber |> int)
-                |> fun x -> x.JsonValue
-                |> JsonContent
-                |> reply StatusCode.OK
+            | Some template ->
+                reply StatusCode.OK template
         | FSharp.Core.Error _ ->
             TextContent (sprintf "invalid address %A" query)
             |> reply StatusCode.BadRequest
@@ -536,24 +576,23 @@ let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
 
 
         parseConfirmations query reply get
-    | Get("/blockchain/blockreward", query) -> 
+    | Get("/blockchain/blockreward", query) ->
         match Map.tryFind "blockNumber" query with
-        | None -> reply StatusCode.BadRequest (TextContent "blockNumber is missing")             
-        | Some blockNumber -> 
+        | None -> reply StatusCode.BadRequest (TextContent "blockNumber is missing")
+        | Some blockNumber ->
             let success,blockNumber = System.UInt32.TryParse blockNumber
-            
-            if success then 
+            if success then
                 Block.blockReward blockNumber
                 |> decimal
                 |> JsonValue.Number
                 |> JsonContent
-                |> reply StatusCode.OK                 
+                |> reply StatusCode.OK
             else
                 reply StatusCode.BadRequest (TextContent "invalid blockNumber")
     | Post("/wallet/restorenewaddresses", Some json) ->
-        match parseRestoreNewAddress json with 
-        | Error error -> reply StatusCode.BadRequest (TextContent error)             
-        | Ok max -> 
+        match parseRestoreNewAddress json with
+        | Error error -> reply StatusCode.BadRequest (TextContent error)
+        | Ok max ->
             Wallet.restoreNewAddresses client max
             reply StatusCode.OK NoContent
     | Get("/wallet/zenpublickey", _) ->
@@ -567,9 +606,9 @@ let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
             |> reply StatusCode.BadRequest
     | Post("/wallet/importzenpublickey", Some json) ->
         match parseImportZenPublicKey json with
-        | Error error -> reply StatusCode.BadRequest (TextContent error)            
+        | Error error -> reply StatusCode.BadRequest (TextContent error)
         | Ok publicKey ->
-            match Wallet.importZenPublicKey client publicKey with 
+            match Wallet.importZenPublicKey client publicKey with
             | Ok _ ->
                 reply StatusCode.OK NoContent
             | Error error -> reply StatusCode.BadRequest (TextContent error)
@@ -577,12 +616,12 @@ let handleRequest chain client (request,reply) (blocksCache : BlocksCache ref) =
         match parseCheckPasswordJson json with
         | Ok password ->
             match Wallet.removeAccount client password with
-            | Ok _ -> reply StatusCode.OK NoContent                                                
+            | Ok _ -> reply StatusCode.OK NoContent
             | Error error -> replyError error
         | Error error ->
-            replyError error            
+            replyError error
     | _ ->
-        reply StatusCode.NotFound NoContent        
+        reply StatusCode.NotFound NoContent
 
 let create chain poller busName bind =
     let httpAgent = Http.Server.create poller bind
@@ -592,16 +631,16 @@ let create chain poller busName bind =
     |> Log.info
 
     let client = Client.create busName
-    let blocksCache = ref ([] : BlocksCache)
+    let blockTemplateCache = BlockTemplateCache client
 
     let observable =
         Http.Server.observable httpAgent
         |> Observable.map (fun request ->
             fun (server:T) ->
-                handleRequest chain client request blocksCache
+                handleRequest chain client request blockTemplateCache
                 server
         )
 
-    {agent = httpAgent; observable = observable; client = client}
+    {agent = httpAgent; observable = observable; client = client; templateCache = blockTemplateCache}
 
 let observable server = server.observable
