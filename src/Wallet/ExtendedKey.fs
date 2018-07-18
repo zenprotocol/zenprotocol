@@ -70,11 +70,10 @@ let derive (i:int) parent =
         | ExtendedPrivateKey key ->
             key.Derive (uint32 i)
             |> ExtendedPrivateKey
-            |> Ok
         | ExtendedPublicKey key ->
             key.Derive (uint32 i)
             |> ExtendedPublicKey
-            |> Ok
+        |> Ok
     with
     | ex -> 
         eventX "failed to derive key\n{ex}"

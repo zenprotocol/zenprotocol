@@ -34,11 +34,11 @@ let main txSkeleton _ contractId command sender messageBody wallet state =
                     let! txSkeleton =
                         Tx.addInput pInput txSkeleton
                         >>= Tx.lockToAddress spend.asset spend.amount returnAddress in
-                        RT.ok @ {
-                          tx = txSkeleton;
-                          message = None;
-                          state = NoChange;
-                        }
+                    RT.ok @ {
+                      tx = txSkeleton;
+                      message = None;
+                      state = NoChange;
+                    }
 
                 | _ -> RT.autoFailw "both returnAddress and amount are required"
             end
