@@ -15,81 +15,110 @@ open DatabaseContext
 open Logary.Message
 open Infrastructure.Result
 
+let getUnionCaseName (x:'a) = 
+    match Microsoft.FSharp.Reflection.FSharpValue.GetUnionFields(x, typeof<'a>) with
+    | case, _ -> case.Name  
+
+let logStartAction actionType action = 
+    eventX (sprintf "Blockchain: Handling %s {action} started" actionType)
+    >> setField "action" (getUnionCaseName action)
+    |> Log.info 
+
+let logEndAction timestamp actionType action =
+    if Timestamp.now() > timestamp + 10000UL then   
+        eventX (sprintf "Blockchain: Handling %s {action} ended, action took more than 10 seconds" actionType)
+        >> setField "action" (getUnionCaseName action)
+        |> Log.warning     
+    else
+        eventX (sprintf "Blockchain: Handling %s {action} ended" actionType)
+        >> setField "action" (getUnionCaseName action)
+        |> Log.info     
+
+
 let handleCommand chainParams command session timestamp (state:State) =
+    logStartAction "command" command
+
     let contractPath = session.context.contractPath
 
-    match command with
-    | ValidateTransaction tx ->
-        effectsWriter {
-            let! memoryState =
-                TransactionHandler.validateTransaction chainParams session contractPath state.tipState.tip.header.blockNumber
-                    timestamp tx state.memoryState
-            return {state with memoryState = memoryState}
-        }
-    | RequestMemPool peerId ->
-        effectsWriter {
-            let txHashes = MemPool.getTxHashes state.memoryState.mempool
-            do! sendMemPool peerId txHashes
-            return state
-        }
-    | RequestTransactions (peerId, txHashes) ->
-         effectsWriter {
-            let txs = List.choose (fun txHash -> MemPool.getTransaction txHash state.memoryState.mempool) txHashes
-
-            if not <| List.isEmpty txs then
-                do! sendTransactions peerId txs
-
-            return state
-         }
-    | HandleMemPool (peerId,txHashes)
-    | HandleNewTransactions (peerId, txHashes) ->
-        effectsWriter {
-            let missingTxHashes = List.filter (fun txHash -> not <| MemPool.containsTransaction txHash state.memoryState.mempool) txHashes
-
-            if not <| List.isEmpty missingTxHashes then
-                do! getTransactions peerId missingTxHashes
-
-            return state
-        }
-    | ValidateBlock (peerId,block) ->
-        BlockHandler.validateBlock chainParams contractPath session timestamp (Some peerId) block false state
-    | ValidateMinedBlock block ->
-        BlockHandler.validateBlock chainParams contractPath session timestamp None block true state
-    | HandleTip (peerId,header) ->
-        BlockHandler.handleTip chainParams session timestamp peerId header state
-    | ValidateNewBlockHeader (peerId, header) ->
-        BlockHandler.handleNewBlockHeader chainParams session timestamp peerId header state
-    | RequestTip peerId ->
-        effectsWriter {
-            if state.tipState.tip <> ExtendedBlockHeader.empty then
-                do! sendTip peerId state.tipState.tip.header
-
-            return state
-        }
-    | RequestBlock (peerId, blockHash) ->
-        effectsWriter {
-            match BlockRepository.tryGetHeader session blockHash with
-            | None -> return state
-            | Some block ->
-                let block = BlockRepository.getFullBlock session block
-                do! sendBlock peerId block
-
+    let result = 
+        match command with
+        | ValidateTransaction tx ->
+            effectsWriter {
+                let! memoryState =
+                    TransactionHandler.validateTransaction chainParams session contractPath state.tipState.tip.header.blockNumber
+                        timestamp tx state.memoryState
+                return {state with memoryState = memoryState}
+            }
+        | RequestMemPool peerId ->
+            effectsWriter {
+                let txHashes = MemPool.getTxHashes state.memoryState.mempool
+                do! sendMemPool peerId txHashes
                 return state
-        }
-    | RequestHeaders (peerId, from, endHash) ->
-        effectsWriter {
-            if state.tipState.tip.hash <> Hash.zero then
-                do! InitialBlockDownload.getHeaders chainParams session peerId from endHash
-
-            return state
-        }
-    | HandleHeaders (peerId,headers) ->
-       effectsWriter {
-           let! initialBlockDownload = InitialBlockDownload.processHeaders chainParams session timestamp peerId headers state.initialBlockDownload
-           return {state with initialBlockDownload = initialBlockDownload}
-       }
+            }
+        | RequestTransactions (peerId, txHashes) ->
+             effectsWriter {
+                let txs = List.choose (fun txHash -> MemPool.getTransaction txHash state.memoryState.mempool) txHashes
+    
+                if not <| List.isEmpty txs then
+                    do! sendTransactions peerId txs
+    
+                return state
+             }
+        | HandleMemPool (peerId,txHashes)
+        | HandleNewTransactions (peerId, txHashes) ->
+            effectsWriter {
+                let missingTxHashes = List.filter (fun txHash -> not <| MemPool.containsTransaction txHash state.memoryState.mempool) txHashes
+    
+                if not <| List.isEmpty missingTxHashes then
+                    do! getTransactions peerId missingTxHashes
+    
+                return state
+            }
+        | ValidateBlock (peerId,block) ->
+            BlockHandler.validateBlock chainParams contractPath session timestamp (Some peerId) block false state
+        | ValidateMinedBlock block ->
+            BlockHandler.validateBlock chainParams contractPath session timestamp None block true state
+        | HandleTip (peerId,header) ->
+            BlockHandler.handleTip chainParams session timestamp peerId header state
+        | ValidateNewBlockHeader (peerId, header) ->
+            BlockHandler.handleNewBlockHeader chainParams session timestamp peerId header state
+        | RequestTip peerId ->
+            effectsWriter {
+                if state.tipState.tip <> ExtendedBlockHeader.empty then
+                    do! sendTip peerId state.tipState.tip.header
+    
+                return state
+            }
+        | RequestBlock (peerId, blockHash) ->
+            effectsWriter {
+                match BlockRepository.tryGetHeader session blockHash with
+                | None -> return state
+                | Some block ->
+                    let block = BlockRepository.getFullBlock session block
+                    do! sendBlock peerId block
+    
+                    return state
+            }
+        | RequestHeaders (peerId, from, endHash) ->
+            effectsWriter {
+                if state.tipState.tip.hash <> Hash.zero then
+                    do! InitialBlockDownload.getHeaders chainParams session peerId from endHash
+    
+                return state
+            }
+        | HandleHeaders (peerId,headers) ->
+           effectsWriter {
+               let! initialBlockDownload = InitialBlockDownload.processHeaders chainParams session timestamp peerId headers state.initialBlockDownload
+               return {state with initialBlockDownload = initialBlockDownload}
+           }
+       
+    logEndAction timestamp "command" command
+    
+    result
 
 let handleRequest chain (requestId:RequestId) request session timestamp state =
+    logStartAction "request" request
+
     match request with
     | ExecuteContract (contractId, command, sender, messageBody, txSkeleton) ->
         TransactionHandler.executeContract session txSkeleton timestamp contractId command sender messageBody state false
@@ -243,13 +272,15 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
         <@> (fun _ -> txHash)
         |> requestId.reply<Result<Hash.Hash,ValidationError.ValidationError>>
 
+    logEndAction timestamp "request" request
+
     ret state
 
 let handleEvent event session timestamp state =
     ret state
 
-let tick chain session timestamp state = effectsWriter {
-    let! ibd = InitialBlockDownload.tick timestamp state.initialBlockDownload
+let tick chain session timestamp state = effectsWriter {    
+    let! ibd = InitialBlockDownload.tick timestamp state.initialBlockDownload    
 
     return {state with initialBlockDownload = ibd}
 }
