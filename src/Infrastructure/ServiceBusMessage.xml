@@ -23,20 +23,24 @@
     </message>
 
     <message name="Request" id= "4">
+        <field name = "requestId" type="uuid">Request Id</field>
         <field name = "service" type="string">Service</field>
         <field name = "payload" type = "chunk">Payload</field>
     </message>
     <message name="Relay Request" id="5">
+        <field name = "requestId" type="uuid">Request Id</field>
         <field name="sender" type="chunk">Sender</field>
         <field name = "payload" type = "chunk">Payload</field>
     </message>
     
     <message name="Response" id="6">
+        <field name = "requestId" type="uuid">Request Id</field>
         <field name="sender" type="chunk">Sender</field>
         <field name = "payload" type = "chunk">Payload</field>
     </message>
     
     <message name="Relay Response" id="7">
+        <field name = "requestId" type="uuid">Request Id</field>
         <field name = "payload" type = "chunk">Payload</field>
     </message>
 
