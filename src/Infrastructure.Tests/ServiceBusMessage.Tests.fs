@@ -107,6 +107,7 @@ let ``RelayCommand size fits stream ``() =
 [<Test>]
 let ``send and recv Request``() =
     let msg = Request {
+        requestId = System.Guid.Parse("DED9D22A-FCE1-488B-8761-84752ACC113E");
         service = "Life is short but Now lasts for ever";
         payload = "Captcha Diem"B;
     }
@@ -126,6 +127,7 @@ let ``send and recv Request``() =
 [<Test>]
 let ``Request size fits stream ``() =
     let request:Request = {
+        requestId = System.Guid.Parse("DED9D22A-FCE1-488B-8761-84752ACC113E");
         service = "Life is short but Now lasts for ever";
         payload = "Captcha Diem"B;
     }
@@ -143,6 +145,7 @@ let ``Request size fits stream ``() =
 [<Test>]
 let ``send and recv RelayRequest``() =
     let msg = RelayRequest {
+        requestId = System.Guid.Parse("DED9D22A-FCE1-488B-8761-84752ACC113E");
         sender = "Captcha Diem"B;
         payload = "Captcha Diem"B;
     }
@@ -162,6 +165,7 @@ let ``send and recv RelayRequest``() =
 [<Test>]
 let ``RelayRequest size fits stream ``() =
     let relayrequest:RelayRequest = {
+        requestId = System.Guid.Parse("DED9D22A-FCE1-488B-8761-84752ACC113E");
         sender = "Captcha Diem"B;
         payload = "Captcha Diem"B;
     }
@@ -179,6 +183,7 @@ let ``RelayRequest size fits stream ``() =
 [<Test>]
 let ``send and recv Response``() =
     let msg = Response {
+        requestId = System.Guid.Parse("DED9D22A-FCE1-488B-8761-84752ACC113E");
         sender = "Captcha Diem"B;
         payload = "Captcha Diem"B;
     }
@@ -198,6 +203,7 @@ let ``send and recv Response``() =
 [<Test>]
 let ``Response size fits stream ``() =
     let response:Response = {
+        requestId = System.Guid.Parse("DED9D22A-FCE1-488B-8761-84752ACC113E");
         sender = "Captcha Diem"B;
         payload = "Captcha Diem"B;
     }
@@ -214,7 +220,10 @@ let ``Response size fits stream ``() =
 
 [<Test>]
 let ``send and recv RelayResponse``() =
-    let msg = RelayResponse ("Captcha Diem"B)
+    let msg = RelayResponse {
+        requestId = System.Guid.Parse("DED9D22A-FCE1-488B-8761-84752ACC113E");
+        payload = "Captcha Diem"B;
+    }
 
     use server = Socket.dealer ()
     Socket.bind server "inproc://RelayResponse.test"
@@ -230,8 +239,10 @@ let ``send and recv RelayResponse``() =
 
 [<Test>]
 let ``RelayResponse size fits stream ``() =
-    let relayresponse:RelayResponse =
-        "Captcha Diem"B
+    let relayresponse:RelayResponse = {
+        requestId = System.Guid.Parse("DED9D22A-FCE1-488B-8761-84752ACC113E");
+        payload = "Captcha Diem"B;
+    }
 
     let messageSize = RelayResponse.getMessageSize relayresponse
 

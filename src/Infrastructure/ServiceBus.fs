@@ -83,11 +83,11 @@ module Broker =
                 sendToService server services c.service (Message.RelayCommand c.payload)
 
             | Message.Request r ->
-                sendToService server services r.service (Message.RelayRequest {sender=routingId;payload=r.payload})
+                sendToService server services r.service (Message.RelayRequest {requestId=r.requestId;sender=routingId;payload=r.payload})
 
             | Message.Response r ->
                 Frame.sendMore server r.sender
-                Message.send server (Message.RelayResponse r.payload)
+                Message.send server (Message.RelayResponse {requestId=r.requestId;payload=r.payload})
                 services
 
             | _ -> services
@@ -113,9 +113,10 @@ module Broker =
 
 module Agent =
 
-    type RequestId(socket:FsNetMQ.Socket.T, sender:byte[]) =
+    type RequestId(socket:FsNetMQ.Socket.T, requestId:System.Guid, sender:byte[]) =
         member this.reply<'a>(msg:'a) =
             Message.send socket (Message.Response {
+               requestId=requestId;                
                sender=sender;
                payload=binarySerializer.Pickle msg;
             })
@@ -159,7 +160,7 @@ module Agent =
                     Some (Command (binarySerializer.UnPickle<'command> c))
                 | Message.RelayRequest r ->
                     let payload = binarySerializer.UnPickle<'request> r.payload
-                    Some (Request (new RequestId(socket, r.sender), payload))
+                    Some (Request (new RequestId(socket, r.requestId, r.sender), payload))
                 | _ -> None)
             |> FSharp.Control.Reactive.Observable.publish
 
@@ -194,27 +195,35 @@ module Client =
         let send<'request,'response> client service (request:'request) =
             let payload = binarySerializer.Pickle request
 
-            Message.send client (Message.Request {service=service; payload = payload})
+            let requestId = System.Guid.NewGuid()
 
-            let response = Message.recv client
+            Message.send client (Message.Request {requestId=requestId;service=service; payload = payload})
 
-            match response with
-            | None -> failwith "malformed response"
-            | Some r ->
-                match r with
-                | Message.RelayResponse r -> binarySerializer.UnPickle<'response> r
-                | x -> failwithf "expecting RelayResponse, got %A" x
+            let rec handleResponse () =                                              
+                match Message.recv client with
+                | None -> failwith "malformed response"                
+                | Some r ->
+                    match r with
+                    | Message.RelayResponse r when r.requestId <> requestId -> handleResponse () // response of another request, skipping
+                    | Message.RelayResponse r -> binarySerializer.UnPickle<'response> r.payload
+                    | x -> failwithf "expecting RelayResponse, got %A" x
+            
+            handleResponse ()
 
         let trySend<'request,'response> client service (request:'request) =
             let payload = binarySerializer.Pickle request
 
-            Message.send client (Message.Request {service=service; payload = payload})
+            let requestId = System.Guid.NewGuid()
 
-            let response = Message.tryRecv client 30000<milliseconds>
+            Message.send client (Message.Request {requestId=requestId;service=service; payload = payload})
 
-            match response with
-            | None -> None
-            | Some r ->
-                match r with
-                | Message.RelayResponse r -> binarySerializer.UnPickle<'response> r |> Some
-                | x -> failwithf "expecting RelayResponse, got %A" x
+            let rec handleResponse () =                                              
+                match Message.tryRecv client 30000<milliseconds> with
+                | None -> None                
+                | Some r ->
+                    match r with
+                    | Message.RelayResponse r when r.requestId <> requestId -> handleResponse () // response of another request, skipping
+                    | Message.RelayResponse r -> binarySerializer.UnPickle<'response> r.payload |> Some
+                    | x -> failwithf "expecting RelayResponse, got %A" x
+            
+            handleResponse ()           

@@ -35,22 +35,27 @@ type RelayCommand =
         byte[]
 
 type Request = {
+        requestId : System.Guid
         service : string
         payload : byte[]
     }
 
 type RelayRequest = {
+        requestId : System.Guid
         sender : byte[]
         payload : byte[]
     }
 
 type Response = {
+        requestId : System.Guid
         sender : byte[]
         payload : byte[]
     }
 
-type RelayResponse =
-        byte[]
+type RelayResponse = {
+        requestId : System.Guid
+        payload : byte[]
+    }
 
 
 type T =
@@ -125,23 +130,28 @@ module RelayCommand =
 module Request =
     let getMessageSize (msg:Request) =
         0 +
+            16 +
             1 + String.length msg.service +
             4 + Array.length msg.payload +
             0
 
     let write (msg:Request) stream =
         stream
+        |> Stream.writeBytes (msg.requestId.ToByteArray()) 16
         |> Stream.writeString msg.service
         |> Stream.writeNumber4 (uint32 (Array.length msg.payload))
         |> Stream.writeBytes msg.payload (Array.length msg.payload)
 
     let read =
         reader {
+            let! requestIdBytes = Stream.readBytes 16
+            let requestId = new System.Guid (requestIdBytes)
             let! service = Stream.readString
             let! payloadLength = Stream.readNumber4
             let! payload = Stream.readBytes (int payloadLength)
 
             return ({
+                        requestId = requestId;
                         service = service;
                         payload = payload;
                     }: Request)
@@ -151,12 +161,14 @@ module Request =
 module RelayRequest =
     let getMessageSize (msg:RelayRequest) =
         0 +
+            16 +
             4 + Array.length msg.sender +
             4 + Array.length msg.payload +
             0
 
     let write (msg:RelayRequest) stream =
         stream
+        |> Stream.writeBytes (msg.requestId.ToByteArray()) 16
         |> Stream.writeNumber4 (uint32 (Array.length msg.sender))
         |> Stream.writeBytes msg.sender (Array.length msg.sender)
         |> Stream.writeNumber4 (uint32 (Array.length msg.payload))
@@ -164,12 +176,15 @@ module RelayRequest =
 
     let read =
         reader {
+            let! requestIdBytes = Stream.readBytes 16
+            let requestId = new System.Guid (requestIdBytes)
             let! senderLength = Stream.readNumber4
             let! sender = Stream.readBytes (int senderLength)
             let! payloadLength = Stream.readNumber4
             let! payload = Stream.readBytes (int payloadLength)
 
             return ({
+                        requestId = requestId;
                         sender = sender;
                         payload = payload;
                     }: RelayRequest)
@@ -179,12 +194,14 @@ module RelayRequest =
 module Response =
     let getMessageSize (msg:Response) =
         0 +
+            16 +
             4 + Array.length msg.sender +
             4 + Array.length msg.payload +
             0
 
     let write (msg:Response) stream =
         stream
+        |> Stream.writeBytes (msg.requestId.ToByteArray()) 16
         |> Stream.writeNumber4 (uint32 (Array.length msg.sender))
         |> Stream.writeBytes msg.sender (Array.length msg.sender)
         |> Stream.writeNumber4 (uint32 (Array.length msg.payload))
@@ -192,32 +209,45 @@ module Response =
 
     let read =
         reader {
+            let! requestIdBytes = Stream.readBytes 16
+            let requestId = new System.Guid (requestIdBytes)
             let! senderLength = Stream.readNumber4
             let! sender = Stream.readBytes (int senderLength)
             let! payloadLength = Stream.readNumber4
             let! payload = Stream.readBytes (int payloadLength)
 
             return ({
+                        requestId = requestId;
                         sender = sender;
                         payload = payload;
                     }: Response)
         }
 
+
 module RelayResponse =
     let getMessageSize (msg:RelayResponse) =
-            4 + Array.length msg
+        0 +
+            16 +
+            4 + Array.length msg.payload +
+            0
 
     let write (msg:RelayResponse) stream =
         stream
-        |> Stream.writeNumber4 (uint32 (Array.length msg))
-        |> Stream.writeBytes msg (Array.length msg)
+        |> Stream.writeBytes (msg.requestId.ToByteArray()) 16
+        |> Stream.writeNumber4 (uint32 (Array.length msg.payload))
+        |> Stream.writeBytes msg.payload (Array.length msg.payload)
 
     let read =
         reader {
-            let! msgLength = Stream.readNumber4
-            let! msg = Stream.readBytes (int msgLength)
+            let! requestIdBytes = Stream.readBytes 16
+            let requestId = new System.Guid (requestIdBytes)
+            let! payloadLength = Stream.readNumber4
+            let! payload = Stream.readBytes (int payloadLength)
 
-            return msg
+            return ({
+                        requestId = requestId;
+                        payload = payload;
+                    }: RelayResponse)
         }
 
 
