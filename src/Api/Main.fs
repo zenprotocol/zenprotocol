@@ -9,7 +9,12 @@ open FSharp.Control
 
 type State = Server.T
 
-let eventHandler event (state:State) = state
+let eventHandler event (state:State) =
+    match event with
+    | TipChanged header ->
+        state.templateCache.newTip()
+        state
+    | _ -> state
 
 let main chain busName bind =
     Actor.create<unit,unit,Event,State> busName "Api" (fun poller sbObservable ebObservable ->            
@@ -18,9 +23,9 @@ let main chain busName bind =
         let ebObservable = 
             ebObservable
             |> Observable.map eventHandler
-            
+
         let httpObservable = 
-            Server.observable server                        
+            Server.observable server
             
         let observable =              
             ebObservable
