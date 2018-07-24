@@ -12,4 +12,5 @@ run src/Consensus.Tests/bin/Debug/Consensus.Tests.dll
 run src/Consensus.Features.Tests/bin/Debug/Consensus.Features.Tests.dll
 run src/Blockchain.Tests/bin/Debug/Blockchain.Tests.dll
 run src/Wallet.Tests/bin/Debug/Wallet.Tests.dll
+run src/AddressDB.Tests/bin/Debug/AddressDB.Tests.dll
 run src/Network.Tests/bin/Debug/Network.Tests.dll

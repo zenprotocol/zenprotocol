@@ -81,6 +81,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Consensus.Features.Tests", 
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "AddressDB", "AddressDB\AddressDB.fsproj", "{9BE81A69-5452-4B96-805A-C0906C767ADC}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "AddressDB.Tests", "AddressDB.Tests\AddressDB.Tests.fsproj", "{01482664-7F31-4876-8C30-1368138AFA27}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -167,6 +169,10 @@ Global
 		{9BE81A69-5452-4B96-805A-C0906C767ADC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9BE81A69-5452-4B96-805A-C0906C767ADC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9BE81A69-5452-4B96-805A-C0906C767ADC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{01482664-7F31-4876-8C30-1368138AFA27}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{01482664-7F31-4876-8C30-1368138AFA27}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{01482664-7F31-4876-8C30-1368138AFA27}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{01482664-7F31-4876-8C30-1368138AFA27}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -181,6 +187,7 @@ Global
 		{DFD94DF5-02C9-48A6-A885-902727A15026} = {C58A477F-36B7-429C-AD06-87A465B47F1D}
 		{72AAB622-79A2-4FAC-B2B6-78173DE52EDC} = {C58A477F-36B7-429C-AD06-87A465B47F1D}
 		{02EC4394-246E-4A9E-8F29-E9E3C899C30F} = {C58A477F-36B7-429C-AD06-87A465B47F1D}
+		{01482664-7F31-4876-8C30-1368138AFA27} = {C58A477F-36B7-429C-AD06-87A465B47F1D}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {077F9143-FC1A-4E01-A026-B8D0891CE24A}
