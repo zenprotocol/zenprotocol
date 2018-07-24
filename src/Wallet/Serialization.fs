@@ -11,18 +11,6 @@ open Wallet.Types
 
 module ExtendedKey = Wallet.ExtendedKey
 
-module Outpoint =
-    let serialize outpoint =
-        Outpoint.write counters outpoint 0ul
-        |> int32
-        |> create
-        |> Outpoint.write serializers outpoint
-        |> getBuffer
-
-    let deserialize bytes =
-        Reader (bytes)
-        |> run Outpoint.read
-
 module ConfirmationStatus =
     let write ops status =
         match status with

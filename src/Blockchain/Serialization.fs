@@ -159,17 +159,6 @@ module ExtendedBlockHeader =
         Reader (bytes)
         |> run read
 
-module Outpoint =
-    let serialize outpoint =
-        Outpoint.write counters outpoint 0ul
-        |> int32
-        |> create
-        |> Outpoint.write serializers outpoint
-        |> getBuffer
-    let deserialize bytes =
-        Reader (bytes)
-        |> run Outpoint.read
-
 module OutputStatus =
     [<Literal>]
     let private SerializedNoOutput = 1uy

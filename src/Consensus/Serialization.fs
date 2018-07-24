@@ -9,8 +9,6 @@ open FsNetMQ.Stream
 
 module ZData = Zen.Types.Data
 
-#nowarn "40"   // Ignore recurssive objects warnings
-
 exception SerializationException
 
 type Reader(buffer:byte array) =
@@ -1208,3 +1206,15 @@ module Message =
         |> write serializers contractCommitment
         |> getBuffer
         |> Hash.Hash
+
+module Outpoint =
+    let serialize outpoint =
+        Outpoint.write counters outpoint 0ul
+        |> int32
+        |> create
+        |> Outpoint.write serializers outpoint
+        |> getBuffer
+
+    let deserialize bytes =
+        Reader (bytes)
+        |> run Outpoint.read

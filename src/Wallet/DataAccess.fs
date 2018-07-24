@@ -6,8 +6,8 @@ open DataAccess
 open Consensus
 open Consensus.Types
 open Consensus.Hash
+open Consensus.Serialization
 open Wallet.Types
-open Wallet.Serialization
 open Wallet.Serialization
 
 let private getBytes str = Encoding.UTF8.GetBytes (str : string)
