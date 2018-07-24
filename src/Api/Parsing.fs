@@ -8,6 +8,8 @@ open Consensus.Types
 open FsBech32
 open System.Text
 open Newtonsoft.Json
+open Wallet
+open Infrastructure.Result
 
 let private getSpend asset amount =
     match Asset.fromString asset with
@@ -245,7 +247,6 @@ let parseAddress json =
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
 
-
 let parseTxHexJson json =
     try
         let hex = TxHexJson.Parse json
@@ -268,4 +269,46 @@ let parseImportZenPublicKey json =
         let json = ImportZenPublicKey.Parse json
         json.PublicKey |> Ok
     with _ as ex ->
-        Error ("Json is invalid: " + ex.Message)            
+        Error ("Json is invalid: " + ex.Message)
+
+let private checkAddresses chain addresses =
+    if Array.isEmpty addresses then
+        Error "Empty addresses list"
+    else
+        addresses
+        |> Array.toList
+        |> Infrastructure.Result.traverseResultM (Address.decodeAny chain) 
+        <@> List.map (Wallet.Address.encode chain)
+
+let parseGetBalanceJson chain json =
+    try
+        let json = GetBalanceJson.Parse json
+        
+        checkAddresses chain json.Addresses
+    with _ as ex ->
+        Error ("Json invalid: " + ex.Message)
+
+let parseGetHistoryJson chain json =
+    try
+        let json = GetHistoryJson.Parse json
+        
+        checkAddresses chain json.Addresses
+        <@> fun addresses -> addresses, json.Skip, json.Take
+    with _ as ex ->
+        Error ("Json invalid: " + ex.Message)
+
+let parseGetOutputsJson chain json =
+    try
+        let json = GetOutputsJson.Parse json
+
+        checkAddresses chain json.Addresses
+        >>= fun addresses -> 
+            match json.Mode with 
+            | "all" -> 
+                Ok (addresses, Messaging.Services.AddressDB.Mode.All)
+            | "unspentOnly" -> 
+                Ok (addresses, Messaging.Services.AddressDB.Mode.UnspentOnly)
+            | _ ->
+                Error "unrecognized mode"
+    with _ as ex ->
+        Error ("Json invalid: " + ex.Message)

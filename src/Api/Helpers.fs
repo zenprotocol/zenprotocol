@@ -3,6 +3,7 @@
 open FSharp.Data
 open Api.Types
 open Consensus.Types
+open Wallet
 
 let rec omitNullFields = function
     | JsonValue.Array items ->
@@ -62,6 +63,15 @@ let lockEncoder chain (lock:Lock) =
 let outputEncoder chain (output:Output) =
     JsonValue.Record [|
         ("lock", lockEncoder chain output.lock);
+        ("spend", spendEncoder output.spend)
+    |]
+
+let pointedOutputEncoder chain (pointedOutput:PointedOutput) =
+    let outpoint, output = fst pointedOutput, snd pointedOutput
+    let outpointJson = OutpointJson.Root (outpoint.txHash.AsString, (int)outpoint.index)
+    JsonValue.Record [|
+        ("outpoint", outpointJson.JsonValue)
+        ("lock", lockEncoder chain output.lock)
         ("spend", spendEncoder output.spend)
     |]
 

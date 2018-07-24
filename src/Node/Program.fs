@@ -24,6 +24,7 @@ type Argument =
     | [<AltCommandLine("-l1");Hidden>] Local1
     | [<AltCommandLine("-l2");Hidden>] Local2
     | [<Hidden>]Seed
+    | AddressDB
     | Data_Path of string
     with
         interface IArgParserTemplate with
@@ -39,6 +40,7 @@ type Argument =
                 | Local1 -> "run node with local1 settings, for tests only"
                 | Local2 -> "run node with local2 settings, for tests only"
                 | Seed -> "run node as a seed"
+                | AddressDB -> "enable address DB"
                 | Data_Path _ -> "path to data folder"
 
 
@@ -114,6 +116,7 @@ let main argv =
     let mutable wipe = false
     let mutable wipeFull = false
     let mutable seed = false
+    let mutable addressDb = false
 
     // if a chain was specified, we want to override config before
     // we handle rest of switches, which may override config again
@@ -182,6 +185,8 @@ let main argv =
         | Seed ->
             seed <- true
             config.listen <- true
+        | AddressDB ->
+            addressDb <- true
         | Data_Path dataPath ->
             config.dataPath <- dataPath
     ) (results.GetAllResults())
@@ -200,6 +205,14 @@ let main argv =
         if wipeFull then Wallet.Main.Full elif wipe then Wallet.Main.Reset else Wallet.Main.NoWipe
         |> Wallet.Main.main dataPath busName chain
 
+    use addressDbActor =
+        if addressDb then
+            if wipeFull then AddressDB.Main.Full elif wipe then AddressDB.Main.Reset else AddressDB.Main.NoWipe
+            |> AddressDB.Main.main dataPath busName chain
+            |> Disposables.toDisposable
+        else
+            Disposables.empty
+            
     use minerActor =
         if config.miner.enabled then
             Miner.Main.main busName chainParams config.miner.threads
@@ -215,8 +228,6 @@ let main argv =
             Disposables.empty
 
     if chain = Chain.Local then
-        let (>>=) m f = Option.bind f m
-
 //        let block = Consensus.Block.createGenesis Chain.localParameters [Consensus.Tests.Helper.rootTx] (0UL,0UL)
 //        printfn "%A" (Block.hash block.header)
 //        printfn "----"
@@ -224,8 +235,7 @@ let main argv =
 
         let block =
             "000000000000000000000000000000000000000000000000000000000000000000000000000000013ca83bcc8483b5a8706a8fed28e4ec64952d7d6b65624c8e8026f48cf177176700000160e073fe8f20ffffff0000000000000000000000000000000003b01098756bcf637bef2a161bd49412cad0a10adf12e64a694c41f9c5b971642029f0999def953f2a14ad6c143e2a0ebf3b4f794d8b17fc1203c12365427c09d3be653064be80f760b9d471dc9afbac2b24236c9f2eb0f08b7427942852dc780201000000000001022030759b07ca01caf8e524fc279946a1e96afc3546ee5f1fd4a1cfaf644763c2b4002c010000"
-            |> FsBech32.Base16.decode
-            >>= Serialization.Block.deserialize
+            |> Block.fromHex
             |> Option.get
 
         use client = ServiceBus.Client.create busName

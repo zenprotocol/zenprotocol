@@ -64,6 +64,10 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\AddressDB\AddressDB.fsproj">
+      <Project>{9BE81A69-5452-4B96-805A-C0906C767ADC}</Project>
+      <Name>AddressDB</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Api\Api.fsproj">
       <Project>{bc871da3-27d5-447d-a35e-d5da8e8f9bc7}</Project>
       <Name>Api</Name>
