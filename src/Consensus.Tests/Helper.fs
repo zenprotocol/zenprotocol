@@ -59,6 +59,8 @@ let rootTx =
         contract=None
     }
 
+let rootTxExtended = Transaction.toExtended rootTx
+
 let rootTxHash = Transaction.hash rootTx
 
 let createTestAccount () =

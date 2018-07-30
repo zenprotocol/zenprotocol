@@ -85,10 +85,10 @@ let publishTx dataAccess session client view publish tx =
     match tx with
     | Ok tx ->
         if publish then
-            let txHash = Transaction.hash tx
-            let view = View.addMempoolTransaction dataAccess session txHash tx view
-
-            Blockchain.validateTransaction client tx
+            let ex = Transaction.toExtended tx
+        
+            let view = View.addMempoolTransaction dataAccess session ex.txHash tx view
+            Blockchain.validateTransaction client ex
 
             Exist view
         else

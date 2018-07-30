@@ -266,12 +266,10 @@ let ``sign with FollowingWitnesses sighash``() =
         Transaction.sign [(secret2, publicKey2)] TxHash tx
         |> Transaction.sign [(secret, publicKey)] FollowingWitnesses
 
-    let txHash = Transaction.hash signedTx
-
     let sigHash = signedTx.witnesses.[0] |> function PKWitness (sigHash,_,_) -> sigHash
     sigHash |> should equal FollowingWitnesses
 
-    inputsValidation 1ul 0UL acs utxos signedTx txHash
+    inputsValidation 1ul 0UL acs utxos signedTx
     |> should be ok
 
 [<Test>]
@@ -301,12 +299,10 @@ let ``sign with FollowingWitnesses sighash last input in tx``() =
         Transaction.sign [(secret2, publicKey2)] FollowingWitnesses tx
         |> Transaction.sign [(secret, publicKey)] TxHash
 
-    let txHash = Transaction.hash signedTx
-
     let sigHash = signedTx.witnesses.[1] |> function PKWitness (sigHash,_,_) -> sigHash
     sigHash |> should equal FollowingWitnesses
 
-    inputsValidation 1ul 0UL acs utxos signedTx txHash
+    inputsValidation 1ul 0UL acs utxos signedTx
     |> should be ok
 
 [<Test>]
@@ -338,11 +334,9 @@ let ``sign with FollowingWitnesses sighash and modify following witness``() =
 
     let signedTx = {signedTx with witnesses = List.rev signedTx.witnesses}
 
-    let txHash = Transaction.hash signedTx
-
     let expected:Result<Transaction,ValidationError.ValidationError> = Error (ValidationError.General "invalid PK witness signature")
 
-    inputsValidation 1ul 0UL acs utxos signedTx txHash |> should equal expected
+    inputsValidation 1ul 0UL acs utxos signedTx |> should equal expected
 
 [<Test>]
 let ``sign last input with FollowingWitnesses sighash and add another witness``() =
@@ -377,11 +371,9 @@ let ``sign last input with FollowingWitnesses sighash and add another witness``(
 
     let signedTx = {signedTx with witnesses = witnesses; inputs = inputs; outputs = outputs}
 
-    let txHash = Transaction.hash signedTx
-
     let expected:Result<Transaction,ValidationError.ValidationError> = Error (ValidationError.General "invalid PK witness signature")
 
-    inputsValidation 1ul 0UL acs utxos signedTx txHash
+    inputsValidation 1ul 0UL acs utxos signedTx
     |> should equal expected
 
 

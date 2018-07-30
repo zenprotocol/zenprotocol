@@ -27,7 +27,7 @@ type T =
         blockChildrenIndex: Index<Hash.Hash,ExtendedBlockHeader.T,Hash.Hash>
         blockState:Collection<Hash.Hash,BlockState.T>
         blockTransactions: Collection<Hash.Hash, Hash.Hash seq>
-        transactions:Collection<Hash.Hash, Transaction>
+        transactions:Collection<Hash.Hash, TransactionExtended>
         transactionBlocks:MultiCollection<Hash.Hash, Hash.Hash>
         contractPath:string
         dbVersion:SingleValue<int>
@@ -87,7 +87,7 @@ let create dataPath =
             (Hashes.deserialize >> Some)
 
     let transactions = Collection.create session "transactions" Hash.bytes
-                        (Transaction.serialize Full) (Transaction.deserialize Full)
+                        TransactionExtended.serialize TransactionExtended.deserialize
 
     let transactionBlocks = MultiCollection.create session "transactionBlocks"
                                 Hash.bytes Hash.bytes (Hash.Hash >> Some)

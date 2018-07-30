@@ -85,7 +85,7 @@ let ``received tokens - block``() =
 
     let tx = {version=Version0;inputs=[];outputs=[output];witnesses=[];contract=None}
 
-    let block = Block.createGenesis chainParams [tx] (0UL,0UL)
+    let block = Block.createGenesis chainParams [Transaction.toExtended tx] (0UL,0UL)
 
     Account.addBlock dataAccess session (Block.hash block.header) block
 
@@ -119,7 +119,7 @@ let ``tokens spent - block``() =
 
     let tx' = {version=Version0;inputs=[ Outpoint {txHash=txHash; index=0ul}];outputs=[];witnesses=[];contract=None}
 
-    let block = Block.createGenesis chainParams [tx;tx'] (0UL,0UL)
+    let block = Block.createGenesis chainParams [Transaction.toExtended tx;Transaction.toExtended tx'] (0UL,0UL)
     Account.addBlock dataAccess session (Block.hash block.header) block
 
     balanceShouldBe session Asset.Zen 10UL View.empty
@@ -344,7 +344,7 @@ let ``account sync up``() =
 
     let block = {
         header = header
-        transactions = [tx]
+        transactions = [Transaction.toExtended tx]
         txMerkleRoot = Hash.zero
         witnessMerkleRoot = Hash.zero
         activeContractSetMerkleRoot= Hash.zero
@@ -386,7 +386,7 @@ let ``sync up from empty wallet``() =
 
     let block = {
         header = header
-        transactions = [tx]
+        transactions = [Transaction.toExtended tx]
         txMerkleRoot = Hash.zero
         witnessMerkleRoot = Hash.zero
         activeContractSetMerkleRoot= Hash.zero
@@ -395,7 +395,7 @@ let ``sync up from empty wallet``() =
 
     let blockHash = Block.hash block.header
 
-    let genesisBlock = Block.createGenesis chainParams [rootTx] (0UL,0UL)
+    let genesisBlock = Block.createGenesis chainParams [Transaction.toExtended rootTx] (0UL,0UL)
     let genesisHeader = genesisBlock.header
 
     let getHeader = function
@@ -454,7 +454,7 @@ let ``account reorg``() =
 
     let block = {
         header = header
-        transactions = [tx]
+        transactions = [Transaction.toExtended tx]
         txMerkleRoot = Hash.zero
         witnessMerkleRoot = Hash.zero
         activeContractSetMerkleRoot= Hash.zero
@@ -582,7 +582,7 @@ let ``wallet spend coinbase when come from block``() =
             nonce = 0UL,0UL
         }
 
-    let block = {header=header;transactions=[origin];commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero}
+    let block = {header=header;transactions=[Transaction.toExtended origin];commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero}
 
     Account.addBlock dataAccess session (Block.hash block.header) block
 
@@ -612,7 +612,7 @@ let ``Should get expected history``() =
 
     let block = {
         header = header
-        transactions = [tx1;tx2]
+        transactions = [Transaction.toExtended tx1;Transaction.toExtended tx2]
         txMerkleRoot = Hash.zero
         witnessMerkleRoot = Hash.zero
         activeContractSetMerkleRoot= Hash.zero
@@ -621,7 +621,7 @@ let ``Should get expected history``() =
 
     let blockHash = Block.hash block.header
 
-    let genesisBlock = Block.createGenesis chainParams [rootTx] (0UL,0UL)
+    let genesisBlock = Block.createGenesis chainParams [Transaction.toExtended rootTx] (0UL,0UL)
     let genesisHeader = genesisBlock.header
 
     let getHeader = function

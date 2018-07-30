@@ -126,6 +126,12 @@ type Transaction = {
     contract: Contract Option
 }
 
+type TransactionExtended = {
+    tx:Transaction
+    txHash:Hash.Hash
+    witnessHash:Hash.Hash    
+}
+
 type Nonce = uint64 * uint64
 
 type BlockHeader = {
@@ -144,7 +150,7 @@ type Block = {
     witnessMerkleRoot: Hash.Hash
     activeContractSetMerkleRoot: Hash.Hash
     commitments: Hash.Hash list
-    transactions: Transaction list
+    transactions: TransactionExtended list
 }
 
 let Anonymous = Zen.Types.Main.Anonymous

@@ -16,7 +16,7 @@ open Api.Types
 open Prims
 
 module Actor = FsNetMQ.Actor
-    
+
 let busName = "test"
 let chain = Chain.Local
 let chainParams = Chain.getChainParameters chain
@@ -51,7 +51,7 @@ let setUp = fun () ->
     Api.Main.main chain busName apiUri |> ignore
 
     // initialize genesis block
-    let block = Block.createGenesis chainParams [Consensus.Tests.Helper.rootTx] (0UL,0UL)
+    let block = Block.createGenesis chainParams [Consensus.Tests.Helper.rootTxExtended] (0UL,0UL)
     let client = ServiceBus.Client.create busName
     Blockchain.validateMinedBlock client block
 

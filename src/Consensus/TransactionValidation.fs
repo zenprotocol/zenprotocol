@@ -338,16 +338,16 @@ let validateCoinbase blockNumber =
     >=> checkNoContractInCoinbase
     >=> checkOutputsOverflow
 
-let validateInContext chainParams getUTXO contractPath blockNumber timestamp acs contractCache set getContractState contractState txHash tx = result {
-    let! outputs = tryGetUtxos getUTXO set tx
-    let txSkel = TxSkeleton.fromTransaction tx outputs
+let validateInContext chainParams getUTXO contractPath blockNumber timestamp acs contractCache set getContractState contractState ex = result {
+    let! outputs = tryGetUtxos getUTXO set ex.tx
+    let txSkel = TxSkeleton.fromTransaction ex.tx outputs
 
-    do! checkWeight chainParams tx txSkel
+    do! checkWeight chainParams ex.tx txSkel
 
     do! checkAmounts txSkel
-    let! contractStates = InputValidation.StateMachine.validate blockNumber timestamp acs getContractState contractState txHash tx txSkel
+    let! contractStates = InputValidation.StateMachine.validate blockNumber timestamp acs getContractState contractState ex.txHash ex.tx txSkel
 
-    let! acs, contractCache = activateContract chainParams contractPath blockNumber acs contractCache tx
-    let! acs = extendContracts chainParams acs tx
-    return tx, acs, contractCache, contractStates
+    let! acs, contractCache = activateContract chainParams contractPath blockNumber acs contractCache ex.tx
+    let! acs = extendContracts chainParams acs ex.tx
+    return ex, acs, contractCache, contractStates
 }

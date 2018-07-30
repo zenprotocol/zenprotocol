@@ -35,23 +35,18 @@ let getFullBlock session (block:ExtendedBlockHeader.T) =
         transactions=transactions
     }
 
-let saveFullBlock session blockHash (block:Block) =
-    let transactions =
-        block.transactions
-        |> List.map Transaction.hash
-        |> List.zip block.transactions
-
+let saveFullBlock session blockHash (block:Block) =    
     // Save all transactions
-    List.iter (fun (tx,txHash) -> Collection.put session.context.transactions session.session txHash tx) transactions
+    List.iter (fun ex -> Collection.put session.context.transactions session.session ex.txHash ex) block.transactions
 
     // Save reference from block to transactions
-    List.map snd transactions
+    List.map (fun ex->ex.txHash) block.transactions
     |> List.toSeq
     |> Collection.put session.context.blockTransactions session.session blockHash
 
     // Save reference from transactions to block
-    List.iter (fun (_,txHash) ->
-        MultiCollection.put session.context.transactionBlocks session.session txHash blockHash) transactions
+    List.iter (fun ex ->
+        MultiCollection.put session.context.transactionBlocks session.session ex.txHash blockHash) block.transactions
 
 let saveBlockState session blockHash (acsUndoData:ActiveContractSet.UndoData) contractStatesUndoData ema =
     let blockState =

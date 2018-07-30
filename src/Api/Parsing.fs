@@ -250,9 +250,9 @@ let parseTxHexJson json =
     try
         let hex = TxHexJson.Parse json
 
-        Transaction.fromHex hex.Tx
-        |> Infrastructure.Result.ofOption "invalid transaction"
-
+        FsBech32.Base16.decode hex.Tx
+        |> Option.bind Consensus.Serialization.TransactionExtended.deserialize
+        |> Infrastructure.Result.ofOption "invalid transaction"          
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
         

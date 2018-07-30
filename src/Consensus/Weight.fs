@@ -91,16 +91,16 @@ let transactionWeight tx txSkeleton = result {
 
 let blockWeight getUTXO block set =
     block.transactions
-    |> List.fold (fun state tx -> 
+    |> List.fold (fun state ex -> 
         state
         >>= (fun (total, set) ->
-            UtxoSet.tryGetOutputs getUTXO set tx.inputs
+            UtxoSet.tryGetOutputs getUTXO set ex.tx.inputs
             |> Result.ofOption "could not get outputs"
-            <@> TxSkeleton.fromTransaction tx
-            >>= transactionWeight tx
+            <@> TxSkeleton.fromTransaction ex.tx
+            >>= transactionWeight ex.tx
             >>= (fun weight ->
                 try //TODO: convert to result
-                    let set = UtxoSet.handleTransaction getUTXO (Transaction.hash tx) tx set
+                    let set = UtxoSet.handleTransaction getUTXO ex.txHash ex.tx set
                     Ok (weight + total, set)
                 with _ as ex when ex.Message = "Expected output to be unspent" ->
                     Error "could not get outputs"

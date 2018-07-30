@@ -66,7 +66,7 @@ let mapError = function
 
 let validateInputs (contract:Contract.T) utxos tx  =
     let acs = ActiveContractSet.add contract.contractId contract ActiveContractSet.empty
-    TransactionValidation.validateInContext Chain.localParameters getUTXO contractPath 1ul 1_000_000UL acs Map.empty utxos getContractState ContractStates.asDatabase (Transaction.hash tx) tx
+    TransactionValidation.validateInContext Chain.localParameters getUTXO contractPath 1ul 1_000_000UL acs Map.empty utxos getContractState ContractStates.asDatabase tx
     |> Result.mapError mapError
 
 let validateBasic tx  =
@@ -87,8 +87,9 @@ let runAndValidate inputTx utxoSet (lazyCompiled : Lazy<_>) =
                 |> Transaction.pushWitnesses [ ContractWitness cw ])
             |> Result.map (Transaction.sign [ sampleKeyPair ] TxHash)
             |> Result.bind validateBasic
+            |> Result.map Transaction.toExtended
             |> Result.bind (validateInputs contract utxoSet))
-            |> Result.map (fun (tx, _, _, _) -> tx)
+            |> Result.map (fun (ex, _, _, _) -> ex.tx)
     )
 
 let compileRunAndValidate inputTx utxoSet code =

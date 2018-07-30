@@ -21,7 +21,7 @@ open Messaging.Events
 
 let private result = new ResultBuilder<string>()
 
-let private (?=) expected actual = 
+let private (?=) expected actual =
     actual |> should equal expected
     //printfn "\nActual: %A\nExpected: %A" actual expected
 
@@ -146,10 +146,10 @@ module Binding =
 
     let findBlock blockLabel = Map.find blockLabel testingState.blocks
 
-    let findBlockLabel block = 
+    let findBlockLabel block =
         testingState.blocks
         |> Map.tryFindKey (fun _ block' -> block = block')
-    
+
     let getContractId contractLabel =
         let path = Path.GetDirectoryName (System.Reflection.Assembly.GetExecutingAssembly().Location)
         let path = Path.Combine (path, "Contracts")
@@ -597,6 +597,7 @@ module Binding =
             rootTxLabels
             |> split
             |> List.map findTx
+            |> List.map Transaction.toExtended
 
         let genesisBlock = Block.createGenesis chain rootTxs (0UL,0UL)
         let genesisHash = Block.hash genesisBlock.header
@@ -639,14 +640,14 @@ module Binding =
                             | UtxoSet.OutputStatus.NoOutput -> failwithf "no output: constructing block %A" newBlockLabel
                             | UtxoSet.OutputStatus.Spent output ->  UtxoSet.OutputStatus.Unspent output
                             | UtxoSet.OutputStatus.Unspent output ->  UtxoSet.OutputStatus.Unspent output) session.context.contractPath (parent.blockNumber + 1ul) (Timestamp.now())
-                            acs state.memoryState.contractCache Map.empty (getContractState session) ContractStates.asDatabase (Transaction.hash tx) tx with
+                            acs state.memoryState.contractCache Map.empty (getContractState session) ContractStates.asDatabase (Transaction.toExtended tx) with
                         | Ok (_,acs,_,_) -> acs
                         | Error err -> failwithf "Tx failed validation: %A %A constructing block %A" (Transaction.hash tx) err newBlockLabel
                     with _ as ex ->
                         acs
                 ) parentAcs txs
 
-            let rawblock = Block.createTemplate chain parent (Timestamp.now() + (uint64 parent.blockNumber)*1_000_000UL) state.tipState.ema newAcs txs Hash.zero
+            let rawblock = Block.createTemplate chain parent (Timestamp.now() + (uint64 parent.blockNumber)*1_000_000UL) state.tipState.ema newAcs (List.map Transaction.toExtended txs) Hash.zero
 
             let rec addPow bk ctr =
                 if ctr > 20 then failwith "You're testing with a real blockchain difficulty. Try setting the proofOfWorkLimit to the lowest value."
@@ -707,6 +708,7 @@ module Binding =
             Map.fold (fun acs contractId contract -> ActiveContractSet.add contractId contract acs) ActiveContractSet.empty contractExecutionCache
 
         TransactionValidation.validateBasic tx
+        <@> Transaction.toExtended
         >>= (TransactionValidation.validateInContext
             chain
             (getUTXO session)
@@ -717,8 +719,7 @@ module Binding =
             Map.empty
             state.memoryState.utxoSet
             (getContractState session)
-            ContractStates.asDatabase
-            (Transaction.hash tx))
+            ContractStates.asDatabase)
 
     // Checks that tx passes validation
     let [<Then>] ``(.*) should pass validation`` txLabel =
@@ -770,7 +771,7 @@ module Binding =
 
     // Checks the tip
     let [<Then>] ``tip should be (.*)`` (blockLabel : string) =
-        match findBlockLabel state.tipState.tip.header with 
+        match findBlockLabel state.tipState.tip.header with
         | Some actualBlockLabel -> blockLabel ?= actualBlockLabel
         | _ -> failwithf "cannot resolve block: %A" blockLabel
 

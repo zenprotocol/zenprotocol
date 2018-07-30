@@ -12,7 +12,7 @@ type ThreeBytesHash = ThreeBytesHash of Hash.Hash
 
 type LeadingZerosHash = LeadingZerosHash of Hash.Hash
 
-type NonEmptyTransactions = NonEmptyTransactions of list<Transaction> with
+type NonEmptyTransactions = NonEmptyTransactions of list<TransactionExtended> with
     static member op_Explicit(NonEmptyTransactions txs) = txs
 
 type CompressibleSubtype = CompressibleSubtype of Hash.Hash with
@@ -43,7 +43,7 @@ type ConsensusGenerator =
     static member Block() =
         gen {
             let! transactions =
-                Arb.generate<Transaction list>
+                Arb.generate<TransactionExtended list>
                 |> Gen.map (fun txs -> List.distinct txs)
 
             let! parentHash = Arb.generate<Hash.Hash>
@@ -52,7 +52,7 @@ type ConsensusGenerator =
             let! blockNumber = Arb.generate<uint32> |> Gen.filter(fun i -> i > 1ul)
             let reward = Block.blockReward blockNumber
 
-            let coinbase = {
+            let coinbase = Transaction.toExtended {
                 version = Version0
                 inputs=[]
                 outputs=
@@ -64,18 +64,18 @@ type ConsensusGenerator =
                     ]
                 contract = None
                 witnesses=[]
-            }
+            } 
 
             let transactions = coinbase :: transactions
 
             let txMerkleRoot =
                 transactions
-                |> List.map Transaction.hash
+                |> List.map (fun ex -> ex.txHash)
                 |> MerkleTree.computeRoot
 
             let witnessMerkleRoot =
                 transactions
-                |> List.map Transaction.witnessHash
+                |> List.map (fun ex -> ex.witnessHash)
                 |> MerkleTree.computeRoot
 
             let acsMerkleRoot = ActiveContractSet.root ActiveContractSet.empty
@@ -97,9 +97,19 @@ type ConsensusGenerator =
 
             return {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot;witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot}
         }
-
-    static member Transactions() =
-        Arb.from<Transaction list>
+    
+    static member TransactionExtended() = 
+        Arb.fromGen (gen {
+            let! tx = Arb.generate<Transaction>
+            return {
+                tx=tx
+                txHash= Transaction.hash tx
+                witnessHash = Transaction.witnessHash tx
+            }
+        })       
+    
+    static member Transactions() =                
+        Arb.from<TransactionExtended list>
         |> Arb.mapFilter List.distinct (fun txs -> List.length txs > 0)
         |> Arb.convert NonEmptyTransactions NonEmptyTransactions.op_Explicit
 

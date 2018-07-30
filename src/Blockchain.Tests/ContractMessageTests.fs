@@ -16,14 +16,13 @@ open Consensus.Tests
 open TestsInfrastructure.Constraints
 open Crypto
 open TxSkeleton
-open Zen
 open Helper
 module Result = Core.Result
 
 let chain = Chain.getChainParameters Chain.Local
 
 let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction (fun _ -> UtxoSet.NoOutput) rootTxHash rootTx
-let mempool = MemPool.empty |> MemPool.add rootTxHash rootTx
+let mempool = MemPool.empty |>  MemPool.add rootTxExtended
 let orphanPool = OrphanPool.create()
 let acs = ActiveContractSet.empty
 
@@ -56,13 +55,13 @@ let shouldBeErrorMessage message =
 
 let activateContract code account session state =
     let (account:TestWallet.T), secretKey = account
-    let account = { account with mempool = MemPool.toList state.memoryState.mempool }
+    let account = { account with mempool = MemPool.toList state.memoryState.mempool |> List.map (fun (ex:TransactionExtended) -> ex.txHash,ex.tx) }
 
     let accountData = account, secretKey
     TestWallet.createActivateContractTransaction chain code 1ul accountData
     |> Result.map (fun tx ->
         let events, state =
-            Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
+            Handler.handleCommand chain (ValidateTransaction (Transaction.toExtended tx)) session 1UL state
             |> Writer.unwrap
         let txHash = Transaction.hash tx
         events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (txHash, tx)))
@@ -179,6 +178,8 @@ let cf _ _ _ _ _ _ _ =
     |> C.ret
 """
 
+open Zen
+
 [<Test>]
 [<Parallelizable>]
 let ``Should execute contract chain and get a valid transaction``() =
@@ -238,7 +239,7 @@ let ``Should execute contract chain and get a valid transaction``() =
         let txHash = Transaction.hash tx
 
         let events, memoryState =
-            TransactionHandler.validateTransaction chain session dataPath blockNumber timestamp tx state.memoryState
+            TransactionHandler.validateTransaction chain session dataPath blockNumber timestamp (Transaction.toExtended tx) state.memoryState
             |> Writer.unwrap
 
         //expect the transaction to be valid
@@ -256,7 +257,7 @@ let ``Should execute contract chain and get a valid transaction``() =
         let txHash = Transaction.hash tx
 
         let events, memoryState =
-            TransactionHandler.validateTransaction chain session dataPath blockNumber timestamp tx state.memoryState
+            TransactionHandler.validateTransaction chain session dataPath blockNumber timestamp (Transaction.toExtended tx) state.memoryState
             |> Writer.unwrap
 
         //expect the transaction to be invalid

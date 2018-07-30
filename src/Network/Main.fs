@@ -41,7 +41,7 @@ let transportHandler transport seeds client addressBook now msg (connector,publi
 
     match msg with
     | InProcMessage.Transactions msg ->
-        match Transactions.deserialize Full msg.count msg.txs with
+        match TransactionsExtended.deserialize msg.count msg.txs with
         | Some txs ->
             List.iter (Services.Blockchain.validateTransaction client ) txs
 
@@ -234,7 +234,7 @@ let commandHandler transport command (state:State) =
         Transport.getTransactions transport peerId bytes
         state
     | Command.SendTransactions (peerId, txs) ->
-        let bytes = Transactions.serialize Full txs
+        let bytes = Transactions.serialize txs
         Transport.sendTransactions transport peerId (List.length txs |> uint32) bytes
         state
     | Command.SendBlock (peerId, block) ->

@@ -12,7 +12,6 @@ open State
 open Logary.Message
 
 let getUTXO = UtxoSetRepository.get
-let getOutput = TransactionRepository.getOutput
 let getContractState = ContractStateRepository.get
 let loadContract contractPath expiry code contractId =
     match Contract.load contractPath expiry code contractId with
@@ -203,8 +202,7 @@ let rec private undoBlocks session (forkBlock:ExtendedBlockHeader.T) (tip:Extend
 
         let mempool = MemPool.undoBlock fullBlock mempool
         let utxoSet =
-            UtxoSet.undoBlock
-                (getOutput session)
+            UtxoSet.undoBlock                
                 (getUTXO session)
                 fullBlock utxoSet
 
@@ -233,9 +231,9 @@ let getMemoryState chainParams session contractPath blockNumber timestamp mempoo
 
     let memoryState = TransactionHandler.validateOrphanTransactions chainParams session contractPath blockNumber timestamp memoryState
 
-    Map.fold (fun writer txHash (_,tx) ->
+    Map.fold (fun writer txHash (_,ex) ->
         Writer.bind writer (fun memoryState ->
-            TransactionHandler.validateInputs chainParams session contractPath blockNumber timestamp txHash tx memoryState false
+            TransactionHandler.validateInputs chainParams session contractPath blockNumber timestamp ex memoryState false
         )) memoryState mempool
 
 

@@ -26,7 +26,7 @@ module Blockchain =
     }
 
     type Command =
-        | ValidateTransaction of Types.Transaction
+        | ValidateTransaction of Types.TransactionExtended
         | RequestMemPool of peerId:byte[]
         | RequestTransactions of peerId:byte[] * txHashes:Hash list
         | RequestBlock of peerId:byte[] * blockHash:Hash
@@ -53,7 +53,7 @@ module Blockchain =
         | GetHeaders
         | GetMempool
         | GetTransaction of Hash
-        | CheckTransaction of Transaction
+        | CheckTransaction of TransactionExtended
 
     type Response = unit
 
@@ -156,9 +156,9 @@ module Blockchain =
 module Network =
     type Command =
         | SendMemPool of peerId:byte[] * Hash list
-        | SendTransactions of peerId:byte[] * Transaction list
+        | SendTransactions of peerId:byte[] * Transaction list // TODO: send bytes instead
         | SendTip of peerId:byte[] * BlockHeader
-        | SendBlock of peerId:byte[] * Block
+        | SendBlock of peerId:byte[] * Block // TODO: send bytes instead
         | GetTransactions of peerId:byte[] * Hash list
         | GetBlock of Hash
         | GetBlockFrom of peerId:byte[] * Hash

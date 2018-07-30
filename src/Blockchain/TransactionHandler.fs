@@ -16,22 +16,22 @@ open Zen.Types.Main
 let getUTXO = UtxoSetRepository.get
 let getContractState = ContractStateRepository.get
 
-let private validateOrphanTransaction chainParams session contractPath blockNumber timestamp state txHash tx  =
+let private validateOrphanTransaction chainParams session contractPath blockNumber timestamp state ex  =
     effectsWriter
         {
             match TransactionValidation.validateInContext chainParams (getUTXO session) contractPath (blockNumber + 1ul) timestamp
-                    state.activeContractSet state.contractCache state.utxoSet (getContractState session) state.contractStates txHash tx with
+                    state.activeContractSet state.contractCache state.utxoSet (getContractState session) state.contractStates ex with
             | Ok (tx, acs, contractCache, contractStates) ->
-                let utxoSet = UtxoSet.handleTransaction (getUTXO session) txHash tx state.utxoSet
-                let mempool = MemPool.add txHash tx state.mempool
+                let utxoSet = UtxoSet.handleTransaction (getUTXO session) ex.txHash ex.tx state.utxoSet
+                let mempool = MemPool.add ex state.mempool
 
-                do! publish (TransactionAddedToMemPool (txHash, tx))
+                do! publish (TransactionAddedToMemPool (ex.txHash, ex.tx))
 
                 eventX "Orphan transaction {hash} added to mempool"
-                >> setField "hash" (Hash.toString txHash)
+                >> setField "hash" (Hash.toString ex.txHash)
                 |> Log.info
 
-                let orphanPool = OrphanPool.remove txHash state.orphanPool
+                let orphanPool = OrphanPool.remove ex.txHash state.orphanPool
                 return {
                     state with
                         activeContractSet = acs
@@ -47,18 +47,18 @@ let private validateOrphanTransaction chainParams session contractPath blockNumb
                 return state
             | Error BadContract ->
                 eventX "Previously orphaned transaction {hash} failed to activate its contract"
-                >> setField "hash" (Hash.toString txHash)
+                >> setField "hash" (Hash.toString ex.txHash)
                 |> Log.info
 
-                let orphanPool = OrphanPool.remove txHash state.orphanPool
+                let orphanPool = OrphanPool.remove ex.txHash state.orphanPool
                 return {state with orphanPool = orphanPool}
             | Error error ->
                 eventX "Orphan transaction {hash} failed validation: {error}"
-                >> setField "hash" (Hash.toString txHash)
+                >> setField "hash" (Hash.toString ex.txHash)
                 >> setField "error" (error.ToString())
                 |> Log.info
 
-                let orphanPool = OrphanPool.remove txHash state.orphanPool
+                let orphanPool = OrphanPool.remove ex.txHash state.orphanPool
                 return {state with orphanPool = orphanPool}
         }
 
@@ -73,49 +73,49 @@ let rec validateOrphanTransactions chainParams session contractPath blockNumber 
             return state'
     }
 
-let validateInputs chainParams session contractPath blockNumber timestamp txHash tx state shouldPublishEvents =
+let validateInputs chainParams session contractPath blockNumber timestamp ex state shouldPublishEvents =
     effectsWriter
         {
             match TransactionValidation.validateInContext chainParams (getUTXO session) contractPath (blockNumber + 1ul) timestamp
-                    state.activeContractSet state.contractCache state.utxoSet (getContractState session) state.contractStates txHash tx with
+                    state.activeContractSet state.contractCache state.utxoSet (getContractState session) state.contractStates ex with
             | Error Orphan ->
-                let orphanPool = OrphanPool.add txHash tx state.orphanPool
+                let orphanPool = OrphanPool.add ex state.orphanPool
 
                 eventX "Transaction {hash} is an orphan. Adding to orphan pool."
-                >> setField "hash" (Hash.toString txHash)
+                >> setField "hash" (Hash.toString ex.txHash)
                 |> Log.info
 
                 return {state with orphanPool = orphanPool}
             | Error ContractNotActive ->
-                let orphanPool = OrphanPool.add txHash tx state.orphanPool
+                let orphanPool = OrphanPool.add ex state.orphanPool
 
                 eventX "Transaction {hash} tried to run an inactive contract. Adding to orphan pool."
-                >> setField "hash" (Hash.toString txHash)
+                >> setField "hash" (Hash.toString ex.txHash)
                 |> Log.info
 
                 return {state with orphanPool = orphanPool}
             | Error BadContract ->
                 eventX "Transaction {hash} failed to activate its contract"
-                >> setField "hash" (Hash.toString txHash)
+                >> setField "hash" (Hash.toString ex.txHash)
                 |> Log.info
 
                 return state
             | Error error ->
                 eventX "Transaction {hash} failed inputs validation: {error}"
-                >> setField "hash" (Hash.toString txHash)
+                >> setField "hash" (Hash.toString ex.txHash)
                 >> setField "error" (error.ToString())
                 |> Log.info
 
                 return state
             | Ok (tx, acs, contractCache, contractStates) ->
-                let utxoSet = UtxoSet.handleTransaction (getUTXO session) txHash tx state.utxoSet
-                let mempool = MemPool.add txHash tx state.mempool
+                let utxoSet = UtxoSet.handleTransaction (getUTXO session) ex.txHash ex.tx state.utxoSet
+                let mempool = MemPool.add ex state.mempool
 
                 if shouldPublishEvents then
-                    do! publish (TransactionAddedToMemPool (txHash,tx))
+                    do! publish (TransactionAddedToMemPool (ex.txHash,ex.tx))
 
                 eventX "Transaction {hash} added to mempool"
-                >> setField "hash" (Hash.toString txHash)
+                >> setField "hash" (Hash.toString ex.txHash)
                 |> Log.info
 
                 let state = {
@@ -131,25 +131,23 @@ let validateInputs chainParams session contractPath blockNumber timestamp txHash
         }
 
 
-let validateTransaction chainParams session contractPath blockNumber timestamp tx (state:MemoryState) =
-    effectsWriter {
-        let txHash = Transaction.hash tx
-
-        if MemPool.containsTransaction txHash state.mempool ||
-           OrphanPool.containsTransaction txHash state.orphanPool ||
-           TransactionRepository.isPartOfMainChain session txHash then
+let validateTransaction chainParams session contractPath blockNumber timestamp ex (state:MemoryState) =
+    effectsWriter {        
+        if MemPool.containsTransaction ex.txHash state.mempool ||
+           OrphanPool.containsTransaction ex.txHash state.orphanPool ||
+           TransactionRepository.isPartOfMainChain session ex.txHash then
             return state
         else
-            match TransactionValidation.validateBasic tx with
+            match TransactionValidation.validateBasic ex.tx with
             | Error error ->
                 eventX "Transaction {hash} failed basic validation: {error}"
-                >> setField "hash" (Hash.toString txHash)
+                >> setField "hash" (Hash.toString ex.txHash)
                 >> setField "error" (error.ToString())
                 |> Log.info
 
                 return state
-            | Ok tx ->
-                return! validateInputs chainParams session contractPath blockNumber timestamp txHash tx state true
+            | Ok _ ->
+                return! validateInputs chainParams session contractPath blockNumber timestamp ex state true
     }
 
 let executeContract session txSkeleton timestamp contractId command sender messageBody state commitToState =

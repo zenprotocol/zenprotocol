@@ -341,8 +341,7 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
             | Ok (tx, contractId) ->
                 let address =
                     Address.Contract contractId
-                    |> Address.encode chain
-                Blockchain.validateTransaction client tx
+                    |> Address.encode chain                
                 let json = new ContractActivateResponseJson.Root (address, ContractId.toString contractId)
                 reply StatusCode.OK (JsonContent json.JsonValue)
             | Error error ->
@@ -353,7 +352,6 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
         | Ok (contractId, numberOfBlocks, password) ->
             match Wallet.extendContract client true contractId numberOfBlocks password with
             | Ok tx ->
-                Blockchain.validateTransaction client tx
                 reply StatusCode.OK NoContent
             | Error error ->
                 replyError error
@@ -468,14 +466,13 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
             reply StatusCode.BadRequest NoContent
     | Post ("/blockchain/publishtransaction", Some tx) ->
         match Parsing.parseTxHexJson tx with
-        | Ok tx ->
-            let txHash = Transaction.hash tx
+        | Ok ex ->
 
-            Blockchain.validateTransaction client tx
+            Blockchain.validateTransaction client ex
 
-            match Blockchain.getTransaction client txHash with
+            match Blockchain.getTransaction client ex.txHash with
             | Some (_,0ul) ->
-                Hash.toString txHash
+                Hash.toString ex.txHash
                 |> JsonValue.String
                 |> JsonContent
                 |> reply StatusCode.OK
@@ -484,9 +481,9 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
                 |> TextContent
                 |> reply StatusCode.Found
             | _ ->
-                match Blockchain.checkTransaction client tx with
+                match Blockchain.checkTransaction client ex with
                 | Ok _ ->
-                    Hash.toString txHash
+                    Hash.toString ex.txHash
                     |> JsonValue.String
                     |> JsonContent
                     |> reply StatusCode.OK
