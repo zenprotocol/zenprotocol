@@ -42,11 +42,11 @@ let handleCommand chainParams command session timestamp (state:State) =
 
     let result = 
         match command with
-        | ValidateTransaction tx ->
+        | ValidateTransaction ex ->
             effectsWriter {
                 let! memoryState =
                     TransactionHandler.validateTransaction chainParams session contractPath state.tipState.tip.header.blockNumber
-                        timestamp tx state.memoryState
+                        timestamp ex state.memoryState
                 return {state with memoryState = memoryState}
             }
         | RequestMemPool peerId ->
@@ -57,7 +57,9 @@ let handleCommand chainParams command session timestamp (state:State) =
             }
         | RequestTransactions (peerId, txHashes) ->
              effectsWriter {
-                let txs = List.choose (fun txHash -> MemPool.getTransaction txHash state.memoryState.mempool) txHashes
+                let txs = 
+                    List.choose (fun txHash -> MemPool.getTransaction txHash state.memoryState.mempool) txHashes
+                    |> List.map (fun ex-> ex.tx)
     
                 if not <| List.isEmpty txs then
                     do! sendTransactions peerId txs
@@ -197,6 +199,7 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
         |> requestId.reply<BlockHeader list>
     | GetMempool ->
         MemPool.toList state.memoryState.mempool
+        |> List.map (fun ex-> ex.txHash,ex.tx)
         |> requestId.reply<List<Hash.Hash * Transaction>>
     | GetBlockChainInfo ->
         let tip = state.tipState.tip.header
@@ -237,8 +240,8 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
 
     | GetTransaction txHash ->
         match MemPool.getTransaction txHash state.memoryState.mempool with
-        | Some tx ->
-            Some (tx,0ul)
+        | Some ex ->
+            Some (ex.tx,0ul)
             |> requestId.reply<(Transaction*uint32) option>
         | None ->
             TransactionRepository.tryGetTransaction session txHash
@@ -246,30 +249,28 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
                 TransactionRepository.tryGetTransactionBlock session txHash
                 |> Option.map (fun block -> tx,block))
             |> function
-            | Some (tx,block) ->
+            | Some (ex,block) ->
                 let confirmations = (state.tipState.tip.header.blockNumber - block.header.blockNumber) + 1ul
 
-                Some (tx,confirmations)
+                Some (ex.tx,confirmations)
                 |> requestId.reply<(Transaction*uint32) option>
             | None ->
                 requestId.reply<(Transaction*uint32) option> None
 
-    | CheckTransaction transaction ->
-        let txHash = Transaction.hash transaction
-
-        TransactionValidation.validateBasic transaction
-        >>= TransactionValidation.validateInContext chain
-                (TransactionHandler.getUTXO session)
-                session.context.contractPath
-                (state.tipState.tip.header.blockNumber + 1ul)
-                timestamp
-                state.memoryState.activeContractSet
-                state.memoryState.contractCache
-                state.memoryState.utxoSet
-                (TransactionHandler.getContractState session)
-                state.memoryState.contractStates
-                txHash
-        <@> (fun _ -> txHash)
+    | CheckTransaction ex ->    
+        TransactionValidation.validateBasic ex.tx
+        >>= fun _ -> TransactionValidation.validateInContext chain
+                        (TransactionHandler.getUTXO session)
+                        session.context.contractPath
+                        (state.tipState.tip.header.blockNumber + 1ul)
+                        timestamp
+                        state.memoryState.activeContractSet
+                        state.memoryState.contractCache
+                        state.memoryState.utxoSet
+                        (TransactionHandler.getContractState session)
+                        state.memoryState.contractStates
+                        ex                
+        <@> (fun _ -> ex.txHash)
         |> requestId.reply<Result<Hash.Hash,ValidationError.ValidationError>>
 
     logEndAction timestamp "request" request

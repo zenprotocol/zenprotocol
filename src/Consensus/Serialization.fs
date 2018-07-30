@@ -1015,6 +1015,25 @@ module Serialization =
             }
             return { version = version; inputs = inputs; witnesses = witnesses; outputs = outputs; contract = contract }
         }
+        
+    module TransactionExtended = 
+        let write ops ex = Transaction.write Full ops ex.tx                 
+        let read stream =
+            match Transaction.read Full stream with 
+            | None,stream' -> None, stream'
+            | Some tx, stream' ->
+                let withoutWitnessSize = Transaction.write WithoutWitness counters tx 0ul |> int  
+                let size = Transaction.write Full counters tx 0ul |> int
+                                
+                let txHash = Stream.readBytes withoutWitnessSize stream |> fst |> Option.get |> Hash.compute
+                let witnessHash = Stream.readBytes size stream |> fst |> Option.get |> Hash.compute
+            
+                Some {
+                    tx=tx
+                    txHash=txHash
+                    witnessHash=witnessHash                                        
+                },stream'
+                
 
     module Header =
         let write ops = fun header ->
@@ -1048,11 +1067,11 @@ module Serialization =
         let write ops bk =
             Header.write ops bk.header
             >> Seq.write ops Hash.write ([ bk.txMerkleRoot; bk.witnessMerkleRoot; bk.activeContractSetMerkleRoot ] @ bk.commitments)
-            >> Seq.write ops (Transaction.write Full) bk.transactions
+            >> Seq.write ops TransactionExtended.write bk.transactions
         let read = reader {
             let! header = Header.read
             let! commitments = List.read Hash.read
-            let! transactions = List.read (Transaction.read Full)
+            let! transactions = List.read TransactionExtended.read
 
             if Seq.length commitments < 3 then
                 yield! fail
@@ -1080,17 +1099,32 @@ module Transaction =
         Stream (bytes, 0)
         |> run (Transaction.read mode)
 
-module Transactions =
-    let serialize mode txs =
-        Seq.writeBody counters (Transaction.write mode) txs 0ul
+module TransactionExtended = 
+    let serialize tx = 
+        TransactionExtended.write counters tx 0ul
         |> int32
         |> create
-        |> Seq.writeBody serializers (Transaction.write mode) txs
+        |> TransactionExtended.write serializers tx
         |> getBuffer
-
-    let deserialize mode count bytes =
+        
+    let deserialize bytes =
         Stream (bytes, 0)
-        |> run (Seq.readBody count (Transaction.read mode))
+        |> run TransactionExtended.read
+
+module Transactions =
+
+    let serialize txs =
+        Seq.writeBody counters (Transaction.write Full) txs 0ul
+        |> int32
+        |> create
+        |> Seq.writeBody serializers (Transaction.write Full) txs
+        |> getBuffer                       
+
+module TransactionsExtended =
+
+    let deserialize count bytes =
+        Stream (bytes, 0)
+        |> run (Seq.readBody count TransactionExtended.read)
         |> Option.map List.ofSeq
 
 module Header =

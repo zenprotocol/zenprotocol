@@ -265,26 +265,24 @@ let addBlock dataAccess session blockHash block =
     else   
 
     block.transactions
-    |> List.mapi (fun index tx -> index,tx)
-    |> List.iter (fun (blockIndex, tx) ->
-        let txHash = Transaction.hash tx
-
+    |> List.mapi (fun index ex -> index,ex)
+    |> List.iter (fun (blockIndex, ex) ->        
         // Mark transaction inputs as spent
         List.iter (fun input ->
             match input with
             | Outpoint outpoint ->
                 match DataAccess.Outputs.tryGet dataAccess session outpoint with
                 | Some output ->
-                    {output with status = Spent (txHash, Confirmed (block.header.blockNumber, blockHash, blockIndex))}
+                    {output with status = Spent (ex.txHash, Confirmed (block.header.blockNumber, blockHash, blockIndex))}
                     |> DataAccess.Outputs.put dataAccess session outpoint
                 | None ->
                     ()
             | _ -> ()
 
-        ) tx.inputs
+        ) ex.tx.inputs
 
         // Add new outputs to database
-        tx.outputs
+        ex.tx.outputs
         |> List.mapi (fun index output -> uint32 index,output)
         |> List.choose (fun (index,output) ->
             match output.lock with
@@ -294,7 +292,7 @@ let addBlock dataAccess session blockHash block =
                 Some (pkHash,index,output)
             | _ -> None)
         |> List.iter (fun (pkHash,index,output) ->
-            let outpoint = {txHash=txHash; index=index}
+            let outpoint = {txHash=ex.txHash; index=index}
 
             let output = {
                 pkHash = pkHash
@@ -326,7 +324,7 @@ let undoBlock dataAccess session blockHash block =
     else
 
     List.rev block.transactions
-    |> List.iter (fun tx ->
+    |> List.iter (fun ex ->
         // Unmark outputs as spent
         List.iter (fun input ->
             match input with
@@ -339,15 +337,13 @@ let undoBlock dataAccess session blockHash block =
                     ()
             | _ -> ()
 
-        ) tx.inputs
-
-        let txHash = Transaction.hash tx
-
+        ) ex.tx.inputs
+       
         // Delete outputs
-        tx.outputs
+        ex.tx.outputs
         |> List.mapi (fun index _ -> uint32 index)
         |> List.iter (fun index ->
-            let outpoint = {txHash=txHash; index=index}
+            let outpoint = {txHash=ex.txHash; index=index}
 
             match DataAccess.Outputs.tryGet dataAccess session outpoint with
             | Some output ->

@@ -21,30 +21,30 @@ let result = new Result.ResultBuilder<string>()
 // use of the UTXOs is to dereference all the outputs.
 let weights session state =
     MemPool.toList state.memoryState.mempool
-    |> Result.traverseResultM (fun (txHash,tx) -> 
-        UtxoSet.tryGetOutputs (getUTXO session) state.memoryState.utxoSet tx.inputs
+    |> Result.traverseResultM (fun ex -> 
+        UtxoSet.tryGetOutputs (getUTXO session) state.memoryState.utxoSet ex.tx.inputs
         |> Result.ofOption "could not get outputs"
-        <@> TxSkeleton.fromTransaction tx
-        >>= Weight.transactionWeight tx
-        <@> fun weight -> txHash,tx, weight)
+        <@> TxSkeleton.fromTransaction ex.tx
+        >>= Weight.transactionWeight ex.tx
+        <@> fun weight -> ex, weight)
     
 let selectOrderedTransactions (chain:Chain.ChainParameters) (session:DatabaseContext.Session) blockNumber timestamp acs contractCache transactions =
     let contractPath = session.context.contractPath
     let maxWeight = chain.maxBlockWeight
 
-    let tryAddTransaction (state, added, notAdded, altered, weight) (txHash,tx,wt) =
+    let tryAddTransaction (state, added, notAdded, altered, weight) (ex,wt) =
         let newWeight = weight+wt
         if newWeight > maxWeight then (state, added, notAdded, false, weight) else
         validateInContext chain (getUTXO session) contractPath (blockNumber + 1ul) timestamp
-            state.activeContractSet state.contractCache state.utxoSet (getContractState session) ContractStates.asDatabase txHash tx
+            state.activeContractSet state.contractCache state.utxoSet (getContractState session) ContractStates.asDatabase ex
         |> function
             | Error (Orphan | ContractNotActive) ->
-                (state, added, (txHash,tx,wt)::notAdded, altered, weight)
+                (state, added, (ex,wt)::notAdded, altered, weight)
             | Error _ ->
                 (state, added, notAdded, altered, weight)
             | Ok (tx, acs, contractCache, contractStates) ->
-                let utxoSet = UtxoSet.handleTransaction (getUTXO session) txHash tx state.utxoSet
-                let mempool = MemPool.add txHash tx state.mempool
+                let utxoSet = UtxoSet.handleTransaction (getUTXO session) ex.txHash ex.tx state.utxoSet
+                let mempool = MemPool.add ex state.mempool
                 ({state with activeContractSet=acs;mempool=mempool;utxoSet=utxoSet;contractCache=contractCache;contractStates=contractStates}, tx::added, notAdded, true, newWeight)
 
     let foldOverTransactions foldState txs =
@@ -72,6 +72,6 @@ let selectOrderedTransactions (chain:Chain.ChainParameters) (session:DatabaseCon
 
 let makeTransactionList chain (session:DatabaseContext.Session) (state:State) timestamp = result {
     let! txs = weights session state 
-    let txs = List.sortBy (fun (_,_,wt) -> wt) txs
+    let txs = List.sortBy (fun (_,wt) -> wt) txs
     return selectOrderedTransactions chain session state.tipState.tip.header.blockNumber timestamp state.tipState.activeContractSet state.memoryState.contractCache txs
 }

@@ -86,13 +86,11 @@ let blockHeaderEncoder (bh:BlockHeader) =
         commitments=bh.commitments.AsString
     ) |> fun j -> j.JsonValue
 
-let blockEncoder chain blockHash (bk:Block) =
-    let txs = bk.transactions
-    let txHashes = List.map (Consensus.Transaction.hash >> Consensus.Hash.toString) txs
+let blockEncoder chain blockHash (bk:Block) =    
     let txsJson =
         JsonValue.Record
-            [| for (h,tx) in List.zip txHashes txs do
-                yield (h, transactionEncoder chain tx)
+            [| for ex in bk.transactions do
+                yield (ex.txHash |> Consensus.Hash.toString, transactionEncoder chain ex.tx)
             |]
     JsonValue.Record
         [|
