@@ -1015,25 +1015,28 @@ module Serialization =
             }
             return { version = version; inputs = inputs; witnesses = witnesses; outputs = outputs; contract = contract }
         }
-        
-    module TransactionExtended = 
-        let write ops ex = Transaction.write Full ops ex.tx                 
+
+    module TransactionExtended =
+        let write ops (ex:TransactionExtended) = ops.writeBytes ex.raw (Array.length ex.raw)
+
         let read stream =
-            match Transaction.read Full stream with 
+            match Transaction.read Full stream with
             | None,stream' -> None, stream'
             | Some tx, stream' ->
-                let withoutWitnessSize = Transaction.write WithoutWitness counters tx 0ul |> int  
+                let withoutWitnessSize = Transaction.write WithoutWitness counters tx 0ul |> int
                 let size = Transaction.write Full counters tx 0ul |> int
-                                
+
+                let raw = Stream.readBytes size stream |> fst |> Option.get
                 let txHash = Stream.readBytes withoutWitnessSize stream |> fst |> Option.get |> Hash.compute
-                let witnessHash = Stream.readBytes size stream |> fst |> Option.get |> Hash.compute
-            
+                let witnessHash = raw |> Hash.compute
+
                 Some {
                     tx=tx
                     txHash=txHash
-                    witnessHash=witnessHash                                        
+                    witnessHash=witnessHash
+                    raw=raw
                 },stream'
-                
+
 
     module Header =
         let write ops = fun header ->
@@ -1088,6 +1091,8 @@ open Serialization
 
 open Serialization
 
+open Serialization
+
 module Transaction =
     let serialize mode tx =
         Transaction.write mode counters tx 0ul
@@ -1099,26 +1104,20 @@ module Transaction =
         Stream (bytes, 0)
         |> run (Transaction.read mode)
 
-module TransactionExtended = 
-    let serialize tx = 
+module TransactionExtended =
+    let serialize tx =
         TransactionExtended.write counters tx 0ul
         |> int32
         |> create
         |> TransactionExtended.write serializers tx
         |> getBuffer
-        
+
     let deserialize bytes =
         Stream (bytes, 0)
         |> run TransactionExtended.read
 
-module Transactions =
-
-    let serialize txs =
-        Seq.writeBody counters (Transaction.write Full) txs 0ul
-        |> int32
-        |> create
-        |> Seq.writeBody serializers (Transaction.write Full) txs
-        |> getBuffer                       
+module TransactionsRaw =
+    let serialize txs = Array.concat txs
 
 module TransactionsExtended =
 

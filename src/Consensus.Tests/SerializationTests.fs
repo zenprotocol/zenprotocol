@@ -9,6 +9,7 @@ open FsCheck.NUnit
 open Serialization
 open FsUnit
 open Infrastructure
+open Consensus.Tests
 
 let txInMode mode tx =
     match mode with
@@ -67,7 +68,7 @@ let ``Data serialization round trip produces same result``(data:data) =
     data
     |> Data.serialize
     |> Data.deserialize = Some data
-        
+
 [<Property(EndSize=10000)>]
 let ``Different data don't produce same serialization result``(data1:data) (data2:data) =
     (data1 <> data2) ==> lazy (Data.serialize data1 <> Data.serialize data2)
@@ -205,7 +206,7 @@ let ``Asset round trips when Zen native token``() =
 
 [<Property>]
 let ``Asset round trips when default contract issued``(cHash:Hash) =
-    let defaultAsset = Asset.defaultOf (ContractId (0u, cHash)) 
+    let defaultAsset = Asset.defaultOf (ContractId (0u, cHash))
     defaultAsset
     |> serializeAsset |> deserializeAsset |> Option.get = defaultAsset
 
@@ -290,3 +291,11 @@ let ``Asset has size 65 with zero type, incompressible subtype, small version``(
     let asset = Asset (ContractId(version, Hash.zero), subtype)
     (sbs.[Length-1] <> 0uy || (sbs.[Length-1] = 0uy && sbs.[Length-2] <> 0uy))
     ==> (Array.length (serializeAsset asset) = 65)
+
+[<Property>]
+let ``Raw transactions equal extended transactions``(NonEmptyTransactions txs) =
+    let raw =
+        List.map (fun tx -> tx.raw) txs
+        |> TransactionsRaw.serialize
+
+    TransactionsExtended.deserialize (List.length txs |> uint32) raw = Some txs

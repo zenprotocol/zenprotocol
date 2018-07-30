@@ -64,7 +64,7 @@ type ConsensusGenerator =
                     ]
                 contract = None
                 witnesses=[]
-            } 
+            }
 
             let transactions = coinbase :: transactions
 
@@ -97,18 +97,14 @@ type ConsensusGenerator =
 
             return {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot;witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot}
         }
-    
-    static member TransactionExtended() = 
+
+    static member TransactionExtended() =
         Arb.fromGen (gen {
             let! tx = Arb.generate<Transaction>
-            return {
-                tx=tx
-                txHash= Transaction.hash tx
-                witnessHash = Transaction.witnessHash tx
-            }
-        })       
-    
-    static member Transactions() =                
+            return Transaction.toExtended tx
+        })
+
+    static member Transactions() =
         Arb.from<TransactionExtended list>
         |> Arb.mapFilter List.distinct (fun txs -> List.length txs > 0)
         |> Arb.convert NonEmptyTransactions NonEmptyTransactions.op_Explicit

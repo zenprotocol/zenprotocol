@@ -15,24 +15,24 @@ open DatabaseContext
 open Logary.Message
 open Infrastructure.Result
 
-let getUnionCaseName (x:'a) = 
+let getUnionCaseName (x:'a) =
     match Microsoft.FSharp.Reflection.FSharpValue.GetUnionFields(x, typeof<'a>) with
-    | case, _ -> case.Name  
+    | case, _ -> case.Name
 
-let logStartAction actionType action = 
+let logStartAction actionType action =
     eventX (sprintf "Blockchain: Handling %s {action} started" actionType)
     >> setField "action" (getUnionCaseName action)
-    |> Log.info 
+    |> Log.info
 
 let logEndAction timestamp actionType action =
-    if Timestamp.now() > timestamp + 10000UL then   
+    if Timestamp.now() > timestamp + 10000UL then
         eventX (sprintf "Blockchain: Handling %s {action} ended, action took more than 10 seconds" actionType)
         >> setField "action" (getUnionCaseName action)
-        |> Log.warning     
+        |> Log.warning
     else
         eventX (sprintf "Blockchain: Handling %s {action} ended" actionType)
         >> setField "action" (getUnionCaseName action)
-        |> Log.info     
+        |> Log.info
 
 
 let handleCommand chainParams command session timestamp (state:State) =
@@ -40,7 +40,7 @@ let handleCommand chainParams command session timestamp (state:State) =
 
     let contractPath = session.context.contractPath
 
-    let result = 
+    let result =
         match command with
         | ValidateTransaction ex ->
             effectsWriter {
@@ -57,23 +57,23 @@ let handleCommand chainParams command session timestamp (state:State) =
             }
         | RequestTransactions (peerId, txHashes) ->
              effectsWriter {
-                let txs = 
+                let txs =
                     List.choose (fun txHash -> MemPool.getTransaction txHash state.memoryState.mempool) txHashes
-                    |> List.map (fun ex-> ex.tx)
-    
+                    |> List.map (fun ex-> ex.raw)
+
                 if not <| List.isEmpty txs then
                     do! sendTransactions peerId txs
-    
+
                 return state
              }
         | HandleMemPool (peerId,txHashes)
         | HandleNewTransactions (peerId, txHashes) ->
             effectsWriter {
                 let missingTxHashes = List.filter (fun txHash -> not <| MemPool.containsTransaction txHash state.memoryState.mempool) txHashes
-    
+
                 if not <| List.isEmpty missingTxHashes then
                     do! getTransactions peerId missingTxHashes
-    
+
                 return state
             }
         | ValidateBlock (peerId,block) ->
@@ -88,7 +88,7 @@ let handleCommand chainParams command session timestamp (state:State) =
             effectsWriter {
                 if state.tipState.tip <> ExtendedBlockHeader.empty then
                     do! sendTip peerId state.tipState.tip.header
-    
+
                 return state
             }
         | RequestBlock (peerId, blockHash) ->
@@ -98,14 +98,14 @@ let handleCommand chainParams command session timestamp (state:State) =
                 | Some block ->
                     let block = BlockRepository.getFullBlock session block
                     do! sendBlock peerId block
-    
+
                     return state
             }
         | RequestHeaders (peerId, from, endHash) ->
             effectsWriter {
                 if state.tipState.tip.hash <> Hash.zero then
                     do! InitialBlockDownload.getHeaders chainParams session peerId from endHash
-    
+
                 return state
             }
         | HandleHeaders (peerId,headers) ->
@@ -113,9 +113,9 @@ let handleCommand chainParams command session timestamp (state:State) =
                let! initialBlockDownload = InitialBlockDownload.processHeaders chainParams session timestamp peerId headers state.initialBlockDownload
                return {state with initialBlockDownload = initialBlockDownload}
            }
-       
+
     logEndAction timestamp "command" command
-    
+
     result
 
 let handleRequest chain (requestId:RequestId) request session timestamp state =
@@ -257,7 +257,7 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
             | None ->
                 requestId.reply<(Transaction*uint32) option> None
 
-    | CheckTransaction ex ->    
+    | CheckTransaction ex ->
         TransactionValidation.validateBasic ex.tx
         >>= fun _ -> TransactionValidation.validateInContext chain
                         (TransactionHandler.getUTXO session)
@@ -269,7 +269,7 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
                         state.memoryState.utxoSet
                         (TransactionHandler.getContractState session)
                         state.memoryState.contractStates
-                        ex                
+                        ex
         <@> (fun _ -> ex.txHash)
         |> requestId.reply<Result<Hash.Hash,ValidationError.ValidationError>>
 
@@ -280,8 +280,8 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
 let handleEvent event session timestamp state =
     ret state
 
-let tick chain session timestamp state = effectsWriter {    
-    let! ibd = InitialBlockDownload.tick timestamp state.initialBlockDownload    
+let tick chain session timestamp state = effectsWriter {
+    let! ibd = InitialBlockDownload.tick timestamp state.initialBlockDownload
 
     return {state with initialBlockDownload = ibd}
 }

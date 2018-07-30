@@ -20,11 +20,14 @@ let witnessHash =
     //TODO: only serialize witness
     Transaction.serialize Full >> Hash.compute
 
-let toExtended tx = 
+let toExtended tx =
+    let raw = Transaction.serialize Full tx
+
     {
         tx=tx
         txHash = hash tx
-        witnessHash = witnessHash tx
+        witnessHash = Hash.compute raw
+        raw=raw
     }
 
 let pushWitnesses witnesses tx =

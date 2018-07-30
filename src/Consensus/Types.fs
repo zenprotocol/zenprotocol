@@ -129,7 +129,8 @@ type Transaction = {
 type TransactionExtended = {
     tx:Transaction
     txHash:Hash.Hash
-    witnessHash:Hash.Hash    
+    witnessHash:Hash.Hash
+    raw:byte array
 }
 
 type Nonce = uint64 * uint64
