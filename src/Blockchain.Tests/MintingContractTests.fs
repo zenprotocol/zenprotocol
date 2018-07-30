@@ -21,7 +21,7 @@ module Result = Core.Result
 let chain = Chain.getChainParameters Chain.Local
 
 let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction (fun _ -> UtxoSet.NoOutput) rootTxHash rootTx
-let mempool = MemPool.empty |> MemPool.add rootTxHash rootTx
+let mempool = MemPool.empty |> MemPool.add rootTxExtended
 let orphanPool = OrphanPool.create()
 let acs = ActiveContractSet.empty
 
@@ -56,7 +56,7 @@ let activateContract code account session state =
     TestWallet.createActivateContractTransaction chain code 1ul account
     |> Result.map (fun tx ->
         let events, state =
-            Handler.handleCommand chain (ValidateTransaction tx) session 1UL state
+            Handler.handleCommand chain (ValidateTransaction (Transaction.toExtended tx)) session 1UL state
             |> Writer.unwrap
         let txHash = Transaction.hash tx
         events |> should contain (EffectsWriter.EventEffect (TransactionAddedToMemPool (txHash, tx)))

@@ -24,7 +24,7 @@ let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO rootTxHash
 
 let validateInContext = validateInContext localParams getUTXO contractPath
 
-type TxResult = Result<Transaction * ActiveContractSet.T * ContractCache.T * ContractStates.T,ValidationError>
+type TxResult = Result<TransactionExtended * ActiveContractSet.T * ContractCache.T * ContractStates.T,ValidationError>
 
 let unwrap =
     function
@@ -54,11 +54,12 @@ let ``Contract activation without contract sacrifice should fail``() =
     let tx =
         {version = Version0; contract = Some (V0 sampleContractRecord); inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
         |> Transaction.sign [rootKeyPair] TxHash
-    let txHash = Transaction.hash tx
+        |> Transaction.toExtended
+
 
     let expected:TxResult = General "Contract activation must include activation sacrifice" |> Error
 
-    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase txHash tx, expected)
+    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase tx, expected)
     |> shouldEqual
 
 [<Test>]
@@ -79,11 +80,12 @@ let ``Contract activation with too low contract activation sacrifice``() =
     let tx =
         {version = Version0; contract = Some (V0 sampleContractRecord); inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
         |> Transaction.sign [rootKeyPair] TxHash
-    let txHash = Transaction.hash tx
+        |> Transaction.toExtended
+
 
     let expected:TxResult = General "Contract must be activated for at least one block" |> Error
 
-    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase txHash tx, expected)
+    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase tx, expected)
     |> shouldEqual
 
 [<Test>]
@@ -94,9 +96,11 @@ let ``Contract extension with too low contract extension sacrifice``() =
     let tx =
         TestWallet.createActivationTransactionFromContract localParams sampleContractWithId 1ul rootAccount
         |> unwrap
+        |> Transaction.toExtended
+
 
     let _, acs, _, _ =
-        validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase (Transaction.hash tx) tx
+        validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase tx
         |> unwrap
 
     let outpoint = TestWallet.getUnspentOutputs (rootAccount |> fst) |> fst |> Map.toSeq |> Seq.head |> fst
@@ -111,10 +115,11 @@ let ``Contract extension with too low contract extension sacrifice``() =
     let tx =
         {version = Version0; contract=None; inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
         |> Transaction.sign [rootKeyPair] TxHash
+        |> Transaction.toExtended
 
     let expected:TxResult = General "Contract must be activated for at least one block" |> Error
 
-    (validateInContext 1ul 1_000_000UL acs ContractCache.empty utxoSet getContractState ContractStates.asDatabase (Transaction.hash tx) tx, expected)
+    (validateInContext 1ul 1_000_000UL acs ContractCache.empty utxoSet getContractState ContractStates.asDatabase tx, expected)
     |> shouldEqual
 
 [<Test>]
@@ -135,10 +140,11 @@ let ``Contract extension of a non active contract should fail``() =
     let tx =
         {version = Version0; contract=None; inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
         |> Transaction.sign [rootKeyPair] TxHash
+        |> Transaction.toExtended
 
     let expected:TxResult = General "Contract(s) must be active" |> Error
 
-    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase (Transaction.hash tx) tx, expected)
+    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase tx, expected)
     |> shouldEqual
 
 [<Test>]
@@ -164,11 +170,11 @@ let ``Contract activation with asset other than zen should fail``() =
     let tx =
         {version=Version0; contract = Some (V0 sampleContractRecord); inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
         |> Transaction.sign [rootKeyPair] TxHash
-    let txHash = Transaction.hash tx
+        |> Transaction.toExtended
 
     let expected:TxResult = General "Sacrifice must be paid in Zen" |> Error
 
-    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase txHash tx, expected)
+    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase tx, expected)
     |> shouldEqual
 
 [<Test>]
@@ -194,11 +200,11 @@ let ``Contract extension with asset other than zen should fail``() =
     let tx =
         {version = Version0; contract = None; inputs=[Outpoint outpoint]; outputs=[output];witnesses=[]}
         |> Transaction.sign [rootKeyPair] TxHash
-    let txHash = Transaction.hash tx
+        |> Transaction.toExtended
 
     let expected:TxResult = General "Sacrifice must be paid in Zen" |> Error
 
-    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase txHash tx, expected)
+    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase tx, expected)
     |> shouldEqual
 
 [<Test>]
@@ -215,9 +221,10 @@ let ``Contract activation with exact amount``() =
     let tx =
         TestWallet.createActivationTransactionFromContract localParams sampleContractWithId blocks rootAccount
         |> unwrap
+        |> Transaction.toExtended
 
     let _, acs, _, _ =
-        validateInContext initialBlock initialTime ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase (Transaction.hash tx) tx
+        validateInContext initialBlock initialTime ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase tx
         |> unwrap
 
     match ActiveContractSet.tryFind contractId acs with
@@ -242,9 +249,10 @@ let ``Contract extension with exact amount``() =
     let tx =
         TestWallet.createActivationTransactionFromContract localParams sampleContractWithId activateBlocks rootAccount
         |> unwrap
+        |> Transaction.toExtended
 
     let _, acs, _, _ =
-        validateInContext initialBlock initialTime ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase (Transaction.hash tx) tx
+        validateInContext initialBlock initialTime ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase tx
         |> unwrap
 
     match ActiveContractSet.tryFind contractId acs with
@@ -264,9 +272,10 @@ let ``Contract extension with exact amount``() =
     let tx =
         {version = Version0; contract=None; inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
         |> Transaction.sign [rootKeyPair] TxHash
+        |> Transaction.toExtended
 
     let _, acs, _, _ =
-        validateInContext initialBlock initialTime acs ContractCache.empty utxoSet getContractState ContractStates.asDatabase (Transaction.hash tx) tx
+        validateInContext initialBlock initialTime acs ContractCache.empty utxoSet getContractState ContractStates.asDatabase tx
         |> unwrap
 
     match ActiveContractSet.tryFind contractId acs with
@@ -293,9 +302,10 @@ let ``Contract extension with more than one output``() =
     let tx =
         TestWallet.createActivationTransactionFromContract localParams sampleContractWithId activateBlocks rootAccount
         |> unwrap
+        |> Transaction.toExtended
 
     let _, acs, _, _ =
-        validateInContext initialBlock initialTime ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase (Transaction.hash tx) tx
+        validateInContext initialBlock initialTime ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase tx
         |> unwrap
 
     match ActiveContractSet.tryFind contractId acs with
@@ -316,9 +326,10 @@ let ``Contract extension with more than one output``() =
     let tx =
         {version = Version0; contract=None; inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
         |> Transaction.sign [rootKeyPair] TxHash
+        |> Transaction.toExtended
 
     let _, acs, _, _ =
-        validateInContext initialBlock initialTime acs ContractCache.empty utxoSet getContractState ContractStates.asDatabase (Transaction.hash tx) tx
+        validateInContext initialBlock initialTime acs ContractCache.empty utxoSet getContractState ContractStates.asDatabase tx
         |> unwrap
 
     match ActiveContractSet.tryFind contractId acs with
@@ -345,11 +356,11 @@ let ``Contract activation without hints should fail``() =
     let tx =
         {version = Version0; contract = Some (V0 { code=code;hints="";rlimit=0u;queries=0u }); inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
         |> Transaction.sign [rootKeyPair] TxHash
-
+        |> Transaction.toExtended
 
     let expected:TxResult = General "total queries: invalid hints" |> Error
 
-    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase (Transaction.hash tx) tx, expected)
+    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase tx, expected)
     |> shouldEqual
 
 [<Test>]
@@ -372,11 +383,11 @@ let ``Contract activation with invalid queries should fail``() =
     let tx =
         {version = Version0; contract = Some (V0 { sampleContractRecord with queries=(totalQueries - 1u)}); inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
         |> Transaction.sign [rootKeyPair] TxHash
-
+        |> Transaction.toExtended
 
     let expected:TxResult = General "Total queries mismatch" |> Error
 
-    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase (Transaction.hash tx) tx, expected)
+    (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase tx, expected)
     |> shouldEqual
 
 [<Test>]
@@ -395,7 +406,6 @@ let ``Contract with activation sacrifice but without a contract should fail``() 
     let tx =
         {version = Version0; contract = None; inputs=[Outpoint outpoint]; outputs=outputs;witnesses=[]}
         |> Transaction.sign [rootKeyPair] TxHash
-
 
     let expected:Result<Transaction,ValidationError> = General "tx with an activation sacrifice must include a contract" |> Error
 

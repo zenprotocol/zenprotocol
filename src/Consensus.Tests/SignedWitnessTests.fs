@@ -27,7 +27,7 @@ let publicKey = ExtendedKey.getPublicKey (snd account) |> Result.get
 
 let serializePK = PublicKey.toString publicKey
 
-type TxResult = Result<Transaction * ActiveContractSet.T * ContractCache.T * ContractStates.T,ValidationError>
+type TxResult = Result<TransactionExtended * ActiveContractSet.T * ContractCache.T * ContractStates.T,ValidationError>
 
 let code = sprintf
             """
@@ -127,7 +127,7 @@ let ``contract witness with valid signature``() =
                                           }
     let tx = {tx with witnesses= [contractWintess]}
 
-    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty getContractState ContractStates.asDatabase txHash tx
+    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty getContractState ContractStates.asDatabase (Transaction.toExtended tx)
 
     result |> should be ok
 
@@ -162,7 +162,7 @@ let ``contract witness with invalid publickey``() =
                                           }
     let tx = {tx with witnesses= [contractWintess]}
 
-    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty getContractState ContractStates.asDatabase txHash tx
+    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty getContractState ContractStates.asDatabase (Transaction.toExtended tx)
 
     let expected:TxResult = Error (General "invalid contract witness signature")
 
@@ -198,7 +198,7 @@ let ``contract witness with no signature``() =
                                           }
     let tx = {tx with witnesses= [contractWintess]}
 
-    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty getContractState ContractStates.asDatabase txHash tx
+    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty getContractState ContractStates.asDatabase (Transaction.toExtended tx)
 
     let expected:TxResult = Error (General "expected pk")
 
@@ -249,7 +249,7 @@ let ``contract witness with unexpcected public key``() =
                                           }
     let tx = {tx with witnesses= [contractWintess]}
 
-    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty getContractState ContractStates.asDatabase txHash tx
+    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty getContractState ContractStates.asDatabase (Transaction.toExtended tx)
 
     let expected:TxResult = Error (General "expected different pk")
 
@@ -297,7 +297,7 @@ let ``contract witness with invalid execution cost``() =
                                           }
     let tx = {tx with witnesses= [contractWintess]}
 
-    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty getContractState ContractStates.asDatabase txHash tx
+    let result = TransactionValidation.validateInContext chain (fun _ -> UtxoSet.NoOutput) contractPath 2u 1_000_000UL acs UtxoSet.asDatabase ContractCache.empty getContractState ContractStates.asDatabase (Transaction.toExtended tx)
 
     let expected:TxResult = Error (General "execution cost commitment mismatch")
 
