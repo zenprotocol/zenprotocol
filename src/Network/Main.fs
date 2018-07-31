@@ -234,7 +234,7 @@ let commandHandler transport command (state:State) =
         Transport.getTransactions transport peerId bytes
         state
     | Command.SendTransactions (peerId, txs) ->
-        let bytes = Transactions.serialize txs
+        let bytes = TransactionsRaw.serialize txs
         Transport.sendTransactions transport peerId (List.length txs |> uint32) bytes
         state
     | Command.SendBlock (peerId, block) ->

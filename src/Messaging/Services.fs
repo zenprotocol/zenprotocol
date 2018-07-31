@@ -156,7 +156,7 @@ module Blockchain =
 module Network =
     type Command =
         | SendMemPool of peerId:byte[] * Hash list
-        | SendTransactions of peerId:byte[] * Transaction list // TODO: send bytes instead
+        | SendTransactions of peerId:byte[] * byte[] list
         | SendTip of peerId:byte[] * BlockHeader
         | SendBlock of peerId:byte[] * Block // TODO: send bytes instead
         | GetTransactions of peerId:byte[] * Hash list
@@ -190,7 +190,7 @@ module Wallet =
 
     type Command =
         | Resync
-        | RestoreNewAddresses of int32          
+        | RestoreNewAddresses of int32
 
     type Request =
         | GetAddressPKHash
@@ -284,14 +284,14 @@ module Wallet =
 
     let getAddressBalance client address confirmations =
         Request.send<Request, Result<Map<Asset, uint64>,string>> client serviceName (GetAddressBalance (address,confirmations))
-        
-    let exportZenPublicKey client = 
+
+    let exportZenPublicKey client =
         Request.send<Request,Result<string,string>> client serviceName ExportZenPublicKey
-    
+
     let importZenPublicKey client publicKey =
         ImportZenPublicKey publicKey
         |> Request.send<Request,Result<unit,string>> client serviceName
-        
-    let removeAccount client password = 
-        RemoveAccount password        
-        |> Request.send<Request,Result<unit,string>> client serviceName        
+
+    let removeAccount client password =
+        RemoveAccount password
+        |> Request.send<Request,Result<unit,string>> client serviceName
