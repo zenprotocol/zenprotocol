@@ -9,7 +9,6 @@ open BlockState
 open ExtendedBlockHeader
 open FsNetMQ
 open FsNetMQ.Stream
-open FsNetMQ.Stream.Reader
 open Infrastructure
 open UtxoSet
 
@@ -19,17 +18,16 @@ module ContractKey =
         >> ops.writeNumber4 contract.expiry
         >> String.write ops contract.code
 
-    let read = reader {
-       let! contractId = ContractId.read
-       let! expiry = readNumber4
-       let! code = String.read
+    let read reader =
+       let contractId = ContractId.read reader
+       let expiry = reader.readNumber4 ()
+       let code = String.read reader
 
-       return ({
-                    contractId=contractId
-                    expiry=expiry
-                    code=code
-               }:ActiveContractSet.ContractKey)
-    }
+       ({
+            contractId=contractId
+            expiry=expiry
+            code=code
+       }:ActiveContractSet.ContractKey)
 
     let serialize contract =
         write counters contract 0ul
@@ -39,7 +37,7 @@ module ContractKey =
         |> getBuffer
 
     let deserialize bytes =
-        Stream (bytes, 0)
+        Reader (bytes)
         |> run read
 
 module BlockState =
@@ -53,28 +51,27 @@ module BlockState =
             ContractId.write ops contractId
             >> Option.write ops Data.write dataOption) blockState.contractStatesUndoData
 
-    let private read = reader {
-        let! difficulty = readNumber4
-        let! delayed = List.read readNumber8
-        let! activeContractSetUndoData = List.read <| reader {
-            let! contractId = ContractId.read
-            let! contractOption = Option.read ContractKey.read
+    let private read (reader:Reader) =
+        let difficulty = reader.readNumber4 ()
+        let delayed = List.read (fun reader -> reader.readNumber8 ()) reader
+        let activeContractSetUndoData = List.read (fun reader ->
+                                            let contractId = ContractId.read reader
+                                            let contractOption = Option.read ContractKey.read reader
 
-            return contractId,contractOption
-        }
+                                            contractId,contractOption
+                                        ) reader
 
-        let! contractStatesUndoData = List.read <| reader {
-            let! contractId = ContractId.read
-            let! dataOption = Option.read Data.read
-            return contractId, dataOption
-        }
+        let contractStatesUndoData = List.read (fun reader ->
+                                            let contractId = ContractId.read reader
+                                            let dataOption = Option.read Data.read reader
+                                            contractId, dataOption
+                                        ) reader
 
-        return {
+        {
             ema = { difficulty = difficulty; delayed = delayed }
             activeContractSetUndoData = activeContractSetUndoData
             contractStatesUndoData = contractStatesUndoData
         }
-    }
 
     let serialize blockState =
         write counters blockState 0ul
@@ -83,7 +80,7 @@ module BlockState =
         |> write serializers blockState
         |> getBuffer
     let deserialize bytes =
-        Stream (bytes, 0)
+        Reader (bytes)
         |> run read
 
 module private BlockStatus =
@@ -102,25 +99,23 @@ module private BlockStatus =
         | MainChain -> Byte.write ops SerializedMainChain
         | Invalid -> Byte.write ops SerializedInvalid
 
-    let read = reader {
-        let! discriminator = Byte.read
+    let read reader =
+        let discriminator = Byte.read reader
         match discriminator with
-        | SerializedOrphan -> return Orphan
-        | SerializedConnected -> return Connected
-        | SerializedMainChain -> return MainChain
-        | SerializedInvalid -> return Invalid
-        | _ -> yield! Serialization.fail
-    }
+        | SerializedOrphan -> Orphan
+        | SerializedConnected -> Connected
+        | SerializedMainChain -> MainChain
+        | SerializedInvalid -> Invalid
+        | _ -> raise SerializationException
 
 module BigInt =
     let write ops =
         BigInteger.toBytes32
         >> Bytes.write ops
 
-    let read = reader {
-        let! bytes = Bytes.read
-        return BigInteger.fromBytes32 bytes
-    }
+    let read reader =
+        let bytes = Bytes.read reader
+        BigInteger.fromBytes32 bytes
 
 module ExtendedBlockHeader =
     let write ops extendedBlockHeader =
@@ -133,17 +128,17 @@ module ExtendedBlockHeader =
         >> Hash.write ops extendedBlockHeader.activeContractSetMerkleRoot
         >> Seq.write ops Hash.write extendedBlockHeader.commitments
 
-    let read = reader {
-        let! hash = Hash.read
-        let! header = Header.read
-        let! status = BlockStatus.read
-        let! chainWork = Option.read BigInt.read
-        let! txMerkleRoot = Hash.read
-        let! witnessMerkleRoot = Hash.read
-        let! activeContractSetMerkleRoot = Hash.read
-        let! commitments = List.read Hash.read
+    let read reader =
+        let hash = Hash.read reader
+        let header = Header.read reader
+        let status = BlockStatus.read reader
+        let chainWork = Option.read BigInt.read reader
+        let txMerkleRoot = Hash.read reader
+        let witnessMerkleRoot = Hash.read reader
+        let activeContractSetMerkleRoot = Hash.read reader
+        let commitments = List.read Hash.read reader
 
-        return {
+        {
             hash = hash
             header = header
             status = status
@@ -153,7 +148,6 @@ module ExtendedBlockHeader =
             activeContractSetMerkleRoot = activeContractSetMerkleRoot
             commitments = commitments
         }
-    }
 
     let serialize extendedBlockHeader =
         write counters extendedBlockHeader 0ul
@@ -162,7 +156,7 @@ module ExtendedBlockHeader =
         |> write serializers extendedBlockHeader
         |> getBuffer
     let deserialize bytes =
-        Stream (bytes, 0)
+        Reader (bytes)
         |> run read
 
 module Outpoint =
@@ -173,7 +167,7 @@ module Outpoint =
         |> Outpoint.write serializers outpoint
         |> getBuffer
     let deserialize bytes =
-        Stream (bytes, 0)
+        Reader (bytes)
         |> run Outpoint.read
 
 module OutputStatus =
@@ -194,18 +188,17 @@ module OutputStatus =
             Byte.write ops SerializedUnspent
             >> Output.write ops output
 
-    let read = reader {
-        let! discriminator = Byte.read
+    let read reader =
+        let discriminator = Byte.read reader
         match discriminator with
-        | SerializedNoOutput -> return NoOutput
+        | SerializedNoOutput -> NoOutput
         | SerializedSpent ->
-            let! output = Output.read
-            return Spent output
+            let output = Output.read reader
+            Spent output
         | SerializedUnspent ->
-            let! output = Output.read
-            return Unspent output
-        | _ -> yield! Serialization.fail
-    }
+            let output = Output.read reader
+            Unspent output
+        | _ -> raise SerializationException
 
     let serialize outputStatus =
         write counters outputStatus 0ul
@@ -214,7 +207,7 @@ module OutputStatus =
         |> write serializers outputStatus
         |> getBuffer
     let deserialize bytes =
-        Stream (bytes, 0)
+        Reader (bytes)
         |> run read
 
 module PointedOutput =
@@ -224,11 +217,10 @@ module PointedOutput =
         Outpoint.write ops outpoint
         >> Output.write ops output
 
-    let read = reader {
-        let! outpoint = Outpoint.read
-        let! output = Output.read
-        return outpoint, output
-    }
+    let read reader =
+        let outpoint = Outpoint.read reader
+        let output = Output.read reader
+        outpoint, output
 
     let serialize outputStatus =
         write counters outputStatus 0ul
@@ -237,15 +229,12 @@ module PointedOutput =
         |> write serializers outputStatus
         |> getBuffer
     let deserialize bytes =
-        Stream (bytes, 0)
+        Reader (bytes)
         |> run read
 
 module Version =
     let private write ops = uint32 >> ops.writeNumber4
-    let private read = reader {
-        let! value = readNumber4
-        return int32 value
-    }
+    let private read (reader:Reader) = reader.readNumber4 () |> int32
 
     let serialize version =
         write counters version 0ul
@@ -254,7 +243,7 @@ module Version =
         |> write serializers version
         |> getBuffer
     let deserialize bytes =
-        Stream (bytes, 0)
+        Reader (bytes)
         |> run read
 
 module Hashes =
@@ -277,5 +266,5 @@ module ContractId =
         |> ContractId.write serializers outputStatus
         |> getBuffer
     let deserialize bytes =
-        Stream (bytes, 0)
+        Reader (bytes)
         |> run ContractId.read

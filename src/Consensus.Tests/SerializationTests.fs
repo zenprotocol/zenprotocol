@@ -73,18 +73,6 @@ let ``Data serialization round trip produces same result``(data:data) =
 let ``Different data don't produce same serialization result``(data1:data) (data2:data) =
     (data1 <> data2) ==> lazy (Data.serialize data1 <> Data.serialize data2)
 
-[<Property(EndSize=10000)>]
-let ``serialize and deserialize varint yield the same number``(num:uint32)  =
-    let stream = FsNetMQ.Stream.create 5
-
-    let stream =
-        Serialization.Serialization.VarInt.write Serialization.Serialization.serializers num stream
-        |> FsNetMQ.Stream.reset
-
-    let num' = Serialization.Serialization.VarInt.read stream |> fst |> Option.get
-
-    num = num'
-
 let serialize writer writer' x =
     writer Serialization.counters x 0ul
     |> int32
@@ -92,13 +80,23 @@ let serialize writer writer' x =
     |> writer' Serialization.serializers x
     |> FsNetMQ.Stream.getBuffer
 let deserialize reader bytes =
-    FsNetMQ.Stream.Stream (bytes, 0)
-    |> FsNetMQ.Stream.Reader.run reader
+    Reader (bytes)
+    |> run reader
 
 let serializeAmount x = serialize Serialization.Amount.write Serialization.Amount.write x
 let serializeAsset x = serialize Serialization.Asset.write Serialization.Asset.write x
+let serializeVarInt x = serialize Serialization.VarInt.write Serialization.VarInt.write x
 let deserializeAmount x = deserialize Serialization.Amount.read x
 let deserializeAsset x = deserialize Serialization.Asset.read x
+let deserializeVarInt x = deserialize Serialization.VarInt.read x
+
+[<Property(EndSize=10000)>]
+let ``serialize and deserialize varint yield the same number``(num:uint32)  =
+    let bytes = serializeVarInt num
+
+    let num' = deserializeVarInt bytes |> Option.get
+
+    num = num'
 
 [<Property(MaxTest=1000)>]
 let ``Amount serialization round trip produces same result``() =

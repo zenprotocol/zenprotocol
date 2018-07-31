@@ -6,7 +6,6 @@ open Consensus.Serialization.Serialization
 open Infrastructure.Timestamp
 
 open FsNetMQ.Stream
-open FsNetMQ.Stream.Reader
 
 module Address =
 
@@ -17,15 +16,14 @@ module Address =
         >> ops.writeBytes bytes bytes.Length
         >> ops.writeNumber8 (timestamp |> uint64)
 
-    let read = reader {
-        let! length = readNumber4
-        let! address = readBytes (length|>int)
-        let! timestamp = readNumber8
+    let read (reader:Reader) =
+        let length = reader.readNumber4 () |>int
+        let address = reader.readBytes length
+        let timestamp = reader.readNumber8 ()
 
         let address = System.Text.Encoding.ASCII.GetString(address)
         let timestamp = timestamp
-        return address,timestamp
-    }
+        address,timestamp
 
     let serialize address =
         write counters address 0ul
@@ -43,8 +41,7 @@ module Addresses =
         |> getBuffer
 
     let deserialize count bytes =
-        Stream (bytes, 0)
-        |> run (Seq.readBody count Address.read)
-        |> Option.map List.ofSeq
+        Reader (bytes)
+        |> run (List.readBody count Address.read)
 
 
