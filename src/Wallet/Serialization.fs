@@ -2,7 +2,6 @@ module Wallet.Serialization
 
 open FsNetMQ
 open FsNetMQ.Stream
-open FsNetMQ.Stream.Reader
 
 open Consensus.Serialization
 open Consensus.Serialization.Serialization
@@ -21,7 +20,7 @@ module Outpoint =
         |> getBuffer
 
     let deserialize bytes =
-        Stream (bytes, 0)
+        Reader (bytes)
         |> run Outpoint.read
 
 module ConfirmationStatus =
@@ -34,18 +33,17 @@ module ConfirmationStatus =
             >> Hash.write ops blockHash
             >> VarInt.write ops (uint32 blockIndex)
 
-    let read = reader {
-        let! status = readNumber1
+    let read (reader:Reader) =
+        let status = reader.readNumber1 ()
 
         if status = 0uy then
-            return Unconfirmed
+            Unconfirmed
         else
-            let! blockNumber = readNumber4
-            let! blockHash = Hash.read
-            let! blockIndex = VarInt.read
+            let blockNumber = reader.readNumber4 ()
+            let blockHash = Hash.read reader
+            let blockIndex = VarInt.read reader
 
-            return Confirmed (blockNumber,blockHash,int blockIndex)
-    }
+            Confirmed (blockNumber,blockHash,int blockIndex)
 
 module Status =
     let write ops status =
@@ -56,18 +54,16 @@ module Status =
             >> Hash.write ops txHash
             >> ConfirmationStatus.write ops confirmationStatus
 
-    let read = reader {
-        let! status = readNumber1
+    let read (reader:Reader) =
+        let status = reader.readNumber1 ()
 
         if status = 0uy then
-            return Unspent
+            Unspent
         else
-            let! txHash = Hash.read
-            let! confirmationStatus = ConfirmationStatus.read
+            let txHash = Hash.read reader
+            let confirmationStatus = ConfirmationStatus.read reader
 
-            return Spent (txHash,confirmationStatus)
-    }
-
+            Spent (txHash,confirmationStatus)
 module Output =
     let write ops (output:Wallet.Types.Output) =
         Hash.write ops output.pkHash
@@ -77,15 +73,15 @@ module Output =
         >> Status.write ops output.status
         >> ConfirmationStatus.write ops output.confirmationStatus
 
-    let read = reader {
-        let! pkHash = Hash.read
-        let! spend = Spend.read
-        let! lock = Lock.read
-        let! outpoint = Outpoint.read
-        let! status = Status.read
-        let! confirmationStatus = ConfirmationStatus.read
+    let read reader =
+        let pkHash = Hash.read reader
+        let spend = Spend.read reader
+        let lock = Lock.read reader
+        let outpoint = Outpoint.read reader
+        let status = Status.read reader
+        let confirmationStatus = ConfirmationStatus.read reader
 
-        return {
+        {
             pkHash=pkHash
             spend=spend
             lock=lock
@@ -93,7 +89,6 @@ module Output =
             status=status
             confirmationStatus=confirmationStatus
         }
-    }
 
     let serialize output =
         write counters output 0ul
@@ -103,7 +98,7 @@ module Output =
         |> getBuffer
 
     let deserialize bytes =
-        Stream (bytes, 0)
+        Reader (bytes)
         |> run read
 
 module AddressType =
@@ -116,36 +111,33 @@ module AddressType =
         | Payment index -> ops.writeNumber1 2uy >> VarInt.write ops (uint32 index)
         | WatchOnly -> ops.writeNumber1 3uy
 
-    let read = reader {
-        let! addressType = readNumber1
+    let read (reader:Reader) =
+        let addressType = reader.readNumber1 ()
 
         if addressType = 3uy then
-            return WatchOnly
+            WatchOnly
         else
-            let! index = VarInt.read
-            let index = int32 index
+            let index = VarInt.read reader |> int32
 
             match addressType with
-            | 0uy -> return External index
-            | 1uy -> return Change index
-            | 2uy -> return Payment index
-            | _ -> return! fail
-    }
+            | 0uy -> External index
+            | 1uy -> Change index
+            | 2uy -> Payment index
+            | _ -> raise SerializationException
 
 module Address =
     let write ops (address:Address) =
          Hash.write ops address.pkHash
          >> AddressType.write ops address.addressType
 
-    let read = reader {
-        let! pkHash = Hash.read
-        let! addressType = AddressType.read
+    let read reader =
+        let pkHash = Hash.read reader
+        let addressType = AddressType.read reader
 
-        return {
+        {
             pkHash=pkHash
             addressType=addressType
         }
-    }
 
     let serialize output =
         write counters output 0ul
@@ -155,7 +147,7 @@ module Address =
         |> getBuffer
 
     let deserialize bytes =
-        Stream (bytes, 0)
+        Reader (bytes)
         |> run read
 
 module ExtendedPublicKey =
@@ -167,13 +159,11 @@ module ExtendedPublicKey =
             Bytes.write ops (key.ToBytes())
         | _ -> failwith "expeded extended public key"
 
-    let read = reader {
-        let! bytes = Bytes.read
+    let read reader =
+        let bytes = Bytes.read reader
 
-        return
-            (new ExtPubKey(bytes)
-            |> ExtendedKey.ExtendedPublicKey)
-    }
+        new ExtPubKey(bytes)
+        |> ExtendedKey.ExtendedPublicKey
 
 module Account =
     let write ops account =
@@ -185,17 +175,16 @@ module Account =
         >> Hash.write ops account.externalPKHash
         >> Hash.write ops account.changePKHash
 
-    let read = reader {
-        let! blockHash = Hash.read
-        let! blockNumber = readNumber4
-        let! counter = VarInt.read
-        let counter = int counter
-        let! publicKey = ExtendedPublicKey.read
-        let! secureMnemonicPhrase = Bytes.read
-        let! externalPKHash = Hash.read
-        let! changePKHash = Hash.read
+    let read reader =
+        let blockHash = Hash.read reader
+        let blockNumber = reader.readNumber4 ()
+        let counter = VarInt.read reader |> int
+        let publicKey = ExtendedPublicKey.read reader
+        let secureMnemonicPhrase = Bytes.read reader
+        let externalPKHash = Hash.read reader
+        let changePKHash = Hash.read reader
 
-        return {
+        {
             blockHash = blockHash
             blockNumber = blockNumber
             counter = counter
@@ -204,7 +193,6 @@ module Account =
             externalPKHash = externalPKHash
             changePKHash = changePKHash
         }
-    }
 
     let serialize account =
         write counters account 0ul
@@ -214,15 +202,12 @@ module Account =
         |> getBuffer
 
     let deserialize bytes =
-        Stream (bytes, 0)
+        Reader (bytes)
         |> run read
 
 module Version =
     let private write ops = uint32 >> ops.writeNumber4
-    let private read = reader {
-        let! value = readNumber4
-        return int32 value
-    }
+    let private read (reader:Reader) = reader.readNumber4() |> int32
 
     let serialize version =
         write counters version 0ul
@@ -231,5 +216,5 @@ module Version =
         |> write serializers version
         |> getBuffer
     let deserialize bytes =
-        Stream (bytes, 0)
+        Reader (bytes)
         |> run read
