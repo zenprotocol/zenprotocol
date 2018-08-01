@@ -277,3 +277,15 @@ type GetOutputsJson = JsonProvider<"""
     "addresses": ["abcd1234", "abcd1234" ],
     "mode": "all"    
 }""">
+
+type ContractExecuteFromTransactionJson = JsonProvider<"""
+{
+    "address": "address",
+    "command": "command",
+    "messageBody": "message body",
+    "options": {
+        "sender": "publickey"
+    },
+    "tx": "abcdef012346789"
+}
+""">

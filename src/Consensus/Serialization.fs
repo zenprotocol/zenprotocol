@@ -1218,3 +1218,55 @@ module Outpoint =
     let deserialize bytes =
         Reader (bytes)
         |> run Outpoint.read
+
+module Input =
+    open TxSkeleton
+    
+    [<Literal>]
+    let private SerializedPointedOutput = 1uy
+    [<Literal>]
+    let private SerializedMint = 2uy
+
+    let write ops = function
+        | PointedOutput pointedOutput ->
+            Byte.write ops SerializedPointedOutput
+            >> PointedOutput.write ops pointedOutput
+        | Mint spend ->
+            Byte.write ops SerializedMint
+            >> Spend.write ops spend
+    let read reader =
+        let discriminator = Byte.read reader
+        match discriminator with
+        | SerializedPointedOutput ->
+            let pointedOutput = PointedOutput.read reader
+            TxSkeleton.PointedOutput pointedOutput
+        | SerializedMint ->
+            let spend = Spend.read reader
+            TxSkeleton.Mint spend
+        | _ ->
+            raise SerializationException
+
+module TxSkeleton =
+    open TxSkeleton
+
+    let private write ops txSkeleton =
+        List.write ops Input.write txSkeleton.pInputs
+        >> List.write ops Output.write txSkeleton.outputs
+
+    let private read reader =
+        let pInputs = List.read Input.read reader
+        let outputs = List.read Output.read reader
+        {
+            pInputs = pInputs
+            outputs = outputs
+        }
+
+    let serialize outputStatus =
+        write counters outputStatus 0ul
+        |> int32
+        |> create
+        |> write serializers outputStatus
+        |> getBuffer
+    let deserialize bytes =
+        Reader (bytes)
+        |> run read

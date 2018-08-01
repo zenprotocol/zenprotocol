@@ -495,6 +495,16 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
 
         | Error error ->
             reply StatusCode.BadRequest <| TextContent error
+    | Post ("/blockchain/contract/execute", Some body) ->
+        parseContractExecuteFromTransactionJson chain body 
+        >>= (fun (contractId, command, message, tx, sender) -> 
+            Blockchain.executeContract client contractId command sender message tx)
+        <@> (Transaction.serialize Full
+            >> Base16.encode
+            >> TextContent
+            >> reply StatusCode.OK)
+        |> Result.mapError replyError
+        |> ignore
     | Post ("/wallet/importwatchonlyaddress", Some json) ->
         match Parsing.parseAddress json with
         | Ok address ->
@@ -571,8 +581,6 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
                     |> reply StatusCode.OK
                 | Error error -> reply StatusCode.BadRequest (TextContent error)
             | _ -> reply StatusCode.BadRequest (TextContent "address is missing")
-
-
         parseConfirmations query reply get
     | Get("/blockchain/blockreward", query) ->
         match Map.tryFind "blockNumber" query with

@@ -200,8 +200,6 @@ module OutputStatus =
         |> run read
 
 module PointedOutput =
-    open Zen.Types.Extracted
-
     let write ops (outpoint, output) =
         Outpoint.write ops outpoint
         >> Output.write ops output
