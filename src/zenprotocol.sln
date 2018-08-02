@@ -83,6 +83,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "AddressDB", "AddressDB\Addr
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "AddressDB.Tests", "AddressDB.Tests\AddressDB.Tests.fsproj", "{01482664-7F31-4876-8C30-1368138AFA27}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "SerializationBenchmark", "SerializationBenchmark\SerializationBenchmark.fsproj", "{CBF2B4FB-5E3F-41AE-BAFF-AA7DCCB55051}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -173,6 +175,10 @@ Global
 		{01482664-7F31-4876-8C30-1368138AFA27}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{01482664-7F31-4876-8C30-1368138AFA27}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{01482664-7F31-4876-8C30-1368138AFA27}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CBF2B4FB-5E3F-41AE-BAFF-AA7DCCB55051}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CBF2B4FB-5E3F-41AE-BAFF-AA7DCCB55051}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CBF2B4FB-5E3F-41AE-BAFF-AA7DCCB55051}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CBF2B4FB-5E3F-41AE-BAFF-AA7DCCB55051}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

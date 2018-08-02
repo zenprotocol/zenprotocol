@@ -706,17 +706,17 @@ let ``sign contract wintess``() =
     let tx:Transaction = Result.get result
 
     let txHash = Transaction.hash tx
-    let messageHash =
+    let message =
         {
             recipient = contractId
             command = ""
             body = None
         }
-        |> Serialization.Message.hash
+        |> Serialization.Message.serialize
 
     let msg =
-        [ txHash; messageHash ]
-        |> Hash.joinHashes
+        [ Hash.bytes txHash; message ]
+        |> Hash.computeMultiple
 
     let publicKey = ExtendedKey.derivePath "m/0'" privateKey |> Result.get |> ExtendedKey.getPublicKey |> Result.get
 

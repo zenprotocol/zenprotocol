@@ -4,14 +4,12 @@ open System
 open Crypto
 open Hash
 open Types
-open FsNetMQ
-open FsNetMQ.Stream
 
 module ZData = Zen.Types.Data
 
 exception SerializationException
 
-type Reader(buffer:byte array) =
+type Stream(buffer:byte array) =
     let mutable offset = 0
 
     member this.Offset = offset
@@ -52,7 +50,6 @@ type Reader(buffer:byte array) =
 
     member this.readNumber8 () =
         if offset + 8 <= buffer.Length then
-
             let number =
                 ((uint64 (buffer.[offset]) <<< 56)) +
                 ((uint64 (buffer.[offset+1]) <<< 48)) +
@@ -71,19 +68,59 @@ type Reader(buffer:byte array) =
 
     member this.readBytes size =
         if offset + size <= buffer.Length then
-            let bytes = Array.sub buffer offset size
+            let bytes = Array.zeroCreate<byte> size
+            System.Buffer.BlockCopy(buffer, offset, bytes, 0, size)
             offset <- offset + size
 
             bytes
         else
             raise SerializationException
 
-let run fn reader =
+    member this.writeBytes bytes size =
+        System.Buffer.BlockCopy (bytes,0,buffer,offset,size)
+        offset <- offset + size
+
+    member this.writeNumber1 (n:byte) =
+        buffer.[offset] <- n
+        offset <- offset + 1
+    member this.writeNumber2 (n:UInt16)  =
+        buffer.[offset] <- byte ((n >>> 8) &&& 255us)
+        buffer.[offset+1] <- byte (n &&& 255us)
+        offset <- offset + 2
+    member this.writeNumber4 (n:UInt32) =
+        buffer.[offset] <- byte ((n >>> 24) &&& 255u)
+        buffer.[offset+1] <- byte ((n >>> 16) &&& 255u)
+        buffer.[offset+2] <- byte ((n >>> 8) &&& 255u)
+        buffer.[offset+3] <- byte ((n) &&& 255u)
+        offset <- offset + 4
+    member this.writeNumber8 (n:UInt64) =
+        buffer.[offset] <- (byte) ((n >>> 56) &&& 255UL)
+        buffer.[offset+1] <- (byte) ((n >>> 48) &&& 255UL)
+        buffer.[offset+2] <- (byte) ((n >>> 40) &&& 255UL)
+        buffer.[offset+3] <- (byte) ((n >>> 32) &&& 255UL)
+        buffer.[offset+4] <- (byte) ((n >>> 24) &&& 255UL)
+        buffer.[offset+5] <- (byte) ((n >>> 16) &&& 255UL)
+        buffer.[offset+6] <- (byte) ((n >>> 8)  &&& 255UL)
+        buffer.[offset+7] <- (byte) ((n)       &&& 255UL)
+        offset <- offset + 8
+
+let serialize size write x =
+    let stream =
+        size x
+        |> Array.zeroCreate
+        |> Stream
+
+    write stream x
+
+    stream.Buffer
+
+let deserialize fn bytes =
     try
-        fn reader
-        |> Some
+        Stream(bytes)
+        |> fn
+        |> Option.Some
     with
-        | SerializationException -> None
+    | SerializationException -> None
 
 [<Literal>]
 let SerializedHeaderSize = 100
@@ -93,31 +130,6 @@ type TransactionSerializationMode =
     | WithoutWitness
 
 module Serialization =
-    let getBytes (s:string) = System.Text.Encoding.ASCII.GetBytes s
-
-    type Operations<'a> = {
-        writeBytes: Byte[] -> int32 -> 'a -> 'a
-        writeNumber1: uint8 -> 'a -> 'a
-        writeNumber2: uint16 -> 'a -> 'a
-        writeNumber4: uint32 -> 'a -> 'a
-        writeNumber8: uint64 -> 'a -> 'a
-    }
-
-    let serializers: Operations<Stream.T> = {
-        writeBytes = writeBytes
-        writeNumber1 = writeNumber1
-        writeNumber2 = writeNumber2
-        writeNumber4 = writeNumber4
-        writeNumber8 = writeNumber8
-    }
-
-    let counters: Operations<uint32> = {
-        writeBytes = fun _ len count -> count + (uint32 len)
-        writeNumber1 = fun _ count -> count + 1u
-        writeNumber2 = fun _ count -> count + 2u
-        writeNumber4 = fun _ count -> count + 4u
-        writeNumber8 = fun _ count -> count + 8u
-    }
 
     let ofOption opt  =
         match opt with
@@ -125,8 +137,9 @@ module Serialization =
         | Some opt -> opt
 
     module Byte =
-        let write ops byte = ops.writeNumber1 byte
-        let read (reader:Reader) = reader.readNumber1()
+        let size = 1
+        let write (stream:Stream) byte = stream.writeNumber1 byte
+        let read (stream:Stream) = stream.readNumber1()
 
     module Option =
         [<Literal>]
@@ -134,17 +147,25 @@ module Serialization =
         [<Literal>]
         let private Some = 1uy
 
-        let write ops writerFn = function
+        let size sizeFn = function
             | Option.Some value ->
-                Byte.write ops Some
-                >> writerFn ops value
+                Byte.size + sizeFn value
             | Option.None ->
-                Byte.write ops None
-        let read readerFn (reader:Reader) =
-            let discriminator = Byte.read reader
+                Byte.size
+
+        let write (stream:Stream) writerFn = function
+            | Option.Some value ->
+                Byte.write stream Some
+
+                writerFn stream value
+            | Option.None ->
+                Byte.write stream None
+
+        let read streamFn (stream:Stream) =
+            let discriminator = Byte.read stream
             match discriminator with
             | Some ->
-                let item = readerFn reader
+                let item = streamFn stream
                 Option.Some item
             | None ->
                 Option.None
@@ -152,7 +173,16 @@ module Serialization =
                 raise SerializationException
 
     module VarInt =
-        let write ops = fun (x:uint32) ->
+        let size x =
+            let rec loop n len =
+                if n <= 0x7Ful then
+                    len + 1
+                else
+                    loop ((n >>> 7) - 1ul) (len + 1)
+
+            loop x 0
+
+        let write (stream:Stream) (x:uint32) =
             // https://github.com/bitcoin/bitcoin/blob/v0.13.2/src/serialize.h#L307L372
             let tmp = Array.zeroCreate 5
 
@@ -167,11 +197,11 @@ module Serialization =
             let len = loop x 0
             let bytes = Array.rev tmp.[0..len]
 
-            ops.writeBytes bytes (len + 1)
+            stream.writeBytes bytes (len + 1)
 
-        let read (reader:Reader) =
+        let read (stream:Stream) =
             let rec loop n  =
-                let data = reader.readNumber1 ()
+                let data = stream.readNumber1 ()
 
                 let n = ((uint32 n) <<< 7) ||| ((uint32 data) &&& 0x7Ful)
 
@@ -183,79 +213,102 @@ module Serialization =
             loop 0ul
 
     module Bytes =
-        let write ops bytes =
-            let len = Seq.length bytes
-            VarInt.write ops (uint32 len)
-            >> ops.writeBytes bytes len
-        let read (reader:Reader) =
-            let len = VarInt.read reader
-            reader.readBytes (int len)
+        let size bytes =
+            let length = Array.length bytes
+            VarInt.size (length |> uint32) + length
+
+        let write (stream:Stream) bytes =
+            let len = Array.length bytes
+            VarInt.write stream (uint32 len)
+
+            stream.writeBytes bytes len
+        let read (stream:Stream) =
+            let len = VarInt.read stream
+            stream.readBytes (int len)
 
     module FixedSizeBytes =
-        let write ops bytes =
-            ops.writeBytes bytes (Array.length bytes)
-        let read len (reader:Reader) = reader.readBytes len
+        let size bytes = Array.length bytes
+        let write (stream:Stream) bytes =
+            stream.writeBytes bytes (Array.length bytes)
+        let read len (stream:Stream) = stream.readBytes len
 
     module Hash =
-        let write ops hash = FixedSizeBytes.write ops (Hash.bytes hash)
-        let read reader =
-            let bytes = FixedSizeBytes.read Hash.Length reader
+        let size = Hash.Length
+        let write (stream:Stream) hash = FixedSizeBytes.write stream (Hash.bytes hash)
+        let read stream =
+            let bytes = FixedSizeBytes.read Hash.Length stream
             Hash bytes
 
     module String =
-        let write ops =
-            getBytes
-            >> Bytes.write ops
-        let read reader =
-            let bytes = Bytes.read reader
+        let size (s:string) =
+            let size = System.Text.Encoding.ASCII.GetByteCount s
+
+            VarInt.size (uint32 size) + size
+
+        let write (stream:Stream) (s:string) =
+            System.Text.Encoding.ASCII.GetBytes s
+            |> Bytes.write stream
+        let read stream =
+            let bytes = Bytes.read stream
             System.Text.Encoding.ASCII.GetString bytes
 
     module Seq =
-        let writeBody ops writerFn =
-            let write writerFn seq stream =
-                let aux stream item = writerFn ops item stream
-                seq |> Seq.fold aux stream
+        let size<'a> (sizeFn:'a->int) seq =
+            let length = (Seq.length seq)
+            VarInt.size (length |> uint32) + Seq.sumBy sizeFn seq
 
-            write writerFn
-        let write ops writerFn seq =
-            VarInt.write ops (Seq.length seq |> uint32)
-            >> writeBody ops writerFn seq
+        let sizeBody (sizeFn:'a->int) seq = Seq.sumBy sizeFn seq
+
+        let writeBody writerFn (stream:Stream) seq =
+            Seq.iter (fun item -> writerFn stream item) seq
+
+        let write writerFn (stream:Stream) seq =
+            VarInt.write stream (Seq.length seq |> uint32)
+            writeBody writerFn stream seq
 
     module List =
-        let write ops writerFn (ls: list<'B>) =
-            Seq.write ops writerFn ls
+        let size = Seq.size
 
-        let readBody length readerFn reader =
+        let write writerFn stream (ls: list<'B>) =
+            Seq.write writerFn stream ls
+
+        let readBody length streamFn stream =
             [1..int length]
-            |> List.map (fun _ -> readerFn reader)
+            |> List.map (fun _ -> streamFn stream)
 
-        let read readerFn reader =
-            let length = VarInt.read reader
-            readBody length readerFn reader
+        let read streamFn stream =
+            let length = VarInt.read stream
+            readBody length streamFn stream
 
     module Array =
-        let write ops writerFn (arr: array<'B>) =
-            Seq.write ops writerFn arr
+        let size = Seq.size
 
-        let readBody length readerFn reader =
+        let write writerFn stream (arr: array<'B>) =
+            Seq.write writerFn stream arr
+
+        let readBody length streamFn stream =
             let length = int length
             let array = Array.zeroCreate (int length)
 
             for i in 0 .. (length-1) do
-                array.[i] <- readerFn reader
+                array.[i] <- streamFn stream
 
             array
 
-        let read readerFn reader =
-            let length = VarInt.read reader
-            readBody length readerFn reader
+        let read streamFn stream =
+            let length = VarInt.read stream
+            readBody length streamFn stream
 
     module Map =
-        let write ops writerFn =
+        let size sizeFn =
             Map.toList
-            >> Seq.write ops writerFn
-        let read readerFn reader =
-            let l = List.read readerFn reader
+            >> Seq.size sizeFn
+
+        let write stream writerFn =
+            Map.toList
+            >> Seq.write stream writerFn
+        let read streamFn stream =
+            let l = List.read streamFn stream
 
             let rec isSorted l =
                 match l with
@@ -268,19 +321,22 @@ module Serialization =
                 Map.ofList l
 
     module ContractId =
-        let write ops (ContractId (version,cHash)) =
-            VarInt.write ops version
-            >> Hash.write ops cHash
-        let read reader =
-            let version = VarInt.read reader
-            let cHash = Hash.read reader
+        let size (ContractId (version,_)) =
+            VarInt.size version + Hash.size
+
+        let write stream (ContractId (version,cHash)) =
+            VarInt.write stream version
+            Hash.write stream cHash
+        let read stream =
+            let version = VarInt.read stream
+            let cHash = Hash.read stream
 
             ContractId (version, cHash)
 
     module Asset =
-        let private writeSubtype ops l = fun sb ->
-            Byte.write ops (byte l)
-            >> FixedSizeBytes.write ops sb
+        let private writeSubtype stream l = fun sb ->
+            Byte.write stream (byte l)
+            FixedSizeBytes.write stream sb
         let private versionBytes (v:uint32) =
             if v &&& 0xFFFFFFE0u = 0u
             then [| byte v |]
@@ -302,50 +358,65 @@ module Serialization =
                     0x80uy ||| byte (v >>> 7);
                     0x7Fuy &&& byte v |]
 
-        let write ops = fun (Asset (ContractId (version, cHash),(Hash sb as subtype))) ->
+        let size (Asset (ContractId (version, cHash),(Hash sb as subtype))) =
+            let versionBytes = versionBytes version
+            let versionBytesLength = Array.length versionBytes
+
+            if Hash.zero = cHash && Hash.zero = subtype then
+                versionBytesLength
+            else
+                match Array.tryFindIndexBack (fun b -> b <> 0uy) sb with
+                | None ->  versionBytesLength + 32
+                | Some 30
+                | Some 31 ->
+                    versionBytesLength + 32 + 32
+                | Some index ->
+                    versionBytesLength + 32 + 1 + index + 1
+
+        let write stream = fun (Asset (ContractId (version, cHash),(Hash sb as subtype))) ->
             let vbs = versionBytes version
             if cHash = Hash.zero && subtype = Hash.zero
             then
-                FixedSizeBytes.write ops vbs
+                FixedSizeBytes.write stream vbs
             else
                 match Array.tryFindIndexBack (fun b -> b <> 0uy) sb with
                 | None ->                               // subtype = Hash.zero
                     vbs.[0] <- 0x80uy ||| vbs.[0]
-                    FixedSizeBytes.write ops vbs
-                    >> Hash.write ops cHash
+                    FixedSizeBytes.write stream vbs
+                    Hash.write stream cHash
                 | Some n when n < 30 ->
                     vbs.[0] <- 0x40uy ||| vbs.[0]
-                    FixedSizeBytes.write ops vbs
-                    >> Hash.write ops cHash
-                    >> Byte.write ops (byte (n + 1))
-                    >> FixedSizeBytes.write ops sb.[..n]
+                    FixedSizeBytes.write stream vbs
+                    Hash.write stream cHash
+                    Byte.write stream (byte (n + 1))
+                    FixedSizeBytes.write stream sb.[..n]
                 | Some _ ->
                     vbs.[0] <- 0xC0uy ||| vbs.[0]
-                    FixedSizeBytes.write ops vbs
-                    >> Hash.write ops cHash
-                    >> Hash.write ops subtype
+                    FixedSizeBytes.write stream vbs
+                    Hash.write stream cHash
+                    Hash.write stream subtype
 
-        let rec private readVersion v counter reader =
+        let rec private readVersion v counter stream =
             if counter > 3 || (counter <> 0 && v = 0u) then raise SerializationException else
-            let b = Byte.read reader
+            let b = Byte.read stream
             let nextV = v + (uint32 (b &&& 0x7Fuy))
             if b &&& 0x80uy = 0uy
             then nextV
             elif nextV >= pown 2u 25 then raise SerializationException     //will be > 2^32
             else
-                let res = readVersion (nextV * 128u) (counter + 1) reader
+                let res = readVersion (nextV * 128u) (counter + 1) stream
                 res
 
-        let private readSubtype reader =
-            let len = Byte.read reader
+        let private readSubtype stream =
+            let len = Byte.read stream
             if len = 0x00uy then Hash.zero else
-            let subtype = FixedSizeBytes.read (int len) reader
+            let subtype = FixedSizeBytes.read (int len) stream
             let res = Array.zeroCreate<byte> Hash.Length
             Array.blit subtype 0 res 0 (int len)
             Hash res
 
-        let read reader =
-            let first = Byte.read reader
+        let read stream =
+            let first = Byte.read stream
 
             // Fast path for zen asset, in case first byte is zero
             if first = 0uy then
@@ -358,13 +429,13 @@ module Serialization =
                 then
                     v
                 else
-                    readVersion (v*128u) 0 reader
+                    readVersion (v*128u) 0 stream
             let cHash, isAbsentCHash =
                 if (first &&& 0xC0uy) = 0uy
                 then
                     Hash.zero, true
                 else
-                    let h = Hash.read reader
+                    let h = Hash.read stream
                     (h,false)
 
             let subtype, isAbsentSubtype, isCompressedSubtype =
@@ -372,10 +443,10 @@ module Serialization =
                 | 0x0uy | 0x80uy ->
                     Hash.zero, true, false
                 | 0xC0uy ->
-                    let h = Hash.read reader
+                    let h = Hash.read stream
                     h,false,false
                 | _ ->
-                    let h = readSubtype reader
+                    let h = readSubtype stream
                     h,false,true
 
             match cHash, subtype with
@@ -415,45 +486,59 @@ module Serialization =
                 let s,e = factor x
                 let f = figures s
                 (s,e,f)
-        let private write16 ops = fun (s,e) ->
+        let private write16 (stream:Stream) = fun (s,e) ->
             let res =
                 s ||| (e <<< 10)
-            ops.writeNumber2 res
+            stream.writeNumber2 res
         [<Literal>]
         let cutoff = 0x04000000u
-        let private write32 ops = fun (s,e) ->
+        let private write32 (stream:Stream) = fun (s,e) ->
             if s < cutoff
             then
                 let shifted = (0x20u ||| e) <<< 26
-                ops.writeNumber4 (s ||| shifted)
+                stream.writeNumber4 (s ||| shifted)
             else
                 let shifted = (0x60u ||| e) <<< 25
-                ops.writeNumber4 ((s - cutoff) ||| shifted)
-        let private write64 ops = fun s ->
+                stream.writeNumber4 ((s - cutoff) ||| shifted)
+        let private write64 (stream:Stream) = fun s ->
             let res = ((0x7EUL <<< 56) ||| s)
-            ops.writeNumber8 res
-        let private write72 ops = fun s ->
-            ops.writeNumber1 0xFEuy
-            >> ops.writeNumber8 s
-        let write ops = fun amount ->
+            stream.writeNumber8 res
+        let private write72 (stream:Stream) = fun s ->
+            stream.writeNumber1 0xFEuy
+            stream.writeNumber8 s
+
+
+        let size amount =
+            let _,_,f = parse(amount)
+
+            if f <= 3 then
+                2
+            elif f<= 8 then
+                4
+            elif amount < pown 2UL 56 then
+                8
+            else
+                9
+
+        let write stream = fun amount ->
             let s,e,f = parse amount
             if f <= 3
             then
-                write16 ops (uint16 s, uint16 e)
+                write16 stream (uint16 s, uint16 e)
             elif f <= 8
             then
                 if e <= 12
                 then
-                    write32 ops (uint32 s, uint32 e)
+                    write32 stream (uint32 s, uint32 e)
                 else
-                    write32 ops (uint32 s * pown 10u (e-12),12u)
+                    write32 stream (uint32 s * pown 10u (e-12),12u)
             elif amount < pown 2UL 56
             then
-                write64 ops amount
+                write64 stream amount
             else
-                write72 ops amount
-        let read (reader:Reader) =
-            let first = reader.readNumber1 ()
+                write72 stream amount
+        let read (stream:Stream) =
+            let first = stream.readNumber1 ()
             if
                 (first &&& 0x7Euy) = 0x7Cuy                //qNaN
                 || (first &&& 0x7Cuy) = 0x78uy             //Infinity
@@ -463,19 +548,19 @@ module Serialization =
             then
                 if first >= 0x80uy                          //72 bit
                 then
-                    let amount = reader.readNumber8 ()
+                    let amount = stream.readNumber8 ()
                     amount
                 else                                        //64 bit
-                    let second = reader.readNumber1 ()
-                    let third = reader.readNumber2 ()
-                    let fourth = reader.readNumber4 ()
+                    let second = stream.readNumber1 ()
+                    let third = stream.readNumber2 ()
+                    let fourth = stream.readNumber4 ()
 
                     (uint64 fourth)
                     + ((uint64 third) <<< 32)
                     + ((uint64 second) <<< 48)
             elif first < 0x80uy                             //16 bit
             then
-                let second = reader.readNumber1 ()
+                let second = stream.readNumber1 ()
                 if (first &&& 0x60uy) = 0x60uy              //non-canonical
                 then
                     let e = int (first &&& 0x1Fuy)
@@ -486,8 +571,8 @@ module Serialization =
                     let s = (uint64 second) + ((uint64 (first &&& 0x03uy)) <<< 8)
                     s * pown 10UL e
             else                                            //32 bit
-                let second = reader.readNumber1 ()
-                let lower = reader.readNumber2 ()
+                let second = stream.readNumber1 ()
+                let lower = stream.readNumber2 ()
                 if (first &&& 0x40uy) = 0uy
                 then
                     let e = int ((first &&& 0x3Cuy) >>> 2)
@@ -506,21 +591,26 @@ module Serialization =
                     s * pown 10UL e
 
     module Spend =
-        let write ops = fun { asset = asset; amount = amount } ->
-            Asset.write ops asset
-            >> Amount.write ops amount
-        let read reader =
-            let asset = Asset.read reader
-            let amount = Amount.read reader
+        let size ({ asset = asset; amount = amount }) =
+            Asset.size asset + Amount.size amount
+
+        let write stream = fun { asset = asset; amount = amount } ->
+            Asset.write stream asset
+            Amount.write stream amount
+        let read stream =
+            let asset = Asset.read stream
+            let amount = Amount.read stream
             { asset = asset; amount = amount }
 
     module Outpoint =
-        let write ops = fun { txHash = txHash; index = index } ->
-            Hash.write ops txHash
-            >> VarInt.write ops index
-        let read reader =
-            let txHash = Hash.read reader
-            let index = VarInt.read reader
+        let size ({ index = index })= Hash.size + VarInt.size index
+
+        let write stream = fun { txHash = txHash; index = index } ->
+            Hash.write stream txHash
+            VarInt.write stream index
+        let read stream =
+            let txHash = Hash.read stream
+            let index = VarInt.read stream
             { txHash = txHash; index = index }
 
     module Input =
@@ -529,41 +619,51 @@ module Serialization =
         [<Literal>]
         let private SerializedMint = 2uy
 
-        let write ops = function
+        let size = function
+           | Outpoint outpoint ->
+               Byte.size + Outpoint.size outpoint
+           | Mint spend ->
+               Byte.size + Spend.size spend
+
+        let write stream = function
             | Outpoint outpoint ->
-                Byte.write ops SerializedOutpoint
-                >> Outpoint.write ops outpoint
+                Byte.write stream SerializedOutpoint
+                Outpoint.write stream outpoint
             | Mint spend ->
-                Byte.write ops SerializedMint
-                >> Spend.write ops spend
-        let read reader =
-            let discriminator = Byte.read reader
+                Byte.write stream SerializedMint
+                Spend.write stream spend
+        let read stream =
+            let discriminator = Byte.read stream
             match discriminator with
             | SerializedOutpoint ->
-                let outpoint = Outpoint.read reader
+                let outpoint = Outpoint.read stream
                 Outpoint outpoint
             | SerializedMint ->
-                let spend = Spend.read reader
+                let spend = Spend.read stream
                 Mint spend
             | _ ->
                 raise SerializationException
 
     module Signature =
-        let write ops signature =
-            FixedSizeBytes.write ops (Signature.serialize signature)
+        let size = SerializedSignatureLength
 
-        let read reader =
-            let bytes = FixedSizeBytes.read SerializedSignatureLength reader
+        let write stream signature =
+            FixedSizeBytes.write stream (Signature.serialize signature)
+
+        let read stream =
+            let bytes = FixedSizeBytes.read SerializedSignatureLength stream
 
             Signature.deserialize bytes
             |> ofOption
 
     module PublicKey =
-        let write ops publicKey =
-            FixedSizeBytes.write ops (PublicKey.serialize publicKey)
+        let size = SerializedPublicKeyLength
 
-        let read reader =
-            let bytes = FixedSizeBytes.read SerializedPublicKeyLength reader
+        let write stream publicKey =
+            FixedSizeBytes.write stream (PublicKey.serialize publicKey)
+
+        let read stream =
+            let bytes = FixedSizeBytes.read SerializedPublicKeyLength stream
 
             PublicKey.deserialize bytes
             |> ofOption
@@ -584,22 +684,17 @@ module Serialization =
         [<Literal>]
         let private DestroyIdentifier = 7u
 
-        let private writerFn ops = function
-            | PK hash -> Hash.write ops hash
-            | Contract contractId -> ContractId.write ops contractId
-            | ExtensionSacrifice contractId ->
-                ContractId.write ops contractId
+        let private sizeFn = function
+            | PK _ -> Hash.size
+            | Contract contractId -> ContractId.size contractId
+            | ExtensionSacrifice contractId -> ContractId.size contractId
             | Fee
             | ActivationSacrifice
-            | Destroy ->
-                id
-            | Coinbase (blockNumber, pkHash) ->
-                ops.writeNumber4 blockNumber
-                >> Hash.write ops pkHash
-            | HighVLock (_, bytes) ->
-                FixedSizeBytes.write ops bytes
+            | Destroy -> 0
+            | Coinbase _ -> 4 + Hash.size
+            | HighVLock (_, bytes) -> FixedSizeBytes.size bytes
 
-        let write ops = fun lock ->
+        let size lock =
             let identifier =
                 match lock with
                 | PK _ -> PKIdentifier
@@ -611,24 +706,54 @@ module Serialization =
                 | Destroy -> DestroyIdentifier
                 | HighVLock (identifier, _) -> identifier
 
-            VarInt.write ops identifier
-            >> VarInt.write ops (writerFn counters lock 0ul)
-            >> writerFn ops lock
+            let payloadSize = sizeFn lock
 
-        let read reader =
-            let identifier = VarInt.read reader
-            let count = VarInt.read reader
+            VarInt.size identifier + VarInt.size (payloadSize |> uint32) + payloadSize
+
+        let private writerFn stream = function
+            | PK hash -> Hash.write stream hash
+            | Contract contractId -> ContractId.write stream contractId
+            | ExtensionSacrifice contractId ->
+                ContractId.write stream contractId
+            | Fee
+            | ActivationSacrifice
+            | Destroy -> ()
+            | Coinbase (blockNumber, pkHash) ->
+                stream.writeNumber4 blockNumber
+                Hash.write stream pkHash
+            | HighVLock (_, bytes) ->
+                FixedSizeBytes.write stream bytes
+
+        let write stream = fun lock ->
+            let identifier =
+                match lock with
+                | PK _ -> PKIdentifier
+                | Contract _ -> ContractIdentifier
+                | Coinbase _ -> CoinbaseIdentifier
+                | Fee -> FeeIdentifier
+                | ActivationSacrifice -> ActivationSacrificeIdentifier
+                | ExtensionSacrifice _ -> ExtensionSacrificeIdentifier
+                | Destroy -> DestroyIdentifier
+                | HighVLock (identifier, _) -> identifier
+
+            VarInt.write stream identifier
+            VarInt.write stream (sizeFn lock |> uint32)
+            writerFn stream lock
+
+        let read stream =
+            let identifier = VarInt.read stream
+            let count = VarInt.read stream
             let value =
                 match identifier with
                 | PKIdentifier ->
-                    let hash = Hash.read reader
+                    let hash = Hash.read stream
                     Lock.PK hash
                 | ContractIdentifier ->
-                    let contractId = ContractId.read reader
+                    let contractId = ContractId.read stream
                     Lock.Contract contractId
                 | CoinbaseIdentifier ->
-                    let blockNumber = reader.readNumber4 ()
-                    let pkHash = Hash.read reader
+                    let blockNumber = stream.readNumber4 ()
+                    let pkHash = Hash.read stream
                     Lock.Coinbase (blockNumber, pkHash)
                 | FeeIdentifier ->
                     Lock.Fee
@@ -637,13 +762,13 @@ module Serialization =
                 | DestroyIdentifier ->
                     Lock.Destroy
                 | ExtensionSacrificeIdentifier ->
-                    let contractId = ContractId.read reader
+                    let contractId = ContractId.read stream
                     Lock.ExtensionSacrifice contractId
                 | _ ->
-                    let bytes = FixedSizeBytes.read (int count) reader
+                    let bytes = FixedSizeBytes.read (int count) stream
                     HighVLock (identifier, bytes)
 
-            if (count = writerFn counters value 0ul) then
+            if (int count = sizeFn value) then
                 value
             else
                 raise SerializationException
@@ -677,130 +802,156 @@ module Serialization =
         let private CollectionListData = 13uy
 
         module Int64 =
-            let write ops = uint64 >> ops.writeNumber8
-            let read (reader:Reader) =
-                let i = reader.readNumber8 ()
+            let size = 8
+            let write (stream:Stream) value = uint64 value |> stream.writeNumber8
+            let read (stream:Stream) =
+                let i = stream.readNumber8 ()
                 int64 i
 
         module Hash =
-            let write ops = Hash.Hash >> Hash.write ops
-            let read (reader:Reader) =
-                let hash = Hash.read reader
+            let size = Hash.size
+            let write stream = Hash.Hash >> Hash.write stream
+            let read (stream:Stream) =
+                let hash = Hash.read stream
                 hash |> Hash.bytes
 
         module Lock =
-            let write ops = ZFStar.fstToFsLock >> Lock.write ops
-            let read (reader:Reader) =
-                let lock = Lock.read reader
+            let size = ZFStar.fstToFsLock >> Lock.size
+            let write stream = ZFStar.fstToFsLock >> Lock.write stream
+            let read (stream:Stream) =
+                let lock = Lock.read stream
                 ZFStar.fsToFstLock lock
 
         module String =
-            let write ops = ZFStar.fstToFsString >> String.write ops
-            let read (reader:Reader) =
-                let s = String.read reader
+            let size = ZFStar.fstToFsString >> String.size
+            let write stream = ZFStar.fstToFsString >> String.write stream
+            let read (stream:Stream) =
+                let s = String.read stream
                 ZFStar.fsToFstString s
 
         module Signature =
-            let write ops = Signature >> Signature.write ops
-            let read (reader:Reader) =
-                let (Signature signature) = Signature.read reader
+            let size = Signature.size
+            let write stream = Signature >> Signature.write stream
+            let read (stream:Stream) =
+                let (Signature signature) = Signature.read stream
                 signature
 
         module PublicKey =
-            let write ops = PublicKey >> PublicKey.write ops
-            let read (reader:Reader) =
-                 let (PublicKey publicKey) = PublicKey.read reader
+            let size = PublicKey.size
+            let write stream = PublicKey >> PublicKey.write stream
+            let read (stream:Stream) =
+                 let (PublicKey publicKey) = PublicKey.read stream
                  publicKey
 
-        let rec write (ops: Operations<'a>)
-                      : ZData.data -> 'a -> 'a = function
-            | ZData.I64 i ->
-                Byte.write ops I64Data
-                >> Int64.write ops i
-            | ZData.Byte b ->
-                Byte.write ops ByteData
-                >> Byte.write ops b
-            | ZData.ByteArray arr ->
-                Byte.write ops ByteArrayData
-                >> Bytes.write ops arr
-            | ZData.U32 i ->
-                Byte.write ops U32Data
-                >> ops.writeNumber4 i
-            | ZData.U64 i ->
-                Byte.write ops U64Data
-                >> ops.writeNumber8 i
-            | ZData.String s ->
-                Byte.write ops StringData
-                >> String.write ops s
-            | ZData.Hash hash ->
-                Byte.write ops HashData
-                >> Hash.write ops hash
-            | ZData.Lock l ->
-                Byte.write ops LockData
-                >> Lock.write ops l
-            | ZData.Signature signature ->
-                Byte.write ops SignatureData
-                >> Signature.write ops signature
-            | ZData.PublicKey publicKey ->
-                Byte.write ops PublicKeyData
-                >> PublicKey.write ops publicKey
-            | ZData.Collection (ZData.Array arr) ->
-                Byte.write ops CollectionArrayData
-                >> Seq.write ops write arr
-            | ZData.Collection (ZData.Dict (map, _)) ->
-                Byte.write ops CollectionDictData
-                >> Map.write ops (fun ops (key, data)->
-                    String.write ops key
-                    >> write ops data) map
-            | ZData.Collection (ZData.List l) ->
-                Byte.write ops CollectionListData
-                >> Seq.write ops write (ZFStar.fstToFsList l)
+        let rec size data =
+            let payloadSize =
+                match data with
+                | ZData.I64 _ -> Int64.size
+                | ZData.Byte _ -> Byte.size
+                | ZData.ByteArray arr -> Bytes.size arr
+                | ZData.U32 _ -> 4
+                | ZData.U64 _ -> 8
+                | ZData.String s -> String.size s
+                | ZData.Hash _ -> Hash.size
+                | ZData.Lock lock -> Lock.size lock
+                | ZData.Signature _ -> Signature.size
+                | ZData.PublicKey _ -> PublicKey.size
+                | ZData.Collection (ZData.Array arr) -> Seq.size size arr
+                | ZData.Collection (ZData.Dict (map, _)) ->
+                    Map.size (fun (key, data)-> String.size key + size data) map
+                | ZData.Collection (ZData.List l) ->
+                    Byte.size + Seq.size size (ZFStar.fstToFsList l)
 
-        let rec read (reader:Reader) =
-            let discriminator = Byte.read reader
+            Byte.size + payloadSize
+
+        let rec write (stream:Stream) = function
+            | ZData.I64 i ->
+                Byte.write stream I64Data
+                Int64.write stream i
+            | ZData.Byte b ->
+                Byte.write stream ByteData
+                Byte.write stream b
+            | ZData.ByteArray arr ->
+                Byte.write stream ByteArrayData
+                Bytes.write stream arr
+            | ZData.U32 i ->
+                Byte.write stream U32Data
+                stream.writeNumber4 i
+            | ZData.U64 i ->
+                Byte.write stream U64Data
+                stream.writeNumber8 i
+            | ZData.String s ->
+                Byte.write stream StringData
+                String.write stream s
+            | ZData.Hash hash ->
+                Byte.write stream HashData
+                Hash.write stream hash
+            | ZData.Lock l ->
+                Byte.write stream LockData
+                Lock.write stream l
+            | ZData.Signature signature ->
+                Byte.write stream SignatureData
+                Signature.write stream signature
+            | ZData.PublicKey publicKey ->
+                Byte.write stream PublicKeyData
+                PublicKey.write stream publicKey
+            | ZData.Collection (ZData.Array arr) ->
+                Byte.write stream CollectionArrayData
+                Seq.write write stream arr
+            | ZData.Collection (ZData.Dict (map, _)) ->
+                Byte.write stream CollectionDictData
+                Map.write (fun stream (key, data)->
+                    String.write stream key
+                    write stream data) stream map
+            | ZData.Collection (ZData.List l) ->
+                Byte.write stream CollectionListData
+                Seq.write write stream (ZFStar.fstToFsList l)
+
+        let rec read (stream:Stream) =
+            let discriminator = Byte.read stream
             match discriminator with
             | I64Data ->
-                let i = Int64.read reader
+                let i = Int64.read stream
                 ZData.I64 i
             | ByteData ->
-                let byte = Byte.read reader
+                let byte = Byte.read stream
                 ZData.Byte byte
             | ByteArrayData ->
-                let arr = Array.read Byte.read reader
+                let arr = Array.read Byte.read stream
                 ZData.ByteArray arr
             | U32Data ->
-                let i = reader.readNumber4 ()
+                let i = stream.readNumber4 ()
                 ZData.U32 i
             | U64Data ->
-                let i = reader.readNumber8 ()
+                let i = stream.readNumber8 ()
                 ZData.U64 i
             | StringData ->
-                let s = String.read reader
+                let s = String.read stream
                 ZData.String s
             | HashData ->
-                let hash = Hash.read reader
+                let hash = Hash.read stream
                 ZData.Hash hash
             | LockData ->
-                let lock = Lock.read reader
+                let lock = Lock.read stream
                 ZData.Lock lock
             | SignatureData ->
-                let signature = Signature.read reader
+                let signature = Signature.read stream
                 ZData.Signature signature
             | PublicKeyData ->
-                let publicKey = PublicKey.read reader
+                let publicKey = PublicKey.read stream
                 ZData.PublicKey publicKey
             | CollectionArrayData ->
-                let arr = Array.read read reader
+                let arr = Array.read read stream
                 ZData.Collection (ZData.Array arr)
             | CollectionDictData ->
-                let map = Map.read (fun reader ->
-                                let key = String.read reader
-                                let value = read reader
+                let map = Map.read (fun stream ->
+                                let key = String.read stream
+                                let value = read stream
                                 key, value
-                            ) reader
+                            ) stream
                 ZData.Collection (ZData.Dict (map, Map.count map |> uint32))
             | CollectionListData ->
-                let l = List.read read reader
+                let l = List.read read stream
                 let l = ZFStar.fsToFstList (List.ofSeq l)
                 ZData.Collection (ZData.List l)
             | _ ->
@@ -814,22 +965,29 @@ module Serialization =
         [<Literal>]
         let private SerializedNotCommitted = 3uy
 
-        let write ops = function
-        | NoState ->
-            Byte.write ops SerializedNoState
-        | State hash ->
-            Byte.write ops SerializedState
-            >> Hash.write ops hash
+        let size = function
+        | NoState
         | NotCommitted ->
-            Byte.write ops SerializedNotCommitted
+            Byte.size
+        | State _ ->
+            Byte.size + Hash.size
 
-        let read reader =
-            let discriminator = Byte.read reader
+        let write stream = function
+        | NoState ->
+            Byte.write stream SerializedNoState
+        | State hash ->
+            Byte.write stream SerializedState
+            Hash.write stream hash
+        | NotCommitted ->
+            Byte.write stream SerializedNotCommitted
+
+        let read stream =
+            let discriminator = Byte.read stream
             match discriminator with
             | SerializedNoState ->
                 NoState
             | SerializedState ->
-                let hash = Hash.read reader
+                let hash = Hash.read stream
                 State hash
             | SerializedNotCommitted ->
                 NotCommitted
@@ -848,7 +1006,34 @@ module Serialization =
         [<Literal>]
         let private SigHashFollowingWitnesses = 3uy
 
-        let private writerFn ops = function
+        let private sizeFn = function
+            | PKWitness _ ->
+                Byte.size + PublicKey.size + Signature.size
+            | ContractWitness cw ->
+                ContractId.size cw.contractId
+                + String.size cw.command
+                + Option.size Data.size cw.messageBody
+                + StateCommitment.size cw.stateCommitment
+                + VarInt.size cw.beginInputs
+                + VarInt.size cw.beginOutputs
+                + VarInt.size cw.inputsLength
+                + VarInt.size cw.outputsLength
+                + Option.size (fun _ -> PublicKey.size + Signature.size) cw.signature +
+                + 8 // cost
+            | HighVWitness (_, bytes) -> FixedSizeBytes.size bytes
+
+        let size witness =
+            let identifier =
+                match witness with
+                | PKWitness _ -> PKIdentifier
+                | ContractWitness _ -> ContractIdentifier
+                | HighVWitness (identifier, _) -> identifier
+
+            let payloadSize = sizeFn witness
+
+            VarInt.size identifier + VarInt.size (payloadSize |> uint32) + payloadSize
+
+        let private writerFn stream = function
             | PKWitness (sigHash, publicKey, signature) ->
                 let sigHashByte =
                     match sigHash with
@@ -856,44 +1041,44 @@ module Serialization =
                     | FollowingWitnesses -> SigHashFollowingWitnesses
                     | UnknownSigHash x -> x
 
-                Byte.write ops sigHashByte
-                >> PublicKey.write ops publicKey
-                >> Signature.write ops signature
+                Byte.write stream sigHashByte
+                PublicKey.write stream publicKey
+                Signature.write stream signature
             | ContractWitness cw ->
-                ContractId.write ops cw.contractId
-                >> String.write ops cw.command
-                >> Option.write ops Data.write cw.messageBody
-                >> StateCommitment.write ops cw.stateCommitment
-                >> VarInt.write ops cw.beginInputs
-                >> VarInt.write ops cw.beginOutputs
-                >> VarInt.write ops cw.inputsLength
-                >> VarInt.write ops cw.outputsLength
-                >> Option.write ops (fun ops (publicKey, signature) ->
-                    PublicKey.write ops publicKey
-                    >> Signature.write ops signature
+                ContractId.write stream cw.contractId
+                String.write stream cw.command
+                Option.write stream Data.write cw.messageBody
+                StateCommitment.write stream cw.stateCommitment
+                VarInt.write stream cw.beginInputs
+                VarInt.write stream cw.beginOutputs
+                VarInt.write stream cw.inputsLength
+                VarInt.write stream cw.outputsLength
+                Option.write stream (fun stream (publicKey, signature) ->
+                    PublicKey.write stream publicKey
+                    Signature.write stream signature
                   ) cw.signature
-                >> ops.writeNumber8 cw.cost //TODO: optimize
+                stream.writeNumber8 cw.cost //TODO: optimize
             | HighVWitness (_, bytes) ->
-                FixedSizeBytes.write ops bytes
+                FixedSizeBytes.write stream bytes
 
-        let write ops = fun witness ->
+        let write stream = fun witness ->
             let identifier =
                 match witness with
                 | PKWitness _ -> PKIdentifier
                 | ContractWitness _ -> ContractIdentifier
                 | HighVWitness (identifier, _) -> identifier
 
-            VarInt.write ops identifier
-            >> VarInt.write ops (writerFn counters witness 0ul)
-            >> writerFn ops witness
+            VarInt.write stream identifier
+            VarInt.write stream (sizeFn witness |> uint32)
+            writerFn stream witness
 
-        let read reader =
-            let identifier = VarInt.read reader
-            let count = VarInt.read reader
+        let read stream =
+            let identifier = VarInt.read stream
+            let count = VarInt.read stream
             let value =
                 match identifier with
                 | PKIdentifier ->
-                    let sigHashByte = Byte.read reader
+                    let sigHashByte = Byte.read stream
 
                     let sigHash =
                         match sigHashByte with
@@ -901,24 +1086,24 @@ module Serialization =
                         | SigHashFollowingWitnesses -> FollowingWitnesses
                         | x -> UnknownSigHash x
 
-                    let publicKey = PublicKey.read reader
-                    let signature = Signature.read reader
+                    let publicKey = PublicKey.read stream
+                    let signature = Signature.read stream
                     PKWitness (sigHash, publicKey, signature)
                 | ContractIdentifier ->
-                    let contractId = ContractId.read reader
-                    let command = String.read reader
-                    let messageBody = Option.read Data.read reader
-                    let stateCommitment = StateCommitment.read reader
-                    let beginInputs = VarInt.read reader
-                    let beginOutputs = VarInt.read reader
-                    let inputsLength = VarInt.read reader
-                    let outputsLength = VarInt.read reader
-                    let signature = Option.read (fun reader ->
-                                                    let publicKey = PublicKey.read reader
-                                                    let signature = Signature.read reader
+                    let contractId = ContractId.read stream
+                    let command = String.read stream
+                    let messageBody = Option.read Data.read stream
+                    let stateCommitment = StateCommitment.read stream
+                    let beginInputs = VarInt.read stream
+                    let beginOutputs = VarInt.read stream
+                    let inputsLength = VarInt.read stream
+                    let outputsLength = VarInt.read stream
+                    let signature = Option.read (fun stream ->
+                                                    let publicKey = PublicKey.read stream
+                                                    let signature = Signature.read stream
                                                     publicKey, signature
-                                                ) reader
-                    let cost = reader.readNumber8 () //TODO: optimize
+                                                ) stream
+                    let cost = stream.readNumber8 () //TODO: optimize
                     ContractWitness {
                         contractId = contractId
                         command = command
@@ -932,59 +1117,84 @@ module Serialization =
                         cost = cost
                     }
                 | _ ->
-                    let bytes = FixedSizeBytes.read (int count) reader
+                    let bytes = FixedSizeBytes.read (int count) stream
                     HighVWitness (identifier, bytes)
 
-            if count = writerFn counters value 0ul then
+            if int count = sizeFn value then
                 value
             else
                 raise SerializationException
     module Output =
-        let write ops = fun { lock = lock; spend = spend } ->
-            Lock.write ops lock
-            >> Spend.write ops spend
-        let read reader =
-            let lock = Lock.read reader
-            let spend = Spend.read reader
+        let size ({ lock = lock; spend = spend })=
+            Lock.size lock + Spend.size spend
+
+        let write stream = fun { lock = lock; spend = spend } ->
+            Lock.write stream lock
+            Spend.write stream spend
+        let read stream =
+            let lock = Lock.read stream
+            let spend = Spend.read stream
             { lock = lock; spend = spend }
 
     module PointedOutput =
-        let write ops = fun (outpoint, output) ->
-            Outpoint.write ops outpoint
-            >> Output.write ops output
-        let read reader =
-            let outpoint = Outpoint.read reader
-            let output = Output.read reader
+        let size (outpoint, output) =
+            Outpoint.size outpoint + Output.size output
+
+        let write stream = fun (outpoint, output) ->
+            Outpoint.write stream outpoint
+            Output.write stream output
+        let read stream =
+            let outpoint = Outpoint.read stream
+            let output = Output.read stream
             outpoint, output
 
     module Contract =
-        let private writerFn ops = function
+        let sizeFn = function
             | V0 contract ->
-                String.write ops contract.code
-                >> String.write ops contract.hints
-                >> VarInt.write ops contract.rlimit
-                >> VarInt.write ops contract.queries
+                String.size contract.code +
+                    String.size contract.hints +
+                    VarInt.size contract.rlimit +
+                    VarInt.size contract.queries
             | HighV (_, bytes) ->
-                FixedSizeBytes.write ops bytes
-        let write ops = fun contract ->
+                FixedSizeBytes.size bytes
+
+        let size contract =
             let identifier =
                 match contract with
                 | V0 _ -> Version0
                 | HighV (version, _) -> version
 
-            VarInt.write ops identifier
-            >> VarInt.write ops (writerFn counters contract 0ul)
-            >> writerFn ops contract
-        let read reader =
-            let version = VarInt.read reader
-            let count = VarInt.read reader
+            let payloadSize = sizeFn contract
+
+            VarInt.size identifier + VarInt.size (uint32 payloadSize) + payloadSize
+
+        let private writerFn stream = function
+            | V0 contract ->
+                String.write stream contract.code
+                String.write stream contract.hints
+                VarInt.write stream contract.rlimit
+                VarInt.write stream contract.queries
+            | HighV (_, bytes) ->
+                FixedSizeBytes.write stream bytes
+        let write stream = fun contract ->
+            let identifier =
+                match contract with
+                | V0 _ -> Version0
+                | HighV (version, _) -> version
+
+            VarInt.write stream identifier
+            VarInt.write stream (sizeFn contract |> uint32)
+            writerFn stream contract
+        let read stream =
+            let version = VarInt.read stream
+            let count = VarInt.read stream
             let value =
                 match version with
                 | Version0 ->
-                    let code = String.read reader
-                    let hints = String.read reader
-                    let rlimit = VarInt.read reader
-                    let queries = VarInt.read reader
+                    let code = String.read stream
+                    let hints = String.read stream
+                    let rlimit = VarInt.read stream
+                    let queries = VarInt.read stream
                     V0 {
                         code = code
                         hints = hints
@@ -992,58 +1202,73 @@ module Serialization =
                         queries = queries
                     }
                 | _ ->
-                    let bytes = FixedSizeBytes.read (int count) reader
+                    let bytes = FixedSizeBytes.read (int count) stream
                     Contract.HighV (version, bytes)
 
 
-            if count = writerFn counters value 0ul then
+            if int count = sizeFn value then
                 value
             else
                 raise SerializationException
 
     module Nonce =
-        let write ops = fun (nonce1, nonce2) ->
-            ops.writeNumber8 nonce1
-            >> ops.writeNumber8 nonce2
-        let read (reader:Reader) =
-            let nonce1 = reader.readNumber8 ()
-            let nonce2 = reader.readNumber8 ()
+        let size = 16
+
+        let write (stream:Stream) = fun (nonce1, nonce2) ->
+            stream.writeNumber8 nonce1
+            stream.writeNumber8 nonce2
+        let read (stream:Stream) =
+            let nonce1 = stream.readNumber8 ()
+            let nonce2 = stream.readNumber8 ()
             nonce1,nonce2
 
     module Transaction =
-        let write mode ops = fun (tx:Transaction) ->
-            ops.writeNumber4 tx.version
-            >> Seq.write ops Input.write tx.inputs
-            >> Seq.write ops Output.write tx.outputs
-            >> Option.write ops Contract.write tx.contract
-            >> match mode with
-               | Full -> Seq.write ops Witness.write tx.witnesses
-               | WithoutWitness -> id
-        let read mode (reader:Reader) =
-            let version = reader.readNumber4 ()
-            let inputs = List.read Input.read reader
-            let outputs = List.read Output.read reader
-            let contract = Option.read Contract.read reader
+        let size mode tx =
+            4 + // version
+                List.size Input.size tx.inputs +
+                List.size Output.size tx.outputs +
+                Option.size Contract.size tx.contract +
+                if mode = Full then
+                    List.size Witness.size tx.witnesses
+                else
+                    0
+
+        let write mode (stream:Stream) = fun (tx:Transaction) ->
+            stream.writeNumber4 tx.version
+            List.write Input.write stream tx.inputs
+            List.write Output.write stream tx.outputs
+            Option.write stream Contract.write tx.contract
+            match mode with
+            | Full -> List.write Witness.write stream tx.witnesses
+            | WithoutWitness -> ()
+
+        let read mode (stream:Stream) =
+            let version = stream.readNumber4 ()
+            let inputs = List.read Input.read stream
+            let outputs = List.read Output.read stream
+            let contract = Option.read Contract.read stream
             let witnesses =
                 match mode with
-                | Full -> List.read Witness.read reader
+                | Full -> List.read Witness.read stream
                 | WithoutWitness -> []
 
             { version = version; inputs = inputs; witnesses = witnesses; outputs = outputs; contract = contract }
 
 
     module TransactionExtended =
-        let write ops (ex:TransactionExtended) = ops.writeBytes ex.raw (Array.length ex.raw)
+        let size (ex:TransactionExtended) = Array.length ex.raw
+        let write (stream:Stream) (ex:TransactionExtended) = stream.writeBytes ex.raw (Array.length ex.raw)
 
-        let read (reader:Reader) =
-            let beginOffset = reader.Offset
+        let read (stream:Stream) =
+            let beginOffset = stream.Offset
 
-            let tx = Transaction.read Full reader
+            let tx = Transaction.read Full stream
 
-            let withoutWitnessesSize = Transaction.write WithoutWitness counters tx 0ul |> int
-            let size = reader.Offset - beginOffset
+            let withoutWitnessesSize = Transaction.size WithoutWitness tx
+            let size = stream.Offset - beginOffset
 
-            let raw = Array.sub reader.Buffer beginOffset size
+            let raw = Array.zeroCreate size
+            System.Buffer.BlockCopy(stream.Buffer, beginOffset, raw, 0, size)
 
             let txHash = Array.zeroCreate Length
             let witnessHash = Array.zeroCreate Length
@@ -1067,22 +1292,24 @@ module Serialization =
             }
 
     module Header =
-        let write ops = fun header ->
-            ops.writeNumber4 header.version
-            >> Hash.write ops header.parent
-            >> ops.writeNumber4 header.blockNumber
-            >> Hash.write ops header.commitments
-            >> ops.writeNumber8 header.timestamp
-            >> ops.writeNumber4 header.difficulty
-            >> Nonce.write ops header.nonce
-        let read (reader:Reader) =
-            let version = reader.readNumber4 ()
-            let parent = Hash.read reader
-            let blockNumber = reader.readNumber4 ()
-            let commitments = Hash.read reader
-            let timestamp = reader.readNumber8 ()
-            let difficulty = reader.readNumber4 ()
-            let nonce = Nonce.read reader
+        let size = SerializedHeaderSize
+
+        let write (stream:Stream) = fun header ->
+            stream.writeNumber4 header.version
+            Hash.write stream header.parent
+            stream.writeNumber4 header.blockNumber
+            Hash.write stream header.commitments
+            stream.writeNumber8 header.timestamp
+            stream.writeNumber4 header.difficulty
+            Nonce.write stream header.nonce
+        let read (stream:Stream) =
+            let version = stream.readNumber4 ()
+            let parent = Hash.read stream
+            let blockNumber = stream.readNumber4 ()
+            let commitments = Hash.read stream
+            let timestamp = stream.readNumber8 ()
+            let difficulty = stream.readNumber4 ()
+            let nonce = Nonce.read stream
 
             {
                 version = version
@@ -1095,14 +1322,19 @@ module Serialization =
             }
 
     module Block =
-        let write ops bk =
-            Header.write ops bk.header
-            >> Seq.write ops Hash.write ([ bk.txMerkleRoot; bk.witnessMerkleRoot; bk.activeContractSetMerkleRoot ] @ bk.commitments)
-            >> Seq.write ops TransactionExtended.write bk.transactions
-        let read (reader:Reader) =
-            let header = Header.read reader
-            let commitments = List.read Hash.read reader
-            let transactions = List.read TransactionExtended.read reader
+        let size block =
+            Header.size +
+                List.size (fun _ -> Hash.size) ([ block.txMerkleRoot; block.witnessMerkleRoot; block.activeContractSetMerkleRoot ] @ block.commitments) +
+                Seq.size TransactionExtended.size block.transactions
+
+        let write stream bk =
+            Header.write stream bk.header
+            Seq.write Hash.write stream ([ bk.txMerkleRoot; bk.witnessMerkleRoot; bk.activeContractSetMerkleRoot ] @ bk.commitments)
+            Seq.write TransactionExtended.write stream bk.transactions
+        let read (stream:Stream) =
+            let header = Header.read stream
+            let commitments = List.read Hash.read stream
+            let transactions = List.read TransactionExtended.read stream
 
             if Seq.length commitments < 3 then
                 raise SerializationException
@@ -1118,122 +1350,78 @@ module Serialization =
 open Serialization
 
 module Transaction =
-    let serialize mode tx =
-        Transaction.write mode counters tx 0ul
-        |> int32
-        |> create
-        |> Transaction.write mode serializers tx
-        |> getBuffer
-    let deserialize mode bytes =
-        Reader (bytes)
-        |> run (Transaction.read mode)
+    let serialize mode = serialize (Transaction.size mode) (Transaction.write mode)
+    let deserialize mode = deserialize (Transaction.read mode)
 
 module TransactionExtended =
-    let serialize tx =
-        TransactionExtended.write counters tx 0ul
-        |> int32
-        |> create
-        |> TransactionExtended.write serializers tx
-        |> getBuffer
-
-    let deserialize bytes =
-        Reader (bytes)
-        |> run TransactionExtended.read
+    let serialize = serialize TransactionExtended.size TransactionExtended.write
+    let deserialize = deserialize TransactionExtended.read
 
 module TransactionsRaw =
     let serialize txs = Array.concat txs
 
 module TransactionsExtended =
-
-    let deserialize count bytes =
-        Reader (bytes)
-        |> run (List.readBody count TransactionExtended.read)
+    let deserialize count = deserialize (List.readBody count TransactionExtended.read)
 
 module Header =
-    let serialize header =
-        create SerializedHeaderSize
-        |> Header.write serializers header
-        |> getBuffer
+    let serialize = serialize (fun _ -> SerializedHeaderSize) Header.write
+
     let deserialize bytes =
         if Array.length bytes <> SerializedHeaderSize then
             None
         else
-            Reader (bytes)
-            |> run Header.read
+            deserialize Header.read bytes
 
 module Block =
-    let serialize bk =
-        Block.write counters bk 0ul
-
-        |> int32
-        |> create
-        |> Block.write serializers bk
-        |> getBuffer
-    let deserialize bytes =
-        Reader (bytes)
-        |> run Block.read
+    let serialize = serialize Block.size Block.write
+    let deserialize = deserialize Block.read
 
 module Data =
-    let serialize data =
-        Data.write counters data 0ul
-        |> int32
-        |> create
-        |> Data.write serializers data
-        |> getBuffer
-    let deserialize bytes =
-        Reader (bytes)
-        |> run Data.read
+    let serialize = serialize Data.size Data.write
+    let deserialize = deserialize Data.read
 
 module Witnesses  =
     let hash witnesses =
-        List.write counters Witness.write witnesses 0ul
-        |> int32
-        |> create
-        |> List.write serializers Witness.write witnesses
-        |> getBuffer
-        |> Hash.compute
+        let bytes = serialize (List.size Witness.size) (List.write Witness.write) witnesses
+
+        Hash.compute bytes
 
 module Message =
-    let private write ops = fun c ->
-        ContractId.write ops c.recipient
-        >> String.write ops c.command
-        >> Option.write ops Data.write c.body
+    let private size c =
+        ContractId.size c.recipient + String.size c.command + Option.size Data.size c.body
 
-    let hash contractCommitment =
-        write counters contractCommitment 0ul
-        |> int32
-        |> create
-        |> write serializers contractCommitment
-        |> getBuffer
-        |> Hash.Hash
+    let private write stream = fun c ->
+        ContractId.write stream c.recipient
+        String.write stream c.command
+        Option.write stream Data.write c.body
+
+    let serialize = serialize size write
 
 module Outpoint =
-    let serialize outpoint =
-        Outpoint.write counters outpoint 0ul
-        |> int32
-        |> create
-        |> Outpoint.write serializers outpoint
-        |> getBuffer
-
-    let deserialize bytes =
-        Reader (bytes)
-        |> run Outpoint.read
+    let serialize = serialize Outpoint.size Outpoint.write
+    let deserialize = deserialize Outpoint.read
 
 module Input =
     open TxSkeleton
-    
+
     [<Literal>]
     let private SerializedPointedOutput = 1uy
     [<Literal>]
     let private SerializedMint = 2uy
 
-    let write ops = function
+    let size = function
         | PointedOutput pointedOutput ->
-            Byte.write ops SerializedPointedOutput
-            >> PointedOutput.write ops pointedOutput
+            Byte.size + PointedOutput.size pointedOutput
         | Mint spend ->
-            Byte.write ops SerializedMint
-            >> Spend.write ops spend
+            Byte.size + Spend.size spend
+
+    let write stream = function
+        | PointedOutput pointedOutput ->
+            Byte.write stream SerializedPointedOutput
+            PointedOutput.write stream pointedOutput
+        | Mint spend ->
+            Byte.write stream SerializedMint
+            Spend.write stream spend
     let read reader =
         let discriminator = Byte.read reader
         match discriminator with
@@ -1249,24 +1437,22 @@ module Input =
 module TxSkeleton =
     open TxSkeleton
 
-    let private write ops txSkeleton =
-        List.write ops Input.write txSkeleton.pInputs
-        >> List.write ops Output.write txSkeleton.outputs
+    let size txSkeleton =
+        List.size Input.size txSkeleton.pInputs
+        + List.size Output.size txSkeleton.outputs
 
-    let private read reader =
-        let pInputs = List.read Input.read reader
-        let outputs = List.read Output.read reader
+    let private write stream txSkeleton =
+        List.write Input.write stream txSkeleton.pInputs
+        List.write Output.write stream txSkeleton.outputs
+
+    let private read stream =
+        let pInputs = List.read Input.read stream
+        let outputs = List.read Output.read stream
         {
             pInputs = pInputs
             outputs = outputs
         }
 
-    let serialize outputStatus =
-        write counters outputStatus 0ul
-        |> int32
-        |> create
-        |> write serializers outputStatus
-        |> getBuffer
-    let deserialize bytes =
-        Reader (bytes)
-        |> run read
+    let serialize = serialize size write
+    let deserialize = deserialize read
+
