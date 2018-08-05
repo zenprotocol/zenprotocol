@@ -14,3 +14,4 @@ run src/Blockchain.Tests/bin/Debug/Blockchain.Tests.dll
 run src/Wallet.Tests/bin/Debug/Wallet.Tests.dll
 run src/AddressDB.Tests/bin/Debug/AddressDB.Tests.dll
 run src/Network.Tests/bin/Debug/Network.Tests.dll
+run src/Node.Tests/bin/Debug/Node.Tests.dll

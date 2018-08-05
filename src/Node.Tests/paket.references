@@ -12,3 +12,4 @@ FsUnit
 System.Reflection.Metadata
 FSharp.Data
 Zulib
+Logary
