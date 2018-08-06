@@ -16,7 +16,7 @@ module Address =
     let private SerializedContract = 2uy
 
     let size = function
-        | PK pkHash ->
+        | PK _ ->
             Byte.size + Hash.size
         |  Contract contractID ->
            Byte.size + ContractId.size contractID
@@ -82,8 +82,7 @@ module Output =
     let deserialize = deserialize read
 
 module Account =
-
-    let size account =
+    let size _ =
         Hash.size + 4
 
     let write stream account =
@@ -98,6 +97,24 @@ module Account =
             blockHash = blockHash
             blockNumber = blockNumber
         }
+
+    let serialize = serialize size write
+    let deserialize = deserialize read
+
+module ContractData =
+    let size (command, messageBody) =
+        String.size command + 
+        Option.size Data.size messageBody
+
+    let write stream (command, messageBody) =
+        String.write stream command
+        Option.write stream Data.write messageBody
+
+    let read reader =
+        let command = String.read reader
+        let messageBody = Option.read Data.read reader
+
+        command, messageBody
 
     let serialize = serialize size write
     let deserialize = deserialize read

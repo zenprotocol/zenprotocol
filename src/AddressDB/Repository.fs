@@ -75,6 +75,12 @@ let getHistory dataAccess session view skip take addresses =
     View.AddressOutpoints.get view dataAccess session addresses
     |> View.OutpointOutputs.get view dataAccess session
     |> getOutputsInfo account.blockNumber
+    |> List.sortWith Wallet.Account.txComparer
+    |> Wallet.Account.paginate skip take
+    |> List.map (fun (txHash,direction,spend,confirmations,_) -> txHash,direction,spend,confirmations)
+
+let getContractHistory dataAccess session view skip take contractId =
+    View.ContractData.get view dataAccess session contractId
     |> Wallet.Account.paginate skip take
 
 let addBlock dataAccess session blockHash block =
@@ -92,25 +98,33 @@ let addBlock dataAccess session blockHash block =
     |> Log.info
 
     block.transactions
-    |> List.mapi (fun blockIndex ex -> blockIndex, ex)
-    |> List.iter (fun (blockIndex, ex) ->
+    |> List.mapi (fun blockIndex ex -> blockIndex, ex.tx, ex.txHash)
+    |> List.iter (fun (blockIndex, tx, txHash) ->
         Confirmed (block.header.blockNumber, blockHash, blockIndex)
-        |> View.mapTxOutputs ex.tx ex.txHash
+        |> View.mapTxOutputs tx txHash
         |> List.iter (fun (address, outpoint, output) ->
             DataAccess.OutpointOutputs.put dataAccess session outpoint output
             DataAccess.AddressOutpoints.put dataAccess session address outpoint
         )
         
-        ex.tx.inputs
+        tx.inputs
         |> List.iter (function
             | Outpoint outpoint ->
                 match DataAccess.OutpointOutputs.tryGet dataAccess session outpoint with
                 | Some output ->
-                    { output with status = Spent (ex.txHash, Confirmed (block.header.blockNumber, blockHash, blockIndex)) }
+                    { output with status = Spent (txHash, Confirmed (block.header.blockNumber, blockHash, blockIndex)) }
                     |> DataAccess.OutpointOutputs.put dataAccess session outpoint
                 | None ->
                     failwithf "AddressDB could not resolve outpoint"
             | _ -> ()
+        )
+        
+        tx.witnesses
+        |> List.iter (function 
+            | ContractWitness cw ->
+                DataAccess.ContractData.put dataAccess session cw.contractId (cw.command, cw.messageBody)
+            | _ ->
+                ()
         )
     )
 
@@ -130,7 +144,8 @@ let undoBlock dataAccess session blockHash block =
     List.rev block.transactions
     |> List.iter (fun ex ->
         // Unmark outputs as spentg
-        List.iter (fun input ->
+        ex.tx.inputs
+        |> List.iter (fun input ->
             match input with
             | Outpoint outpoint ->
                 match DataAccess.OutpointOutputs.tryGet dataAccess session outpoint with
@@ -141,7 +156,7 @@ let undoBlock dataAccess session blockHash block =
                     ()
             | _ -> ()
 
-        ) ex.tx.inputs
+        )
 
         // Delete outputs
         ex.tx.outputs
@@ -152,6 +167,14 @@ let undoBlock dataAccess session blockHash block =
                 DataAccess.OutpointOutputs.delete dataAccess session outpoint
                 DataAccess.AddressOutpoints.delete dataAccess session output.address outpoint
             | None -> ()
+        )
+        
+        ex.tx.witnesses
+        |> List.iter (function 
+            | ContractWitness cw ->
+                DataAccess.ContractData.delete dataAccess session cw.contractId (cw.command, cw.messageBody)
+            | _ ->
+                ()
         )
     )
 
@@ -199,3 +222,4 @@ let reset dataAccess session =
 
     DataAccess.OutpointOutputs.truncate dataAccess session
     DataAccess.AddressOutpoints.truncate dataAccess session
+    DataAccess.ContractData.truncate dataAccess session

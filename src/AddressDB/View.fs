@@ -8,6 +8,7 @@ open DataAccess
 open Types
 open Hash
 open Messaging.Services.AddressDB
+open Zen.Types.Data
 
 let addOutput outputs outpoint output =
     Map.add outpoint output outputs
@@ -20,10 +21,19 @@ let addAddressOutpoints addressOutpoints address outpoints =
         | None -> []
     Map.add address outpoints addressOutpoints
 
+let addContractData contractData contractId data =
+    let data = 
+        data @
+        match Map.tryFind contractId contractData with 
+        | Some outpoints -> outpoints
+        | None -> []
+    Map.add contractId data contractData
+    
 type T =
     {
         outpointOutputs: Map<Outpoint, DBOutput>
         addressOutpoints: Map<Address, List<Outpoint>>
+        contractData: Map<ContractId, List<string * data option>>
     }
     with
         member this.getOutputs outputs = // add given (db) onto view (memory)
@@ -34,6 +44,7 @@ type T =
 let empty = {
     outpointOutputs = Map.empty
     addressOutpoints = Map.empty
+    contractData = Map.empty
 }
 
 module OutpointOutputs =
@@ -54,7 +65,16 @@ module AddressOutpoints =
         |> List.concat
     let get view dataAcesss session addresses =
         AddressOutpoints.get dataAcesss session addresses @ get' view addresses
-            
+
+module ContractData =
+    let private get' view contractId =
+        Map.tryFind contractId view.contractData
+        |> function 
+            | Some list -> list
+            | None -> List.empty
+    let get view dataAcesss session contractId =
+        ContractData.get dataAcesss session contractId @ get' view contractId
+        
 let mapTxOutputs tx txHash confirmationStatus =
     tx.outputs
     |> List.mapi (fun index output -> uint32 index, output)
@@ -94,8 +114,20 @@ let addMempoolTransaction dataAccess session txHash tx view =
         {
             outpointOutputs = addOutput view.outpointOutputs outpoint output
             addressOutpoints = addAddressOutpoints view.addressOutpoints address [ outpoint ]
-        }) view
-    )
+            contractData = view.contractData
+        }) view)
+    |> Option.map (fun view ->
+        tx.witnesses
+        |> List.fold (fun view -> function 
+            | ContractWitness cw ->
+                {
+                    outpointOutputs = view.outpointOutputs
+                    addressOutpoints = view.addressOutpoints
+                    contractData = addContractData view.contractData cw.contractId [ cw.command, cw.messageBody ]
+                }                
+            | _ ->
+                view
+        ) view)
     |> function
     | Some view' -> view'
     | None -> view

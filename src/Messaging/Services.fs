@@ -303,6 +303,8 @@ module Wallet =
 module AddressDB =
     open Wallet
 
+    type ContractHistoryResponse = List<string * data option>
+        
     type Mode =
         | All
         | UnspentOnly
@@ -314,20 +316,25 @@ module AddressDB =
         | GetBalance of addresses:string list
         | GetOutputs of addresses:string list * Mode
         | GetTransactions of addresses:string list * skip: int * take: int
+        | GetContractHistory of contractId : ContractId * skip: int * take: int
 
     let serviceName = "addressDB"
 
     //TODO: apply same convention to other services
-    let private send<'a> = Request.send<Request, Result<'a,string>>
+    let private send<'a> client = Request.send<Request, Result<'a,string>> client serviceName
 
-    let getBalance client addresses =
-        GetBalance addresses
-        |> send<BalanceResponse> client serviceName
+    let getBalance client args =
+        GetBalance args
+        |> send<BalanceResponse> client
 
-    let getOutputs client mode addresses =
-        GetOutputs (addresses, mode)
-        |> send<List<PointedOutput>> client serviceName
+    let getOutputs client args =
+        GetOutputs args
+        |> send<List<PointedOutput>> client
 
-    let getTransactions client addresses =
-        GetTransactions addresses
-        |> send<TransactionsResponse> client serviceName
+    let getTransactions client args =
+        GetTransactions args
+        |> send<TransactionsResponse> client
+
+    let getContractHistory client args =
+        GetContractHistory args
+        |> send<ContractHistoryResponse> client

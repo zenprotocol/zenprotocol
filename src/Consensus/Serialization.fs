@@ -332,7 +332,10 @@ module Serialization =
             let cHash = Hash.read stream
 
             ContractId (version, cHash)
-
+    
+        let serialize = serialize size write
+        let deserialize = deserialize read
+            
     module Asset =
         let private writeSubtype stream l = fun sb ->
             Byte.write stream (byte l)

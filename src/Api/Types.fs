@@ -289,3 +289,16 @@ type ContractExecuteFromTransactionJson = JsonProvider<"""
     "tx": "abcdef012346789"
 }
 """>
+
+type GetContractHistoryJson = JsonProvider<"""
+{
+    "contractId": "abcd1234",
+    "skip": 1000,
+    "take": 1000
+}""">
+
+type ContractCommandHistoryResultJson = JsonProvider<"""
+[{
+    "command": "command",
+    "messageBody": "abcdef012346789"
+}]""">

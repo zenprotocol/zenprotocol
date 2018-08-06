@@ -471,23 +471,24 @@ let getOutputsInfo blockNumber outputs =
             (txHash,TransactionDirection.Out, {asset=asset;amount = amount * -1I |> uint64}, confirmations, blockIndex))
     |> List.ofSeq
 
-let paginate skip take list =
-    let comparer (_,_,_,x1,x2) (_,_,_,y1,y2) =
-        if x1 < y1 then
-            -1
-        elif x1 > y1 then
-           1
-        else
-            y2 - x2
+let txComparer (_,_,_,x1,x2) (_,_,_,y1,y2) =
+    if x1 < y1 then
+        -1
+    elif x1 > y1 then
+       1
+    else
+        y2 - x2
 
-    List.sortWith comparer list
+let paginate skip take list =
+    list
     |> fun xs -> if List.length xs <= skip then [] else List.skip skip xs
     |> List.truncate take
-    |> List.map (fun (txHash,direction,spend,confirmations,_) -> txHash,direction,spend,confirmations)
 
 let getHistory dataAccess session view skip take =
     let account = DataAccess.Account.get dataAccess session
     
     View.Outputs.getAll view dataAccess session
     |> getOutputsInfo account.blockNumber
+    |> List.sortWith txComparer
     |> paginate skip take
+    |> List.map (fun (txHash,direction,spend,confirmations,_) -> txHash,direction,spend,confirmations)

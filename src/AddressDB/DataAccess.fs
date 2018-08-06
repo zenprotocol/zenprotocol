@@ -10,6 +10,7 @@ open Wallet.Serialization
 open AddressDB.Serialization
 open Consensus.Serialization
 open Wallet.Address
+open Zen.Types.Data
 
 let private getBytes str = Encoding.UTF8.GetBytes (str : string)
 
@@ -19,6 +20,7 @@ let DbVersion = 1
 type T = {
     outpointOutputs: Collection<Outpoint, DBOutput>
     addressOutpoints: MultiCollection<Address, Outpoint>
+    contractData: MultiCollection<ContractId, string * data option>
     account: SingleValue<Account>
     dbVersion: SingleValue<int>
 }
@@ -31,6 +33,7 @@ let init databaseContext =
     use session = DatabaseContext.createSession databaseContext
     let outpointOutputs = Collection.create session "outpointOutputs" Outpoint.serialize Output.serialize Output.deserialize
     let addressOutpoints = MultiCollection.create session "addressOutpoints" Address.serialize Outpoint.serialize Outpoint.deserialize
+    let contractData = MultiCollection.create session "contractData" Serialization.ContractId.serialize ContractData.serialize ContractData.deserialize
     let account = SingleValue.create databaseContext "account" Account.serialize Account.deserialize
     let dbVersion = SingleValue.create databaseContext "dbVersion" Version.serialize Version.deserialize
 
@@ -44,6 +47,7 @@ let init databaseContext =
     let t = {
         outpointOutputs = outpointOutputs
         addressOutpoints = addressOutpoints
+        contractData = contractData
         account = account
         dbVersion = dbVersion
     }
@@ -78,3 +82,9 @@ module AddressOutpoints =
         |> List.map (MultiCollection.get t.addressOutpoints session)
         |> List.concat
     let truncate t = MultiCollection.truncate t.addressOutpoints
+
+module ContractData =
+    let get t = MultiCollection.get t.contractData
+    let put t = MultiCollection.put t.contractData
+    let delete t = MultiCollection.delete t.contractData
+    let truncate t = MultiCollection.truncate t.contractData

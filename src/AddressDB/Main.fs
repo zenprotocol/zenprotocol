@@ -65,6 +65,10 @@ let requestHandler chain (requestId:RequestId) request dataAccess session view =
         decodeAddresses addresses
         <@> Repository.getHistory dataAccess session view skip take
         |> reply<TransactionsResponse> requestId
+    | GetContractHistory (contractId, skip, take) ->
+        Repository.getContractHistory dataAccess session view skip take contractId
+        |> Ok
+        |> reply<ContractHistoryResponse> requestId
     view
 
 type Wipe =
