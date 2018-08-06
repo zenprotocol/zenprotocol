@@ -73,19 +73,9 @@ let ``Data serialization round trip produces same result``(data:data) =
 let ``Different data don't produce same serialization result``(data1:data) (data2:data) =
     (data1 <> data2) ==> lazy (Data.serialize data1 <> Data.serialize data2)
 
-let serialize writer writer' x =
-    writer Serialization.counters x 0ul
-    |> int32
-    |> FsNetMQ.Stream.create
-    |> writer' Serialization.serializers x
-    |> FsNetMQ.Stream.getBuffer
-let deserialize reader bytes =
-    Reader (bytes)
-    |> run reader
-
-let serializeAmount x = serialize Serialization.Amount.write Serialization.Amount.write x
-let serializeAsset x = serialize Serialization.Asset.write Serialization.Asset.write x
-let serializeVarInt x = serialize Serialization.VarInt.write Serialization.VarInt.write x
+let serializeAmount x = serialize Serialization.Amount.size Serialization.Amount.write x
+let serializeAsset x = serialize Serialization.Asset.size Serialization.Asset.write x
+let serializeVarInt x = serialize Serialization.VarInt.size Serialization.VarInt.write x
 let deserializeAmount x = deserialize Serialization.Amount.read x
 let deserializeAsset x = deserialize Serialization.Asset.read x
 let deserializeVarInt x = deserialize Serialization.VarInt.read x
@@ -296,4 +286,40 @@ let ``Raw transactions equal extended transactions``(NonEmptyTransactions txs) =
         List.map (fun tx -> tx.raw) txs
         |> TransactionsRaw.serialize
 
-    TransactionsExtended.deserialize (List.length txs |> uint32) raw = Some txs
+    let result = TransactionsExtended.deserialize (List.length txs |> uint32) raw = Some txs
+
+    if not result then
+        printfn "%A" <| TransactionsExtended.deserialize (List.length txs |> uint32) raw
+
+    result
+
+let checkSize sizeFn write value =
+    let size = sizeFn value
+    let stream = Stream(Array.zeroCreate size)
+    write stream value
+
+    stream.Offset = size
+
+[<Property>]
+let ``Data amount wrote equal to Data.size``(data:data) =
+    checkSize Serialization.Data.size Serialization.Data.write data
+
+[<Property>]
+let ``Output amount wrote equal to Output.size``(output:Output) =
+    checkSize Serialization.Output.size Serialization.Output.write output
+
+[<Property>]
+let ``Input amount wrote equal to Input.size``(input:Input) =
+    checkSize Serialization.Input.size Serialization.Input.write input
+
+[<Property>]
+let ``Wintess amount wrote equal to Wintess.size``(witness:Witness) =
+    checkSize Serialization.Witness.size Serialization.Witness.write witness
+
+[<Property>]
+let ``Transaction amount wrote equal to Transaction.size``(tx:Transaction) =
+    checkSize (Serialization.Transaction.size Full) (Serialization.Transaction.write Full) tx
+
+[<Property>]
+let ``Block amount wrote equal to Block.size``(tx:Block) =
+    checkSize Serialization.Block.size Serialization.Block.write tx

@@ -182,18 +182,18 @@ let private signFirstWitness signKey tx = result {
             | _ -> Error "missing contract witness"
 
         let txHash = Transaction.hash tx
-        let messageHash = 
+        let message =
             {
                 recipient = witness.contractId
                 command = witness.command
                 body = witness.messageBody
-            }            
-            |> Serialization.Message.hash
-            
-        let msg = 
-            [ txHash; messageHash ]
-            |> Hash.joinHashes
-            
+            }
+            |> Serialization.Message.serialize
+
+        let msg =
+            [ Hash.bytes txHash; message ]
+            |> Hash.computeMultiple
+
         let! signature = ExtendedKey.sign msg signKey
         let! publicKey = ExtendedKey.getPublicKey signKey
 

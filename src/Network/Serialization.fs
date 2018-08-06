@@ -5,43 +5,31 @@ open Consensus.Serialization
 open Consensus.Serialization.Serialization
 open Infrastructure.Timestamp
 
-open FsNetMQ.Stream
-
 module Address =
+    let size ((address:string),(timestamp:Timestamp)) =
+        4 + System.Text.Encoding.ASCII.GetByteCount address + 8
 
-    let write ops ((address:string),(timestamp:Timestamp)) =
+    let write (stream:Stream) ((address:string),(timestamp:Timestamp)) =
         let bytes = System.Text.Encoding.ASCII.GetBytes address
 
-        ops.writeNumber4 (bytes.Length |> uint32)
-        >> ops.writeBytes bytes bytes.Length
-        >> ops.writeNumber8 (timestamp |> uint64)
+        stream.writeNumber4 (bytes.Length |> uint32)
+        stream.writeBytes bytes bytes.Length
+        stream.writeNumber8 (timestamp |> uint64)
 
-    let read (reader:Reader) =
-        let length = reader.readNumber4 () |>int
-        let address = reader.readBytes length
-        let timestamp = reader.readNumber8 ()
+    let read (stream:Stream) =
+        let length = stream.readNumber4 () |>int
+        let address = stream.readBytes length
+        let timestamp = stream.readNumber8 ()
 
         let address = System.Text.Encoding.ASCII.GetString(address)
         let timestamp = timestamp
         address,timestamp
 
-    let serialize address =
-        write counters address 0ul
-        |> int32
-        |> create
-        |> write serializers address
-        |> getBuffer
+    let serialize = serialize size write
 
 module Addresses =
-    let serialize addresses =
-        Seq.writeBody counters Address.write addresses 0ul
-        |> int32
-        |> create
-        |> Seq.writeBody serializers Address.write addresses
-        |> getBuffer
+    let serialize : (string*Timestamp) seq -> byte array =
+        serialize (Seq.sizeBody Address.size) (Seq.writeBody Address.write)
 
-    let deserialize count bytes =
-        Reader (bytes)
-        |> run (List.readBody count Address.read)
-
+    let deserialize count = deserialize (List.readBody count Address.read)
 

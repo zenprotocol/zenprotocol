@@ -99,17 +99,17 @@ let ``contract witness with valid signature``() =
         }
 
     let txHash = Transaction.hash tx
-    let messageHash =
+    let message =
         {
             recipient = contractId
             command = ""
             body = None
         }
-        |> Serialization.Message.hash
+        |> Serialization.Message.serialize
 
     let msg =
-        [ txHash; messageHash ]
-        |> Hash.joinHashes
+        [ Hash.bytes txHash; message ]
+        |> Hash.computeMultiple
 
     let signature = ExtendedKey.sign msg (snd account) |> Result.get
 
@@ -218,17 +218,17 @@ let ``contract witness with unexpcected public key``() =
         }
 
     let txHash = Transaction.hash tx
-    let messageHash =
+    let message=
         {
             recipient = contractId
             command = ""
             body = None
         }
-        |> Serialization.Message.hash
+        |> Serialization.Message.serialize
 
     let msg =
-        [ txHash; messageHash ]
-        |> Hash.joinHashes
+        [ Hash.bytes txHash; message]
+        |> Hash.computeMultiple
 
     let key = ExtendedKey.derivePath "m/0'" (snd account) |> Result.get
 
@@ -269,17 +269,17 @@ let ``contract witness with invalid execution cost``() =
         }
 
     let txHash = Transaction.hash tx
-    let messageHash =
+    let message =
         {
             recipient = contractId
             command = ""
             body = None
         }
-        |> Serialization.Message.hash
+        |> Serialization.Message.serialize
 
     let msg =
-        [ txHash; messageHash ]
-        |> Hash.joinHashes
+        [ Hash.bytes txHash; message]
+        |> Hash.computeMultiple
 
     let signature = ExtendedKey.sign msg (snd account) |> Result.get
 

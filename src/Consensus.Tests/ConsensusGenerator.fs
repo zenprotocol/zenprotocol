@@ -219,6 +219,44 @@ type ConsensusGenerator =
                 lockGen;
             ])
 
+    static member ContractWitness() =
+        Arb.fromGen (gen {
+            let! cHash = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+            let! command = Arb.generate<string> |> Gen.filter ((<>) null)
+
+            let! beginInputs = Arb.generate<uint32>
+            let! beginOutputs = Arb.generate<uint32>
+            let! inputsLength = Arb.generate<uint32>
+            let! outputsLength = Arb.generate<uint32>
+            let! cost = Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
+            let! data = Arb.generate<Option<data>>
+
+            let! hasSignature = Arb.generate<bool>
+
+            let secretKey, publicKey = KeyPair.create()
+            let! hash = Arb.generate<Hash.Hash>
+            let signature = sign secretKey hash
+
+            let signature =
+                if hasSignature then
+                    Some (publicKey, signature)
+                else
+                    None
+
+            return ContractWitness {
+                contractId = ContractId (Version0, Hash.Hash cHash)
+                command = command
+                messageBody = data
+                stateCommitment = NotCommitted;
+                beginInputs = beginInputs
+                beginOutputs = beginOutputs
+                inputsLength = inputsLength
+                outputsLength = outputsLength
+                signature = signature
+                cost = cost
+            }
+        })
+
     static member Transaction() =
         let outpointGenerator =
             gen {

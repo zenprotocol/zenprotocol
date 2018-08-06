@@ -69,7 +69,7 @@ let private validateWitness context acs getContractState contractStates _ finalT
 
         let contractWallet = Contract.getContractWallet finalTx w
         let! contractState = validateState contract w getContractState contractStates
-        
+
         do! validateCost contract inputTx context sender contractWallet w contractState
 
         // running the contract
@@ -119,12 +119,12 @@ let private getSender (w:ContractWitness) txHash =
                 recipient = w.contractId
                 command = w.command
                 body = w.messageBody
-            } : Message) 
-            |> Serialization.Message.hash
+            } : Message)
+            |> Serialization.Message.serialize
 
         let msg =
-            [ txHash; messageHash ]
-            |> Hash.joinHashes
+            [ Hash.bytes txHash; messageHash ]
+            |> Hash.computeMultiple
 
         match Crypto.verify publicKey signature msg with
         | Crypto.Valid ->

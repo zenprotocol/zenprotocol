@@ -15,14 +15,20 @@ module Address =
     [<Literal>]
     let private SerializedContract = 2uy
 
-    let write ops = function
+    let size = function
         | PK pkHash ->
-            Byte.write ops SerializedPK
-            >> Hash.write ops pkHash
+            Byte.size + Hash.size
+        |  Contract contractID ->
+           Byte.size + ContractId.size contractID
+
+    let write stream = function
+        | PK pkHash ->
+            Byte.write stream SerializedPK
+            Hash.write stream pkHash
         | Contract contractID ->
-            Byte.write ops SerializedContract
-            >> ContractId.write ops contractID
-    let read reader = 
+            Byte.write stream SerializedContract
+            ContractId.write stream contractID
+    let read reader =
         let discriminator = Byte.read reader
         match discriminator with
         | SerializedPK ->
@@ -33,34 +39,35 @@ module Address =
             Contract contractID
         | _ ->
             raise SerializationException
-    
-    let serialize address =
-        write counters address 0ul
-        |> int32
-        |> create
-        |> write serializers address
-        |> getBuffer
 
-    let deserialize bytes =
-        Reader (bytes)
-        |> run read
+    let serialize = serialize size write
+    let deserialize = deserialize read
+
 
 module Output =
-    let write ops output =
-        Address.write ops output.address
-        >> Spend.write ops output.spend
-        >> Lock.write ops output.lock
-        >> Outpoint.write ops output.outpoint
-        >> Status.write ops output.status
-        >> ConfirmationStatus.write ops output.confirmationStatus
+    let size output =
+        Address.size output.address
+        + Spend.size output.spend
+        + Lock.size output.lock
+        + Outpoint.size output.outpoint
+        + Status.size output.status
+        + ConfirmationStatus.size output.confirmationStatus
 
-    let read reader =
-        let address = Address.read reader
-        let spend = Spend.read reader
-        let lock = Lock.read reader
-        let outpoint = Outpoint.read reader
-        let status = Status.read reader
-        let confirmationStatus = ConfirmationStatus.read reader
+    let write stream output =
+        Address.write stream output.address
+        Spend.write stream output.spend
+        Lock.write stream output.lock
+        Outpoint.write stream output.outpoint
+        Status.write stream output.status
+        ConfirmationStatus.write stream output.confirmationStatus
+
+    let read stream =
+        let address = Address.read stream
+        let spend = Spend.read stream
+        let lock = Lock.read stream
+        let outpoint = Outpoint.read stream
+        let status = Status.read stream
+        let confirmationStatus = ConfirmationStatus.read stream
 
         {
             address = address
@@ -71,38 +78,26 @@ module Output =
             confirmationStatus = confirmationStatus
         }
 
-    let serialize output =
-        write counters output 0ul
-        |> int32
-        |> create
-        |> write serializers output
-        |> getBuffer
-
-    let deserialize bytes =
-        Reader (bytes)
-        |> run read
+    let serialize = serialize size write
+    let deserialize = deserialize read
 
 module Account =
-    let write ops account =
-        Hash.write ops account.blockHash
-        >> ops.writeNumber4 account.blockNumber
 
-    let read reader =
-        let blockHash = Hash.read reader
-        let blockNumber = reader.readNumber4 () 
+    let size account =
+        Hash.size + 4
+
+    let write stream account =
+        Hash.write stream account.blockHash
+        stream.writeNumber4 account.blockNumber
+
+    let read stream =
+        let blockHash = Hash.read stream
+        let blockNumber = stream.readNumber4 ()
 
         {
             blockHash = blockHash
             blockNumber = blockNumber
         }
 
-    let serialize account =
-        write counters account 0ul
-        |> int32
-        |> create
-        |> write serializers account
-        |> getBuffer
-
-    let deserialize bytes =
-        Reader (bytes)
-        |> run read
+    let serialize = serialize size write
+    let deserialize = deserialize read
