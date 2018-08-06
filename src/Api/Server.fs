@@ -19,6 +19,7 @@ open FSharp.Data
 open Hopac.Extensions.Seq
 open FsBech32
 open Hash
+open Wallet
 
 [<Literal>]
 let BlockTemplateCacheSize = 500
@@ -494,6 +495,16 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
 
         | Error error ->
             reply StatusCode.BadRequest <| TextContent error
+    | Post ("/blockchain/contract/execute", Some body) ->
+        parseContractExecuteFromTransactionJson chain body 
+        >>= (fun (contractId, command, message, tx, sender) -> 
+            Blockchain.executeContract client contractId command sender message tx)
+        <@> (Transaction.serialize Full
+            >> Base16.encode
+            >> TextContent
+            >> reply StatusCode.OK)
+        |> Result.mapError replyError
+        |> ignore
     | Post ("/wallet/importwatchonlyaddress", Some json) ->
         match Parsing.parseAddress json with
         | Ok address ->
@@ -570,8 +581,6 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
                     |> reply StatusCode.OK
                 | Error error -> reply StatusCode.BadRequest (TextContent error)
             | _ -> reply StatusCode.BadRequest (TextContent "address is missing")
-
-
         parseConfirmations query reply get
     | Get("/blockchain/blockreward", query) ->
         match Map.tryFind "blockNumber" query with
@@ -617,8 +626,54 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
             | Error error -> replyError error
         | Error error ->
             replyError error
+    | Post("/addressdb/balance", Some json) ->
+        match parseGetBalanceJson chain json with
+        | Error error -> reply StatusCode.BadRequest (TextContent error)            
+        | Ok addresses ->
+            match AddressDB.getBalance client addresses with 
+            | Ok balance ->
+                balance
+                |> Map.toSeq
+                |> Seq.map (fun (asset, amount) -> new BalanceResponseJson.Root(Asset.toString asset, int64 amount))
+                |> Seq.map (fun json -> json.JsonValue)
+                |> Seq.toArray
+                |> JsonValue.Array
+                |> JsonContent
+                |> reply StatusCode.OK
+            | Error error -> reply StatusCode.BadRequest (TextContent error)
+    | Post("/addressdb/outputs", Some json) ->
+        match parseGetOutputsJson chain json with
+        | Error error -> reply StatusCode.BadRequest (TextContent error)            
+        | Ok (addresses, mode) ->
+            match AddressDB.getOutputs client mode addresses with 
+            | Ok pointedOutputs ->
+                pointedOutputs
+                |> Seq.map (pointedOutputEncoder chain)
+                |> Seq.toArray
+                |> JsonValue.Array
+                |> JsonContent
+                |> reply StatusCode.OK
+            | Error error -> reply StatusCode.BadRequest (TextContent error)
+    | Post("/addressdb/transactions", Some json) ->
+        match parseGetHistoryJson chain json with
+        | Error error -> reply StatusCode.BadRequest (TextContent error)            
+        | Ok addresses ->
+            match AddressDB.getTransactions client addresses with 
+            | Ok txs ->
+                let json =
+                    txs
+                    |> List.map (fun (txHash,direction, spend, confirmations) ->
+                        let amount = (if direction = TransactionDirection.In then 1L else -1L) * int64 spend.amount
+
+                        (new TransactionsResponseJson.Root(Hash.toString txHash, Asset.toString spend.asset, amount, int confirmations)).JsonValue)
+                    |> List.toArray
+                    |> JsonValue.Array
+                (new TransactionsResponseJson.Root(json)).JsonValue
+                |> JsonContent
+                |> reply StatusCode.OK
+            | Error error -> reply StatusCode.BadRequest (TextContent error)
     | _ ->
-        reply StatusCode.NotFound NoContent
+        reply StatusCode.BadRequest (TextContent "unmatched request")
 
 let create chain poller busName bind =
     let httpAgent = Http.Server.create poller bind

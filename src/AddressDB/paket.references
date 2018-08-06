@@ -1,0 +1,10 @@
+FsNetMQ
+FSharp.Control.Reactive
+FSharp.Core
+FsBech32
+FSharp.Compiler.Tools
+Base58Check
+NBitcoin
+BouncyCastle
+Logary
+Zulib

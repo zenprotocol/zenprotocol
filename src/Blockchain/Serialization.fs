@@ -159,17 +159,6 @@ module ExtendedBlockHeader =
         Reader (bytes)
         |> run read
 
-module Outpoint =
-    let serialize outpoint =
-        Outpoint.write counters outpoint 0ul
-        |> int32
-        |> create
-        |> Outpoint.write serializers outpoint
-        |> getBuffer
-    let deserialize bytes =
-        Reader (bytes)
-        |> run Outpoint.read
-
 module OutputStatus =
     [<Literal>]
     let private SerializedNoOutput = 1uy
@@ -211,8 +200,6 @@ module OutputStatus =
         |> run read
 
 module PointedOutput =
-    open Zen.Types.Extracted
-
     let write ops (outpoint, output) =
         Outpoint.write ops outpoint
         >> Output.write ops output

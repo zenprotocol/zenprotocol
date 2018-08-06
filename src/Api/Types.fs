@@ -259,3 +259,33 @@ type ImportZenPublicKey = JsonProvider<"""
 {
     "publicKey":"abcd1234"    
 }""">
+
+type GetBalanceJson = JsonProvider<"""
+{
+    "addresses": ["abcd1234", "abcd1234" ]
+}""">
+
+type GetHistoryJson = JsonProvider<"""
+{
+    "addresses": ["abcd1234", "abcd1234" ],
+    "skip": 1000,
+    "take": 1000
+}""">
+
+type GetOutputsJson = JsonProvider<"""
+{
+    "addresses": ["abcd1234", "abcd1234" ],
+    "mode": "all"    
+}""">
+
+type ContractExecuteFromTransactionJson = JsonProvider<"""
+{
+    "address": "address",
+    "command": "command",
+    "messageBody": "message body",
+    "options": {
+        "sender": "publickey"
+    },
+    "tx": "abcdef012346789"
+}
+""">

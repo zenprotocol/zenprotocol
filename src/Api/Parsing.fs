@@ -4,15 +4,26 @@ open Api
 open FSharp.Data
 open Api.Types
 open Consensus
-open Consensus.Types
+open Serialization
+open Serialization.Serialization
+open Crypto
+open Types
 open FsBech32
 open System.Text
 open Newtonsoft.Json
+open Wallet
+open Infrastructure
+open Infrastructure.Result
 
 let private getSpend asset amount =
     match Asset.fromString asset with
     | Some asset -> Ok { asset = asset; amount = uint64 amount }
     | None -> Error "invalid asset"
+
+let private getOutpoint txHash index =
+    Hash.fromString txHash 
+    |> Result.mapError (fun _ -> "invalid txHash")
+    <@> fun txHash -> { txHash = txHash; index = index }
 
 let parseSendJson chain json =
     try
@@ -92,6 +103,43 @@ let parseContractExecuteJson chain json =
                     |> Error
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
+
+let parseContractExecuteFromTransactionJson chain json =
+    Exception.resultWrap<ContractExecuteFromTransactionJson.Root, string> (ContractExecuteFromTransactionJson.Parse json) "Invalid JSON"
+    >>= (fun json ->
+        Address.decodeContract chain json.Address
+        >>= fun address -> Ok (json, address))
+    >>= (fun (json, contractId) -> 
+        json.Tx
+        |> Base16.decode
+        |> Result.ofOption "Invalid tx: decoding"
+        >>= (TxSkeleton.deserialize
+            >> Result.ofOption "Invalid tx: deserializing")
+        >>= fun tx -> Ok (json, contractId, tx))
+    >>= (fun (json, contractId, tx) ->
+        (if System.String.IsNullOrEmpty json.MessageBody then
+            Ok None
+        else
+            json.MessageBody
+            |> Base16.decode 
+            |> Result.ofOption "Invalid data: decoding"
+            >>= (Data.deserialize 
+                >> Result.ofOption "Invalid data: deserializing")
+                <@> Some)
+        <@> (fun messageBody -> json, contractId, tx, messageBody))
+    >>= (fun (json, contractId, tx, messageBody) ->
+        (if System.String.IsNullOrEmpty json.Options.Sender then
+            Ok None
+        else
+            json.Options.Sender
+            |> Base16.decode
+            |> Result.ofOption "Invalid sender: decoding"
+            >>= (PublicKey.deserialize 
+                >> Result.ofOption "Invalid sender: deserializing")
+                <@> Some)
+        <@> (fun sender -> json, contractId, tx, messageBody, sender))
+    <@> (fun (json, contractId, tx, messageBody, sender) ->
+        contractId, json.Command, messageBody, tx, sender)
 
 let parseContractActivateJson json =
     try
@@ -245,7 +293,6 @@ let parseAddress json =
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
 
-
 let parseTxHexJson json =
     try
         let hex = TxHexJson.Parse json
@@ -268,4 +315,46 @@ let parseImportZenPublicKey json =
         let json = ImportZenPublicKey.Parse json
         json.PublicKey |> Ok
     with _ as ex ->
-        Error ("Json is invalid: " + ex.Message)            
+        Error ("Json is invalid: " + ex.Message)
+
+let private checkAddresses chain addresses =
+    if Array.isEmpty addresses then
+        Error "Empty addresses list"
+    else
+        addresses
+        |> Array.toList
+        |> Infrastructure.Result.traverseResultM (Address.decodeAny chain) 
+        <@> List.map (Wallet.Address.encode chain)
+
+let parseGetBalanceJson chain json =
+    try
+        let json = GetBalanceJson.Parse json
+        
+        checkAddresses chain json.Addresses
+    with _ as ex ->
+        Error ("Json invalid: " + ex.Message)
+
+let parseGetHistoryJson chain json =
+    try
+        let json = GetHistoryJson.Parse json
+        
+        checkAddresses chain json.Addresses
+        <@> fun addresses -> addresses, json.Skip, json.Take
+    with _ as ex ->
+        Error ("Json invalid: " + ex.Message)
+
+let parseGetOutputsJson chain json =
+    try
+        let json = GetOutputsJson.Parse json
+
+        checkAddresses chain json.Addresses
+        >>= fun addresses -> 
+            match json.Mode with 
+            | "all" -> 
+                Ok (addresses, Messaging.Services.AddressDB.Mode.All)
+            | "unspentOnly" -> 
+                Ok (addresses, Messaging.Services.AddressDB.Mode.UnspentOnly)
+            | _ ->
+                Error "unrecognized mode"
+    with _ as ex ->
+        Error ("Json invalid: " + ex.Message)

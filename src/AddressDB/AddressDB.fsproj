@@ -1,20 +1,19 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\..\packages\NUnit\build\NUnit.props" Condition="Exists('..\..\packages\NUnit\build\NUnit.props')" Label="Paket" />
   <Import Project="..\..\packages\FSharp.Compiler.Tools\build\FSharp.Compiler.Tools.props" Condition="Exists('..\..\packages\FSharp.Compiler.Tools\build\FSharp.Compiler.Tools.props')" Label="Paket" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <Import Project="..\packages\FSharp.Compiler.Tools.10.0.1\build\FSharp.Compiler.Tools.props" Condition="Exists('..\packages\FSharp.Compiler.Tools.10.0.1\build\FSharp.Compiler.Tools.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{9755DEA0-2931-486A-984A-0FAD1C44EDF7}</ProjectGuid>
+    <ProjectGuid>{9BE81A69-5452-4B96-805A-C0906C767ADC}</ProjectGuid>
     <OutputType>Exe</OutputType>
-    <RootNamespace>Node</RootNamespace>
-    <AssemblyName>zen-node</AssemblyName>
+    <RootNamespace>AddressDB</RootNamespace>
+    <AssemblyName>AddressDB</AssemblyName>
     <TargetFrameworkVersion>v4.7</TargetFrameworkVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <DocumentationFile>bin\$(Configuration)\$(AssemblyName).xml</DocumentationFile>
-    <Name>Node</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -24,9 +23,7 @@
     <OutputPath>bin\$(Configuration)\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Debug\zen-node.XML</DocumentationFile>
     <OtherFlags>--warnon:1182</OtherFlags>
-    <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -38,51 +35,31 @@
     <OtherFlags>--warnon:1182</OtherFlags>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Accessibility" />
     <Reference Include="mscorlib" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
+    <Reference Include="System.ValueTuple">
+      <HintPath>..\packages\System.ValueTuple.4.4.0\lib\netstandard1.0\System.ValueTuple.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="Program.fs" />
-    <Content Include="main.yaml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="paket.references" />
-    <Content Include="scheme.yaml" />
-    <Content Include="test.yaml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="zen-cli">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="zen-node">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <None Include="App.config" />
+    <Compile Include="Types.fs" />
+    <Compile Include="Serialization.fs" />
+    <Compile Include="DataAccess.fs" />
+    <Compile Include="View.fs" />
+    <Compile Include="Account.fs" />
+    <Compile Include="Main.fs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\AddressDB\AddressDB.fsproj">
-      <Project>{9BE81A69-5452-4B96-805A-C0906C767ADC}</Project>
-      <Name>AddressDB</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Api\Api.fsproj">
-      <Project>{bc871da3-27d5-447d-a35e-d5da8e8f9bc7}</Project>
-      <Name>Api</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Blockchain\Blockchain.fsproj">
-      <Project>{16b10d81-c99e-4562-810c-9b637234c72d}</Project>
-      <Name>Blockchain</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Cli\Cli.fsproj">
-      <Project>{f2ab0cff-5137-4a1c-858a-d317181b29fe}</Project>
-      <Name>Cli</Name>
-    </ProjectReference>
     <ProjectReference Include="..\Consensus\Consensus.fsproj">
       <Project>{5ec4457b-615a-4bbd-b3d5-d0e311b9d5e9}</Project>
       <Name>Consensus</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\DataAccess\DataAccess.fsproj">
+      <Project>{cd83f0e5-0e3b-4582-924a-18da50f4d7c7}</Project>
+      <Name>DataAccess</Name>
     </ProjectReference>
     <ProjectReference Include="..\Infrastructure\Infrastructure.fsproj">
       <Project>{81161f64-d019-422c-a3cf-321cde6ca209}</Project>
@@ -92,55 +69,20 @@
       <Project>{44277422-32e3-4f1b-bd6d-153b7a621444}</Project>
       <Name>Messaging</Name>
     </ProjectReference>
-    <ProjectReference Include="..\Miner\Miner.fsproj">
-      <Project>{26ee7861-df8c-46ea-889b-0a585b687209}</Project>
-      <Name>Miner</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Network\Network.fsproj">
-      <Project>{8471efe5-4b38-4969-ac2a-0bf64a031eba}</Project>
-      <Name>Network</Name>
-    </ProjectReference>
     <ProjectReference Include="..\Wallet\Wallet.fsproj">
       <Project>{289a59eb-d1d4-499f-87b9-f75b799829c0}</Project>
       <Name>Wallet</Name>
     </ProjectReference>
   </ItemGroup>
-  <PropertyGroup>
-    <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
-  </PropertyGroup>
-  <Import Project="$(FSharpTargetsPath)" />
+  <ItemGroup>
+    <Content Include="paket.references" />
+  </ItemGroup>
+  <Import Project="$(FSharpTargetsPath)" Condition="Exists('$(FSharpTargetsPath)')" />
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
       <PropertyGroup>
         <__paket__zen_z3_osx_targets>net40\zen_z3_osx</__paket__zen_z3_osx_targets>
       </PropertyGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
-      <PropertyGroup>
-        <__paket__zen_secp256k1_osx_targets>net40\zen_secp256k1_osx</__paket__zen_secp256k1_osx_targets>
-      </PropertyGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
-      <PropertyGroup>
-        <__paket__zen_secp256k1_linux_targets>net40\zen_secp256k1_linux</__paket__zen_secp256k1_linux_targets>
-      </PropertyGroup>
-    </When>
-  </Choose>
-  <Import Project="..\lmdb.targets" />
-  <Import Project="..\secp256k1_windows.targets" />
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
-      <ItemGroup>
-        <Reference Include="Argu">
-          <HintPath>..\..\packages\Argu\lib\net45\Argu.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
     </When>
   </Choose>
   <Choose>
@@ -151,6 +93,17 @@
         </Reference>
         <Reference Include="AsyncIO">
           <HintPath>..\..\packages\AsyncIO\lib\net40\AsyncIO.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
+      <ItemGroup>
+        <Reference Include="Base58Check">
+          <HintPath>..\..\packages\Base58Check\lib\Net40\Base58Check.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
@@ -211,22 +164,6 @@
       <ItemGroup>
         <Reference Include="FSharp.Compatibility.OCaml">
           <HintPath>..\..\packages\FSharp.Compatibility.OCaml\lib\net45\FSharp.Compatibility.OCaml.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
-      <ItemGroup>
-        <Reference Include="FSharp.Configuration">
-          <HintPath>..\..\packages\FSharp.Configuration\lib\net45\FSharp.Configuration.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-        <Reference Include="SharpYaml">
-          <HintPath>..\..\packages\FSharp.Configuration\lib\net45\SharpYaml.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
@@ -312,11 +249,33 @@
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
       <ItemGroup>
+        <Reference Include="NBitcoin">
+          <HintPath>..\..\packages\NBitcoin\lib\net461\NBitcoin.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
+      <ItemGroup>
         <Reference Include="System.ServiceModel">
           <Paket>True</Paket>
         </Reference>
         <Reference Include="NetMQ">
           <HintPath>..\..\packages\NetMQ\lib\net40\NetMQ.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
+      <ItemGroup>
+        <Reference Include="Newtonsoft.Json">
+          <HintPath>..\..\packages\Newtonsoft.Json\lib\net45\Newtonsoft.Json.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
@@ -362,6 +321,28 @@
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
       <ItemGroup>
+        <Reference Include="System.IO">
+          <HintPath>..\..\packages\System.IO\lib\net462\System.IO.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
+      <ItemGroup>
+        <Reference Include="System.Net.Http">
+          <HintPath>..\..\packages\System.Net.Http\lib\net46\System.Net.Http.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
+      <ItemGroup>
         <Reference Include="System.Windows">
           <Paket>True</Paket>
         </Reference>
@@ -382,107 +363,66 @@
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
       <ItemGroup>
-        <Reference Include="System.Reactive.Core">
-          <HintPath>..\..\packages\System.Reactive.Core\lib\net46\System.Reactive.Core.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
-      <ItemGroup>
-        <Reference Include="System.Reactive.Experimental">
-          <HintPath>..\..\packages\System.Reactive.Experimental\lib\net46\System.Reactive.Experimental.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
-      <ItemGroup>
-        <Reference Include="System.Reactive.Interfaces">
-          <HintPath>..\..\packages\System.Reactive.Interfaces\lib\net46\System.Reactive.Interfaces.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
-      <ItemGroup>
-        <Reference Include="System.Reactive.Linq">
-          <HintPath>..\..\packages\System.Reactive.Linq\lib\net46\System.Reactive.Linq.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
-      <ItemGroup>
-        <Reference Include="System.Reactive.PlatformServices">
-          <HintPath>..\..\packages\System.Reactive.PlatformServices\lib\net46\System.Reactive.PlatformServices.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
-      <ItemGroup>
-        <Reference Include="System.Reactive.Providers">
-          <HintPath>..\..\packages\System.Reactive.Providers\lib\net46\System.Reactive.Providers.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
-      <ItemGroup>
-        <Reference Include="System.Reactive.Runtime.Remoting">
-          <HintPath>..\..\packages\System.Reactive.Runtime.Remoting\lib\net46\System.Reactive.Runtime.Remoting.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
-      <ItemGroup>
-        <Reference Include="System.Reactive.Windows.Forms">
-          <HintPath>..\..\packages\System.Reactive.Windows.Forms\lib\net46\System.Reactive.Windows.Forms.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
-      <ItemGroup>
-        <Reference Include="System.Reactive.Windows.Threading">
-          <HintPath>..\..\packages\System.Reactive.Windows.Threading\lib\net46\System.Reactive.Windows.Threading.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-      </ItemGroup>
-    </When>
-  </Choose>
-  <Choose>
-    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
-      <ItemGroup>
         <Reference Include="System.Reflection.Metadata">
           <HintPath>..\..\packages\System.Reflection.Metadata\lib\netstandard1.1\System.Reflection.Metadata.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
+      <ItemGroup>
+        <Reference Include="System.ComponentModel.Composition">
+          <Paket>True</Paket>
+        </Reference>
+        <Reference Include="System.Runtime">
+          <HintPath>..\..\packages\System.Runtime\lib\net462\System.Runtime.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
+      <ItemGroup>
+        <Reference Include="System.Security.Cryptography.Algorithms">
+          <HintPath>..\..\packages\System.Security.Cryptography.Algorithms\lib\net463\System.Security.Cryptography.Algorithms.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
+      <ItemGroup>
+        <Reference Include="System.Security.Cryptography.Encoding">
+          <HintPath>..\..\packages\System.Security.Cryptography.Encoding\lib\net46\System.Security.Cryptography.Encoding.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
+      <ItemGroup>
+        <Reference Include="System.Security.Cryptography.Primitives">
+          <HintPath>..\..\packages\System.Security.Cryptography.Primitives\lib\net46\System.Security.Cryptography.Primitives.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
+      <ItemGroup>
+        <Reference Include="System.Security.Cryptography.X509Certificates">
+          <HintPath>..\..\packages\System.Security.Cryptography.X509Certificates\lib\net461\System.Security.Cryptography.X509Certificates.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
@@ -511,8 +451,6 @@
       </ItemGroup>
     </When>
   </Choose>
-  <Import Project="..\..\packages\zen_secp256k1_linux\build\$(__paket__zen_secp256k1_linux_targets).targets" Condition="Exists('..\..\packages\zen_secp256k1_linux\build\$(__paket__zen_secp256k1_linux_targets).targets')" Label="Paket" />
-  <Import Project="..\..\packages\zen_secp256k1_osx\build\$(__paket__zen_secp256k1_osx_targets).targets" Condition="Exists('..\..\packages\zen_secp256k1_osx\build\$(__paket__zen_secp256k1_osx_targets).targets')" Label="Paket" />
   <Import Project="..\..\packages\zen_z3_linux\build\zen_z3_linux.targets" Condition="Exists('..\..\packages\zen_z3_linux\build\zen_z3_linux.targets')" Label="Paket" />
   <Import Project="..\..\packages\zen_z3_osx\build\$(__paket__zen_z3_osx_targets).targets" Condition="Exists('..\..\packages\zen_z3_osx\build\$(__paket__zen_z3_osx_targets).targets')" Label="Paket" />
   <Import Project="..\..\packages\zen_z3_windows\build\zen_z3_windows.targets" Condition="Exists('..\..\packages\zen_z3_windows\build\zen_z3_windows.targets')" Label="Paket" />

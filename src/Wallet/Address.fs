@@ -1,4 +1,4 @@
-﻿module Address
+﻿module Wallet.Address
 
 open Consensus
 open Consensus.Hash

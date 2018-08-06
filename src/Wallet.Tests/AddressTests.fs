@@ -4,6 +4,7 @@ open NUnit.Framework
 open Consensus
 open Consensus.Types
 open Chain
+open Wallet
 open Address
 open Hash
 open FsCheck.NUnit

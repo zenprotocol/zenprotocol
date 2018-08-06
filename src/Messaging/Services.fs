@@ -132,7 +132,6 @@ module Blockchain =
     let tryGetBlockChainInfo client =
         Request.trySend<Request,BlockchainInfo> client serviceName GetBlockChainInfo
 
-
     let requestHeaders client peerId startBlockHash endBlockHash=
         RequestHeaders (peerId,startBlockHash,endBlockHash) |> Command.send client serviceName
 
@@ -180,7 +179,7 @@ module Network =
 
 module Wallet =
     type BalanceResponse = Map<Asset,uint64>
-
+    
     type TransactionDirection =
         | In
         | Out
@@ -291,7 +290,39 @@ module Wallet =
     let importZenPublicKey client publicKey =
         ImportZenPublicKey publicKey
         |> Request.send<Request,Result<unit,string>> client serviceName
+        
+    let removeAccount client password = 
+        RemoveAccount password        
+        |> Request.send<Request,Result<unit,string>> client serviceName        
 
-    let removeAccount client password =
-        RemoveAccount password
-        |> Request.send<Request,Result<unit,string>> client serviceName
+module AddressDB =
+    open Wallet
+        
+    type Mode =
+        | All
+        | UnspentOnly
+
+    type Command =
+        | Resync
+
+    type Request =
+        | GetBalance of addresses:string list
+        | GetOutputs of addresses:string list * Mode
+        | GetTransactions of addresses:string list * skip: int * take: int
+
+    let serviceName = "addressDB"
+    
+    //TODO: apply same convention to other services
+    let private send<'a> = Request.send<Request, Result<'a,string>>
+
+    let getBalance client addresses =
+        GetBalance addresses
+        |> send<BalanceResponse> client serviceName
+
+    let getOutputs client mode addresses =
+        GetOutputs (addresses, mode)
+        |> send<List<PointedOutput>> client serviceName
+
+    let getTransactions client addresses =
+        GetTransactions addresses 
+        |> send<TransactionsResponse> client serviceName

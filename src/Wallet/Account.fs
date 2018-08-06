@@ -435,15 +435,11 @@ let getMnemonicPhrase dataAccess session password =
 
     Secured.decrypt password account.secureMnemonicPhrase
 
-let getHistory dataAccess session view skip take =
-    let account = DataAccess.Account.get dataAccess session
-
-    let outputs = View.Outputs.getAll view dataAccess session
-
+let getOutputsInfo blockNumber outputs = 
     let getConfirmations confirmationStatus =
         match confirmationStatus with
-        | Confirmed (blockNumber,_,blockIndex) ->
-            account.blockNumber - blockNumber + 1ul, blockIndex
+        | Confirmed (blockNumber',_,blockIndex) ->
+            blockNumber - blockNumber' + 1ul, blockIndex
         | Unconfirmed ->
             0ul,0
 
@@ -462,20 +458,20 @@ let getHistory dataAccess session view skip take =
             (txHash, output.spend.asset, output.spend.amount |> bigint |> (*) -1I,confirmations,blockIndex)
             |> Some) outputs
 
-    let all =
-        incoming @ outgoing
-        |> List.fold (fun txs (txHash, asset, amount, confirmations, blockIndex) ->
-            match Map.tryFind (txHash, asset) txs with
-            | None -> Map.add (txHash, asset) (amount, confirmations, blockIndex) txs
-            | Some (amount',_,_) -> Map.add (txHash, asset) (amount + amount', confirmations, blockIndex) txs) Map.empty
-        |> Map.toSeq
-        |> Seq.map (fun ((txHash, asset),(amount, confirmations, blockIndex)) ->
-            if amount >= 0I then
-                (txHash,TransactionDirection.In, {asset=asset;amount = uint64 amount}, confirmations, blockIndex)
-            else
-                (txHash,TransactionDirection.Out, {asset=asset;amount = amount * -1I |> uint64}, confirmations, blockIndex))
-        |> List.ofSeq
+    incoming @ outgoing
+    |> List.fold (fun txs (txHash, asset, amount, confirmations, blockIndex) ->
+        match Map.tryFind (txHash, asset) txs with
+        | None -> Map.add (txHash, asset) (amount, confirmations, blockIndex) txs
+        | Some (amount',_,_) -> Map.add (txHash, asset) (amount + amount', confirmations, blockIndex) txs) Map.empty
+    |> Map.toSeq
+    |> Seq.map (fun ((txHash, asset),(amount, confirmations, blockIndex)) ->
+        if amount >= 0I then
+            (txHash,TransactionDirection.In, {asset=asset;amount = uint64 amount}, confirmations, blockIndex)
+        else
+            (txHash,TransactionDirection.Out, {asset=asset;amount = amount * -1I |> uint64}, confirmations, blockIndex))
+    |> List.ofSeq
 
+let paginate skip take list =
     let comparer (_,_,_,x1,x2) (_,_,_,y1,y2) =
         if x1 < y1 then
             -1
@@ -484,7 +480,14 @@ let getHistory dataAccess session view skip take =
         else
             y2 - x2
 
-    List.sortWith comparer all
+    List.sortWith comparer list
     |> fun xs -> if List.length xs <= skip then [] else List.skip skip xs
     |> List.truncate take
     |> List.map (fun (txHash,direction,spend,confirmations,_) -> txHash,direction,spend,confirmations)
+
+let getHistory dataAccess session view skip take =
+    let account = DataAccess.Account.get dataAccess session
+    
+    View.Outputs.getAll view dataAccess session
+    |> getOutputsInfo account.blockNumber
+    |> paginate skip take
