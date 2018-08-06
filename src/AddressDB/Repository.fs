@@ -1,4 +1,4 @@
-module AddressDB.Account
+module AddressDB.Repository
 
 open Consensus
 open Types
