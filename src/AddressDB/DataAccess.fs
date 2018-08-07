@@ -21,7 +21,7 @@ type T = {
     outpointOutputs: Collection<Outpoint, DBOutput>
     addressOutpoints: MultiCollection<Address, Outpoint>
     contractData: MultiCollection<ContractId, string * data option>
-    account: SingleValue<Account>
+    tip: SingleValue<Tip>
     dbVersion: SingleValue<int>
 }
 
@@ -34,7 +34,7 @@ let init databaseContext =
     let outpointOutputs = Collection.create session "outpointOutputs" Outpoint.serialize Output.serialize Output.deserialize
     let addressOutpoints = MultiCollection.create session "addressOutpoints" Address.serialize Outpoint.serialize Outpoint.deserialize
     let contractData = MultiCollection.create session "contractData" Serialization.ContractId.serialize ContractData.serialize ContractData.deserialize
-    let account = SingleValue.create databaseContext "account" Account.serialize Account.deserialize
+    let tip = SingleValue.create databaseContext "blockchain" Tip.serialize Tip.deserialize
     let dbVersion = SingleValue.create databaseContext "dbVersion" Version.serialize Version.deserialize
 
     match SingleValue.tryGet dbVersion session with
@@ -48,7 +48,7 @@ let init databaseContext =
         outpointOutputs = outpointOutputs
         addressOutpoints = addressOutpoints
         contractData = contractData
-        account = account
+        tip = tip
         dbVersion = dbVersion
     }
 
@@ -58,9 +58,9 @@ let init databaseContext =
 let dispose t =
     Disposables.dispose t.outpointOutputs
 
-module Account =
-    let put t = SingleValue.put t.account
-    let tryGet t = SingleValue.tryGet t.account
+module Tip =
+    let put t = SingleValue.put t.tip
+    let tryGet t = SingleValue.tryGet t.tip
     let get t session = tryGet t session |> Option.get
 
 module OutpointOutputs =

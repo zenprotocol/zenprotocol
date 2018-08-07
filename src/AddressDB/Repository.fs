@@ -70,7 +70,7 @@ let getOutputsInfo blockNumber outputs =
     |> List.ofSeq
 
 let getHistory dataAccess session view skip take addresses =
-    let account = DataAccess.Account.get dataAccess session
+    let account = DataAccess.Tip.get dataAccess session
     
     View.AddressOutpoints.get view dataAccess session addresses
     |> View.OutpointOutputs.get view dataAccess session
@@ -84,7 +84,7 @@ let getContractHistory dataAccess session view skip take contractId =
     |> Wallet.Account.paginate skip take
 
 let addBlock dataAccess session blockHash block =
-    let account = DataAccess.Account.get dataAccess session
+    let account = DataAccess.Tip.get dataAccess session
 
     if account.blockHash = blockHash || block.header.blockNumber < account.blockNumber then
         // we already handled the block, skip
@@ -129,10 +129,10 @@ let addBlock dataAccess session blockHash block =
     )
 
     {account with blockNumber = block.header.blockNumber; blockHash = blockHash}
-    |> DataAccess.Account.put dataAccess session
+    |> DataAccess.Tip.put dataAccess session
 
 let undoBlock dataAccess session blockHash block =
-    let account = DataAccess.Account.get dataAccess session
+    let account = DataAccess.Tip.get dataAccess session
 
     if account.blockHash = block.header.parent || block.header.blockNumber > account.blockNumber then
         // we already undo this block, skipping
@@ -179,14 +179,14 @@ let undoBlock dataAccess session blockHash block =
     )
 
     {account with blockNumber = block.header.blockNumber - 1ul; blockHash = block.header.parent}
-    |> DataAccess.Account.put dataAccess session
+    |> DataAccess.Tip.put dataAccess session
 
 type private SyncAction =
     | Undo of Block * Hash
     | Add of Block * Hash
 
 let sync dataAccess session tipBlockHash (tipHeader:BlockHeader) (getHeader:Hash -> BlockHeader) (getBlock:Hash -> Block) =
-    let account = DataAccess.Account.get dataAccess session
+    let account = DataAccess.Tip.get dataAccess session
 
     // Find the fork block of the account and the blockchain, logging actions
     // to perform. Undo each block in the account's chain but not the blockchain,
@@ -215,10 +215,10 @@ let sync dataAccess session tipBlockHash (tipHeader:BlockHeader) (getHeader:Hash
         | Add (block,hash) -> addBlock dataAccess session hash block)
 
 let init dataAccess session =
-    DataAccess.Account.put dataAccess session empty
+    DataAccess.Tip.put dataAccess session empty
 
 let reset dataAccess session =
-    DataAccess.Account.put dataAccess session empty
+    DataAccess.Tip.put dataAccess session empty
 
     DataAccess.OutpointOutputs.truncate dataAccess session
     DataAccess.AddressOutpoints.truncate dataAccess session

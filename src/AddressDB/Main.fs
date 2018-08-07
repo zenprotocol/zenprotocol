@@ -8,7 +8,6 @@ open Messaging.Events
 open ServiceBus.Agent
 open Consensus
 open Types
-open Account
 open Crypto
 open Messaging.Services.AddressDB
 open Result
@@ -93,7 +92,7 @@ let main dataPath busName chain (wipe:Wipe) =
         let client = ServiceBus.Client.create busName
         use session = DatabaseContext.createSession databaseContext
 
-        match DataAccess.Account.tryGet dataAccess session with 
+        match DataAccess.Tip.tryGet dataAccess session with 
         | None -> 
             eventX "Creating AddressDB"
             |> Log.info

@@ -19,7 +19,7 @@ type DBOutput =
         confirmationStatus: ConfirmationStatus
     }
 
-type Account =
+type Tip =
     {
         blockHash: Hash
         blockNumber: uint32

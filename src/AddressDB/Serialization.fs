@@ -81,13 +81,13 @@ module Output =
     let serialize = serialize size write
     let deserialize = deserialize read
 
-module Account =
+module Tip =
     let size _ =
         Hash.size + 4
 
-    let write stream account =
-        Hash.write stream account.blockHash
-        stream.writeNumber4 account.blockNumber
+    let write stream tip =
+        Hash.write stream tip.blockHash
+        stream.writeNumber4 tip.blockNumber
 
     let read stream =
         let blockHash = Hash.read stream
