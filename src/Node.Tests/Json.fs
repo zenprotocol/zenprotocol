@@ -53,3 +53,16 @@ let parseBalanceJson =
         |> Option.get,
         assertBalance.Balance
     )
+
+let getContractHistoryJson contractId skip take =
+    (new GetContractHistoryJson.Root(
+        ContractId.toString contractId, 
+        skip, 
+        take
+    )).JsonValue
+
+let parseContractCommandHistoryResultJson =
+    Array.map (fun (contractData:ContractCommandHistoryResultJson.Root) ->
+        contractData.Command,
+        contractData.MessageBody
+    )

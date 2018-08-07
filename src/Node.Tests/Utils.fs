@@ -30,6 +30,7 @@ let getActors () =
         Network.Main.main dataPath busName chainParams "" false "" [] false false
         Wallet.Main.main dataPath busName chain Wallet.Main.Wipe.NoWipe
         Api.Main.main chain busName apiUri
+        AddressDB.Main.main dataPath busName chain AddressDB.Main.NoWipe        
     ]
     |> List.rev
     |> List.map Disposables.toDisposable
