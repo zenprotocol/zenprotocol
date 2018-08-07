@@ -88,8 +88,23 @@ let private wrapFStar errorResult outputFile fstarFn =
         sprintf "%A\n%A" errorResult error)
     |> Result.map (fun _ -> File.ReadAllText outputFile)
 
+#if DEBUG
+let mutable unitTesting = false
+#endif
+
 let initOutputDir moduleName =
+
+#if DEBUG
+    let oDir =
+        if unitTesting then
+            Platform.workingDirectory / "../../test-contracts"
+            |> Platform.normalizeNameToFileSystem
+        else
+            Platform.normalizeNameToFileSystem (Path.GetTempPath()) / Path.GetRandomFileName()
+#else
     let oDir = Platform.normalizeNameToFileSystem (Path.GetTempPath()) / Path.GetRandomFileName()
+#endif
+
     Directory.CreateDirectory oDir |> ignore
     oDir, oDir / moduleName
 
@@ -99,6 +114,13 @@ let private extract code hints limits rlimit moduleName =
     let hintsFile = changeExtention ".fst.hints" file
     let elaboratedFile = changeExtention ".fst" file
     let extractedFile = changeExtention ".fs" file
+
+#if DEBUG
+    if unitTesting && File.Exists extractedFile then
+        File.ReadAllText extractedFile
+        |> Ok
+    else
+#endif
 
     File.WriteAllText(originalFile, sprintf "module %s\n%s" moduleName code)
     File.WriteAllText(hintsFile, hints)
@@ -128,7 +150,7 @@ let private extract code hints limits rlimit moduleName =
 #endif
 
 let calculateMetrics hints =
-    let oDir, file = initOutputDir "" //as for now, using the filesystem as temporary solution
+    let file = Path.GetTempFileName()
     let hintsFile = changeExtention ".fst.hints" file
 
     File.WriteAllText(hintsFile, hints)
@@ -155,11 +177,11 @@ let calculateMetrics hints =
             Exception.toError "limits" ex
     finally
 #if DEBUG
-        eventX "calculate metrics output directory: {dir}"
-        >> setField "dir" oDir
+        eventX "calculate metrics output: {file}"
+        >> setField "file" file
         |> Log.debug
 #else
-        Directory.Delete (oDir, true)
+        ()
 #endif
 
 let recordHints code moduleName =
@@ -167,6 +189,13 @@ let recordHints code moduleName =
     let originalFile = changeExtention ".orig.fst" file
     let hintsFile = oDir / changeExtention ".fst.hints" file
     let elaboratedFile = changeExtention ".fst" file
+
+#if DEBUG
+    if unitTesting && File.Exists hintsFile then
+        File.ReadAllText hintsFile
+        |> Ok
+    else
+#endif
 
     File.WriteAllText(originalFile, sprintf "module %s\n%s" moduleName code)
 
@@ -177,7 +206,7 @@ let recordHints code moduleName =
                  "--z3rlimit";(2723280u * 2u).ToString()
                  "--use_cached_modules"
                  "--record_hints"
-                 "--no_default_includes"; elaboratedFile ]
+                 ]
             |> wrapFStar "record hints" hintsFile)
     finally
 #if DEBUG
@@ -187,6 +216,7 @@ let recordHints code moduleName =
 #else
         Directory.Delete (oDir, true)
 #endif
+
 
 let compile path code hints rlimit moduleName =
     calculateMetrics hints
@@ -207,7 +237,7 @@ let load path moduleName =
         Error "compiled contract DLL file not found"
 
 let totalQueries hints =
-    let oDir, file = initOutputDir "" //as for now, using the filesystem as temporary solution
+    let file = Path.GetTempFileName()
     let hintsFile = changeExtention ".fst.hints" file
 
     File.WriteAllText(hintsFile, hints)
@@ -224,9 +254,9 @@ let totalQueries hints =
               >> uint32 )
     finally
 #if DEBUG
-        eventX "total queries output directory: {dir}"
-        >> setField "dir" oDir
+        eventX "total queries output : {file}"
+        >> setField "file" file
         |> Log.debug
 #else
-        Directory.Delete (oDir, true)
+        ()
 #endif

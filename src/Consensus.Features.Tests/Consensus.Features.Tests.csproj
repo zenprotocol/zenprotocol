@@ -47,6 +47,7 @@
     <Compile Include="ContractExamples.feature.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ContractState.feature.cs" />
+    <Compile Include="Setup.cs" />
     <Compile Include="SimpleBlockChain.feature.cs" />
     <Compile Include="SimpleContracts.feature.cs" />
     <Compile Include="TransactionValidationInContext.feature.cs" />
@@ -80,6 +81,10 @@
     <ProjectReference Include="..\Consensus.Tests\Consensus.Tests.fsproj">
       <Project>{b5e951fc-ae90-4ef1-9365-3e2b5a56b510}</Project>
       <Name>Consensus.Tests</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Infrastructure\Infrastructure.fsproj">
+      <Project>{81161f64-d019-422c-a3cf-321cde6ca209}</Project>
+      <Name>Infrastructure</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

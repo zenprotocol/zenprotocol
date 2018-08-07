@@ -1,4 +1,4 @@
-namespace Node.Tests
+namespace Consensus.Tests
 
 open NUnit.Framework
 

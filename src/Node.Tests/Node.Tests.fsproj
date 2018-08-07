@@ -44,6 +44,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="Setup.fs" />
     <Compile Include="Config.fs" />
     <Compile Include="Json.fs" />
     <Compile Include="Utils.fs" />

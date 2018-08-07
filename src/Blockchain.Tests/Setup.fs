@@ -1,4 +1,4 @@
-namespace Node.Tests
+namespace Blockchain.Tests
 
 open NUnit.Framework
 
