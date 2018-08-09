@@ -54,6 +54,7 @@ module Blockchain =
         | GetMempool
         | GetTransaction of Hash
         | CheckTransaction of TransactionExtended
+        | GetTotalZP
 
     type Response = unit
 
@@ -152,6 +153,10 @@ module Blockchain =
         CheckTransaction transaction
         |> Request.send<Request, Result<Hash,ValidationError.ValidationError>> client serviceName
 
+    let getTotalZP client =
+        GetTotalZP
+        |> Request.send<Request, uint64> client serviceName
+
 module Network =
     type Command =
         | SendMemPool of peerId:byte[] * Hash list
@@ -179,7 +184,7 @@ module Network =
 
 module Wallet =
     type BalanceResponse = Map<Asset,uint64>
-    
+
     type TransactionDirection =
         | In
         | Out
@@ -290,14 +295,14 @@ module Wallet =
     let importZenPublicKey client publicKey =
         ImportZenPublicKey publicKey
         |> Request.send<Request,Result<unit,string>> client serviceName
-        
-    let removeAccount client password = 
-        RemoveAccount password        
-        |> Request.send<Request,Result<unit,string>> client serviceName        
+
+    let removeAccount client password =
+        RemoveAccount password
+        |> Request.send<Request,Result<unit,string>> client serviceName
 
 module AddressDB =
     open Wallet
-        
+
     type Mode =
         | All
         | UnspentOnly
@@ -311,7 +316,7 @@ module AddressDB =
         | GetTransactions of addresses:string list * skip: int * take: int
 
     let serviceName = "addressDB"
-    
+
     //TODO: apply same convention to other services
     let private send<'a> = Request.send<Request, Result<'a,string>>
 
@@ -324,5 +329,5 @@ module AddressDB =
         |> send<List<PointedOutput>> client serviceName
 
     let getTransactions client addresses =
-        GetTransactions addresses 
+        GetTransactions addresses
         |> send<TransactionsResponse> client serviceName

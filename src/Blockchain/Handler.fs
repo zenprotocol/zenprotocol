@@ -272,6 +272,10 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
                         ex
         <@> (fun _ -> ex.txHash)
         |> requestId.reply<Result<Hash.Hash,ValidationError.ValidationError>>
+    | GetTotalZP ->
+        [2ul..state.tipState.tip.header.blockNumber]
+        |> List.fold (fun sum blockNumber -> sum + Block.blockReward blockNumber) (20_000_000UL * 100_000_000UL)
+        |> requestId.reply
 
     logEndAction timestamp "request" request
 

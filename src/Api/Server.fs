@@ -342,7 +342,7 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
             | Ok (tx, contractId) ->
                 let address =
                     Address.Contract contractId
-                    |> Address.encode chain                
+                    |> Address.encode chain
                 let json = new ContractActivateResponseJson.Root (address, ContractId.toString contractId)
                 reply StatusCode.OK (JsonContent json.JsonValue)
             | Error error ->
@@ -496,8 +496,8 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
         | Error error ->
             reply StatusCode.BadRequest <| TextContent error
     | Post ("/blockchain/contract/execute", Some body) ->
-        parseContractExecuteFromTransactionJson chain body 
-        >>= (fun (contractId, command, message, tx, sender) -> 
+        parseContractExecuteFromTransactionJson chain body
+        >>= (fun (contractId, command, message, tx, sender) ->
             Blockchain.executeContract client contractId command sender message tx)
         <@> (Transaction.serialize Full
             >> Base16.encode
@@ -628,9 +628,9 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
             replyError error
     | Post("/addressdb/balance", Some json) ->
         match parseGetBalanceJson chain json with
-        | Error error -> reply StatusCode.BadRequest (TextContent error)            
+        | Error error -> reply StatusCode.BadRequest (TextContent error)
         | Ok addresses ->
-            match AddressDB.getBalance client addresses with 
+            match AddressDB.getBalance client addresses with
             | Ok balance ->
                 balance
                 |> Map.toSeq
@@ -643,9 +643,9 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
             | Error error -> reply StatusCode.BadRequest (TextContent error)
     | Post("/addressdb/outputs", Some json) ->
         match parseGetOutputsJson chain json with
-        | Error error -> reply StatusCode.BadRequest (TextContent error)            
+        | Error error -> reply StatusCode.BadRequest (TextContent error)
         | Ok (addresses, mode) ->
-            match AddressDB.getOutputs client mode addresses with 
+            match AddressDB.getOutputs client mode addresses with
             | Ok pointedOutputs ->
                 pointedOutputs
                 |> Seq.map (pointedOutputEncoder chain)
@@ -656,9 +656,9 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
             | Error error -> reply StatusCode.BadRequest (TextContent error)
     | Post("/addressdb/transactions", Some json) ->
         match parseGetHistoryJson chain json with
-        | Error error -> reply StatusCode.BadRequest (TextContent error)            
+        | Error error -> reply StatusCode.BadRequest (TextContent error)
         | Ok addresses ->
-            match AddressDB.getTransactions client addresses with 
+            match AddressDB.getTransactions client addresses with
             | Ok txs ->
                 let json =
                     txs
@@ -672,6 +672,12 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
                 |> JsonContent
                 |> reply StatusCode.OK
             | Error error -> reply StatusCode.BadRequest (TextContent error)
+    | Get("/blockchain/totalzp",_) ->
+        Blockchain.getTotalZP client
+        |> decimal
+        |> JsonValue.Number
+        |> JsonContent
+        |> reply StatusCode.OK
     | _ ->
         reply StatusCode.BadRequest (TextContent "unmatched request")
 
