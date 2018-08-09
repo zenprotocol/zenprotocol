@@ -10,6 +10,7 @@ open Wallet.Serialization
 open AddressDB.Serialization
 open Consensus.Serialization
 open Wallet.Address
+open Zen.Types.Data
 
 let private getBytes str = Encoding.UTF8.GetBytes (str : string)
 
@@ -19,7 +20,8 @@ let DbVersion = 1
 type T = {
     outpointOutputs: Collection<Outpoint, DBOutput>
     addressOutpoints: MultiCollection<Address, Outpoint>
-    account: SingleValue<Account>
+    contractData: MultiCollection<ContractId, string * data option>
+    tip: SingleValue<Tip>
     dbVersion: SingleValue<int>
 }
 
@@ -31,7 +33,8 @@ let init databaseContext =
     use session = DatabaseContext.createSession databaseContext
     let outpointOutputs = Collection.create session "outpointOutputs" Outpoint.serialize Output.serialize Output.deserialize
     let addressOutpoints = MultiCollection.create session "addressOutpoints" Address.serialize Outpoint.serialize Outpoint.deserialize
-    let account = SingleValue.create databaseContext "account" Account.serialize Account.deserialize
+    let contractData = MultiCollection.create session "contractData" Serialization.ContractId.serialize ContractData.serialize ContractData.deserialize
+    let tip = SingleValue.create databaseContext "blockchain" Tip.serialize Tip.deserialize
     let dbVersion = SingleValue.create databaseContext "dbVersion" Version.serialize Version.deserialize
 
     match SingleValue.tryGet dbVersion session with
@@ -44,7 +47,8 @@ let init databaseContext =
     let t = {
         outpointOutputs = outpointOutputs
         addressOutpoints = addressOutpoints
-        account = account
+        contractData = contractData
+        tip = tip
         dbVersion = dbVersion
     }
 
@@ -54,9 +58,9 @@ let init databaseContext =
 let dispose t =
     Disposables.dispose t.outpointOutputs
 
-module Account =
-    let put t = SingleValue.put t.account
-    let tryGet t = SingleValue.tryGet t.account
+module Tip =
+    let put t = SingleValue.put t.tip
+    let tryGet t = SingleValue.tryGet t.tip
     let get t session = tryGet t session |> Option.get
 
 module OutpointOutputs =
@@ -78,3 +82,9 @@ module AddressOutpoints =
         |> List.map (MultiCollection.get t.addressOutpoints session)
         |> List.concat
     let truncate t = MultiCollection.truncate t.addressOutpoints
+
+module ContractData =
+    let get t = MultiCollection.get t.contractData
+    let put t = MultiCollection.put t.contractData
+    let delete t = MultiCollection.delete t.contractData
+    let truncate t = MultiCollection.truncate t.contractData

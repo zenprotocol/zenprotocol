@@ -358,3 +358,14 @@ let parseGetOutputsJson chain json =
                 Error "unrecognized mode"
     with _ as ex ->
         Error ("Json invalid: " + ex.Message)
+
+let parseGetContractHistoryJson json =
+    try
+        let json = GetContractHistoryJson.Parse json
+
+        json.ContractId
+        |> ContractId.fromString
+        |> Result.ofOption "invalid contractId"        
+        <@> fun contractId -> contractId, json.Skip, json.Take
+    with _ as ex ->
+        Error ("Json invalid: " + ex.Message)

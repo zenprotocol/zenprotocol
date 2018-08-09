@@ -195,10 +195,10 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
               |> reply StatusCode.BadRequest
         | Some address ->
             match Address.decodeContract chain address with
-            | FSharp.Core.Ok contractId ->
+            | Ok contractId ->
                 TextContent (ContractId.toString contractId)
                 |> reply StatusCode.OK
-            | FSharp.Core.Error _ ->
+            | Error _ ->
                 TextContent (sprintf "invalid address %A" query)
                 |> reply StatusCode.BadRequest
     | Post ("/wallet/publickey", Some body) ->
@@ -394,13 +394,13 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
             | Some address -> Address.decodePK chain address
 
         match pkHash with
-        | FSharp.Core.Ok pkHash ->
+        | Ok pkHash ->
             match templateCache.response(pkHash) with
             | None ->
                 reply StatusCode.RequestTimeout NoContent
             | Some template ->
                 reply StatusCode.OK template
-        | FSharp.Core.Error _ ->
+        | Error _ ->
             TextContent (sprintf "invalid address %A" query)
             |> reply StatusCode.BadRequest
     | Get ("/blockchain/block", query) ->
@@ -645,7 +645,7 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
         match parseGetOutputsJson chain json with
         | Error error -> reply StatusCode.BadRequest (TextContent error)
         | Ok (addresses, mode) ->
-            match AddressDB.getOutputs client mode addresses with
+            match AddressDB.getOutputs client (addresses, mode) with 
             | Ok pointedOutputs ->
                 pointedOutputs
                 |> Seq.map (pointedOutputEncoder chain)
@@ -678,6 +678,27 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
         |> JsonValue.Number
         |> JsonContent
         |> reply StatusCode.OK
+    | Post("/addressdb/contract/history", Some json) ->
+        parseGetContractHistoryJson json 
+        >>= AddressDB.getContractHistory client 
+        <@> List.map (fun (command, messageBody) -> 
+            new ContractCommandHistoryResultJson.Root(
+                command,
+                match messageBody with 
+                | Some data -> 
+                    data
+                    |> Data.serialize
+                    |> Base16.encode
+                | None -> ""
+            )
+        )
+        <@> List.map (fun json -> json.JsonValue)
+        <@> List.toArray
+        <@> JsonValue.Array
+        <@> JsonContent
+        <@> reply StatusCode.OK
+        |> Result.mapError replyError
+        |> ignore
     | _ ->
         reply StatusCode.BadRequest (TextContent "unmatched request")
 

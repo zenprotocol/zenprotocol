@@ -49,7 +49,7 @@
     <Compile Include="Serialization.fs" />
     <Compile Include="DataAccess.fs" />
     <Compile Include="View.fs" />
-    <Compile Include="Account.fs" />
+    <Compile Include="Repository.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
   <ItemGroup>

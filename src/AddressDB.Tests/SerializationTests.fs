@@ -59,7 +59,7 @@ let ``DBOutput serialization round trip produces same result`` (value:DBOutput) 
     |> Output.deserialize = Some value
     
 [<Property(EndSize=10000,MaxTest=1000)>]
-let ``Account serialization round trip produces same result`` (value:Account) =
+let ``Tip serialization round trip produces same result`` (value:Tip) =
     value
-    |> Account.serialize
-    |> Account.deserialize = Some value    
+    |> Tip.serialize
+    |> Tip.deserialize = Some value
