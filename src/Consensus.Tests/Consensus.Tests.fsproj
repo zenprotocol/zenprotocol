@@ -43,6 +43,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="Setup.fs" />
     <Compile Include="ContractAssetTests.fs" />
     <Compile Include="TestWallet.fs" />
     <Compile Include="Helper.fs" />

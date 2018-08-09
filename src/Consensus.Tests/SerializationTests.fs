@@ -20,7 +20,7 @@ let txInMode mode tx =
 let setup = fun () ->
     Arb.register<ConsensusGenerator>() |> ignore
 
-[<Property(EndSize=10000)>]
+[<Property(EndSize=2000)>]
 let ``Transaction serialization round trip produces same result`` (tx:Transaction) =
     try
         tx
@@ -31,7 +31,7 @@ let ``Transaction serialization round trip produces same result`` (tx:Transactio
         printf "null exception caught in tx round trip"
         false
 
-[<Property(EndSize=10000)>]
+[<Property(EndSize=2000)>]
 let ``Different transactions don't produce same serialization result``(mode:TransactionSerializationMode) (tx1:Transaction) (tx2:Transaction) =
     (txInMode mode tx1 <> txInMode mode tx2) ==> lazy (Transaction.serialize mode tx1 <> Transaction.serialize mode tx2)
 
@@ -40,36 +40,36 @@ let ``Different transactions don't produce same serialization result``(mode:Tran
 // Therefore, it's not necessary to test tx1 <> tx2 ==> hash tx1 <> hash tx2.
 // The same applies to hashes of blocks.
 
-[<Property(EndSize=10000)>]
+[<Property(EndSize=2000)>]
 let ``Block-header serialization round trip produces same result`` (h:BlockHeader) =
     h
     |> Header.serialize
     |> Header.deserialize = Some h
 
-[<Property(EndSize=10000)>]
+[<Property(EndSize=2000)>]
 let ``Different block headers don't produce same serialization result`` (h1:BlockHeader) (h2:BlockHeader) =
     (h1 <> h2) ==> lazy (Header.serialize h1 <> Header.serialize h2)
 
-[<Property(EndSize=10000)>]
+[<Property(EndSize=2000)>]
 let ``Block serialization round trip produces same result`` (bk:Block) =
     bk
     |> Block.serialize
     |> Block.deserialize = Some bk
 
-[<Property(EndSize=10000)>]
+[<Property(EndSize=2000)>]
 let ``Different blocks don't produce same serialization result`` (bk1:Block) (bk2:Block) =
     (bk1 <> bk2) ==> lazy (Block.serialize bk1 <> Block.serialize bk2)
 
 open Consensus.Tests
 open Zen.Types.Data
 
-[<Property(EndSize=10000)>]
+[<Property(EndSize=2000)>]
 let ``Data serialization round trip produces same result``(data:data) =
     data
     |> Data.serialize
     |> Data.deserialize = Some data
 
-[<Property(EndSize=10000)>]
+[<Property(EndSize=2000)>]
 let ``Different data don't produce same serialization result``(data1:data) (data2:data) =
     (data1 <> data2) ==> lazy (Data.serialize data1 <> Data.serialize data2)
 
@@ -80,7 +80,7 @@ let deserializeAmount x = deserialize Serialization.Amount.read x
 let deserializeAsset x = deserialize Serialization.Asset.read x
 let deserializeVarInt x = deserialize Serialization.VarInt.read x
 
-[<Property(EndSize=10000)>]
+[<Property(EndSize=2000)>]
 let ``serialize and deserialize varint yield the same number``(num:uint32)  =
     let bytes = serializeVarInt num
 

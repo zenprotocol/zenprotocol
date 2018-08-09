@@ -62,12 +62,12 @@ let ``block with one invalid transaction fail validation``(header) (NonEmptyTran
     let index = 1 + (index % (List.length transactions))
     let header = {header with difficulty = 0x20fffffful }
 
-    let transactions = coinbase header.blockNumber transactions :: transactions   
+    let transactions = coinbase header.blockNumber transactions :: transactions
 
     // Making TX invalid by removing inputs
-    let invalidTx = 
+    let invalidTx =
         {transactions.[index].tx  with inputs = []}
-        |> Transaction.toExtended                        
+        |> Transaction.toExtended
 
     let transactions = List.mapi (fun i tx -> if i = index then invalidTx else tx) transactions
 
@@ -148,13 +148,7 @@ let ``connecting block should fail when transaction inputs are invalid``(parent:
     let block = Block.createTemplate chain parent timestamp ema acs transactions Hash.zero
 
     match Block.connect chain getUTXO contractsPath parent (timestamp + 1UL) utxoSet acs ContractCache.empty ema getContractState ContractStates.asDatabase block with
-    | Error error
-                when error.StartsWith "transactions failed inputs validation due to"
-                  || error = "Output lookup error"
-                  || error.Contains "Orphan"
-                  || error.Contains "witness" -> true     //too many/few wts
-    | Error _ as res ->
-        System.Console.WriteLine (sprintf "Got unexpected result %A" res)
+    | Error _ ->
         true
     | _ -> false
 

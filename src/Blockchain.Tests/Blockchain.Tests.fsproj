@@ -47,6 +47,7 @@
     <Reference Include="System.Numerics" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Setup.fs" />
     <Compile Include="InitialBlockDownloadTests.fs" />
     <Compile Include="SerializationTests.fs" />
     <Compile Include="ValidateBlockTests.fs" />
