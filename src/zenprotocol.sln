@@ -85,6 +85,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "AddressDB.Tests", "AddressD
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "SerializationBenchmark", "SerializationBenchmark\SerializationBenchmark.fsproj", "{CBF2B4FB-5E3F-41AE-BAFF-AA7DCCB55051}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Swaps", "Swaps\Swaps.fsproj", "{56976F07-D182-4388-88F3-6FEB8C85C755}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -179,6 +181,10 @@ Global
 		{CBF2B4FB-5E3F-41AE-BAFF-AA7DCCB55051}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CBF2B4FB-5E3F-41AE-BAFF-AA7DCCB55051}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CBF2B4FB-5E3F-41AE-BAFF-AA7DCCB55051}.Release|Any CPU.Build.0 = Release|Any CPU
+		{56976F07-D182-4388-88F3-6FEB8C85C755}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{56976F07-D182-4388-88F3-6FEB8C85C755}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{56976F07-D182-4388-88F3-6FEB8C85C755}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{56976F07-D182-4388-88F3-6FEB8C85C755}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
