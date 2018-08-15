@@ -4,9 +4,10 @@ let toError s (e : System.Exception) =
     sprintf "%s %A" s e
     |> Error
     
-let resultWrap<'T,'TError> f error : Result<'T,'TError> = 
+let resultWrap<'T> f error : Result<'T, string> = 
     try
-        f
+        f()
         |> Ok
-    with _ ->
-        Error error
+    with _ as ex ->
+        sprintf "%s %s" error ex.Message
+        |> Error

@@ -105,7 +105,7 @@ let parseContractExecuteJson chain json =
         Error ("Json is invalid: " + ex.Message)
 
 let parseContractExecuteFromTransactionJson chain json =
-    Exception.resultWrap<ContractExecuteFromTransactionJson.Root, string> (ContractExecuteFromTransactionJson.Parse json) "Invalid JSON"
+    Exception.resultWrap<ContractExecuteFromTransactionJson.Root> (fun _ -> ContractExecuteFromTransactionJson.Parse json) "Invalid JSON"
     >>= (fun json ->
         Address.decodeContract chain json.Address
         >>= fun address -> Ok (json, address))
