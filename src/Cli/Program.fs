@@ -44,6 +44,11 @@ type PasswordArgs =
     interface IArgParserTemplate with
         member arg.Usage = ""
 
+type PublicKeyArgs =
+    | [<MainCommand("COMMAND");ExactlyOnce>] PublicKey_Arguments of path:string * password:string
+    interface IArgParserTemplate with
+        member arg.Usage = ""
+
 type ImportPublicKeyArgs = 
     | [<MainCommand("COMMAND");ExactlyOnce>] ImportPublicKey_Arguments of publicKey:string    
     interface IArgParserTemplate with
@@ -78,6 +83,7 @@ type Arguments =
     | [<CliPrefix(CliPrefix.None)>] ExportZenPublicKey of ParseResults<NoArgs>
     | [<CliPrefix(CliPrefix.None)>] ImportZenPublicKey of ParseResults<ImportPublicKeyArgs>
     | [<CliPrefix(CliPrefix.None)>] RemoveWallet of ParseResults<PasswordArgs>
+    | [<CliPrefix(CliPrefix.None)>] PublicKey of ParseResults<PublicKeyArgs>
     
     interface IArgParserTemplate with
         member arg.Usage =
@@ -105,6 +111,7 @@ type Arguments =
             | ExportZenPublicKey _ -> "export zen extended public key"
             | ImportZenPublicKey _ -> "import zen extended public key and create watch-only account"
             | RemoveWallet _ -> "remove wallet" 
+            | PublicKey _ -> "derive a public key from a given derivation path" 
 
 [<EntryPoint>]
 let main argv =
@@ -286,7 +293,7 @@ let main argv =
             |> getUri
             |> (new ImportZenPublicKey.Root(publicKey)).JsonValue.Request
             |> printResponse
-        | Some (ExportZenPublicKey args) ->
+        | Some (ExportZenPublicKey _) ->
             "wallet/zenpublickey"
             |> getUri
             |> Http.Request
@@ -298,7 +305,14 @@ let main argv =
             |> getUri
             |> (new CheckPasswordJson.Root(password))
                 .JsonValue.Request
-            |> printResponse                 
+            |> printResponse
+        | Some (PublicKey args) ->
+            let path, password = args.GetResult <@ PublicKey_Arguments @>
+            "wallet/publickey"
+            |> getUri
+            |> (new GetPublicKeyJson.Root(path, password))
+                .JsonValue.Request
+            |> printResponse
         | _ -> ()
     with
     | :? Net.WebException as ex ->
