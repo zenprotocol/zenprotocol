@@ -8,7 +8,7 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{9BE81A69-5452-4B96-805A-C0906C767ADC}</ProjectGuid>
-    <OutputType>Exe</OutputType>
+    <OutputType>Library</OutputType>
     <RootNamespace>AddressDB</RootNamespace>
     <AssemblyName>AddressDB</AssemblyName>
     <TargetFrameworkVersion>v4.7</TargetFrameworkVersion>
