@@ -4,7 +4,7 @@ NUGET
   remote: https://www.nuget.org/api/v2
     Argu (5.1)
       FSharp.Core (>= 4.0.0.1)
-    AsyncIO (0.1.40)
+    AsyncIO (0.1.60)
     Base58Check (0.2)
     BouncyCastle (1.8.2)
     FAKE (4.64.13)
