@@ -10,6 +10,7 @@ nuget FsCheck.NUnit >= 3.0.0-alpha2
 nuget FAKE
 nuget FSharp.Compatibility.OCaml
 nuget FSharpx.Collections
+nuget AsyncIO >= 0.1.60
 nuget NetMQ >= 4.0.0.175-pre
 nuget FsNetMQ >= 0.2.8.0
 nuget FsPickler
