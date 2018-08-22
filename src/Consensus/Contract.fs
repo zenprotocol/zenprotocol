@@ -57,7 +57,7 @@ type ContractCostFn =
         -> data option
         -> ContractWallet
         -> data option
-        -> int64
+        -> Result<int64,string>
 
 type Contract = {
     contractId: ContractId
@@ -92,27 +92,34 @@ let private getMainFunction assembly =
 
 let private wrapMainFn (mainFn : zfstarMainFn) : ContractMainFn =
     fun txSkeleton (context:ContractContext) (ContractId (version, Hash.Hash cHash)) command sender messageBody contractWallet contractState ->
-        let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
-        let command' = ZFStar.fsToFstString command
-        let messageBody' = ZFStar.fsToFstOption messageBody
-        let contractWallet' = ZFStar.fsToFstWallet contractWallet
-        let context' = ZFStar.convertContext context
-        let contractState' = ZFStar.fsToFstOption contractState
-        mainFn txSkeleton' context' (version,cHash) command' sender messageBody' contractWallet' contractState'
-        |> ZFStar.unCost
-        |> ZFStar.toResult
-        |> Result.map ZFStar.convertResult
-
+        try
+            let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
+            let command' = ZFStar.fsToFstString command
+            let messageBody' = ZFStar.fsToFstOption messageBody
+            let contractWallet' = ZFStar.fsToFstWallet contractWallet
+            let context' = ZFStar.convertContext context
+            let contractState' = ZFStar.fsToFstOption contractState
+            mainFn txSkeleton' context' (version,cHash) command' sender messageBody' contractWallet' contractState'
+            |> ZFStar.unCost
+            |> ZFStar.toResult
+            |> Result.map ZFStar.convertResult
+        with _ as ex ->
+            Exception.toError "mainFn" ex
+            
 let private wrapCostFn (costFn: zfstarCostFn) : ContractCostFn =
     fun txSkeleton context command sender messageBody contractWallet contractState ->
-        let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
-        let command' = ZFStar.fsToFstString command
-        let data' = ZFStar.fsToFstOption messageBody
-        let contractWallet' = ZFStar.fsToFstWallet contractWallet
-        let context' = ZFStar.convertContext context
-        let contractState' = ZFStar.fsToFstOption contractState
-        costFn txSkeleton' context' command' sender data' contractWallet' contractState'
-        |> ZFStar.unCost
+        try
+            let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
+            let command' = ZFStar.fsToFstString command
+            let data' = ZFStar.fsToFstOption messageBody
+            let contractWallet' = ZFStar.fsToFstWallet contractWallet
+            let context' = ZFStar.convertContext context
+            let contractState' = ZFStar.fsToFstOption contractState
+            costFn txSkeleton' context' command' sender data' contractWallet' contractState'
+            |> ZFStar.unCost
+            |> Ok
+        with _ as ex ->
+            Exception.toError "costFn" ex
 
 let private getModuleName : Hash -> string =
     Hash.bytes
