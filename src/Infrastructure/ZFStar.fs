@@ -42,7 +42,10 @@ let private compile' path moduleName code =
                     "-r"; (+/) "System.dll";
                     "-r"; (+/) "System.Numerics.dll";
                     "-r"; "Zulib.dll";
-                    "-r"; "FSharp.Compatibility.OCaml.dll"|])
+                    "-r"; "FSharp.Compatibility.OCaml.dll";
+                    "-r"; "BouncyCastle.Crypto.dll";
+                    "-r"; "FSharpx.Collections.dll";
+                    "-r"; "FsBech32.dll" |])
             if exitCode = 0 then
                 Ok ()
             else
