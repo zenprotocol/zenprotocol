@@ -267,7 +267,7 @@ let ``can connect block with a contract``() =
         {
             contractId=SampleContract.sampleContractId
             mainFn = fun tx _ _ _ _ _ _ _ -> Ok (tx,None,Zen.Types.Main.stateUpdate.NoChange)
-            costFn = fun _ _ _ _ _ _ _ -> 0L
+            costFn = fun _ _ _ _ _ _ _ -> Ok 0L
             expiry = 1000ul
             code=SampleContract.sampleContractCode
         }
@@ -299,7 +299,7 @@ let ``block with invalid contract failed connecting``() =
         {
             contractId=Contract.makeContractId Version0 "ada"
             mainFn = fun tx _ _ _ _ _ _ _ -> Ok (tx,None,Zen.Types.Main.stateUpdate.NoChange)
-            costFn = fun _ _ _ _ _ _ _ -> 0L
+            costFn = fun _ _ _ _ _ _ _ -> Ok 0L
             expiry=1000ul
             code=""
         }
@@ -677,7 +677,7 @@ let ``contract get removed when expiring arrive``() =
         {
             contractId = SampleContract.sampleContractId
             mainFn = fun tx _ _ _ _ _ _ _ -> Ok (tx,None,Zen.Types.Main.stateUpdate.NoChange)
-            costFn = fun _ _ _ _ _ _ _ -> 0L
+            costFn = fun _ _ _ _ _ _ _ -> Ok 0L
             expiry = 0ul
             code = ""
         }
