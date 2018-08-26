@@ -31,7 +31,7 @@ let redeem txSkeleton contractId returnAddress wallet =
     >>= Tx.lockToAddress zenAsset amount returnAddress
     >>= Tx.fromWallet zenAsset amount contractId wallet in
 
-  CR.ofOptionTxSkel "contract doesn't have enough zens tokens" txSkeleton
+  CR.ofOptionTxSkel "This contract doesn't have enough ZP in order to redeem the requested amount" txSkeleton
 
 let main txSkeleton _ contractId command sender messageBody wallet state =
   let! returnAddress =
