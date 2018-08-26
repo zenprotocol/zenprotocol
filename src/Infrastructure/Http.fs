@@ -36,11 +36,11 @@ module Server =
         match request.HasEntityBody with
         | false -> Ok None
         | true ->
-            let bytes = Array.zeroCreate <| int request.ContentLength64
-            request.InputStream.Read(bytes,0, Array.length bytes) |> ignore // TODO: read all
-
             if request.ContentType.StartsWith HttpContentTypes.Json then
-               Ok(Some(request.ContentEncoding.GetString(bytes)))
+               use reader = new System.IO.StreamReader(request.InputStream,request.ContentEncoding)
+               let body = reader.ReadToEnd()
+                
+               Ok(Some(body))
             else
                Error(sprintf "only %s ContentType is supported" HttpContentTypes.Json)
     
