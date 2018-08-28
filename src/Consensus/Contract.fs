@@ -10,6 +10,7 @@ open Infrastructure
 open Zen.Types.Extracted
 open FStar.Pervasives
 open System
+open System.IO
 open Zen.Cost.Realized
 open Zen.Types.Realized
 open Zen.Types.Data
@@ -77,6 +78,15 @@ with
 
 type T = Contract
 
+let compatibilityPath = 
+    (Platform.workingDirectory, "compatibility", "v0_contract_hints")
+    |> Path.Combine
+
+let compatibilityFiles = 
+    compatibilityPath
+    |> Directory.GetFiles
+    |> Array.map Path.GetFileName
+
 let private getMainFunction assembly =
     try
         let getProperty name =
@@ -105,7 +115,7 @@ let private wrapMainFn (mainFn : zfstarMainFn) : ContractMainFn =
             |> Result.map ZFStar.convertResult
         with _ as ex ->
             Exception.toError "mainFn" ex
-            
+
 let private wrapCostFn (costFn: zfstarCostFn) : ContractCostFn =
     fun txSkeleton context command sender messageBody contractWallet contractState ->
         try
@@ -158,10 +168,21 @@ let compile (contractsPath:string)
             (contract:ContractV0) =
     let hash = computeHash Version0 contract.code
 
+    let contractId = ContractId (Version0,hash)
+
+    let hints =
+        match Array.tryFind ((=) (sprintf "Z%s" contractId.AsString)) compatibilityFiles with
+        | Some file -> 
+            (compatibilityPath, file)
+            |> Path.Combine
+            |> File.ReadAllText
+        | None -> 
+            contract.hints
+
     hash
     |> getModuleName
-    |> ZFStar.compile contractsPath contract.code contract.hints contract.rlimit
-    |> Result.map (fun _ -> ContractId (Version0,hash))
+    |> ZFStar.compile contractsPath contract.code hints contract.rlimit
+    |> Result.map (fun _ -> contractId)
 
 let recordHints (code:string) : Result<string, string> =
     code
