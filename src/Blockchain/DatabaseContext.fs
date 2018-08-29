@@ -9,10 +9,11 @@ open UtxoSet
 open FStar
 open ContractStates
 open Infrastructure
+open Result
 open Serialization
 
 [<Literal>]
-let DbVersion = 0
+let DbVersion = 1
 
 type T =
     {
@@ -61,6 +62,7 @@ let createSession context : Session =
     }
 
 let create dataPath =
+    let contractPath = Platform.combine dataPath "contracts"
     let databaseContext = DataAccess.DatabaseContext.create DataAccess.DatabaseContext.Large (Platform.combine dataPath "blockchain")
     use session = DatabaseContext.createSession databaseContext
 
@@ -125,11 +127,27 @@ let create dataPath =
             Version.deserialize
 
     match SingleValue.tryGet dbVersion session with
-    | Some version when version <> DbVersion ->
-        failwithf "Blockchain: wrong db version, expected %d but got %d" DbVersion version
     | None ->
         SingleValue.put dbVersion session DbVersion
-    | _ -> () // TODO: in the future we should have here db upgrade script
+    | Some 0 ->
+        Platform.cleanDirectory contractPath
+        Collection.getAll activeContractSet session
+        |> List.iter (fun contractKey ->
+            let (ContractId (_, contractHash)) = contractKey.contractId
+            let moduleName = Contract.getModuleName contractHash
+            
+            Infrastructure.ZFStar.recordHints contractKey.code moduleName
+            <@> (fun hints -> 
+                Infrastructure.ZFStar.compile contractPath contractKey.code hints (2723280u * 10u) moduleName
+            )
+            |> Result.mapError (failwithf "could not recompile contract %A due to %A. try using 'wipe'" contractKey.contractId)
+            |> ignore
+        )
+        SingleValue.put dbVersion session DbVersion
+    | Some DbVersion ->
+        ()
+    | Some version ->
+        failwithf "Blockchain: wrong db version, expected %d but got %d" DbVersion version
 
     Session.commit session
 
@@ -147,7 +165,7 @@ let create dataPath =
         blockTransactions=blockTransactions
         transactions=transactions
         transactionBlocks = transactionBlocks
-        contractPath=(Platform.combine dataPath "contracts")
+        contractPath=contractPath
         dbVersion = dbVersion
     }
 

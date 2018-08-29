@@ -131,7 +131,7 @@ let private wrapCostFn (costFn: zfstarCostFn) : ContractCostFn =
         with _ as ex ->
             Exception.toError "costFn" ex
 
-let private getModuleName : Hash -> string =
+let public getModuleName : Hash -> string =
     Hash.bytes
     >> Base16.encode
     >> (+) "Z"
