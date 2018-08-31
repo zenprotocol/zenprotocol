@@ -12,6 +12,7 @@ open Consensus.Types
 open State
 open Logary.Message
 open Zen.Types.Main
+open Result
 
 let getUTXO = UtxoSetRepository.get
 let getContractState = ContractStateRepository.get
@@ -130,7 +131,6 @@ let validateInputs chainParams session contractPath blockNumber timestamp ex sta
                 return! validateOrphanTransactions chainParams session contractPath blockNumber timestamp state
         }
 
-
 let validateTransaction chainParams session contractPath blockNumber timestamp ex (state:MemoryState) =
     effectsWriter {        
         if MemPool.containsTransaction ex.txHash state.mempool ||
@@ -186,10 +186,10 @@ let executeContract session txSkeleton timestamp contractId command sender messa
 
             contractState
             |> Contract.run contract txSkeleton contractContext command sender messageBody contractWallet
-            |> Result.bind (fun (tx, message, updatedState) ->
+            >>= (fun (tx, message, updatedState) ->
 
                 TxSkeleton.checkPrefix txSkeleton tx
-                |> Result.bind (fun finalTxSkeleton ->
+                >>= (fun finalTxSkeleton ->
                     let contractStates, contractState =
                         match updatedState with
                         | stateUpdate.Delete ->
@@ -204,20 +204,20 @@ let executeContract session txSkeleton timestamp contractId command sender messa
                     // To commit to the cost we need the real contract wallet
                     let contractWallet = Contract.getContractWallet tx witness
 
-                    let cost = Contract.getCost contract txSkeleton contractContext command sender messageBody contractWallet contractState
-
-                    let totalCost = cost + totalCost
-
-                    // We can now commit to the cost, so lets alter it with the real cost
-                    let witness = {witness with cost = uint64 cost}
-
-                    let witnesses = List.add (ContractWitness witness) witnesses
-
-                    match message with
-                    | Some {recipient=recipient; command=command; body=messageBody} ->
-                        run finalTxSkeleton recipient command (ContractSender contract.contractId) messageBody witnesses totalCost contractStates
-                    | None ->
-                        Ok (finalTxSkeleton, witnesses, totalCost)
+                    Contract.getCost contract txSkeleton contractContext command sender messageBody contractWallet contractState
+                    >>= (fun cost ->
+                        let totalCost = cost + totalCost
+    
+                        // We can now commit to the cost, so lets alter it with the real cost
+                        let witness = {witness with cost = uint64 cost}
+    
+                        let witnesses = List.add (ContractWitness witness) witnesses
+    
+                        match message with
+                        | Some {recipient=recipient; command=command; body=messageBody} ->
+                            run finalTxSkeleton recipient command (ContractSender contract.contractId) messageBody witnesses totalCost contractStates
+                        | None ->
+                            Ok (finalTxSkeleton, witnesses, totalCost))
                 )
             )
         | _ -> Error "Contract not active"
@@ -228,14 +228,11 @@ let executeContract session txSkeleton timestamp contractId command sender messa
         | None -> Anonymous
 
     run txSkeleton contractId command sender messageBody [] 0L state.memoryState.contractStates
-    |> Result.map (fun (finalTxSkeleton, witnesses, totalCost) ->
+    <@> (fun (finalTxSkeleton, witnesses, totalCost) ->
         eventX "Running contract chain with cost: {totalCost}"
         >> setField "totalCost" totalCost
         |> Log.info
 
-        let tx =
-            Transaction.fromTxSkeleton finalTxSkeleton
-            |> Transaction.pushWitnesses witnesses
-
-        tx
+        Transaction.fromTxSkeleton finalTxSkeleton
+        |> Transaction.pushWitnesses witnesses
     )

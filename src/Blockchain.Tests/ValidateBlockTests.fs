@@ -631,7 +631,7 @@ let ``block with a contract activation is added to chain``() =
     let contract = {
         contractId=contractId
         mainFn = fun tx _ _ _ _ _ _ _ -> Ok (tx,None,Zen.Types.Main.stateUpdate.NoChange)
-        costFn = fun _ _ _ _ _ _ _ -> 1L
+        costFn = fun _ _ _ _ _ _ _ -> Ok 1L
         expiry = 1001ul
         code = sampleContractCode
     }

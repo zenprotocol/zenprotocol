@@ -10,6 +10,7 @@ open Infrastructure
 open Zen.Types.Extracted
 open FStar.Pervasives
 open System
+open System.IO
 open Zen.Cost.Realized
 open Zen.Types.Realized
 open Zen.Types.Data
@@ -57,7 +58,7 @@ type ContractCostFn =
         -> data option
         -> ContractWallet
         -> data option
-        -> int64
+        -> Result<int64,string>
 
 type Contract = {
     contractId: ContractId
@@ -77,6 +78,15 @@ with
 
 type T = Contract
 
+let compatibilityPath = 
+    (Platform.workingDirectory, "compatibility", "v0_contract_hints")
+    |> Path.Combine
+
+let compatibilityFiles = 
+    compatibilityPath
+    |> Directory.GetFiles
+    |> Array.map Path.GetFileName
+
 let private getMainFunction assembly =
     try
         let getProperty name =
@@ -92,29 +102,36 @@ let private getMainFunction assembly =
 
 let private wrapMainFn (mainFn : zfstarMainFn) : ContractMainFn =
     fun txSkeleton (context:ContractContext) (ContractId (version, Hash.Hash cHash)) command sender messageBody contractWallet contractState ->
-        let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
-        let command' = ZFStar.fsToFstString command
-        let messageBody' = ZFStar.fsToFstOption messageBody
-        let contractWallet' = ZFStar.fsToFstWallet contractWallet
-        let context' = ZFStar.convertContext context
-        let contractState' = ZFStar.fsToFstOption contractState
-        mainFn txSkeleton' context' (version,cHash) command' sender messageBody' contractWallet' contractState'
-        |> ZFStar.unCost
-        |> ZFStar.toResult
-        |> Result.map ZFStar.convertResult
+        try
+            let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
+            let command' = ZFStar.fsToFstString command
+            let messageBody' = ZFStar.fsToFstOption messageBody
+            let contractWallet' = ZFStar.fsToFstWallet contractWallet
+            let context' = ZFStar.convertContext context
+            let contractState' = ZFStar.fsToFstOption contractState
+            mainFn txSkeleton' context' (version,cHash) command' sender messageBody' contractWallet' contractState'
+            |> ZFStar.unCost
+            |> ZFStar.toResult
+            |> Result.map ZFStar.convertResult
+        with _ as ex ->
+            Exception.toError "mainFn" ex
 
 let private wrapCostFn (costFn: zfstarCostFn) : ContractCostFn =
     fun txSkeleton context command sender messageBody contractWallet contractState ->
-        let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
-        let command' = ZFStar.fsToFstString command
-        let data' = ZFStar.fsToFstOption messageBody
-        let contractWallet' = ZFStar.fsToFstWallet contractWallet
-        let context' = ZFStar.convertContext context
-        let contractState' = ZFStar.fsToFstOption contractState
-        costFn txSkeleton' context' command' sender data' contractWallet' contractState'
-        |> ZFStar.unCost
+        try
+            let txSkeleton' = ZFStar.fsToFstTxSkeleton txSkeleton
+            let command' = ZFStar.fsToFstString command
+            let data' = ZFStar.fsToFstOption messageBody
+            let contractWallet' = ZFStar.fsToFstWallet contractWallet
+            let context' = ZFStar.convertContext context
+            let contractState' = ZFStar.fsToFstOption contractState
+            costFn txSkeleton' context' command' sender data' contractWallet' contractState'
+            |> ZFStar.unCost
+            |> Ok
+        with _ as ex ->
+            Exception.toError "costFn" ex
 
-let private getModuleName : Hash -> string =
+let public getModuleName : Hash -> string =
     Hash.bytes
     >> Base16.encode
     >> (+) "Z"
@@ -151,10 +168,21 @@ let compile (contractsPath:string)
             (contract:ContractV0) =
     let hash = computeHash Version0 contract.code
 
+    let contractId = ContractId (Version0,hash)
+
+    let hints =
+        match Array.tryFind ((=) (sprintf "Z%s" contractId.AsString)) compatibilityFiles with
+        | Some file -> 
+            (compatibilityPath, file)
+            |> Path.Combine
+            |> File.ReadAllText
+        | None -> 
+            contract.hints
+
     hash
     |> getModuleName
-    |> ZFStar.compile contractsPath contract.code contract.hints contract.rlimit
-    |> Result.map (fun _ -> ContractId (Version0,hash))
+    |> ZFStar.compile contractsPath contract.code hints contract.rlimit
+    |> Result.map (fun _ -> contractId)
 
 let recordHints (code:string) : Result<string, string> =
     code

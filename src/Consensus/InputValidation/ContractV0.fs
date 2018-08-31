@@ -7,14 +7,18 @@ open ValidationError
 open TxSkeleton
 open State
 open Zen.Types.Main
+open Infrastructure.Result
 
 let private validateCost contract initialTx context sender contractWallet (w:ContractWitness) contractState =
-    let cost = Contract.getCost contract initialTx context w.command sender w.messageBody contractWallet contractState
-
-    if uint64 cost <> w.cost then
-        GeneralError "execution cost commitment mismatch"
-    else
-        Ok ()
+    Contract.getCost contract initialTx context w.command sender w.messageBody contractWallet contractState
+    <@> uint64 
+    <@> (<>) w.cost
+    >>= fun noteq -> 
+        if noteq then
+            Error "execution cost commitment mismatch"
+        else
+            Ok ()
+    |> Result.mapError General
 
 let private validateState (contract:Contract.T) witness getContractState contractStates =
     let computeCommitment =

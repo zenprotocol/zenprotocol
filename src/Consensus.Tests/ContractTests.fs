@@ -78,18 +78,19 @@ let runAndValidate inputTx utxoSet (lazyCompiled : Lazy<_>) =
     |> Result.bind (fun contract ->
         Contract.run contract inputTx context "" Anonymous None List.empty None
         |> Result.bind (fun (tx, _, _) ->
-            let cost = Contract.getCost contract inputTx context "" Anonymous None List.empty None
-            tx
-            |> TxSkeleton.checkPrefix inputTx
-            |> Result.map (fun finalTxSkeleton ->
-                let cw = TxSkeleton.getContractWitness contract.contractId "" None NotCommitted inputTx finalTxSkeleton cost
-                Transaction.fromTxSkeleton finalTxSkeleton
-                |> Transaction.pushWitnesses [ ContractWitness cw ])
-            |> Result.map (Transaction.sign [ sampleKeyPair ] TxHash)
-            |> Result.bind validateBasic
-            |> Result.map Transaction.toExtended
-            |> Result.bind (validateInputs contract utxoSet))
-            |> Result.map (fun (ex, _, _, _) -> ex.tx)
+            Contract.getCost contract inputTx context "" Anonymous None List.empty None
+            |> Result.bind (fun cost ->
+                tx
+                |> TxSkeleton.checkPrefix inputTx
+                |> Result.map (fun finalTxSkeleton ->
+                    let cw = TxSkeleton.getContractWitness contract.contractId "" None NotCommitted inputTx finalTxSkeleton cost
+                    Transaction.fromTxSkeleton finalTxSkeleton
+                    |> Transaction.pushWitnesses [ ContractWitness cw ])
+                |> Result.map (Transaction.sign [ sampleKeyPair ] TxHash)
+                |> Result.bind validateBasic
+                |> Result.map Transaction.toExtended
+                |> Result.bind (validateInputs contract utxoSet))
+                |> Result.map (fun (ex, _, _, _) -> ex.tx))
     )
 
 let compileRunAndValidate inputTx utxoSet code =
@@ -109,7 +110,7 @@ let ``Contract generated transaction should be valid``() =
 [<Parallelizable>]
 let ``Should get expected contract cost``() =
     (compiledSampleContract.Force ()
-     |> Result.map (fun contract ->
+     |> Result.bind (fun contract ->
         Contract.getCost contract sampleInputTx context "" Anonymous None List.empty None)
     , (Ok 214L : Result<int64, string>))
     |> shouldEqual

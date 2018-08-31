@@ -52,7 +52,7 @@ let testParameters =
             |> get
             |> Hash.computeOfHash
         genesisTime=1529579777092UL
-        networkId=2014ul
+        networkId=2015ul
         contractSacrificePerBytePerBlock=ContractSacrificePerBytePerBlock
         versionExpiry= new System.DateTime(2200,1,1,0,0,0,System.DateTimeKind.Utc) |> Infrastructure.Timestamp.fromDateTime
     }
