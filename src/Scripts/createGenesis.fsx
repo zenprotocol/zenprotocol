@@ -53,7 +53,7 @@ let genesisTime = Timestamp.now()
 
 let testParameters = { testParameters with genesisTime = genesisTime}
 
-let block = Block.createGenesis testParameters [tx] (getRandomNonce (),getRandomNonce())
+let block = Block.createGenesis testParameters [Transaction.toExtended tx] (getRandomNonce(),getRandomNonce())
 
 
 
