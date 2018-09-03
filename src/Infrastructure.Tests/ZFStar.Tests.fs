@@ -66,8 +66,7 @@ let getModuleName (code : string) =
 let compile fstCode =
     let moduleName = getModuleName fstCode
     ZFStar.recordHints fstCode moduleName
-    |> Result.map (fun hints -> (fstCode, hints))
-    |> Result.bind (fun (code, hints) -> ZFStar.compile assemblyDirectory code hints rlimit moduleName)
+    |> Result.bind (fun hints -> ZFStar.compile assemblyDirectory fstCode hints rlimit moduleName)
     |> Result.bind (fun _ -> ZFStar.load assemblyDirectory moduleName)
 
 let fstCode = """

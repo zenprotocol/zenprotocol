@@ -228,7 +228,7 @@ let main argv =
             Disposables.empty
 
     if chain = Chain.Local then
-//        let block = Consensus.Block.createGenesis Chain.localParameters [Consensus.Tests.Helper.rootTx] (0UL,0UL)
+//        let block = Consensus.Block.createGenesis Chain.localParameters [Transaction.toExtended Consensus.Tests.Helper.rootTx] (0UL,0UL)
 //        printfn "%A" (Block.hash block.header)
 //        printfn "----"
 //        printfn "%A" (Serialization.Block.serialize block |> FsBech32.Base16.encode)
