@@ -20,7 +20,7 @@ let getRandomNonce () =
 
     System.BitConverter.ToUInt64 (array,0)
 
-let faucetAddress = "tp1qlvm8ey4m5mj6ak3an39qdfzf7yx4uz59flzlant6jp0gzld48egsrwtv7j"
+let faucetAddress = "tzn1qlvm8ey4m5mj6ak3an39qdfzf7yx4uz59flzlant6jp0gzld48egsj433m6"
 let faucetPKHash = Address.decodePK Chain.Test faucetAddress |> function | Ok hash -> hash | Error error -> failwith error
 
 let decodeCrowdsale pk =
