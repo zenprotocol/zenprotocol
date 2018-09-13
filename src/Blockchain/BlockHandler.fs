@@ -226,6 +226,7 @@ let getMemoryState chainParams session contractPath blockNumber timestamp mempoo
         orphanPool = orphanPool
         contractCache = contractCache
         contractStates = ContractStates.asDatabase
+        invalidTxHashes = Set.empty
     }
 
 

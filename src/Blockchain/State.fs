@@ -18,6 +18,7 @@ type MemoryState =
         mempool: MemPool.T
         contractCache: ContractCache.T
         contractStates: ContractStates.T
+        invalidTxHashes: Set<Hash.Hash>
     }
 
 type State =

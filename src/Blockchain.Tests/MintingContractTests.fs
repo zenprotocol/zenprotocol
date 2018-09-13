@@ -34,6 +34,7 @@ let mutable state = {
             activeContractSet = acs
             contractCache = ContractCache.empty
             contractStates = ContractStates.asDatabase
+            invalidTxHashes = FSharp.Collections.Set.empty
         }
     tipState =
         {
