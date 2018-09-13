@@ -65,6 +65,7 @@ let selectOrderedTransactions (chain:Chain.ChainParameters) (session:DatabaseCon
         mempool = MemPool.empty
         contractCache = contractCache
         contractStates = ContractStates.asDatabase
+        invalidTxHashes = Set.empty
     }
 
     foldUntilUnchanged initialState transactions

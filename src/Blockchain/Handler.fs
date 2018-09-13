@@ -69,10 +69,11 @@ let handleCommand chainParams command session timestamp (state:State) =
         | HandleMemPool (peerId,txHashes)
         | HandleNewTransactions (peerId, txHashes) ->
             effectsWriter {
-                let missingTxHashes = List.filter (fun txHash -> not <| MemPool.containsTransaction txHash state.memoryState.mempool) txHashes
-
-                if not <| List.isEmpty missingTxHashes then
-                    do! getTransactions peerId missingTxHashes
+                if not <| List.exists (fun txHash -> Set.contains txHash state.memoryState.invalidTxHashes) txHashes then
+                    let missingTxHashes = List.filter (fun txHash -> not <| MemPool.containsTransaction txHash state.memoryState.mempool) txHashes
+    
+                    if not <| List.isEmpty missingTxHashes then
+                        do! getTransactions peerId missingTxHashes
 
                 return state
             }

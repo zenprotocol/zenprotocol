@@ -104,6 +104,7 @@ module Binding =
             mempool = MemPool.empty
             contractCache = ContractCache.empty
             contractStates = ContractStates.asDatabase
+            invalidTxHashes = Set.empty
         }
 
         {

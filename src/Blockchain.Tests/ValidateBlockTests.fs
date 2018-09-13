@@ -77,6 +77,7 @@ let state = {
             activeContractSet = acs
             contractCache = ContractCache.empty
             contractStates = ContractStates.asDatabase
+            invalidTxHashes = Set.empty
         }
     tipState =
         {

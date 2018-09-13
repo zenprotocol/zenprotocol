@@ -85,6 +85,7 @@ let main dataPath chainParams busName wipe =
                 orphanPool=OrphanPool.create ()
                 contractCache=contractCache
                 contractStates=ContractStates.asDatabase
+                invalidTxHashes = Set.empty
             }
 
         let state =

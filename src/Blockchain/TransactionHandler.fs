@@ -99,6 +99,11 @@ let validateInputs chainParams session contractPath blockNumber timestamp ex sta
                 eventX "Transaction {hash} failed to activate its contract"
                 >> setField "hash" (Hash.toString ex.txHash)
                 |> Log.info
+                
+                let state = {
+                    state with
+                        invalidTxHashes = Set.add ex.txHash state.invalidTxHashes
+                    }
 
                 return state
             | Error error ->
