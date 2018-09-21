@@ -31,8 +31,6 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Api", "Api\Api.fsproj", "{B
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Cli", "Cli\Cli.fsproj", "{F2AB0CFF-5137-4A1C-858A-D317181B29FE}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Wallet", "Wallet\Wallet.fsproj", "{289A59EB-D1D4-499F-87B9-F75B799829C0}"
-EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Wallet.Tests", "Wallet.Tests\Wallet.Tests.fsproj", "{B00B9A97-D059-434D-81B9-BDC5D07A7DDB}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Blockchain.Tests", "Blockchain.Tests\Blockchain.Tests.fsproj", "{890069D1-B830-4407-BE70-265647B318CE}"
@@ -84,6 +82,8 @@ EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "AddressDB.Tests", "AddressDB.Tests\AddressDB.Tests.fsproj", "{01482664-7F31-4876-8C30-1368138AFA27}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "SerializationBenchmark", "SerializationBenchmark\SerializationBenchmark.fsproj", "{CBF2B4FB-5E3F-41AE-BAFF-AA7DCCB55051}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Wallet", "Wallet\Wallet.fsproj", "{289A59EB-D1D4-499F-87B9-F75B799829C0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -179,6 +179,10 @@ Global
 		{CBF2B4FB-5E3F-41AE-BAFF-AA7DCCB55051}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CBF2B4FB-5E3F-41AE-BAFF-AA7DCCB55051}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CBF2B4FB-5E3F-41AE-BAFF-AA7DCCB55051}.Release|Any CPU.Build.0 = Release|Any CPU
+		{289A59EB-D1D4-499F-87B9-F75B799829C0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{289A59EB-D1D4-499F-87B9-F75B799829C0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{289A59EB-D1D4-499F-87B9-F75B799829C0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{289A59EB-D1D4-499F-87B9-F75B799829C0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
