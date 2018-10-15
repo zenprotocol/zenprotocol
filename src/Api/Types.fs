@@ -300,5 +300,6 @@ type GetContractHistoryJson = JsonProvider<"""
 type ContractCommandHistoryResultJson = JsonProvider<"""
 [{
     "command": "command",
-    "messageBody": "abcdef012346789"
+    "messageBody": "abcdef012346789",
+    "txHash": "abcdef012346789"
 }]""">

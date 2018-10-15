@@ -33,7 +33,7 @@ type T =
     {
         outpointOutputs: Map<Outpoint, DBOutput>
         addressOutpoints: Map<Address, List<Outpoint>>
-        contractData: Map<ContractId, List<string * data option>>
+        contractData: Map<ContractId, List<string * data option * Hash>>
     }
     with
         member this.getOutputs outputs = // add given (db) onto view (memory)
@@ -123,7 +123,7 @@ let addMempoolTransaction dataAccess session txHash tx view =
                 {
                     outpointOutputs = view.outpointOutputs
                     addressOutpoints = view.addressOutpoints
-                    contractData = addContractData view.contractData cw.contractId [ cw.command, cw.messageBody ]
+                    contractData = addContractData view.contractData cw.contractId [ cw.command, cw.messageBody, txHash ]
                 }                
             | _ ->
                 view

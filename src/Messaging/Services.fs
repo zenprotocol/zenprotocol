@@ -303,7 +303,7 @@ module Wallet =
 module AddressDB =
     open Wallet
 
-    type ContractHistoryResponse = List<string * data option>
+    type ContractHistoryResponse = List<string * data option * Hash>
         
     type Mode =
         | All
