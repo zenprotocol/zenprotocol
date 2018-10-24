@@ -20,16 +20,17 @@ let txInMode mode tx =
 let setup = fun () ->
     Arb.register<ConsensusGenerator>() |> ignore
 
+[<Property>]
+let ``Raw Transaction serialization round trip produces same result`` (tx:RawTransaction) =
+    tx
+    |> RawTransaction.serialize
+    |> RawTransaction.deserialize = Some tx
+
 [<Property(EndSize=2000)>]
 let ``Transaction serialization round trip produces same result`` (tx:Transaction) =
-    try
-        tx
-        |> Transaction.serialize Full
-        |> Transaction.deserialize Full = Some tx
-    with
-    | :? System.NullReferenceException ->
-        printf "null exception caught in tx round trip"
-        false
+    tx
+    |> Transaction.serialize Full
+    |> Transaction.deserialize Full = Some tx
 
 [<Property(EndSize=2000)>]
 let ``Different transactions don't produce same serialization result``(mode:TransactionSerializationMode) (tx1:Transaction) (tx2:Transaction) =

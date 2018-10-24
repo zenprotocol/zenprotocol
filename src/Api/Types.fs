@@ -19,6 +19,30 @@ type ContractActivateResponseJson = JsonProvider<"""
 }
 """>
 
+type CreateRawTransactionJson = JsonProvider<"""
+{
+    "outputs": [{
+        "address": "address",
+        "asset": "asset",
+        "amount": 2147483649
+    }]
+}
+""">
+
+type RawTransactionResultJson = JsonProvider<"""
+{
+    "txHash" : "abcd123456",
+    "tx": "abcd123456"
+}
+""">
+
+type SignRawTransactionJson = JsonProvider<"""
+{
+    "tx":"abcdef1234",
+    "password":"ab1234"
+}
+""">
+
 type SendRequestJson = JsonProvider<"""
 {
     "outputs": [{
@@ -257,7 +281,7 @@ type RestoreNewAddressesJson = JsonProvider<"""
 
 type ImportZenPublicKey = JsonProvider<"""
 {
-    "publicKey":"abcd1234"    
+    "publicKey":"abcd1234"
 }""">
 
 type GetBalanceJson = JsonProvider<"""
@@ -275,7 +299,7 @@ type GetHistoryJson = JsonProvider<"""
 type GetOutputsJson = JsonProvider<"""
 {
     "addresses": ["abcd1234", "abcd1234" ],
-    "mode": "all"    
+    "mode": "all"
 }""">
 
 type ContractExecuteFromTransactionJson = JsonProvider<"""

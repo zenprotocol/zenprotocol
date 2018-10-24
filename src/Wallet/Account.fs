@@ -30,7 +30,13 @@ let deriveChange index key =
 let deriveExternal index key =
     ExtendedKey.derive 0 key
     >>= ExtendedKey.derive index
-     
+
+let getKeyPath addressType =
+    match addressType with
+    | External index -> sprintf "%s0/%d" zenKeyPath index
+    | Change index -> sprintf "%s1/%d" zenKeyPath index
+    | Payment index -> sprintf "%s2/%d" zenKeyPath index
+    | WatchOnly -> failwith "watch only address cannot be spent"
 
 let import dataAccess session mnemonicPhrase password tipHash tipBlockNumber = result {
     let mnemonicPhrase = (String.concat " " mnemonicPhrase)
@@ -73,12 +79,12 @@ let import dataAccess session mnemonicPhrase password tipHash tipBlockNumber = r
     return ()
 }
 
-let fromZenPublicKey dataAccess session tipHash tipBlockNumber publicKey = result { 
+let fromZenPublicKey dataAccess session tipHash tipBlockNumber publicKey = result {
     let! externalPKHash =
             deriveExternal 0 publicKey
             >>= ExtendedKey.getPublicKey
             <@> PublicKey.hash
-    
+
     {pkHash=externalPKHash; addressType=External 0}
     |> DataAccess.Addresses.put dataAccess session externalPKHash
 
@@ -89,7 +95,7 @@ let fromZenPublicKey dataAccess session tipHash tipBlockNumber publicKey = resul
 
     {pkHash=changePKHash; addressType=Change 0}
     |> DataAccess.Addresses.put dataAccess session changePKHash
-   
+
     let account = {
         blockHash = tipHash
         blockNumber = tipBlockNumber
@@ -102,12 +108,12 @@ let fromZenPublicKey dataAccess session tipHash tipBlockNumber publicKey = resul
 
     DataAccess.Account.put dataAccess session account
 
-    return ()    
+    return ()
 }
 
-let getZenExtendedPublicKey dataAccess session = 
+let getZenExtendedPublicKey dataAccess session =
     let account = DataAccess.Account.get dataAccess session
-    account.publicKey    
+    account.publicKey
 
 let getAddress dataAccess session chain =
     let account = DataAccess.Account.get dataAccess session
@@ -140,7 +146,7 @@ let getNewPKHash dataAccess session =
 let restoreNewAddresses dataAccess session maxIndex =
     let account = DataAccess.Account.get dataAccess session
     let minIndex = account.counter
-            
+
     [minIndex..maxIndex]
     |> Seq.iter (fun _ -> getNewPKHash dataAccess session |> ignore)
 
@@ -262,11 +268,11 @@ let addBlock dataAccess session blockHash block =
         ()
     elif account.blockHash <> block.header.parent then
         failwithf "trying to add a block to account but account in different chain %A %A" (block.header.blockNumber) (account.blockNumber)
-    else   
+    else
 
     block.transactions
     |> List.mapi (fun index ex -> index,ex)
-    |> List.iter (fun (blockIndex, ex) ->        
+    |> List.iter (fun (blockIndex, ex) ->
         // Mark transaction inputs as spent
         List.iter (fun input ->
             match input with
@@ -338,7 +344,7 @@ let undoBlock dataAccess session blockHash block =
             | _ -> ()
 
         ) ex.tx.inputs
-       
+
         // Delete outputs
         ex.tx.outputs
         |> List.mapi (fun index _ -> uint32 index)
@@ -389,12 +395,12 @@ let sync dataAccess session tipBlockHash (tipHeader:BlockHeader) (getHeader:Hash
         | Undo (block,hash) -> undoBlock dataAccess session hash block
         | Add (block,hash) -> addBlock dataAccess session hash block)
 
-let delete dataAccess session = 
+let delete dataAccess session =
     DataAccess.Outputs.truncate dataAccess session
     DataAccess.AddressOutputs.truncate dataAccess session
     DataAccess.Addresses.truncate dataAccess session
     DataAccess.Account.delete dataAccess session
-            
+
 let reset dataAccess session =
     let account = DataAccess.Account.get dataAccess session
 
@@ -435,7 +441,7 @@ let getMnemonicPhrase dataAccess session password =
 
     Secured.decrypt password account.secureMnemonicPhrase
 
-let getOutputsInfo blockNumber outputs = 
+let getOutputsInfo blockNumber outputs =
     let getConfirmations confirmationStatus =
         match confirmationStatus with
         | Confirmed (blockNumber',_,blockIndex) ->
@@ -486,7 +492,7 @@ let paginate skip take list =
 
 let getHistory dataAccess session view skip take =
     let account = DataAccess.Account.get dataAccess session
-    
+
     View.Outputs.getAll view dataAccess session
     |> getOutputsInfo account.blockNumber
     |> List.sortWith txComparer

@@ -257,6 +257,177 @@ type ConsensusGenerator =
             }
         })
 
+    static member RawTransaction() =
+        let outpointGenerator =
+            gen {
+                let! bytes = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+                let txHash = Hash.Hash bytes
+                let! index = Gen.choose (0,10)
+                let index = uint32 index
+
+                return Outpoint {txHash = txHash;index=index;}
+            }
+
+        let mintGenerator =
+            gen {
+                let! bytes1 = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+                let! bytes2 = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+                let asset = Asset (ContractId (Version0, Hash.Hash bytes1), Hash.Hash bytes2)
+                let! amount = Arb.generate<uint32> |> Gen.filter ((<>) 0ul)
+                let amount = uint64 amount
+
+                return Mint { asset=asset; amount=amount }
+            }
+
+        let inputGenerator =
+            Gen.oneof [ outpointGenerator; mintGenerator ]
+
+        let outputGenerator =
+            gen {
+                let notCoinbaseLockOrAcivationSacrifice = function
+                | ActivationSacrifice _
+                | Coinbase _ -> false
+                | _ -> true
+
+                let! lock =
+                    Arb.generate<Lock>
+                    |> Gen.filter notCoinbaseLockOrAcivationSacrifice
+                    |> Gen.filter (function
+                    | HighVLock (identifier, _) -> identifier > 7u // last reserved identifier
+                    | _ -> true)
+                let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+                let asset = Asset (ContractId (Version0, Hash.Hash asset), Hash.zero)
+                let! amount = Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
+
+                return {lock=lock;spend={asset=asset;amount=amount}}
+            }
+
+        let contractGenerator =
+            gen {
+                let! shouldHaveContract = Arb.generate<bool>
+                let! isHighVContract = Arb.generate<bool>
+                let! NonEmptyString code = Arb.generate<NonEmptyString>
+                let! NonEmptyString hints = Arb.generate<NonEmptyString>
+                let! rlimit = Arb.generate<uint32> |> Gen.filter ((<>) 0u)
+                let! queries = Arb.generate<uint32> |> Gen.filter ((<>) 0u)
+
+                if shouldHaveContract then
+                    if isHighVContract then
+                        let! version = Arb.generate<uint32> |> Gen.filter ((<>) Version0)
+                        let! bytes = Arb.generate<byte[]>
+                        return Some (HighV (version, bytes))
+                    else
+                        return Some (V0 { code = code; hints = hints; rlimit = rlimit; queries = queries })
+                else
+                    return None
+            }
+
+        let pkWitnessGenerator =
+            gen {
+                let secretKey, publicKey = KeyPair.create()
+                let! hash = Arb.generate<Hash.Hash>
+                return PKWitness (TxHash, publicKey, sign secretKey hash)
+            }
+
+        let contractWitnessGenerator nInputs nOutputs =
+            gen {
+                let! cHash = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+                let! command = Arb.generate<string> |> Gen.filter ((<>) null)
+
+                let! beginInputs = Arb.generate<uint32> |> Gen.filter (fun i -> i < nInputs)
+                let! beginOutputs = Arb.generate<uint32> |> Gen.filter (fun i -> i < nOutputs)
+                let! inputsLength = Arb.generate<uint32> |> Gen.filter ((<>) 0ul) |> Gen.filter (fun i -> i <= nInputs - beginInputs)
+                let! outputsLength = Arb.generate<uint32> |> Gen.filter (fun i -> i <= nOutputs - beginOutputs)
+                let! cost = Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
+                let! data = Arb.generate<Option<data>>
+
+                let! hasSignature = Arb.generate<bool>
+
+                let secretKey, publicKey = KeyPair.create()
+                let! hash = Arb.generate<Hash.Hash>
+                let signature = sign secretKey hash
+
+                let signature =
+                    if hasSignature then
+                        Some (publicKey, signature)
+                    else
+                        None
+
+                return ContractWitness {
+                    contractId = ContractId (Version0, Hash.Hash cHash)
+                    command = command
+                    messageBody = data
+                    stateCommitment = NotCommitted;
+                    beginInputs = beginInputs
+                    beginOutputs = beginOutputs
+                    inputsLength = inputsLength
+                    outputsLength = outputsLength
+                    signature = signature
+                    cost = cost
+                }
+            }
+
+        let highVWitnessGenerator =
+            gen {
+                let! identifier =
+                    Arb.generate<uint32>
+                    |> Gen.filter (fun i -> i > 2u) // last reserved identifier
+                let! bytes = Arb.generate<byte[]>
+                return HighVWitness (identifier, bytes)
+            }
+
+        let activationSacrificeOutputGenerator =
+            gen {
+                let! amount = Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
+                return [{lock=ActivationSacrifice; spend={asset=Asset (ContractId (Version0,Hash.zero),Hash.zero);amount=amount}}]
+            }
+
+        let witnessGenerator inputs outputs =
+            [ highVWitnessGenerator
+              contractWitnessGenerator (List.length inputs |> uint32) (List.length outputs |> uint32)
+              pkWitnessGenerator ]
+            |> Gen.oneof
+            |> Gen.map (fun w -> Witness w)
+
+        let emptyPKWitnessGenerator = gen {
+            let secretKey, publicKey = KeyPair.create()
+            return EmptyPKWitness (TxHash, publicKey, "m/0'/168'/0'/0'/0/1")
+        }
+
+        let highVRawWitnessGenerator =
+            gen {
+                let! identifier =
+                    Arb.generate<uint32>
+                    |> Gen.filter (fun i -> i > 1u) // last reserved identifier
+                let! bytes = Arb.generate<byte[]>
+                return HighVRawWitness (identifier, bytes)
+            }
+
+        Arb.fromGen (gen {
+            let checkMintsOnly =
+                List.forall (function | Mint _ -> true | _ -> false)
+                >> not
+
+            let! inputs = Gen.nonEmptyListOf inputGenerator |> Gen.filter checkMintsOnly
+            let! outputs = Gen.nonEmptyListOf outputGenerator
+            let! witnesses =
+                [ witnessGenerator inputs outputs; emptyPKWitnessGenerator; highVRawWitnessGenerator]
+                |> Gen.oneof
+                |> Gen.nonEmptyListOf
+
+            let! contract = contractGenerator
+
+            let! activationSacrificeOutputs =
+                if Option.isSome contract then
+                    activationSacrificeOutputGenerator
+                else
+                    Gen.constant []
+
+            let raw:RawTransaction = {version = Version0;inputs=inputs;outputs=List.append outputs activationSacrificeOutputs;contract=contract;witnesses=witnesses}
+
+            return raw
+            })
+
     static member Transaction() =
         let outpointGenerator =
             gen {

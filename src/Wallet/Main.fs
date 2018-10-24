@@ -73,11 +73,11 @@ let commandHandler client command dataAccess session accountStatus =
         | Resync ->
             Account.reset dataAccess session
             sync dataAccess session client
-        | RestoreNewAddresses maxIndex -> 
+        | RestoreNewAddresses maxIndex ->
             Account.restoreNewAddresses dataAccess session maxIndex
             Account.reset dataAccess session
             sync dataAccess session client
-            
+
 let private reply<'a> (requestId:RequestId) (value : Result<'a,string>) =
     requestId.reply value
 
@@ -86,7 +86,7 @@ let publishTx dataAccess session client view publish tx =
     | Ok tx ->
         if publish then
             let ex = Transaction.toExtended tx
-        
+
             let view = View.addMempoolTransaction dataAccess session ex.txHash tx view
             Blockchain.validateTransaction client ex
 
@@ -126,9 +126,9 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             | Error error ->
                 reply<unit> requestId (Error error)
                 NoAccount
-                
+
         | ImportZenPublicKey b58 ->
-            match ExtendedKey.fromString chain b58 with 
+            match ExtendedKey.fromString chain b58 with
             | Error error ->
                 reply<unit> requestId (Error error)
                 NoAccount
@@ -137,20 +137,20 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
                     match Blockchain.getTip client with
                     | Some (blockHash,header) -> blockHash, header.blockNumber
                     | None -> Hash.zero, 0ul
-            
-                match Account.fromZenPublicKey dataAccess session tipHash tipBlockNumber publicKey with 
+
+                match Account.fromZenPublicKey dataAccess session tipHash tipBlockNumber publicKey with
                 | Error error ->
                     reply<unit> requestId (Error error)
                     NoAccount
                 | Ok () ->
                     eventX "Account imported from zen public key"
                     |> Log.info
-    
+
                     reply<unit> requestId (Ok ())
-    
+
                     Blockchain.getMempool client
                     |> View.fromMempool dataAccess session
-                    |> Exist                                     
+                    |> Exist
         | GetBalance ->
             error
             |> reply<BalanceResponse> requestId
@@ -220,13 +220,19 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             |> reply<Map<Asset, uint64>> requestId
             NoAccount
         | ExportZenPublicKey ->
-            error 
+            error
             |> reply<string> requestId
             NoAccount
         | RemoveAccount _ ->
-            error 
+            error
             |> reply<unit> requestId
-            NoAccount                        
+            NoAccount
+        | RawTransactionCreate _
+        | RawTransactionSign _ ->
+            error
+            |> reply<RawTransaction> requestId
+            NoAccount
+
     | Exist view ->
         let chainParams = Consensus.Chain.getChainParameters chain
         match request with
@@ -255,12 +261,12 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             |> reply<TransactionsResponse> requestId
 
             accountStatus
-        | ImportZenPublicKey _       
+        | ImportZenPublicKey _
         | ImportSeed (_, _) ->
             Error "account already exist"
             |> reply<unit> requestId
 
-            accountStatus                    
+            accountStatus
         | Send (publish, outputs, password) ->
             let tx =
                 outputs
@@ -270,6 +276,19 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             reply<Transaction> requestId tx
             publishTx dataAccess session client view publish tx
 
+        | RawTransactionCreate outputs ->
+            let raw =
+                outputs
+                |> List.map (fun (hash, spend) -> { lock = PK hash; spend = spend })
+                |> TransactionCreator.createRawTransaction dataAccess session view None
+
+            reply<RawTransaction> requestId raw
+            accountStatus
+        | RawTransactionSign (raw,password) ->
+            let raw = TransactionCreator.signRawTransaction dataAccess session password raw
+
+            reply<RawTransaction> requestId raw
+            accountStatus
         | ActivateContract (publish, code, numberOfBlocks, password) ->
             let tx =
 
@@ -353,24 +372,23 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             |> ExtendedKey.toString chain
             |> Ok
             |> reply<string> requestId
-            
-            accountStatus  
-        | RemoveAccount password ->                    
+
+            accountStatus
+        | RemoveAccount password ->
             match Account.checkPassword dataAccess session password with
             | Ok _ ->
                 Account.delete dataAccess session
-                
+
                 Ok ()
                 |> reply<unit> requestId
-                
+
                 NoAccount
-            | Error error -> 
+            | Error error ->
                 Error error
                 |> reply<unit> requestId
-                
+
                 accountStatus
-        
-            
+
 type Wipe =
     | Full
     | Reset

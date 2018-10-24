@@ -21,7 +21,7 @@ let private getSpend asset amount =
     | None -> Error "invalid asset"
 
 let private getOutpoint txHash index =
-    Hash.fromString txHash 
+    Hash.fromString txHash
     |> Result.mapError (fun _ -> "invalid txHash")
     <@> fun txHash -> { txHash = txHash; index = index }
 
@@ -55,6 +55,65 @@ let parseSendJson chain json =
             |> String.concat " "
             |> Error
 
+    with _ as ex ->
+        Error ("Json invalid: " + ex.Message)
+
+let parseCreateRawTransactionJson chain json =
+    try
+        let json = CreateRawTransactionJson.Parse json
+        let mutable outputs = List.empty
+        let mutable errors = List.empty
+
+        if json.Outputs.Length = 0 then
+            errors <- "Outputs is empty" :: errors
+        else
+            for output in json.Outputs do
+                Address.decodePK chain output.Address
+                |> function
+                | Error err ->
+                    errors <- ("Address is invalid: " + err) :: errors
+                | Ok pkHash ->
+                    match getSpend output.Asset output.Amount with
+                    | Ok spend ->
+                        outputs <- (pkHash, spend) :: outputs
+                    | Error err ->
+                        errors <- err :: errors
+
+        if List.isEmpty errors then
+            Ok outputs
+        else
+            errors
+            |> String.concat " "
+            |> Error
+
+    with _ as ex ->
+        Error ("Json invalid: " + ex.Message)
+
+let parseSignRawTransactionJson json =
+    try
+        let json = SignRawTransactionJson.Parse json
+
+        if String.length json.Password = 0 then
+            Error "Password is empty"
+        else
+
+        match Serialization.RawTransaction.fromHex json.Tx with
+        | Some tx ->
+            Ok (tx, json.Password)
+        | None ->
+            Error "Invalid tx: decoding"
+    with _ as ex ->
+        Error ("Json invalid: " + ex.Message)
+
+let parseRawTransactionJson json =
+    try
+        let json = TxHexJson.Parse json
+
+        match Serialization.RawTransaction.fromHex json.Tx with
+            | Some tx ->
+                Ok tx
+            | None ->
+                Error "Invalid tx: decoding"
     with _ as ex ->
         Error ("Json invalid: " + ex.Message)
 
@@ -109,7 +168,7 @@ let parseContractExecuteFromTransactionJson chain json =
     >>= (fun json ->
         Address.decodeContract chain json.Address
         >>= fun address -> Ok (json, address))
-    >>= (fun (json, contractId) -> 
+    >>= (fun (json, contractId) ->
         json.Tx
         |> Base16.decode
         |> Result.ofOption "Invalid tx: decoding"
@@ -121,9 +180,9 @@ let parseContractExecuteFromTransactionJson chain json =
             Ok None
         else
             json.MessageBody
-            |> Base16.decode 
+            |> Base16.decode
             |> Result.ofOption "Invalid data: decoding"
-            >>= (Data.deserialize 
+            >>= (Data.deserialize
                 >> Result.ofOption "Invalid data: deserializing")
                 <@> Some)
         <@> (fun messageBody -> json, contractId, tx, messageBody))
@@ -134,7 +193,7 @@ let parseContractExecuteFromTransactionJson chain json =
             json.Options.Sender
             |> Base16.decode
             |> Result.ofOption "Invalid sender: decoding"
-            >>= (PublicKey.deserialize 
+            >>= (PublicKey.deserialize
                 >> Result.ofOption "Invalid sender: deserializing")
                 <@> Some)
         <@> (fun sender -> json, contractId, tx, messageBody, sender))
@@ -299,18 +358,18 @@ let parseTxHexJson json =
 
         FsBech32.Base16.decode hex.Tx
         |> Option.bind Consensus.Serialization.TransactionExtended.deserialize
-        |> Infrastructure.Result.ofOption "invalid transaction"          
+        |> Infrastructure.Result.ofOption "invalid transaction"
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
-        
-let parseRestoreNewAddress json = 
+
+let parseRestoreNewAddress json =
     try
         let json = RestoreNewAddressesJson.Parse json
         json.Max |> Ok
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
-        
-let parseImportZenPublicKey json = 
+
+let parseImportZenPublicKey json =
     try
         let json = ImportZenPublicKey.Parse json
         json.PublicKey |> Ok
@@ -323,13 +382,13 @@ let private checkAddresses chain addresses =
     else
         addresses
         |> Array.toList
-        |> Infrastructure.Result.traverseResultM (Address.decodeAny chain) 
+        |> Infrastructure.Result.traverseResultM (Address.decodeAny chain)
         <@> List.map (Wallet.Address.encode chain)
 
 let parseGetBalanceJson chain json =
     try
         let json = GetBalanceJson.Parse json
-        
+
         checkAddresses chain json.Addresses
     with _ as ex ->
         Error ("Json invalid: " + ex.Message)
@@ -337,7 +396,7 @@ let parseGetBalanceJson chain json =
 let parseGetHistoryJson chain json =
     try
         let json = GetHistoryJson.Parse json
-        
+
         checkAddresses chain json.Addresses
         <@> fun addresses -> addresses, json.Skip, json.Take
     with _ as ex ->
@@ -348,11 +407,11 @@ let parseGetOutputsJson chain json =
         let json = GetOutputsJson.Parse json
 
         checkAddresses chain json.Addresses
-        >>= fun addresses -> 
-            match json.Mode with 
-            | "all" -> 
+        >>= fun addresses ->
+            match json.Mode with
+            | "all" ->
                 Ok (addresses, Messaging.Services.AddressDB.Mode.All)
-            | "unspentOnly" -> 
+            | "unspentOnly" ->
                 Ok (addresses, Messaging.Services.AddressDB.Mode.UnspentOnly)
             | _ ->
                 Error "unrecognized mode"
@@ -365,7 +424,7 @@ let parseGetContractHistoryJson json =
 
         json.ContractId
         |> ContractId.fromString
-        |> Result.ofOption "invalid contractId"        
+        |> Result.ofOption "invalid contractId"
         <@> fun contractId -> contractId, json.Skip, json.Take
     with _ as ex ->
         Error ("Json invalid: " + ex.Message)

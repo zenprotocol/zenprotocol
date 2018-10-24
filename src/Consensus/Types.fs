@@ -118,6 +118,19 @@ type Contract =
     | V0 of ContractV0
     | HighV of version:uint32 * byte[]
 
+type RawWitness =
+    | Witness of Witness
+    | EmptyPKWitness of SigHash * PublicKey * keyPath:string
+    | HighVRawWitness of identifier:uint32 * byte[]
+
+type RawTransaction = {
+    version: uint32
+    inputs: Input list
+    outputs: Output list
+    witnesses: RawWitness list
+    contract: Contract Option
+}
+
 type Transaction = {
     version: uint32
     inputs: Input list
@@ -158,3 +171,4 @@ let Anonymous = Zen.Types.Main.Anonymous
 let ContractSender (ContractId (version, Hash.Hash cHash)) = Zen.Types.Main.Contract (version,cHash)
 let PKSender (Crypto.PublicKey publicKey) = Zen.Types.Main.PK publicKey
 type ContractContext = {blockNumber: uint32; timestamp: uint64}
+
