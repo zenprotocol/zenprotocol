@@ -3,6 +3,7 @@
 open FSharp.Data
 open Api.Types
 open Consensus.Types
+open Consensus
 open Wallet
 
 let rec omitNullFields = function
@@ -75,13 +76,24 @@ let pointedOutputEncoder chain (pointedOutput:PointedOutput) =
         ("spend", spendEncoder output.spend)
     |]
 
+let contractEncoder chain (tx:Transaction) =
+        match tx.contract with 
+        | Some (V0 c) -> 
+            let contractId = Contract.makeContractId Version0 c.code
+                        
+            let address = Address.encode chain (Address.Contract contractId)
+                    
+            JsonValue.Record [|("contract", JsonValue.Record [| ("contractId", JsonValue.String (contractId.ToString())); ("address",JsonValue.String address); ("code",JsonValue.String c.code) |])|]
+        | _ -> JsonValue.Null
+    
 let transactionEncoder chain (tx:Transaction) =
     JsonValue.Record
         [|
             ("version",JsonValue.Number ((decimal) tx.version));
             ("inputs", JsonValue.Array [| for i in tx.inputs -> inputEncoder i |]);
             ("outputs", JsonValue.Array [| for op in tx.outputs -> outputEncoder chain op |])
-            // witnesses and contracts not yet sent
+            ("contract", contractEncoder chain tx)
+            // witnesses not yet set
         |]
     |> omitNullFields
 
