@@ -20,7 +20,7 @@ let DbVersion = 1
 type T = {
     outpointOutputs: Collection<Outpoint, DBOutput>
     addressOutpoints: MultiCollection<Address, Outpoint>
-    contractData: MultiCollection<ContractId, string * data option>
+    contractData: MultiCollection<ContractId, string * data option * Hash>
     tip: SingleValue<Tip>
     dbVersion: SingleValue<int>
 }

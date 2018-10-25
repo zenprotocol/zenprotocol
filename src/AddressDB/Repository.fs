@@ -122,7 +122,7 @@ let addBlock dataAccess session blockHash block =
         tx.witnesses
         |> List.iter (function 
             | ContractWitness cw ->
-                DataAccess.ContractData.put dataAccess session cw.contractId (cw.command, cw.messageBody)
+                DataAccess.ContractData.put dataAccess session cw.contractId (cw.command, cw.messageBody, txHash)
             | _ ->
                 ()
         )
@@ -172,7 +172,7 @@ let undoBlock dataAccess session blockHash block =
         ex.tx.witnesses
         |> List.iter (function 
             | ContractWitness cw ->
-                DataAccess.ContractData.delete dataAccess session cw.contractId (cw.command, cw.messageBody)
+                DataAccess.ContractData.delete dataAccess session cw.contractId (cw.command, cw.messageBody, ex.txHash)
             | _ ->
                 ()
         )

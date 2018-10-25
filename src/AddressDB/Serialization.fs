@@ -2,8 +2,10 @@ module AddressDB.Serialization
 
 open FsNetMQ.Stream
 
-open Consensus.Serialization
-open Consensus.Serialization.Serialization
+open Consensus
+open Serialization
+open Serialization
+open Hash
 open Wallet.Serialization
 
 open AddressDB.Types
@@ -102,19 +104,22 @@ module Tip =
     let deserialize = deserialize read
 
 module ContractData =
-    let size (command, messageBody) =
+    let size (command, messageBody, _:Hash) =
         String.size command + 
-        Option.size Data.size messageBody
+        Option.size Data.size messageBody +
+        Hash.size
 
-    let write stream (command, messageBody) =
+    let write stream (command, messageBody, txHash) =
         String.write stream command
         Option.write stream Data.write messageBody
+        Hash.write stream txHash
 
     let read reader =
         let command = String.read reader
         let messageBody = Option.read Data.read reader
+        let txHash = Hash.read reader
 
-        command, messageBody
+        command, messageBody, txHash
 
     let serialize = serialize size write
     let deserialize = deserialize read

@@ -55,5 +55,5 @@ let ``AddressDB should show contract history``() =
     |> post "addressdb/contract/history"
     |> ContractCommandHistoryResultJson.Parse
     |> parseContractCommandHistoryResultJson
-    |> Array.map fst
+    |> Array.map (fun (fst, _, _) -> fst)
     |> should contain "mock command"

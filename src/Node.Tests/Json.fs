@@ -64,5 +64,6 @@ let getContractHistoryJson contractId skip take =
 let parseContractCommandHistoryResultJson =
     Array.map (fun (contractData:ContractCommandHistoryResultJson.Root) ->
         contractData.Command,
-        contractData.MessageBody
+        contractData.MessageBody,
+        contractData.TxHash
     )

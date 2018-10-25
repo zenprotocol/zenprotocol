@@ -681,15 +681,16 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
     | Post("/addressdb/contract/history", Some json) ->
         parseGetContractHistoryJson json 
         >>= AddressDB.getContractHistory client 
-        <@> List.map (fun (command, messageBody) -> 
+        <@> List.map (fun (command, messageBody, txHash) -> 
             new ContractCommandHistoryResultJson.Root(
                 command,
-                match messageBody with 
+                (match messageBody with 
                 | Some data -> 
                     data
                     |> Data.serialize
                     |> Base16.encode
-                | None -> ""
+                | None -> ""),
+                Consensus.Hash.toString txHash
             )
         )
         <@> List.map (fun json -> json.JsonValue)
