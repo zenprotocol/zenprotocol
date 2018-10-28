@@ -83,7 +83,7 @@ let contractEncoder chain (tx:Transaction) =
                         
             let address = Address.encode chain (Address.Contract contractId)
                     
-            JsonValue.Record [|("contract", JsonValue.Record [| ("contractId", JsonValue.String (contractId.ToString())); ("address",JsonValue.String address); ("code",JsonValue.String c.code) |])|]
+            JsonValue.Record [| ("contractId", JsonValue.String (contractId.ToString())); ("address",JsonValue.String address); ("code",JsonValue.String c.code) |]
         | _ -> JsonValue.Null
     
 let transactionEncoder chain (tx:Transaction) =
