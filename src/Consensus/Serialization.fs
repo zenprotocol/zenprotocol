@@ -120,7 +120,7 @@ let deserialize fn bytes =
         |> fn
         |> Option.Some
     with
-    | SerializationException -> None
+    | SerializationException as ex-> None
 
 [<Literal>]
 let SerializedHeaderSize = 100
@@ -332,10 +332,10 @@ module Serialization =
             let cHash = Hash.read stream
 
             ContractId (version, cHash)
-    
+
         let serialize = serialize size write
         let deserialize = deserialize read
-            
+
     module Asset =
         let private writeSubtype stream l = fun sb ->
             Byte.write stream (byte l)
@@ -997,17 +997,37 @@ module Serialization =
             | _ ->
                 raise SerializationException
 
-    module Witness =
-        [<Literal>]
-        let private PKIdentifier = 1u
-        [<Literal>]
-        let private ContractIdentifier = 2u
-
+    module SigHash =
         [<Literal>]
         let private SigHashTxHash = 1uy
 
         [<Literal>]
         let private SigHashFollowingWitnesses = 3uy
+
+        let size = Byte.size
+        let write stream sigHash =
+
+            let sigHashByte =
+                match sigHash with
+                | TxHash -> SigHashTxHash
+                | FollowingWitnesses -> SigHashFollowingWitnesses
+                | UnknownSigHash x -> x
+
+            Byte.write stream sigHashByte
+
+        let read stream =
+            let sigHashByte = Byte.read stream
+
+            match sigHashByte with
+            | SigHashTxHash -> TxHash
+            | SigHashFollowingWitnesses -> FollowingWitnesses
+            | x -> UnknownSigHash x
+
+    module Witness =
+        [<Literal>]
+        let private PKIdentifier = 1u
+        [<Literal>]
+        let private ContractIdentifier = 2u
 
         let private sizeFn = function
             | PKWitness _ ->
@@ -1038,13 +1058,8 @@ module Serialization =
 
         let private writerFn stream = function
             | PKWitness (sigHash, publicKey, signature) ->
-                let sigHashByte =
-                    match sigHash with
-                    | TxHash -> SigHashTxHash
-                    | FollowingWitnesses -> SigHashFollowingWitnesses
-                    | UnknownSigHash x -> x
 
-                Byte.write stream sigHashByte
+                SigHash.write stream sigHash
                 PublicKey.write stream publicKey
                 Signature.write stream signature
             | ContractWitness cw ->
@@ -1081,14 +1096,7 @@ module Serialization =
             let value =
                 match identifier with
                 | PKIdentifier ->
-                    let sigHashByte = Byte.read stream
-
-                    let sigHash =
-                        match sigHashByte with
-                        | SigHashTxHash -> TxHash
-                        | SigHashFollowingWitnesses -> FollowingWitnesses
-                        | x -> UnknownSigHash x
-
+                    let sigHash = SigHash.read stream
                     let publicKey = PublicKey.read stream
                     let signature = Signature.read stream
                     PKWitness (sigHash, publicKey, signature)
@@ -1225,6 +1233,84 @@ module Serialization =
             let nonce2 = stream.readNumber8 ()
             nonce1,nonce2
 
+    module RawTransactionWitness =
+        [<Literal>]
+        let private WitnessIdentifier = 0u
+        [<Literal>]
+        let private EmptyPKWitnessIdentifier = 1u
+
+        let sizeFn = function
+            | EmptyPKWitness (_, _, keyPath) -> SigHash.size + PublicKey.size +  (String.size keyPath)
+            | Witness witness -> Witness.size witness
+            | HighVRawWitness (_, bytes) -> FixedSizeBytes.size bytes
+
+        let identifier = function
+            | Witness _ -> WitnessIdentifier
+            | EmptyPKWitness _ -> EmptyPKWitnessIdentifier
+            | HighVRawWitness (identifier,_) -> identifier
+
+        let size witness =
+            let payloadSize = sizeFn witness
+
+            VarInt.size (identifier witness) + VarInt.size (uint32 payloadSize) + payloadSize
+
+        let writeFn stream = function
+            | Witness witness ->
+                Witness.write stream witness
+            | EmptyPKWitness (sigHash, publicKey, keyPath) ->
+                SigHash.write stream sigHash
+                PublicKey.write stream publicKey
+                String.write stream keyPath
+            | HighVRawWitness (_, bytes) ->
+                FixedSizeBytes.write stream bytes
+
+        let write stream witness =
+            VarInt.write stream (identifier witness)
+            VarInt.write stream (sizeFn witness |> uint32)
+            writeFn stream witness
+
+        let read stream =
+            let identifier = VarInt.read stream
+            let size = VarInt.read stream
+
+            match identifier with
+            | WitnessIdentifier ->
+                Witness.read stream |> Witness
+            | EmptyPKWitnessIdentifier ->
+                let sigHash = SigHash.read stream
+                let publicKey = PublicKey.read stream
+                let keyPath = String.read stream
+
+                EmptyPKWitness (sigHash, publicKey, keyPath)
+            | _ ->
+                let bytes = FixedSizeBytes.read (int size) stream
+                HighVRawWitness (identifier, bytes)
+
+    module RawTransaction =
+
+        let size (tx:RawTransaction) =
+            4 + // version
+                List.size Input.size tx.inputs +
+                List.size Output.size tx.outputs +
+                Option.size Contract.size tx.contract +
+                List.size RawTransactionWitness.size tx.witnesses
+
+        let write (stream:Stream) (tx:RawTransaction) =
+            stream.writeNumber4 tx.version
+            List.write Input.write stream tx.inputs
+            List.write Output.write stream tx.outputs
+            Option.write stream Contract.write tx.contract
+            List.write RawTransactionWitness.write stream tx.witnesses
+
+        let read (stream:Stream) =
+            let version = stream.readNumber4 ()
+            let inputs = List.read Input.read stream
+            let outputs = List.read Output.read stream
+            let contract = Option.read Contract.read stream
+            let witnesses = List.read RawTransactionWitness.read stream
+
+            { version = version; inputs = inputs; witnesses = witnesses; outputs = outputs; contract = contract }:RawTransaction
+
     module Transaction =
         let size mode tx =
             4 + // version
@@ -1351,6 +1437,15 @@ module Serialization =
             }
 
 open Serialization
+
+module RawTransaction =
+    let serialize = serialize RawTransaction.size RawTransaction.write
+    let deserialize = deserialize RawTransaction.read
+    let toHex = serialize >> FsBech32.Base16.encode
+
+    let fromHex hex =
+        FsBech32.Base16.decode hex
+        |> Option.bind deserialize
 
 module Transaction =
     let serialize mode = serialize (Transaction.size mode) (Transaction.write mode)

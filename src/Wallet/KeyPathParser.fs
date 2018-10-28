@@ -51,7 +51,7 @@ let parse (path:string) =
         match parsePart chars with
         | EndOfPath,_ -> List.rev parts |> Ok
         | Derive index, chars -> parseAll chars (index :: parts)
-        | Invalid,_ -> Error "invalid key path"
+        | Invalid,_ -> Error (sprintf "invalid key path %s" path)
 
     // first two characters must be m/
     if path.StartsWith "m/" then

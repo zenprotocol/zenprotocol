@@ -49,15 +49,30 @@ type PublicKeyArgs =
     interface IArgParserTemplate with
         member arg.Usage = ""
 
-type ImportPublicKeyArgs = 
-    | [<MainCommand("COMMAND");ExactlyOnce>] ImportPublicKey_Arguments of publicKey:string    
+type ImportPublicKeyArgs =
+    | [<MainCommand("COMMAND");ExactlyOnce>] ImportPublicKey_Arguments of publicKey:string
     interface IArgParserTemplate with
         member arg.Usage = ""
-    
+
+type RawTransactionCreateArgs =
+    | [<MainCommand("COMMAND");ExactlyOnce>] RawTransactionCreate_Arguments of asset:string * amount:int64 * address:string
+    interface IArgParserTemplate with
+        member arg.Usage = ""
+
+type RawTransactionSignArgs =
+    | [<MainCommand("COMMAND");ExactlyOnce>] RawTransactionSign_Arguments of password:string * file:string
+    interface IArgParserTemplate with
+        member arg.Usage = ""
+
+type RawTransactionPublishArgs =
+    | [<MainCommand("COMMAND");ExactlyOnce>] RawTransactionPublish_Arguments of file:string
+    interface IArgParserTemplate with
+        member arg.Usage = ""
+
 type NoArgs =
     | [<Hidden>] NoArg
     interface IArgParserTemplate with
-        member arg.Usage = "get address"              
+        member arg.Usage = "get address"
 
 type Arguments =
     | [<AltCommandLine("-p");UniqueAttribute>] Port of port:uint16
@@ -84,7 +99,11 @@ type Arguments =
     | [<CliPrefix(CliPrefix.None)>] ImportZenPublicKey of ParseResults<ImportPublicKeyArgs>
     | [<CliPrefix(CliPrefix.None)>] RemoveWallet of ParseResults<PasswordArgs>
     | [<CliPrefix(CliPrefix.None)>] PublicKey of ParseResults<PublicKeyArgs>
-    
+    | [<CliPrefix(CliPrefix.None)>] RawTx_Create of ParseResults<RawTransactionCreateArgs>
+    | [<CliPrefix(CliPrefix.None)>] RawTx_Sign of ParseResults<RawTransactionSignArgs>
+    | [<CliPrefix(CliPrefix.None)>] RawTx_Publish of ParseResults<RawTransactionPublishArgs>
+    | [<CliPrefix(CliPrefix.None)>] Wallet_Create of ParseResults<PasswordArgs>
+
     interface IArgParserTemplate with
         member arg.Usage =
             match arg with
@@ -110,8 +129,12 @@ type Arguments =
             | MnemonicPhrase _ -> "get the mnemonic phrase"
             | ExportZenPublicKey _ -> "export zen extended public key"
             | ImportZenPublicKey _ -> "import zen extended public key and create watch-only account"
-            | RemoveWallet _ -> "remove wallet" 
-            | PublicKey _ -> "derive a public key from a given derivation path" 
+            | RemoveWallet _ -> "remove wallet"
+            | PublicKey _ -> "derive a public key from a given derivation path"
+            | RawTx_Create _ -> "create a raw transaction that pass the asset and amount to the address"
+            | RawTx_Sign _ -> "sign all possible inputs of the raw transaction and return the signed transaction"
+            | RawTx_Publish _ -> "publish a fully signed raw transaction"
+            | Wallet_Create _ -> "Generate new mnemonic phrase and creating a wallet. Use mnemonichhrase command to get the newly generated mnemonic phrase."
 
 [<EntryPoint>]
 let main argv =
@@ -153,6 +176,21 @@ let main argv =
             text
 
     let printResponse = getResponse >> printfn "%s"
+
+    let saveRawToFile (response : HttpResponse) =
+        let text =
+            match response.Body with
+            | Text text -> text
+            | Binary bytes -> Text.Encoding.ASCII.GetString bytes
+
+        if response.StatusCode <> 200 then
+            exit text |> printfn "%s"
+        else
+            let json = RawTransactionResultJson.Parse text
+
+            System.IO.File.WriteAllText(sprintf "%s.raw" json.TxHash, json.Tx)
+
+            printfn "Raw transaction written to file %s.raw" json.TxHash
 
     try
         match results.TryGetSubCommand() with
@@ -300,7 +338,7 @@ let main argv =
             |> printResponse
         | Some (RemoveWallet args) ->
             let password = args.GetResult <@ Password_Arguments @>
-        
+
             "wallet/remove"
             |> getUri
             |> (new CheckPasswordJson.Root(password))
@@ -313,6 +351,39 @@ let main argv =
             |> (new GetPublicKeyJson.Root(path, password))
                 .JsonValue.Request
             |> printResponse
+        | Some (RawTx_Create args) ->
+            let asset, amount, address = args.GetResult <@ RawTransactionCreate_Arguments @>
+            "wallet/rawtransaction/create"
+            |> getUri
+            |> (new CreateRawTransactionJson.Root([| new CreateRawTransactionJson.Output(address, asset, amount) |]))
+                .JsonValue.Request
+            |> saveRawToFile
+        | Some (RawTx_Sign args) ->
+            let password, file = args.GetResult <@ RawTransactionSign_Arguments @>
+            let raw = System.IO.File.ReadAllText file
+            "wallet/rawtransaction/sign"
+            |> getUri
+            |> (new SignRawTransactionJson.Root(raw, password) )
+                .JsonValue.Request
+            |> saveRawToFile
+        | Some (RawTx_Publish args) ->
+            let file = args.GetResult <@ RawTransactionPublish_Arguments @>
+            let raw = System.IO.File.ReadAllText file
+            "wallet/rawtransaction/publish"
+            |> getUri
+            |> (new TxHexJson.Root(raw))
+                .JsonValue.Request
+            |> printResponse
+        | Some (Wallet_Create args) ->
+            let password = args.GetResult <@ Password_Arguments @>
+
+            let words = (new NBitcoin.Mnemonic(NBitcoin.Wordlist.English, NBitcoin.WordCount.TwentyFour)).Words
+
+            "wallet/import"
+            |> getUri
+            |> (new ImportSeedJson.Root(password, words)).JsonValue.Request
+            |> printResponse
+
         | _ -> ()
     with
     | :? Net.WebException as ex ->

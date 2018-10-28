@@ -219,6 +219,8 @@ module Wallet =
         | ExportZenPublicKey
         | ImportZenPublicKey of string
         | RemoveAccount of password:string
+        | RawTransactionCreate of outputs:List<Hash * Spend>
+        | RawTransactionSign of RawTransaction * password:string
 
     let serviceName = "wallet"
 
@@ -233,6 +235,14 @@ module Wallet =
 
     let getAddress client =
         send<string> client serviceName GetAddress
+
+    let createRawTransaction client outputs =
+        RawTransactionCreate outputs
+        |> send<RawTransaction> client serviceName
+
+    let signRawTransaction client rawTx password =
+        RawTransactionSign (rawTx, password)
+        |> send<RawTransaction> client serviceName
 
     let createTransaction client publish outputs password =
         send<Transaction> client serviceName (Send (publish, outputs, password))
@@ -304,7 +314,7 @@ module AddressDB =
     open Wallet
 
     type ContractHistoryResponse = List<string * data option * Hash>
-        
+
     type Mode =
         | All
         | UnspentOnly

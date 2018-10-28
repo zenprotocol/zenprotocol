@@ -101,6 +101,31 @@ let parseConfirmations query reply get =
         | true, confirmations -> get confirmations
         | _ -> reply StatusCode.BadRequest (TextContent "invalid confirmations")
 
+let publishTransaction client reply ex =
+    Blockchain.validateTransaction client ex
+
+    match Blockchain.getTransaction client ex.txHash with
+    | Some (_,0ul) ->
+        Hash.toString ex.txHash
+        |> JsonValue.String
+        |> JsonContent
+        |> reply StatusCode.OK
+    | Some _ ->
+        "transaction already exists"
+        |> TextContent
+        |> reply StatusCode.Found
+    | _ ->
+        match Blockchain.checkTransaction client ex with
+        | Ok _ ->
+            Hash.toString ex.txHash
+            |> JsonValue.String
+            |> JsonContent
+            |> reply StatusCode.OK
+        | Error error ->
+            sprintf "%A" error
+            |> TextContent
+            |> reply StatusCode.BadRequest
+
 let handleRequest chain client (request,reply) (templateCache : BlockTemplateCache) =
     let replyError error =
         reply StatusCode.BadRequest (TextContent error)
@@ -113,6 +138,18 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
             Transaction.hash tx
             |> Hash.toString
             |> JsonValue.String
+            |> JsonContent
+            |> reply StatusCode.OK
+
+    let handleRawTxResult result =
+        match result with
+        | Error error ->
+            replyError error
+        | Ok raw ->
+            let txHash = Transaction.fromRaw raw |> Transaction.hash |> Hash.toString
+            let hex = Serialization.RawTransaction.toHex raw
+
+            (new RawTransactionResultJson.Root(txHash, hex)).JsonValue
             |> JsonContent
             |> reply StatusCode.OK
 
@@ -301,7 +338,36 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
             |> handleTxResult
         | Error error ->
             replyError error
-    | Post ("/wallet/createrawtransaction", Some body) ->
+    | Post ("/wallet/rawtransaction/create", Some body) ->
+        match parseCreateRawTransactionJson chain body with
+        | Ok outputs ->
+            Wallet.createRawTransaction client outputs
+            |> handleRawTxResult
+        | Error error ->
+            replyError error
+    | Post ("/wallet/rawtransaction/sign", Some body) ->
+        match parseSignRawTransactionJson body with
+        | Ok (tx,password) ->
+            Wallet.signRawTransaction client tx password
+            |> handleRawTxResult
+        | Error error ->
+            replyError error
+    | Post ("/wallet/rawtransaction/publish", Some body) ->
+        match parseRawTransactionJson body with
+        | Ok raw ->
+            let tx = Transaction.fromRaw raw
+
+            if List.length tx.witnesses <> List.length raw.witnesses then
+                replyError "raw transaction is not fully signed"
+            else
+                let ex = Transaction.toExtended tx
+                publishTransaction client reply ex
+
+        | Error error ->
+            replyError error
+    // OBSOLETE: createrawtransaction is obsolete, please use create transaction
+    | Post ("/wallet/createrawtransaction", Some body)
+    | Post ("/wallet/createtransaction", Some body) ->
         match parseSendJson chain body with
         | Ok (outputs, password) ->
             match Wallet.createTransaction client false outputs password with
@@ -468,30 +534,7 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
     | Post ("/blockchain/publishtransaction", Some tx) ->
         match Parsing.parseTxHexJson tx with
         | Ok ex ->
-
-            Blockchain.validateTransaction client ex
-
-            match Blockchain.getTransaction client ex.txHash with
-            | Some (_,0ul) ->
-                Hash.toString ex.txHash
-                |> JsonValue.String
-                |> JsonContent
-                |> reply StatusCode.OK
-            | Some _ ->
-                "transaction already exists"
-                |> TextContent
-                |> reply StatusCode.Found
-            | _ ->
-                match Blockchain.checkTransaction client ex with
-                | Ok _ ->
-                    Hash.toString ex.txHash
-                    |> JsonValue.String
-                    |> JsonContent
-                    |> reply StatusCode.OK
-                | Error error ->
-                    sprintf "%A" error
-                    |> TextContent
-                    |> reply StatusCode.BadRequest
+            publishTransaction client reply ex
 
         | Error error ->
             reply StatusCode.BadRequest <| TextContent error
@@ -645,7 +688,7 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
         match parseGetOutputsJson chain json with
         | Error error -> reply StatusCode.BadRequest (TextContent error)
         | Ok (addresses, mode) ->
-            match AddressDB.getOutputs client (addresses, mode) with 
+            match AddressDB.getOutputs client (addresses, mode) with
             | Ok pointedOutputs ->
                 pointedOutputs
                 |> Seq.map (pointedOutputEncoder chain)
@@ -679,13 +722,13 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
         |> JsonContent
         |> reply StatusCode.OK
     | Post("/addressdb/contract/history", Some json) ->
-        parseGetContractHistoryJson json 
-        >>= AddressDB.getContractHistory client 
-        <@> List.map (fun (command, messageBody, txHash) -> 
+        parseGetContractHistoryJson json
+        >>= AddressDB.getContractHistory client
+        <@> List.map (fun (command, messageBody, txHash) ->
             new ContractCommandHistoryResultJson.Root(
                 command,
-                (match messageBody with 
-                | Some data -> 
+                (match messageBody with
+                | Some data ->
                     data
                     |> Data.serialize
                     |> Base16.encode

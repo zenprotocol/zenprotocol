@@ -338,3 +338,96 @@ let createExtendContractTransaction dataAccess session view (getContract:Contrac
 
         return! createTransactionFromOutputs dataAccess session view password None outputs
     }
+
+let createRawTransaction dataAccess session view contract outputs = result {
+    let account = DataAccess.Account.get dataAccess session
+
+    // summarize the amount of inputs needed per asset
+    let requiredAmounts = List.fold (fun amounts (output:Consensus.Types.Output) ->
+        match Map.tryFind output.spend.asset amounts with
+        | Some amount -> Map.add output.spend.asset (amount + output.spend.amount) amounts
+        | None ->  Map.add output.spend.asset output.spend.amount amounts) Map.empty outputs
+
+    let! inputs = collectInputs dataAccess session view account requiredAmounts
+    let changeOutputs = getChangeOutputs inputs requiredAmounts account
+
+    // Convert to outpoint list and get the key for every input
+    let inputs,witnesses =
+        Map.toSeq inputs
+        |> Seq.collect (fun (_,inputs) -> inputs)
+        |> Seq.map (fun (outpoint,_,pkHash) ->
+
+            let address = DataAccess.Addresses.get dataAccess session pkHash
+            let keyPath = Account.getKeyPath address.addressType
+
+            let publicKey =
+                match address.addressType with
+                | Change index -> Account.deriveChange index account.publicKey >>= ExtendedKey.getPublicKey |> get // The key must be valid as we already used it, safe to call get
+                | External index -> Account.deriveExternal index account.publicKey >>= ExtendedKey.getPublicKey |> get
+                | Payment index -> Account.deriveNewAddress index account.publicKey  >>= ExtendedKey.getPublicKey |> get
+                | WatchOnly -> failwith "watch only address cannot be spent"
+
+            Outpoint outpoint,  EmptyPKWitness (TxHash, publicKey, keyPath)
+            )
+        |> List.ofSeq
+        |> List.unzip
+
+    let raw:RawTransaction = {
+        version=Version0
+        inputs=inputs
+        outputs = outputs @ changeOutputs
+        witnesses = witnesses
+        contract = contract
+    }
+
+    return raw
+}
+
+let signRawTransaction dataAccess session password (raw:RawTransaction) = result {
+    let account = DataAccess.Account.get dataAccess session
+
+    let! extendedPrivateKey =
+        Secured.decrypt password account.secureMnemonicPhrase
+        >>= ExtendedKey.fromMnemonicPhrase
+
+    let txHash = Transaction.fromRaw raw |> Transaction.hash
+
+    let folder witness witnesses =
+        match witness with
+        | Witness _
+        | HighVRawWitness _ -> witness :: witnesses
+        | EmptyPKWitness (sigHash,publicKey,keyPath) ->
+            let extendedKey = ExtendedKey.derivePath keyPath extendedPrivateKey |> Result.get
+            let publicKey' = ExtendedKey.getPublicKey extendedKey |> Result.get
+
+            if publicKey' <> publicKey then
+                EmptyPKWitness (sigHash,publicKey,keyPath) :: witnesses // It is not our key, skipping
+            else
+                let secretKey = ExtendedKey.getPrivateKey extendedKey |> Result.get
+
+                match sigHash with
+                | TxHash ->
+                    Witness (PKWitness (sigHash, publicKey, Crypto.sign secretKey txHash)) :: witnesses
+                | FollowingWitnesses ->
+                    let signedWitnesses =
+                        List.choose (fun w ->
+                            match w with
+                            | Witness w -> Some w
+                            | _ -> None) witnesses
+
+                    if List.length signedWitnesses <> List.length witnesses then
+                        witness :: witnesses // Not all witnesses are signed, we are not ready to sign
+                    else
+
+                    let witnessesHash = Serialization.Witnesses.hash signedWitnesses
+                    let msg = Hash.joinHashes [ txHash; witnessesHash ]
+
+                    Witness (PKWitness (sigHash, publicKey, Crypto.sign secretKey msg)) :: witnesses
+
+                | _ -> witness :: witnesses // unknown sighash, skipping
+
+    let witnesses =
+        List.foldBack folder raw.witnesses List.empty
+
+    return {raw with witnesses = witnesses}
+}

@@ -67,6 +67,18 @@ let fromTxSkeleton tx =
         contract = None
     }
 
+let fromRaw (raw:RawTransaction) =
+    {
+        version = raw.version
+        inputs = raw.inputs
+        outputs = raw.outputs
+        witnesses = List.choose (fun w ->
+            match w with
+            | Witness w -> Some w
+            | _ -> None) raw.witnesses
+        contract = raw.contract
+    }
+
 let isOutputSpendable output =
     match output.lock with
     | PK _

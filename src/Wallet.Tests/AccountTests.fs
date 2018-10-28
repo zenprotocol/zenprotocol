@@ -756,3 +756,29 @@ let ``Typescript testvector``() =
         |> Infrastructure.Result.get
 
     Transaction.hash tx |> should equal expectedTxHash
+
+[<Test>]
+let ``creating and signing raw transaction``() =
+    use session = DataAccess.DatabaseContext.createSession databaseContext
+
+    let lockToBob = Account.getNewPKHash dataAccess session |> Result.get |> fst |> PK
+    let lockToAlice = Hash.zero  |> PK
+
+    // giving some money to bob
+    let output = {lock = lockToBob; spend={asset=Asset.Zen;amount=10UL}}
+    let tx = {version=Version0;inputs=[];outputs=[output];witnesses=[];contract=None}
+    let bob = View.addMempoolTransaction dataAccess session (Transaction.hash tx) tx View.empty
+
+    // sending money to alice
+    let raw =
+        TransactionCreator.createRawTransaction dataAccess session bob None [ { lock = lockToAlice; spend = { asset = Asset.Zen; amount = 7UL } } ]
+        |> Result.bind (TransactionCreator.signRawTransaction dataAccess session password)
+
+    match raw with
+    | Error x -> failwithf "expected transaction %s" x
+    | Ok raw ->
+        let tx = Transaction.fromRaw raw
+
+        let bob = View.addMempoolTransaction dataAccess session (Transaction.hash tx) tx bob
+
+        bob |> balanceShouldBe session Asset.Zen 3UL
