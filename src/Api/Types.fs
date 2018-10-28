@@ -187,28 +187,42 @@ type BlockHeaderJson = JsonProvider<"""
 }
 """>
 
-type LockJson = JsonProvider<"""
-[
-    {
-        "PK": {"hash": "12..34","address":"zen1adb"}
-    },
-    {
-        "Contract": {"id":"c234234","address":"czen1adb"}
-    },
-    {
-        "Coinbase": {"blockNumber":100, "pkHash":"12..34"}
-    },
-    "Fee",
-    "ActivationSacrifice",
-    {
-        "ExtensionSacrifice": {"id":"c234234"}
-    },
-    "Destroy",
-    {
-        "HighVLock": {"identifier":56, "data":"12..45"}
-    }
-]
-""", SampleIsList=true>
+type PKLockJson = JsonProvider<"""
+{
+  "hash": "12..34",
+  "address":"zen1adb"
+}
+""">
+
+type ContractLockJson = JsonProvider<"""
+{
+  "id":"c234234",
+  "address":"czen1adb"
+}
+""">
+
+type CoinbaseLockJson = JsonProvider<"""
+{
+  "blockNumber":100, 
+  "pkHash":"12..34", 
+  "address":"zen1adb"
+}
+""">
+
+type ExtensionSacrificeLockJson = JsonProvider<"""
+{
+  "id":"c234234",
+  "address":"czen1adb"
+}
+""">
+
+type HighVLockLockJson = JsonProvider<"""
+{
+  "identifier":56, 
+  "data":"12..45"
+}
+""">
+
 
 type SpendJson = JsonProvider<"""
 {

@@ -37,29 +37,24 @@ let inputEncoder (input:Input) =
 let lockEncoder chain (lock:Lock) =
     match lock with
     | PK hash ->
-        let pkJson = LockJson.Pk(hash.AsString, Address.encode chain (Address.PK hash))
-        LockJson.Record (Some pkJson,None,None,None,None)
-        |> LockJson.Root
+        PKLockJson.Root (hash.AsString, Address.encode chain (Address.PK hash))
+        |> fun j -> JsonValue.Record [| ("PK", j.JsonValue) |]
     | Contract cId ->
-        let cJson = LockJson.Contract (cId.AsString, Address.encode chain (Address.Contract cId))
-        LockJson.Record (None, Some cJson, None, None, None)
-        |> LockJson.Root
+        ContractLockJson.Root (cId.AsString, Address.encode chain (Address.Contract cId))
+        |> fun j -> JsonValue.Record [| ("Contract", j.JsonValue) |]
     | Coinbase (blockNumber, pkHash) ->
-        let cJson = LockJson.Coinbase ((int)blockNumber, pkHash.AsString)
-        LockJson.Record (None, None, Some cJson, None, None)
-        |> LockJson.Root
-    | Fee -> LockJson.Root "Fee"
-    | ActivationSacrifice -> LockJson.Root "ActivationSacrifice"
+        CoinbaseLockJson.Root ((int)blockNumber, pkHash.AsString, Address.encode chain (Address.PK pkHash))
+        |> fun j -> JsonValue.Record [| ("Coinbase", j.JsonValue) |]
+    | Fee -> JsonValue.String "Fee"
+    | ActivationSacrifice -> JsonValue.String "ActivationSacrifice"
     | ExtensionSacrifice cId ->
-        let esJson = LockJson.ExtensionSacrifice (cId.AsString)
-        LockJson.Record (None, None, None, Some esJson, None)
-        |> LockJson.Root
-    | Destroy -> LockJson.Root "Destroy"
+        ExtensionSacrificeLockJson.Root (cId.AsString, Address.encode chain (Address.Contract cId))
+        |> fun j -> JsonValue.Record [| ("ExtensionSacrifice", j.JsonValue) |]
+    | Destroy -> JsonValue.String "Destroy"
     | HighVLock (identifier, data) ->
-        let hvJson = LockJson.HighVLock ((int)identifier, FsBech32.Base16.encode data)
-        LockJson.Record (None, None, None, None, Some hvJson)
-        |> LockJson.Root
-    |> fun json -> json.JsonValue
+        HighVLockLockJson.Root ((int)identifier, FsBech32.Base16.encode data)
+        |> fun j -> JsonValue.Record [| ("HighVLock", j.JsonValue) |]
+        
 
 let outputEncoder chain (output:Output) =
     JsonValue.Record [|
