@@ -26,6 +26,8 @@ type Argument =
     | [<Hidden>]Seed
     | AddressDB
     | Data_Path of string
+    | Service_Bus of string
+    | Publisher of string
     with
         interface IArgParserTemplate with
             member s.Usage =
@@ -42,19 +44,21 @@ type Argument =
                 | Seed -> "run node as a seed"
                 | AddressDB -> "enable address DB"
                 | Data_Path _ -> "path to data folder"
+                | Service_Bus _ -> "expose the service bus over zeromq address"
+                | Publisher _ -> "expose the publisher over zeromq address"
 
 
 type Config = YamlConfig<"scheme.yaml">
 
 let busName = "main"
 
-let createBroker () =
+let createBroker serviceBusAddress publisherBusAddress =
      Actor.create (fun shim ->
         use poller = Poller.create ()
         use emObserver = Poller.registerEndMessage poller shim
 
-        use sbBroker = ServiceBus.Broker.create poller busName
-        use evBroker = EventBus.Broker.create poller busName
+        use sbBroker = ServiceBus.Broker.create poller busName serviceBusAddress
+        use evBroker = EventBus.Broker.create poller busName publisherBusAddress
 
         Actor.signal shim
         Poller.run poller
@@ -117,6 +121,8 @@ let main argv =
     let mutable wipeFull = false
     let mutable seed = false
     let mutable addressDb = false
+    let mutable serviceBusAddress = None
+    let mutable publisherAddress = None
 
     // if a chain was specified, we want to override config before
     // we handle rest of switches, which may override config again
@@ -189,13 +195,17 @@ let main argv =
             addressDb <- true
         | Data_Path dataPath ->
             config.dataPath <- dataPath
+        | Publisher address ->
+            publisherAddress <- Some address
+        | Service_Bus address ->
+            serviceBusAddress <- Some address
     ) (results.GetAllResults())
 
     let chain = getChain config
     let chainParams = getChainParameters chain
     let dataPath = Platform.combine config.dataPath config.chain
 
-    use brokerActor = createBroker ()
+    use brokerActor = createBroker serviceBusAddress publisherAddress
     use blockchainActor = Blockchain.Main.main dataPath chainParams busName wipe
 
     use networkActor =
@@ -212,7 +222,7 @@ let main argv =
             |> Disposables.toDisposable
         else
             Disposables.empty
-            
+
     use minerActor =
         if config.miner.enabled then
             Miner.Main.main busName chainParams config.miner.threads

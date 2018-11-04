@@ -42,7 +42,7 @@ module Broker =
                     Poller.removeSocket b.poller b.server
                     (b.server :> System.IDisposable).Dispose ()
 
-    let create poller name =
+    let create poller name address =
         let sendAck server routingId =
             Frame.sendMore server routingId
             Message.send server ServiceBusMessage.Ack
@@ -97,6 +97,7 @@ module Broker =
         Options.setSendHighWatermark server 0 |> ignore
         Socket.bind server (getBrokerAddress name)
 
+        Option.iter (fun address -> Socket.bind server address) address
 
         let observer =
             Poller.addSocket poller server
@@ -116,7 +117,7 @@ module Agent =
     type RequestId(socket:FsNetMQ.Socket.T, requestId:System.Guid, sender:byte[]) =
         member this.reply<'a>(msg:'a) =
             Message.send socket (Message.Response {
-               requestId=requestId;                
+               requestId=requestId;
                sender=sender;
                payload=binarySerializer.Pickle msg;
             })
@@ -183,6 +184,15 @@ module Client =
 
         client
 
+    let createByAddress address =
+        let client = Socket.dealer ()
+        Options.setRecvHighwatermark client 0 |> ignore
+        Options.setSendHighWatermark client 0 |> ignore
+
+        Socket.connect client address
+
+        client
+
     module Command =
         let send client service command =
             let payload = binarySerializer.Pickle command
@@ -199,15 +209,15 @@ module Client =
 
             Message.send client (Message.Request {requestId=requestId;service=service; payload = payload})
 
-            let rec handleResponse () =                                              
+            let rec handleResponse () =
                 match Message.recv client with
-                | None -> failwith "malformed response"                
+                | None -> failwith "malformed response"
                 | Some r ->
                     match r with
                     | Message.RelayResponse r when r.requestId <> requestId -> handleResponse () // response of another request, skipping
                     | Message.RelayResponse r -> binarySerializer.UnPickle<'response> r.payload
                     | x -> failwithf "expecting RelayResponse, got %A" x
-            
+
             handleResponse ()
 
         let trySend<'request,'response> client service (request:'request) =
@@ -217,13 +227,13 @@ module Client =
 
             Message.send client (Message.Request {requestId=requestId;service=service; payload = payload})
 
-            let rec handleResponse () =                                              
+            let rec handleResponse () =
                 match Message.tryRecv client 30000<milliseconds> with
-                | None -> None                
+                | None -> None
                 | Some r ->
                     match r with
                     | Message.RelayResponse r when r.requestId <> requestId -> handleResponse () // response of another request, skipping
                     | Message.RelayResponse r -> binarySerializer.UnPickle<'response> r.payload |> Some
                     | x -> failwithf "expecting RelayResponse, got %A" x
-            
-            handleResponse ()           
+
+            handleResponse ()
