@@ -16,8 +16,8 @@ let createBroker () =
         use poller = Poller.create ()
         use emObserver = Poller.registerEndMessage poller shim
 
-        use sbBroker = ServiceBus.Broker.create poller busName
-        use evBroker = EventBus.Broker.create poller busName
+        use sbBroker = ServiceBus.Broker.create poller busName None
+        use evBroker = EventBus.Broker.create poller busName None
 
         Actor.signal shim
         Poller.run poller
@@ -29,7 +29,7 @@ let getActors () =
         Blockchain.Main.main dataPath chainParams busName false
         Network.Main.main dataPath busName chainParams "" false "" [] false false
         Wallet.Main.main dataPath busName chain Wallet.Main.Wipe.NoWipe
-        AddressDB.Main.main dataPath busName chain AddressDB.Main.NoWipe        
+        AddressDB.Main.main dataPath busName chain AddressDB.Main.NoWipe
         Api.Main.main chain busName apiUri
     ]
     |> List.rev

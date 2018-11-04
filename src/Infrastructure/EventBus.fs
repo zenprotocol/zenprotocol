@@ -30,14 +30,16 @@ module Broker =
                     (broker.publisher :> System.IDisposable).Dispose ()
                     (broker.subscriber :> System.IDisposable).Dispose ()
 
-    let create poller name =
+    let create poller name publisherAddress =
         let publisher = Socket.pub ()
         Options.setSendHighWatermark publisher 0 |> ignore
         Socket.bind publisher (getPublisherAddress name)
+        Option.iter (fun publisherAddress -> Socket.bind publisher publisherAddress) publisherAddress
 
         let subscriber = Socket.sub ()
         Options.setRecvHighwatermark subscriber 0 |> ignore
         Socket.bind subscriber (getSubscriberAddress name)
+
         Socket.subscribe subscriber ""
 
         let observer =
@@ -67,6 +69,15 @@ module Subscriber =
 
         Socket.subscribe subscriber ""
         Socket.connect subscriber (getPublisherAddress name)
+
+        Subscriber subscriber
+
+    let createByAddress<'event> address : Subscriber<'event> =
+        let subscriber = Socket.sub ()
+        Options.setRecvHighwatermark subscriber 0 |> ignore
+
+        Socket.subscribe subscriber ""
+        Socket.connect subscriber address
 
         Subscriber subscriber
 
