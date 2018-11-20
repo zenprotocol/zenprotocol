@@ -107,12 +107,11 @@ module Agent =
                     agent.observer.Dispose()
                     (agent.subscriber :> System.IDisposable).Dispose ()
 
-    let create<'a> poller name =
-
+    let createByAddress<'a> poller address =
         let subscriber = Socket.sub ()
         Options.setRecvHighwatermark subscriber 0 |> ignore
         Socket.subscribe subscriber ""
-        Socket.connect subscriber (getPublisherAddress name)
+        Socket.connect subscriber address
 
         let observable =
             Poller.addSocket poller subscriber
@@ -132,6 +131,11 @@ module Agent =
         }
 
         Agent agent
+
+    let create<'a> poller name =
+        let address = (getPublisherAddress name)
+
+        createByAddress<'a> poller address
 
     let observable (Agent agent) = agent.observable
 
