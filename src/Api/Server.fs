@@ -380,6 +380,16 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
             | Error error -> replyError error
         | Error error ->
             replyError error
+    | Get ("/wallet/transactioncount", _) ->
+        match Wallet.getTransactionCount client with 
+        | Ok count -> 
+                    count
+                    |> decimal
+                    |> JsonValue.Number
+                    |> JsonContent
+                    |> reply StatusCode.OK
+        | Error error ->
+                    replyError error
     | Get ("/wallet/transactions", query) ->
         match parseTransactionsRequestJson query with
         | Ok (skip, take) ->
