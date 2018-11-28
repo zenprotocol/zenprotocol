@@ -498,3 +498,7 @@ let getHistory dataAccess session view skip take =
     |> List.sortWith txComparer
     |> paginate skip take
     |> List.map (fun (txHash,direction,spend,confirmations,_) -> txHash,direction,spend,confirmations)
+    
+let getTransactionCount dataAccess session view =
+    List.length (View.Outputs.getAll view dataAccess session)
+    

@@ -163,6 +163,10 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             error
             |> reply<string> requestId
             NoAccount
+        | GetTransactionCount _ ->
+            error
+            |> reply<int> requestId
+            NoAccount
         | GetTransactions _ ->
             error
             |> reply<TransactionsResponse> requestId
@@ -255,6 +259,13 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             |> reply<string> requestId
 
             accountStatus
+        | GetTransactionCount ->
+            Account.getTransactionCount dataAccess session view
+            |> Ok
+            |> reply<int> requestId
+            
+            accountStatus
+            
         | GetTransactions (skip, take) ->
             Account.getHistory dataAccess session view skip take
             |> Ok

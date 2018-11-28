@@ -199,6 +199,7 @@ module Wallet =
     type Request =
         | GetAddressPKHash
         | GetAddress
+        | GetTransactionCount
         | GetTransactions of skip: int * take: int
         | GetBalance
         | ImportSeed of string list * password:string
@@ -258,6 +259,9 @@ module Wallet =
 
     let importSeed client words password =
         send<unit> client serviceName (ImportSeed (words, password))
+        
+    let getTransactionCount client =
+        send<int> client serviceName GetTransactionCount
 
     let getTransactions client skip take =
         send<TransactionsResponse> client serviceName (GetTransactions (skip, take))
