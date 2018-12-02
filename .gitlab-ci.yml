@@ -1,4 +1,4 @@
-image: mono:5.4
+image: mono:5.14
 
 before_script:
  - apt-get update
