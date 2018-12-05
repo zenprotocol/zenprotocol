@@ -104,22 +104,39 @@ module Tip =
     let deserialize = deserialize read
 
 module ContractData =
-    let size (command, messageBody, _:Hash) =
+    let size (command, messageBody) =
         String.size command + 
-        Option.size Data.size messageBody +
-        Hash.size
+        Option.size Data.size messageBody
 
-    let write stream (command, messageBody, txHash) =
+    let write stream (command, messageBody) =
         String.write stream command
         Option.write stream Data.write messageBody
-        Hash.write stream txHash
 
     let read reader =
         let command = String.read reader
         let messageBody = Option.read Data.read reader
-        let txHash = Hash.read reader
-
-        command, messageBody, txHash
+        command, messageBody
 
     let serialize = serialize size write
     let deserialize = deserialize read
+    
+module ContractHistory =
+    open System
+
+    let size (_:Hash, witnessIndex:uint32) =
+        Hash.size +
+        VarInt.size witnessIndex
+        
+    let write stream (txHash, witnessIndex) =
+        Hash.write stream txHash 
+        VarInt.write stream witnessIndex
+        
+    let read reader = 
+        let txHash = Hash.read reader
+        let witnessIndex = VarInt.read reader
+        txHash, witnessIndex
+        
+    let serialize = serialize size write
+    let deserialize = deserialize read
+        
+    

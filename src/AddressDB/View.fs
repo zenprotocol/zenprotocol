@@ -7,8 +7,10 @@ open Consensus.Types
 open DataAccess
 open Types
 open Hash
+open Infrastructure
 open Messaging.Services.AddressDB
 open Zen.Types.Data
+open Result
 
 let addOutput outputs outpoint output =
     Map.add outpoint output outputs
@@ -21,11 +23,19 @@ let addAddressOutpoints addressOutpoints address outpoints =
         | None -> []
     Map.add address outpoints addressOutpoints
 
+let addContractHistory contractData contractId data =
+    let data = 
+        data @
+        match Map.tryFind contractId contractData with 
+        | Some data -> data
+        | None -> []
+    Map.add contractId data contractData
+    
 let addContractData contractData contractId data =
     let data = 
         data @
         match Map.tryFind contractId contractData with 
-        | Some outpoints -> outpoints
+        | Some data -> data
         | None -> []
     Map.add contractId data contractData
     
@@ -33,7 +43,8 @@ type T =
     {
         outpointOutputs: Map<Outpoint, DBOutput>
         addressOutpoints: Map<Address, List<Outpoint>>
-        contractData: Map<ContractId, List<string * data option * Hash>>
+        contractHistory: Map<ContractId, List<Hash * uint32>>
+        contractData: Map<Hash * uint32, List<string * data option>>
     }
     with
         member this.getOutputs outputs = // add given (db) onto view (memory)
@@ -44,8 +55,19 @@ type T =
 let empty = {
     outpointOutputs = Map.empty
     addressOutpoints = Map.empty
+    contractHistory = Map.empty
     contractData = Map.empty
 }
+
+let private witnessIndex tx =
+    List.tryFindIndex (fun witness ->
+        match witness with
+        | ContractWitness _ -> true
+        | _ -> false) tx.witnesses
+    |> ofOption "missing contract witness"
+    |> get
+    |> uint32
+
 
 module OutpointOutputs =
     let get view dataAccess session outpoints =
@@ -66,14 +88,28 @@ module AddressOutpoints =
     let get view dataAcesss session addresses =
         AddressOutpoints.get dataAcesss session addresses @ get' view addresses
 
-module ContractData =
+module ContractHistory =
+    open AddressDB.Serialization
+
     let private get' view contractId =
-        Map.tryFind contractId view.contractData
+        Map.tryFind contractId view.contractHistory
         |> function 
             | Some list -> list
             | None -> List.empty
-    let get view dataAcesss session contractId =
-        ContractData.get dataAcesss session contractId @ get' view contractId
+    let get view dataAccess session contractId =
+        ContractHistory.get dataAccess session contractId @ get' view contractId
+        
+module ContractData =
+    open AddressDB.Serialization
+    
+    let get view dataAccess session txHash witnessIndex =
+        match Map.tryFind (txHash, witnessIndex) view.contractData with 
+        | Some [command,data] -> (command, data, txHash)
+        | _ -> 
+            ContractData.get dataAccess session (txHash,witnessIndex)
+            |> fun (command, data) -> (command, data, txHash)   
+
+        
         
 let mapTxOutputs tx txHash confirmationStatus =
     tx.outputs
@@ -114,6 +150,7 @@ let addMempoolTransaction dataAccess session txHash tx view =
         {
             outpointOutputs = addOutput view.outpointOutputs outpoint output
             addressOutpoints = addAddressOutpoints view.addressOutpoints address [ outpoint ]
+            contractHistory = view.contractHistory
             contractData = view.contractData
         }) view)
     |> Option.map (fun view ->
@@ -123,7 +160,8 @@ let addMempoolTransaction dataAccess session txHash tx view =
                 {
                     outpointOutputs = view.outpointOutputs
                     addressOutpoints = view.addressOutpoints
-                    contractData = addContractData view.contractData cw.contractId [ cw.command, cw.messageBody, txHash ]
+                    contractHistory = addContractHistory view.contractHistory cw.contractId [ txHash, witnessIndex tx ]
+                    contractData = addContractData view.contractData (txHash, witnessIndex tx)  [cw.command, cw.messageBody]
                 }                
             | _ ->
                 view
