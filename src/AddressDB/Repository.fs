@@ -9,6 +9,7 @@ open Infrastructure
 open Messaging.Services
 open Messaging.Services.Wallet
 open AddressDB
+open Result
 
 let empty = 
     {
@@ -80,8 +81,19 @@ let getHistory dataAccess session view skip take addresses =
     |> List.map (fun (txHash,direction,spend,confirmations,_) -> txHash,direction,spend,confirmations)
 
 let getContractHistory dataAccess session view skip take contractId =
-    View.ContractData.get view dataAccess session contractId
+    View.ContractHistory.get view dataAccess session contractId
+    |> List.map (fun (txHash, witessIndex) -> View.ContractData.get view dataAccess session txHash witessIndex )
     |> Wallet.Account.paginate skip take
+    
+    
+let private witnessIndex tx =
+    List.tryFindIndex (fun witness ->
+        match witness with
+        | ContractWitness _ -> true
+        | _ -> false) tx.witnesses
+    |> ofOption "missing contract witness"
+    |> get
+    |> uint32
 
 let addBlock dataAccess session blockHash block =
     let account = DataAccess.Tip.get dataAccess session
@@ -118,17 +130,18 @@ let addBlock dataAccess session blockHash block =
                     failwithf "AddressDB could not resolve outpoint"
             | _ -> ()
         )
-        
+            
         tx.witnesses
         |> List.iter (function 
-            | ContractWitness cw ->
-                DataAccess.ContractData.put dataAccess session cw.contractId (cw.command, cw.messageBody, txHash)
-            | _ ->
+            | ContractWitness cw -> 
+                DataAccess.ContractData.put dataAccess session (txHash, witnessIndex tx) (cw.command, cw.messageBody)
+                DataAccess.ContractHistory.put dataAccess session cw.contractId (txHash, witnessIndex tx)
+            | _ -> 
                 ()
         )
     )
 
-    {account with blockNumber = block.header.blockNumber; blockHash = blockHash}
+    { account with blockNumber = block.header.blockNumber; blockHash = blockHash}
     |> DataAccess.Tip.put dataAccess session
 
 let undoBlock dataAccess session blockHash block =
@@ -172,7 +185,8 @@ let undoBlock dataAccess session blockHash block =
         ex.tx.witnesses
         |> List.iter (function 
             | ContractWitness cw ->
-                DataAccess.ContractData.delete dataAccess session cw.contractId (cw.command, cw.messageBody, ex.txHash)
+                DataAccess.ContractData.delete dataAccess session (ex.txHash, witnessIndex ex.tx)
+                DataAccess.ContractHistory.delete dataAccess session cw.contractId (ex.txHash, witnessIndex ex.tx)    
             | _ ->
                 ()
         )
