@@ -4,7 +4,6 @@ open FSharp.Configuration
 open Argu
 open Infrastructure
 open Consensus
-open Chain
 open Logary.Message
 
 module Actor = FsNetMQ.Actor
@@ -12,18 +11,24 @@ module Actor = FsNetMQ.Actor
 type Wipe =
     | Full
 
+#if DEBUG
+[<Literal>]
+let Localhost = "127.0.0.1"
+#endif
+
 [<NoAppSettings>]
 type Argument =
-    | Chain of string
+    | Test
     | Api of string
     | Bind of string
     | Ip of string
     | Wipe of full:Wipe option
     | Miner of threads:int option
-    | [<AltCommandLine("-lr");Hidden>] Localhost
-    | [<AltCommandLine("-l1");Hidden>] Local1
-    | [<AltCommandLine("-l2");Hidden>] Local2
-    | [<Hidden>]Seed
+#if DEBUG
+    // non-zero indexed nodes act as outbound nodes which connect to the zero-indexed inbound node
+    | Local of int
+#endif
+    | [<Hidden>] Seed
     | AddressDB
     | Data_Path of string
     | Service_Bus of string
@@ -32,20 +37,20 @@ type Argument =
         interface IArgParserTemplate with
             member s.Usage =
                 match s with
-                | Api _ -> "Enable api and set bind address"
-                | Bind _ -> "Set the address the node should listen on"
-                | Chain _ -> "specify chain (local,test or main)."
+                | Api _ -> "enable api and set bind address"
+                | Bind _ -> "set the address the node should listen on"
+                | Test -> "use testnet"
                 | Ip _ -> "specify the IP the node should relay to other peers"
-                | Wipe _ -> "wipe database, specify full if you want wipe wallet private key"
+                | Wipe _ -> "wipe database, specify full to wipe the wallet's private key"
                 | Miner _ -> "enable miner and optionally specify number of threads"
-                | Localhost -> "specify if the node should act as localhost, for tests only"
-                | Local1 -> "run node with local1 settings, for tests only"
-                | Local2 -> "run node with local2 settings, for tests only"
                 | Seed -> "run node as a seed"
-                | AddressDB -> "enable address DB"
-                | Data_Path _ -> "path to data folder"
+                | AddressDB -> "enable the AddressDB module"
+                | Data_Path _ -> "set the data folder path"
                 | Service_Bus _ -> "expose the service bus over zeromq address"
                 | Publisher _ -> "expose the publisher over zeromq address"
+#if DEBUG
+                | Local _ -> "local mode, used for debugging. specify zero value for host, other for client"
+#endif
 
 
 type Config = YamlConfig<"scheme.yaml">
@@ -66,9 +71,9 @@ let createBroker serviceBusAddress publisherBusAddress =
 
 let getChain (config:Config) =
     match config.chain with
-    | "main" -> Main
-    | "test" -> Test
-    | _ -> Local
+    | "main" -> Chain.Main
+    | "test" -> Chain.Test
+    | _ -> Chain.Local
 
 [<EntryPoint>]
 let main argv =
@@ -112,7 +117,6 @@ let main argv =
     let errorHandler = ProcessExiter(colorizer = function ErrorCode.HelpText -> None | _ -> Some ConsoleColor.Red)
 
     let config = new Config()
-    config.Load("main.yaml")
 
     let parser = ArgumentParser.Create<Argument>(programName = "zen-node.exe", errorHandler = errorHandler)
     let results = parser.Parse argv
@@ -123,53 +127,28 @@ let main argv =
     let mutable addressDb = false
     let mutable serviceBusAddress = None
     let mutable publisherAddress = None
+    let mutable chain = Chain.Main
 
-    // if a chain was specified, we want to override config before
-    // we handle rest of switches, which may override config again
-    List.iter (fun arg ->
-        match arg with
-        | Chain chain ->
-            let file = sprintf "%s.yaml" chain
-            if System.IO.File.Exists(file) then
-                config.Load(file)
-            else
-                eventX "Config file {configFile} not found, using default"
-                >> setField "configFile" file
-                |> Log.warning
-        | _ -> ()
-    ) (results.GetAllResults())
+    if List.contains Test (results.GetAllResults()) then
+        config.Load("test.yaml")
+    else 
+        config.Load("main.yaml")
 
     List.iter (fun arg ->
         match arg with
-        | Chain chain ->
-            config.chain <- chain
 #if DEBUG
-        | Localhost ->
+        | Local idx ->
+            let getEndpoint port idx = sprintf "%s:%i" Localhost (port + idx)
+
+            chain <- Chain.Local
+            config.dataPath <- sprintf "./data/local/%i" idx
             config.chain <- "local"
-            config.externalIp <- "127.0.0.1"
-            config.listen <- true
+            config.externalIp <- Localhost
+            config.bind <- getEndpoint 10000 idx
+            config.api.bind <- getEndpoint 20000 idx
             config.seeds.Clear ()
-            config.api.enabled <- true
-        | Local1 ->
-            config.dataPath <- "./data/l1"
-            config.chain <- "local"
-            config.listen <- true
-            config.bind <- "127.0.0.1:37000"
-            config.externalIp <- "127.0.0.1"
-            config.api.enabled <- true
-            config.api.bind <- "127.0.0.1:36000"
-            config.seeds.Clear()
-            config.seeds.Add "127.0.0.1:29555"
-        | Local2 ->
-            config.dataPath <- "./data/l2"
-            config.chain <- "local"
-            config.listen <- true
-            config.bind <- "127.0.0.1:37001"
-            config.externalIp <- "127.0.0.1"
-            config.api.enabled <- true
-            config.api.bind <- "127.0.0.1:36001"
-            config.seeds.Clear()
-            config.seeds.Add "127.0.0.1:29555"
+
+            if idx <> 0 then config.seeds.Add (getEndpoint 10000 0)
 #endif
         | Api address ->
             config.api.enabled <- true
@@ -182,12 +161,11 @@ let main argv =
         | Wipe full ->
             wipe <- true
             wipeFull <- Option.isSome full
-        | Miner threads ->
+        | Miner None ->
             config.miner.enabled <- true
-
-            match threads with
-            | Some threads -> config.miner.threads <- threads
-            | None -> ()
+        | Miner (Some threads) ->
+            config.miner.enabled <- true
+            config.miner.threads <- threads
         | Seed ->
             seed <- true
             config.listen <- true
@@ -199,10 +177,12 @@ let main argv =
             publisherAddress <- Some address
         | Service_Bus address ->
             serviceBusAddress <- Some address
+        | _ ->
+            ()
     ) (results.GetAllResults())
 
     let chain = getChain config
-    let chainParams = getChainParameters chain
+    let chainParams = Chain.getChainParameters chain
     let dataPath = Platform.combine config.dataPath config.chain
 
     use brokerActor = createBroker serviceBusAddress publisherAddress
@@ -237,6 +217,7 @@ let main argv =
         else
             Disposables.empty
 
+#if DEBUG
     if chain = Chain.Local then
 //        let block = Consensus.Block.createGenesis Chain.localParameters [Transaction.toExtended Consensus.Tests.Helper.rootTx] (0UL,0UL)
 //        printfn "%A" (Block.hash block.header)
@@ -251,6 +232,7 @@ let main argv =
         use client = ServiceBus.Client.create busName
 
         Messaging.Services.Blockchain.validateMinedBlock client block
+#endif
 
     use event = new Threading.ManualResetEvent(false)
 
