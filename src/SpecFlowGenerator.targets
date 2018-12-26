@@ -2,7 +2,7 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
 
   <Target Name="BeforeBuild">
-    <Exec Command="$(SolutionDir)/../packages/SpecFlow/tools/specflow.exe generateall $(MSBuildProjectFullPath)" />
+    <Exec Command="$(SolutionDir)/../packages/SpecFlow/tools/specflow.exe generateall -p $(MSBuildProjectFullPath)" />
   </Target>
 
 </Project>
