@@ -10,6 +10,7 @@ build:
  - mono .paket/paket.exe restore
  - chmod +x packages/zen_z3_linux/output/z3-linux
  - chmod +x packages/SpecFlow/tools/specflow.exe
+ - chmod +x packages/FSharp.Compiler.Tools/tools/fsc.exe
  - msbuild src/zenprotocol.sln
  - cp packages/zen_secp256k1_linux/output/libsecp256k1.so /usr/lib
  - ./run-tests
