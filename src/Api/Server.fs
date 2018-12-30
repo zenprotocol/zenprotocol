@@ -337,6 +337,20 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
             |> handleTxResult
         | Error error ->
             replyError error
+    | Post ("/wallet/vote/allocation", Some body) ->
+        match parseVoteAllocationJson body with
+        | Ok (allocation, password) ->
+            Wallet.createVoteTransaction client true allocation password
+            |> handleTxResult
+        | Error error ->
+            replyError error
+    | Post ("/wallet/vote/payout", Some body) ->
+        match parseVotePayoutJson chain body with
+        | Ok (payout, password) ->
+            Wallet.createVoteTransaction client true payout password
+            |> handleTxResult
+        | Error error ->
+            replyError error
     | Post ("/wallet/rawtransaction/create", Some body) ->
         match parseCreateRawTransactionJson chain body with
         | Ok outputs ->

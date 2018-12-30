@@ -80,24 +80,131 @@ let private collectInputs chainParams dataAccess session view account assetAmoun
     else
         Ok inputs
 
+let private getTxVersion =
+    List.exists (function
+        | ({ lock = Consensus.Types.Vote _; spend = _ }:Consensus.Types.Output) -> true
+        | _ -> false
+    )
+    >> function | true -> Version1 | false -> Version0
 
+let private existingVoteData outputs chainParams tip =
+    outputs
+    |> List.choose (function
+        | ({lock = Vote (voteData,interval,_); spend = _ }:Consensus.Types.Output) when interval = CGP.getInterval chainParams tip ->
+            Some voteData
+        | _ -> 
+            None)
+    |> List.tryHead
+    |> Option.defaultValue { allocation = None; payout = None }  
+    
 // Return the change outputs by subtract the required amount from the collected inputs
-let private getChangeOutputs inputs amounts account =
-    let lock = PK account.changePKHash
-
+let private getChangeOutputs inputs amounts account chainParams tip =
     Map.fold (fun changes asset inputs ->
         let inputSum = List.sumBy (fun (_,(output:Consensus.Types.Output),_) -> output.spend.amount) inputs
         let outputAmount = Map.find asset amounts
 
         let change = inputSum - outputAmount
 
+        let outputs = List.choose (fun (_,outputs,_) -> Some outputs) inputs
+        let voteData = existingVoteData outputs chainParams tip
+        let lock =
+            match voteData with
+            | { allocation = None; payout = None }  ->
+                PK account.changePKHash
+            | _ ->
+                outputs
+                |> List.choose (function
+                    | { lock = Types.Vote (_,interval,pkHash); spend = _} when interval >= CGP.getInterval chainParams tip -> 
+                        Some (Types.Vote (voteData, interval, pkHash))
+                    | _ -> 
+                        None)
+                |> List.head
+                
         if change > 0UL then
             let changeOutput = {lock=lock; spend={amount=change;asset=asset}}
             changeOutput :: changes
         else
             changes) List.empty inputs
+            
 
-let createTransactionFromOutputs chainParams dataAccess session view password contract outputs = result {
+     
+let createVoteTransaction dataAccess session view chainParams tip password (allocation : byte option option) (payout : (Recipient * uint64) option option)  = result {
+    let account = DataAccess.Account.get dataAccess session
+        
+    let! extendedPrivateKey =
+            Secured.decrypt password account.secureMnemonicPhrase
+            >>= ExtendedKey.fromMnemonicPhrase
+            >>= (ExtendedKey.derivePath Account.zenKeyPath)
+            
+    let unspentOutputs = Account.getUnspentOutputs dataAccess session view 0ul
+    
+    let outputs = List.choose (fun (_,outputs) -> Some outputs) unspentOutputs
+        
+    let existingVoteData = existingVoteData outputs chainParams tip
+        
+    let voteData =  
+        match allocation, payout with
+        | Some allocation, Some payout -> { allocation = allocation; payout = payout}
+        | Some allocation, None -> { allocation = allocation; payout = existingVoteData.payout }
+        | None, Some payout -> { allocation = existingVoteData.allocation; payout = payout } 
+        | None, None -> { allocation = existingVoteData.allocation; payout = existingVoteData.payout } 
+        
+    let inputs, keys, outputs =
+        unspentOutputs
+        |> List.choose (function
+            | (outpoint, { lock = Coinbase (blockNumber,pkHash); spend = spend}) when (account.blockNumber + 1ul) - blockNumber >= chainParams.coinbaseMaturity ->
+                Some (outpoint, (pkHash, spend))
+            | (outpoint, { lock = PK pkHash; spend = spend }) ->
+                Some (outpoint, (pkHash, spend)) 
+            | (outpoint, { lock = Types.Vote (_,_,pkHash); spend = spend}) ->
+                Some (outpoint, (pkHash, spend)) 
+            | _ ->
+                None
+        )
+        |> List.map (fun (outpoint, (pkHash, spend)) ->             
+            let address = DataAccess.Addresses.get dataAccess session pkHash
+            
+            let secretkey =
+                    match address.addressType with
+                    | Change index -> Account.deriveChange index extendedPrivateKey >>= ExtendedKey.getPrivateKey |> get // The key must be valid as we already used it, safe to call get
+                    | External index -> Account.deriveExternal index extendedPrivateKey >>= ExtendedKey.getPrivateKey |> get
+                    | Payment index -> Account.deriveNewAddress index extendedPrivateKey  >>= ExtendedKey.getPrivateKey |> get
+                    | WatchOnly -> failwith "watch only address cannot be spent" 
+            
+            let publicKey = SecretKey.getPublicKey secretkey |> Option.get
+            
+            let lock = 
+                match voteData with
+                | { allocation = None; payout = None } ->
+                    PK pkHash
+                | _ ->
+                    Types.Vote (voteData, (CGP.getInterval chainParams tip), pkHash)
+            
+            Outpoint outpoint, (secretkey,publicKey),  { lock = lock; spend = spend }
+        )
+        |> List.unzip3
+     
+    let! inputs =   
+         if List.length inputs = 0 then
+           eventX "Not enough tokens"
+           |> Log.warning
+    
+           Error "Not enough tokens"
+         else
+           Ok inputs
+             
+    let transaction = {
+        version=getTxVersion outputs
+        inputs=inputs
+        outputs = outputs 
+        witnesses = []
+        contract = None 
+    }
+    
+    return Transaction.sign keys TxHash transaction
+}
+
+let createTransactionFromOutputs chainParams dataAccess session view password contract tip outputs = result {
     let account = DataAccess.Account.get dataAccess session
 
     let! extendedPrivateKey =
@@ -112,7 +219,7 @@ let createTransactionFromOutputs chainParams dataAccess session view password co
         | None ->  Map.add output.spend.asset output.spend.amount amounts) Map.empty outputs
 
     let! inputs = collectInputs chainParams dataAccess session view account requiredAmounts
-    let changeOutputs = getChangeOutputs inputs requiredAmounts account
+    let changeOutputs = getChangeOutputs inputs requiredAmounts account chainParams tip
 
     // Convert to outpoint list and get the key for every input
     let inputs,keys =
@@ -137,7 +244,7 @@ let createTransactionFromOutputs chainParams dataAccess session view password co
         |> List.unzip
 
     let transaction = {
-        version=Version0
+        version=getTxVersion <| outputs @ changeOutputs
         inputs=inputs
         outputs = outputs @ changeOutputs
         witnesses = []
@@ -147,8 +254,8 @@ let createTransactionFromOutputs chainParams dataAccess session view password co
     return Transaction.sign keys TxHash transaction
 }
 
-let createTransaction chainParams dataAccess session view password outputs =
-    createTransactionFromOutputs chainParams dataAccess session view password None outputs
+let createTransaction chainParams dataAccess session view password tip outputs  =
+    createTransactionFromOutputs chainParams dataAccess session view password None tip outputs 
 
 
 let addReturnAddressToData pkHash data =
@@ -204,7 +311,7 @@ let private signFirstWitness signKey tx = result {
     | None -> return tx
 }
 
-let createExecuteContractTransaction chainParams dataAccess session view executeContract password (contractId:ContractId) command data provideReturnAddress sign spends = result {
+let createExecuteContractTransaction chainParams dataAccess session view executeContract password (contractId:ContractId) command data provideReturnAddress sign spends tip = result {
     let account = DataAccess.Account.get dataAccess session
 
     let! masterPrivateKey =
@@ -224,7 +331,7 @@ let createExecuteContractTransaction chainParams dataAccess session view execute
 
             let feeOutput = { lock = Fee; spend = { amount = tempFeeAmount; asset = Asset.Zen } }
 
-            let changeOutputs = getChangeOutputs inputs spends account
+            let changeOutputs = getChangeOutputs inputs spends account chainParams tip
 
             let txSkeleton =
                 TxSkeleton.addOutputs changeOutputs TxSkeleton.empty
@@ -234,7 +341,7 @@ let createExecuteContractTransaction chainParams dataAccess session view execute
         else
             let! inputs = collectInputs chainParams dataAccess session view account spends
 
-            let changeOutputs = getChangeOutputs inputs spends account
+            let changeOutputs = getChangeOutputs inputs spends account chainParams tip
 
             let txSkeleton = TxSkeleton.addOutputs changeOutputs TxSkeleton.empty
 
@@ -292,7 +399,7 @@ let createExecuteContractTransaction chainParams dataAccess session view execute
     return! sign unsignedTx
 }
 
-let createActivateContractTransaction chainParams dataAccess session view chain password code (numberOfBlocks:uint32)  =
+let createActivateContractTransaction chainParams dataAccess session view chain password code (numberOfBlocks:uint32) tip =
     result {
         let contractId = Contract.makeContractId Version0 code
 
@@ -320,10 +427,10 @@ let createActivateContractTransaction chainParams dataAccess session view chain 
                 { spend = { amount = activationFee; asset = Asset.Zen }; lock = Fee }
             ]
 
-        return! createTransactionFromOutputs chainParams dataAccess session view password contract outputs
+        return! createTransactionFromOutputs chainParams dataAccess session view password contract tip outputs 
     }
 
-let createExtendContractTransaction dataAccess session view (getContract:ContractId->ActiveContract option) chainParams password (contractId:ContractId) (numberOfBlocks:uint32)=
+let createExtendContractTransaction dataAccess session view (getContract:ContractId->ActiveContract option) chainParams password (contractId:ContractId) (numberOfBlocks:uint32) tip =
     result {
         let! code =
             match getContract contractId with
@@ -336,10 +443,10 @@ let createExtendContractTransaction dataAccess session view (getContract:Contrac
 
         let outputs = [output]
 
-        return! createTransactionFromOutputs chainParams dataAccess session view password None outputs
+        return! createTransactionFromOutputs chainParams dataAccess session view password None tip outputs 
     }
 
-let createRawTransaction chainParams dataAccess session view contract outputs = result {
+let createRawTransaction chainParams dataAccess session view contract tip outputs = result {
     let account = DataAccess.Account.get dataAccess session
 
     // summarize the amount of inputs needed per asset
@@ -349,7 +456,7 @@ let createRawTransaction chainParams dataAccess session view contract outputs = 
         | None ->  Map.add output.spend.asset output.spend.amount amounts) Map.empty outputs
 
     let! inputs = collectInputs chainParams dataAccess session view account requiredAmounts
-    let changeOutputs = getChangeOutputs inputs requiredAmounts account
+    let changeOutputs = getChangeOutputs inputs requiredAmounts account chainParams tip
 
     // Convert to outpoint list and get the key for every input
     let inputs,witnesses =
@@ -373,7 +480,7 @@ let createRawTransaction chainParams dataAccess session view contract outputs = 
         |> List.unzip
 
     let raw:RawTransaction = {
-        version=Version0
+        version=getTxVersion <| outputs @ changeOutputs
         inputs=inputs
         outputs = outputs @ changeOutputs
         witnesses = witnesses
