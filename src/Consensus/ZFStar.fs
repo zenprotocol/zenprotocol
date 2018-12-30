@@ -59,6 +59,8 @@ let fsToFstLock (outputLock:Types.Lock) : lock =
     match outputLock with
     | Types.PK (Hash.Hash pkHash) ->
         PKLock pkHash
+    | Types.Lock.Vote (_, _, Hash.Hash pkHash) ->
+        PKLock pkHash
     | Types.Contract contractId ->
         ContractLock (fsToFstContractId contractId)
     | Destroy ->

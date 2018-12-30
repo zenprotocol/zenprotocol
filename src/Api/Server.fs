@@ -16,7 +16,6 @@ open Consensus.Crypto
 open Logary.Message
 open Api.Helpers
 open FSharp.Data
-open Hopac.Extensions.Seq
 open FsBech32
 open Hash
 open Wallet
@@ -657,7 +656,7 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
         | Some blockNumber ->
             let success,blockNumber = System.UInt32.TryParse blockNumber
             if success then
-                Block.blockReward blockNumber
+                Blockchain.getBlockReward client blockNumber
                 |> decimal
                 |> JsonValue.Number
                 |> JsonContent

@@ -24,7 +24,7 @@ let rlimit = 2723280u
 let result = new ResultBuilder<string>()
 
 // Collect inputs from the account unspent outputs
-let private collectInputs dataAccess session view account assetAmounts =
+let private collectInputs chainParams dataAccess session view account assetAmounts =
     let spendableAddresses =
         DataAccess.Addresses.getAll dataAccess session
         |> List.filter (fun address -> address.addressType <> WatchOnly) // Both payment and change addresses
@@ -49,7 +49,7 @@ let private collectInputs dataAccess session view account assetAmounts =
 
             let isMature =
                 match output.lock with
-                | Coinbase (blockNumber,_) -> (account.blockNumber + 1ul) - blockNumber >= CoinbaseMaturity
+                | Coinbase (blockNumber,_) -> (account.blockNumber + 1ul) - blockNumber >= chainParams.coinbaseMaturity
                 | _ -> true
 
             if isMature then
@@ -97,7 +97,7 @@ let private getChangeOutputs inputs amounts account =
         else
             changes) List.empty inputs
 
-let createTransactionFromOutputs dataAccess session view password contract outputs = result {
+let createTransactionFromOutputs chainParams dataAccess session view password contract outputs = result {
     let account = DataAccess.Account.get dataAccess session
 
     let! extendedPrivateKey =
@@ -111,7 +111,7 @@ let createTransactionFromOutputs dataAccess session view password contract outpu
         | Some amount -> Map.add output.spend.asset (amount + output.spend.amount) amounts
         | None ->  Map.add output.spend.asset output.spend.amount amounts) Map.empty outputs
 
-    let! inputs = collectInputs dataAccess session view account requiredAmounts
+    let! inputs = collectInputs chainParams dataAccess session view account requiredAmounts
     let changeOutputs = getChangeOutputs inputs requiredAmounts account
 
     // Convert to outpoint list and get the key for every input
@@ -147,8 +147,8 @@ let createTransactionFromOutputs dataAccess session view password contract outpu
     return Transaction.sign keys TxHash transaction
 }
 
-let createTransaction dataAccess session view password outputs =
-    createTransactionFromOutputs dataAccess session view password None outputs
+let createTransaction chainParams dataAccess session view password outputs =
+    createTransactionFromOutputs chainParams dataAccess session view password None outputs
 
 
 let addReturnAddressToData pkHash data =
@@ -204,7 +204,7 @@ let private signFirstWitness signKey tx = result {
     | None -> return tx
 }
 
-let createExecuteContractTransaction dataAccess session view executeContract password (contractId:ContractId) command data provideReturnAddress sign spends = result {
+let createExecuteContractTransaction chainParams dataAccess session view executeContract password (contractId:ContractId) command data provideReturnAddress sign spends = result {
     let account = DataAccess.Account.get dataAccess session
 
     let! masterPrivateKey =
@@ -220,7 +220,7 @@ let createExecuteContractTransaction dataAccess session view executeContract pas
             let tempFeeAmount = 1UL
 
             let spends = (Map.add Asset.Zen tempFeeAmount Map.empty)
-            let! inputs = collectInputs dataAccess session view account spends
+            let! inputs = collectInputs chainParams dataAccess session view account spends
 
             let feeOutput = { lock = Fee; spend = { amount = tempFeeAmount; asset = Asset.Zen } }
 
@@ -232,7 +232,7 @@ let createExecuteContractTransaction dataAccess session view executeContract pas
 
             return inputs,txSkeleton
         else
-            let! inputs = collectInputs dataAccess session view account spends
+            let! inputs = collectInputs chainParams dataAccess session view account spends
 
             let changeOutputs = getChangeOutputs inputs spends account
 
@@ -292,7 +292,7 @@ let createExecuteContractTransaction dataAccess session view executeContract pas
     return! sign unsignedTx
 }
 
-let createActivateContractTransaction dataAccess session view chain password code (numberOfBlocks:uint32)  =
+let createActivateContractTransaction chainParams dataAccess session view chain password code (numberOfBlocks:uint32)  =
     result {
         let contractId = Contract.makeContractId Version0 code
 
@@ -320,7 +320,7 @@ let createActivateContractTransaction dataAccess session view chain password cod
                 { spend = { amount = activationFee; asset = Asset.Zen }; lock = Fee }
             ]
 
-        return! createTransactionFromOutputs dataAccess session view password contract outputs
+        return! createTransactionFromOutputs chainParams dataAccess session view password contract outputs
     }
 
 let createExtendContractTransaction dataAccess session view (getContract:ContractId->ActiveContract option) chainParams password (contractId:ContractId) (numberOfBlocks:uint32)=
@@ -336,10 +336,10 @@ let createExtendContractTransaction dataAccess session view (getContract:Contrac
 
         let outputs = [output]
 
-        return! createTransactionFromOutputs dataAccess session view password None outputs
+        return! createTransactionFromOutputs chainParams dataAccess session view password None outputs
     }
 
-let createRawTransaction dataAccess session view contract outputs = result {
+let createRawTransaction chainParams dataAccess session view contract outputs = result {
     let account = DataAccess.Account.get dataAccess session
 
     // summarize the amount of inputs needed per asset
@@ -348,7 +348,7 @@ let createRawTransaction dataAccess session view contract outputs = result {
         | Some amount -> Map.add output.spend.asset (amount + output.spend.amount) amounts
         | None ->  Map.add output.spend.asset output.spend.amount amounts) Map.empty outputs
 
-    let! inputs = collectInputs dataAccess session view account requiredAmounts
+    let! inputs = collectInputs chainParams dataAccess session view account requiredAmounts
     let changeOutputs = getChangeOutputs inputs requiredAmounts account
 
     // Convert to outpoint list and get the key for every input

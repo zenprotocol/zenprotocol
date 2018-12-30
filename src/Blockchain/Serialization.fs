@@ -1,9 +1,8 @@
 module Blockchain.Serialization
 
-open Consensus.Serialization
-open Consensus.Serialization.Serialization
-
 open Consensus
+open Serialization
+open Serialization
 open Hash
 open BlockState
 open ExtendedBlockHeader
@@ -34,6 +33,7 @@ module ContractKey =
     let deserialize = deserialize read
 
 module BlockState =
+
     let private size blockState =
         4 +
             Seq.size (fun _ -> 8) blockState.ema.delayed +
@@ -42,7 +42,8 @@ module BlockState =
                     Option.size ContractKey.size contractOption) blockState.activeContractSetUndoData +
             Seq.size (fun (contractId, dataOption) ->
                 ContractId.size contractId +
-                    Option.size Data.size dataOption) blockState.contractStatesUndoData
+                    Option.size Data.size dataOption) blockState.contractStatesUndoData +
+            (if CGP.isEmpty blockState.cgp then 0 else CGP.size blockState.cgp)
 
     let private write (stream:Stream) blockState =
         stream.writeNumber4 blockState.ema.difficulty
@@ -53,6 +54,8 @@ module BlockState =
         Seq.write (fun stream (contractId, dataOption) ->
             ContractId.write stream contractId
             Option.write stream Data.write dataOption) stream blockState.contractStatesUndoData
+        if not <| CGP.isEmpty blockState.cgp then
+            CGP.write stream blockState.cgp
 
     let private read (stream:Stream) =
         let difficulty = stream.readNumber4 ()
@@ -70,10 +73,19 @@ module BlockState =
                                             contractId, dataOption
                                         ) stream
 
+        let conditionalRead (stream:Stream) defaultValue readerFn =
+            if stream.Offset = stream.Buffer.Length then
+                defaultValue
+            else
+                readerFn stream
+
+        let cgp = conditionalRead stream CGP.empty CGP.read
+
         {
             ema = { difficulty = difficulty; delayed = delayed }
             activeContractSetUndoData = activeContractSetUndoData
             contractStatesUndoData = contractStatesUndoData
+            cgp = cgp
         }
 
     let serialize = serialize size write
@@ -118,6 +130,10 @@ module BigInt =
         BigInteger.fromBytes32 bytes
 
 module ExtendedBlockHeader =
+    let private commitments bk =
+        match bk.cgpCommitment with | Some cgpCommitment -> [ cgpCommitment ] | None -> []
+        @ bk.commitments
+
     let size extendedBlockHeader =
         Hash.size
         + Header.size
@@ -126,7 +142,7 @@ module ExtendedBlockHeader =
         + Hash.size
         + Hash.size
         + Hash.size
-        + Seq.size (fun _ -> Hash.size) extendedBlockHeader.commitments
+        + Seq.size (fun _ -> Hash.size) (commitments extendedBlockHeader)
 
     let write stream extendedBlockHeader =
         Hash.write stream extendedBlockHeader.hash
@@ -136,7 +152,7 @@ module ExtendedBlockHeader =
         Hash.write stream extendedBlockHeader.txMerkleRoot
         Hash.write stream extendedBlockHeader.witnessMerkleRoot
         Hash.write stream extendedBlockHeader.activeContractSetMerkleRoot
-        Seq.write Hash.write stream extendedBlockHeader.commitments
+        Seq.write Hash.write stream (commitments extendedBlockHeader)
 
     let read stream =
         let hash = Hash.read stream
@@ -148,6 +164,13 @@ module ExtendedBlockHeader =
         let activeContractSetMerkleRoot = Hash.read stream
         let commitments = List.read Hash.read stream
 
+        let popOption =
+            function
+            | next :: rest -> Some next, rest
+            | [] -> None, []
+
+        let cgpCommitment, commitments = popOption commitments
+
         {
             hash = hash
             header = header
@@ -156,6 +179,7 @@ module ExtendedBlockHeader =
             txMerkleRoot = txMerkleRoot
             witnessMerkleRoot = witnessMerkleRoot
             activeContractSetMerkleRoot = activeContractSetMerkleRoot
+            cgpCommitment = cgpCommitment
             commitments = commitments
         }
 

@@ -286,7 +286,7 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             let tx =
                 outputs
                 |> List.map (fun (hash, spend) -> { lock = PK hash; spend = spend })
-                |> TransactionCreator.createTransaction dataAccess session view password
+                |> TransactionCreator.createTransaction chainParams dataAccess session view password
 
             reply<Transaction> requestId tx
             publishTx dataAccess session client view publish tx
@@ -295,7 +295,7 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             let raw =
                 outputs
                 |> List.map (fun (hash, spend) -> { lock = PK hash; spend = spend })
-                |> TransactionCreator.createRawTransaction dataAccess session view None
+                |> TransactionCreator.createRawTransaction chainParams dataAccess session view None
 
             reply<RawTransaction> requestId raw
             accountStatus
@@ -307,7 +307,7 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
         | ActivateContract (publish, code, numberOfBlocks, password) ->
             let tx =
 
-                TransactionCreator.createActivateContractTransaction dataAccess session view chainParams password code numberOfBlocks
+                TransactionCreator.createActivateContractTransaction chainParams dataAccess session view chainParams password code numberOfBlocks
                 <@> fun tx -> tx, Consensus.Contract.makeContractId Version0 code
 
             reply<ActivateContractResponse> requestId tx
@@ -320,7 +320,7 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             publishTx dataAccess session client view publish tx
 
         | ExecuteContract (publish, contractId, command, data, provideReturnAddress, sign, spends, password) ->
-            let tx = TransactionCreator.createExecuteContractTransaction dataAccess session view (Blockchain.executeContract client) password contractId command data provideReturnAddress sign spends
+            let tx = TransactionCreator.createExecuteContractTransaction chainParams dataAccess session view (Blockchain.executeContract client) password contractId command data provideReturnAddress sign spends
 
             reply<Transaction> requestId tx
             publishTx dataAccess session client view publish tx

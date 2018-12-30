@@ -22,6 +22,9 @@ type ChainParameters =
         networkId:uint32;
         contractSacrificePerBytePerBlock:uint64
         versionExpiry:Timestamp.Timestamp
+        coinbaseMaturity:uint32
+        intervalLength:uint32
+        allocationCorrectionCap:byte
     }
 
 let mainParameters =
@@ -37,6 +40,9 @@ let mainParameters =
         networkId=1000ul
         contractSacrificePerBytePerBlock=ContractSacrificePerBytePerBlock
         versionExpiry= new System.DateTime(2020,2,15,0,0,0,System.DateTimeKind.Utc) |> Infrastructure.Timestamp.fromDateTime
+        intervalLength=10000ul
+        allocationCorrectionCap=50uy
+        coinbaseMaturity=100ul
     }
 
 let testParameters =
@@ -54,7 +60,10 @@ let testParameters =
         genesisTime=1535968146719UL
         networkId=2016ul
         contractSacrificePerBytePerBlock=ContractSacrificePerBytePerBlock
-        versionExpiry=new System.DateTime(2200,1,1,0,0,0,System.DateTimeKind.Utc) |> Infrastructure.Timestamp.fromDateTime
+        versionExpiry= new System.DateTime(2200,1,1,0,0,0,System.DateTimeKind.Utc) |> Infrastructure.Timestamp.fromDateTime
+        intervalLength=100ul
+        allocationCorrectionCap=5uy
+        coinbaseMaturity=10ul
     }
 
 let localGenesisHash = Hash.fromString "6d678ab961c8b47046da8d19c0de5be07eb0fe1e1e82ad9a5b32145b5d4811c7" |> get
@@ -76,3 +85,18 @@ let getChainParameters = function
     | Main -> mainParameters
     | Test -> testParameters
     | Local -> localParameters
+
+let private getPeriod blockNumber =
+    blockNumber / 800_000ul
+    |> int
+
+let private initialBlockReward = 50.0 * 100_000_000.0
+
+let blockReward blockNumber (allocationPortion : byte) =
+    let allocation = (100.0 - float allocationPortion) / 100.0
+
+    let initial = initialBlockReward * allocation
+    uint64 initial >>> getPeriod blockNumber
+
+let blockAllocation (blockNumber:uint32) allocationPortion =
+    (uint64 initialBlockReward >>> getPeriod blockNumber) - (blockReward blockNumber allocationPortion)

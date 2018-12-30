@@ -161,6 +161,33 @@ let checkWeight chain tx txSkeleton =
             Error "transaction weight exceeds maximum")
     |> Result.mapError General
 
+let private checkVoteLocks (txSkeleton:TxSkeleton.T) =
+    let pkHashes =
+        txSkeleton.outputs
+        |> List.choose (function
+            | { spend = { amount = _; asset = asset }; lock = Vote (_, _, pkHash) } ->
+                Some pkHash
+            | _ ->
+                None)
+
+    let isMissing pkHash =
+        txSkeleton.pInputs
+        |> List.choose (function
+            | TxSkeleton.Input.PointedOutput (_, output) -> Some output.lock
+            | _ -> None)
+        |> List.choose (function
+            | Coinbase (_, pkHash)
+            | PK pkHash
+            | Vote (_, _, pkHash) -> Some pkHash
+            | _ -> None)
+        |> List.contains pkHash
+        |> not
+
+    if List.exists isMissing pkHashes then
+        GeneralError "vote outputs should not be transferable"
+    else
+        Ok ()
+        
 let private checkOutputsOverflow tx =
     if tx.outputs
         |> List.map (fun o -> o.spend)
@@ -180,7 +207,7 @@ let private checkMintsOnly tx =
         Ok tx
 
 let private checkVersion (tx:Transaction) =
-    if tx.version <> Version0 then
+    if tx.version > Version1 then
         GeneralError "unsupported transaction version"
     else
         Ok tx
@@ -225,12 +252,28 @@ let private checkStructure =
         if List.isEmpty tx.outputs || List.exists (fun { lock = lock; spend = spend } ->
             match lock with
             | HighVLock (identifier, bytes) ->
-                identifier <= 7u // last reserved identifier for lock types
+                identifier <= Serialization.Serialization.Lock.LastReservedIdentifier
                 || isEmptyArr bytes
-            | _ -> false
+            | _ ->
+                false
             || isInvalidSpend spend
         ) tx.outputs then
             GeneralError "structurally invalid output(s)"
+        else
+            Ok tx
+
+    let checkVoteLocks = fun (tx:Transaction) ->
+        if tx.version = Version1 && List.exists (function
+            | { lock = Vote ({ allocation = None; payout = None }, _, _); spend = _ } ->
+                true
+            | { lock = Vote ({ allocation = Some x; payout = _ }, _, _); spend = _ } when x > 99uy ->
+                true
+            | { lock = Vote _; spend = spend } when spend.asset <> Asset.Zen ->
+                true
+            | _ ->
+                false
+        ) tx.outputs then
+            GeneralError "structurally invalid vote locks(s)"
         else
             Ok tx
 
@@ -253,6 +296,7 @@ let private checkStructure =
     checkContractStructure
     >=> checkInputsStructrue
     >=> checkOutputsStructrue
+    >=> checkVoteLocks
     >=> checkWitnessesStructure
 
 let private checkNoCoinbaseLock tx =
@@ -283,7 +327,7 @@ let private checkActivationSacrifice tx =
         else
             GeneralError "tx with a contract must include an activation sacrifice"
 
-    
+
 let private tryGetUtxos getUTXO utxoSet tx =
     getUtxosResult getUTXO tx.inputs utxoSet
     |> Result.mapError (fun errors ->
@@ -302,25 +346,46 @@ let validateBasic =
     >=> checkMintsOnly
     >=> checkActivationSacrifice
 
-let validateCoinbase blockNumber =
+let validateCoinbase chain blockNumber =
+    let isPayout = CGP.isPayoutBlock chain blockNumber
     let checkOnlyCoinbaseLocks blockNumber tx =
         let allCoinbase =
-            List.forall (fun output ->
+            tx.outputs
+            |> if isPayout then List.tail else id
+            |> List.forall (fun output ->
                 match output.lock with
                 | Coinbase (blockNumber',_) when blockNumber' = blockNumber -> true
-                | _ -> false) tx.outputs
+                | _ -> false)
 
         if allCoinbase then
             Ok tx
         else
             GeneralError "within coinbase transaction all outputs must use coinbase lock"
 
-    let checkNoInputWithinCoinbaseTx tx =
+    let checkPayout tx =
+        let isZen = function { amount = _; asset = asset } -> asset = Asset.Zen
+        match isPayout, List.head tx.outputs with
+        | false, _ ->
+            Ok tx
+        | true, { lock = PK _; spend = spend } when isZen spend ->
+            Ok tx
+        | true, { lock = Contract _; spend = spend } when isZen spend ->
+            Ok tx
+        | true, { lock = Coinbase (blockNumber',_); spend = _ } when blockNumber' = blockNumber ->
+            Ok tx
+            (* could be in a payout block without an actual payout in the following cases:
+                1) payout blocks before the hard-fork
+                2) the CGP can't satisfy any winning payout results
+                3) no payout votes exist *)
+        | _ ->
+            GeneralError "payout output mismatch"
+
+    let checkNoInput tx =
         match tx.inputs with
         | [] -> Ok tx
         | _ -> GeneralError "coinbase transaction must not have any inputs"
 
-    let checkNoContractInCoinbase tx =
+    let checkNoContract tx =
         if Option.isSome tx.contract then
             GeneralError "coinbase transaction cannot activate a contract"
         else
@@ -340,10 +405,11 @@ let validateCoinbase blockNumber =
             Ok tx
 
     checkOutputsNotEmpty
-    >=> checkNoInputWithinCoinbaseTx
+    >=> checkNoInput
     >=> checkNoWitnesses
     >=> checkOnlyCoinbaseLocks blockNumber
-    >=> checkNoContractInCoinbase
+    >=> checkPayout
+    >=> checkNoContract
     >=> checkOutputsOverflow
 
 let validateInContext chainParams getUTXO contractPath blockNumber timestamp acs contractCache set getContractState contractState ex = result {
@@ -354,7 +420,11 @@ let validateInContext chainParams getUTXO contractPath blockNumber timestamp acs
     do! checkWeight chainParams ex.tx txSkel
 
     do! checkAmounts txSkel
-    let! contractStates = InputValidation.StateMachine.validate blockNumber timestamp acs getContractState contractState ex.txHash ex.tx txSkel
+    
+    if ex.tx.version = Version1 then
+        do! checkVoteLocks txSkel
+        
+    let! contractStates = InputValidation.StateMachine.validate chainParams blockNumber timestamp acs getContractState contractState ex.txHash ex.tx txSkel
 
     let! acs, contractCache = activateContract chainParams contractPath blockNumber acs contractCache ex.tx
     let! acs = extendContracts chainParams acs ex.tx

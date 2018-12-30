@@ -56,7 +56,8 @@ let private accumulateWeights total witnesses pInputs =
     | PointedOutput (_, output) :: _ ->
         match output.lock with
         | Coinbase _
-        | PK _ ->
+        | PK _
+        | Vote _ ->
             accumulatePkWeight total witnesses pInputs
         | Contract _ ->
             accumulateContractWeight total witnesses pInputs
