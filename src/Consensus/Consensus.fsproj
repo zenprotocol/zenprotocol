@@ -56,6 +56,8 @@
     <Compile Include="Chain.fs" />
     <Compile Include="EMA.fs" />
     <Compile Include="ZFStar.fs" />
+    <Compile Include="Tally.fs" />
+    <Compile Include="CGP.fs" />
     <Compile Include="Serialization.fs" />
     <Compile Include="Transaction.fs" />
     <Compile Include="UtxoSet.fs" />

@@ -14,6 +14,7 @@ open State
 open DatabaseContext
 open Logary.Message
 open Infrastructure.Result
+open Chain
 
 let getUnionCaseName (x:'a) =
     match Microsoft.FSharp.Reflection.FSharpValue.GetUnionFields(x, typeof<'a>) with
@@ -129,7 +130,7 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
     | GetBlockTemplate pkHash ->
         BlockTemplateBuilder.makeTransactionList chain session state timestamp
         <@> fun (memState, validatedTransactions) ->
-            Block.createTemplate chain state.tipState.tip.header timestamp state.tipState.ema memState.activeContractSet validatedTransactions pkHash
+            Block.createTemplate chain state.tipState.tip.header timestamp state.tipState.ema memState.activeContractSet memState.cgp validatedTransactions pkHash
         |> Result.get
         |> requestId.reply<Block>
     | GetBlock (mainChain,blockHash) ->
@@ -275,17 +276,21 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
         |> requestId.reply<Result<Hash.Hash,ValidationError.ValidationError>>
     | GetTotalZP ->
         [2ul..state.tipState.tip.header.blockNumber]
-        |> List.fold (fun sum blockNumber -> sum + Block.blockReward blockNumber) (20_000_000UL * 100_000_000UL)
+        |> List.fold (fun sum blockNumber -> sum + blockReward blockNumber state.tipState.cgp.allocation) (20_000_000UL * 100_000_000UL)
         |> requestId.reply
+    | GetBlockReward blockNumber ->
+        blockReward blockNumber state.tipState.cgp.allocation
+        |> requestId.reply
+        
 
     logEndAction timestamp "request" request
 
     ret state
 
-let handleEvent event session timestamp state =
+let handleEvent _ _ _ state =
     ret state
 
-let tick chain session timestamp state = effectsWriter {
+let tick _ _ timestamp state = effectsWriter {
     let! ibd = InitialBlockDownload.tick timestamp state.initialBlockDownload
 
     return {state with initialBlockDownload = ibd}

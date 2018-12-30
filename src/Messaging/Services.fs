@@ -55,6 +55,7 @@ module Blockchain =
         | GetTransaction of Hash
         | CheckTransaction of TransactionExtended
         | GetTotalZP
+        | GetBlockReward of uint32
 
     type Response = unit
 
@@ -155,6 +156,10 @@ module Blockchain =
 
     let getTotalZP client =
         GetTotalZP
+        |> Request.send<Request, uint64> client serviceName
+
+    let getBlockReward client blockNumber =
+        GetBlockReward blockNumber
         |> Request.send<Request, uint64> client serviceName
 
 module Network =

@@ -113,7 +113,7 @@ let validateInputs chainParams session contractPath blockNumber timestamp ex sta
                 |> Log.info
 
                 return state
-            | Ok (tx, acs, contractCache, contractStates) ->
+            | Ok (_, acs, contractCache, contractStates) ->
                 let utxoSet = UtxoSet.handleTransaction (getUTXO session) ex.txHash ex.tx state.utxoSet
                 let mempool = MemPool.add ex state.mempool
 

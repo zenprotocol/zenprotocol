@@ -43,10 +43,10 @@ let main dataPath chainParams busName wipe =
 
         let databaseContext = DatabaseContext.create dataPath
 
-        let tip, acs, ema, contractCache =
+        let tip, acs, ema, contractCache, cgp =
             use session = DatabaseContext.createSession databaseContext
             match BlockRepository.tryGetTip session with
-            | Some (tip,ema) ->
+            | Some (tip,ema,tally) ->
                 eventX "Loading tip from db #{blockNumber} {blockHash}"
                 >> setField "blockNumber" tip.header.blockNumber
                 >> setField "blockHash" (Hash.toString tip.hash)
@@ -59,7 +59,8 @@ let main dataPath chainParams busName wipe =
                 ema,
                 Seq.fold (fun contractCache contract ->
                     ContractCache.add contract contractCache)
-                    ContractCache.empty (ActiveContractSet.getContracts acs)
+                    ContractCache.empty (ActiveContractSet.getContracts acs),
+                tally
 
             | None ->
                 eventX "No tip in db"
@@ -68,13 +69,15 @@ let main dataPath chainParams busName wipe =
                 ExtendedBlockHeader.empty,
                 ActiveContractSet.empty,
                 EMA.create chainParams,
-                ContractCache.empty
+                ContractCache.empty,
+                CGP.empty
 
         let tipState =
             {
                 activeContractSet=acs
                 ema=ema
                 tip=tip
+                cgp=cgp
             }
 
         let memoryState =
