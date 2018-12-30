@@ -32,7 +32,7 @@ let ``coinbase cannot have any locks other than coinbase lock``() =
 
     let expected:Result<Transaction,ValidationError> = Error (General "within coinbase transaction all outputs must use coinbase lock")
 
-    TransactionValidation.validateCoinbase 15ul tx |> should equal expected
+    TransactionValidation.validateCoinbase Chain.localParameters 15ul tx |> should equal expected
 
 [<Test>]
 let ``coinbase with wrong block nubmer should fail``() =
@@ -47,7 +47,7 @@ let ``coinbase with wrong block nubmer should fail``() =
 
     let expected:Result<Transaction,ValidationError> = Error (General "within coinbase transaction all outputs must use coinbase lock")
 
-    TransactionValidation.validateCoinbase 14ul tx |> should equal expected
+    TransactionValidation.validateCoinbase Chain.localParameters 14ul tx |> should equal expected
 
 [<Test>]
 let ``coinbase with inputs should fail``() =
@@ -62,7 +62,7 @@ let ``coinbase with inputs should fail``() =
 
     let expected:Result<Transaction,ValidationError> = Error (General "coinbase transaction must not have any inputs")
 
-    TransactionValidation.validateCoinbase 15ul tx |> should equal expected
+    TransactionValidation.validateCoinbase Chain.localParameters 15ul tx |> should equal expected
 
 [<Test>]
 let ``coinbase with witnesses fail``() =
@@ -77,7 +77,7 @@ let ``coinbase with witnesses fail``() =
 
     let expected:Result<Transaction,ValidationError> = Error (General  "coinbase transaction must not have any witnesses")
 
-    TransactionValidation.validateCoinbase 15ul tx |> should equal expected
+    TransactionValidation.validateCoinbase Chain.localParameters 15ul tx |> should equal expected
 
 [<Test>]
 let ``coinbase with contract should fail``() =
@@ -92,7 +92,7 @@ let ``coinbase with contract should fail``() =
 
     let expected:Result<Transaction,ValidationError> = Error (General "coinbase transaction cannot activate a contract")
 
-    TransactionValidation.validateCoinbase 15ul tx |> should equal expected
+    TransactionValidation.validateCoinbase Chain.localParameters 15ul tx |> should equal expected
 
 [<Test>]
 let ``valid coinbase should pass``() =
@@ -107,7 +107,7 @@ let ``valid coinbase should pass``() =
 
     let expected:Result<Transaction,ValidationError> = Ok tx
 
-    TransactionValidation.validateCoinbase 15ul tx |> should equal expected
+    TransactionValidation.validateCoinbase Chain.localParameters 15ul tx |> should equal expected
 
 [<Test>]
 let ``coinbase with two outputs should pass``() =
@@ -126,7 +126,7 @@ let ``coinbase with two outputs should pass``() =
 
     let expected:Result<Transaction,ValidationError> = Ok tx
 
-    TransactionValidation.validateCoinbase 15ul tx |> should equal expected
+    TransactionValidation.validateCoinbase Chain.localParameters 15ul tx |> should equal expected
 
 [<Test>]
 let ``coinbase with no outputs``() =
@@ -141,7 +141,7 @@ let ``coinbase with no outputs``() =
 
     let expected:Result<Transaction,ValidationError> = Error (General "outputs empty")
 
-    TransactionValidation.validateCoinbase 15ul tx |> should equal expected
+    TransactionValidation.validateCoinbase Chain.localParameters 15ul tx |> should equal expected
 
 [<Test>]
 let ``transaction spending coinbase with maturity should be valid``() =
@@ -163,7 +163,7 @@ let ``transaction spending coinbase with maturity should be valid``() =
 [<Test>]
 let ``transaction spending coinbase with no maturity should fail``() =
     let _, publicKey = keys.[0]
-    let outputLock = Coinbase (15ul,PublicKey.hash publicKey)
+    let outputLock = Coinbase (100ul, PublicKey.hash publicKey)
     let output = { lock = outputLock; spend = { asset = Asset.Zen; amount = 1UL } }
     let tx = {
         version = Version0
@@ -174,5 +174,5 @@ let ``transaction spending coinbase with no maturity should fail``() =
     }
     let utxos = Map.ofSeq [ testInput1, Unspent output ]
 
-    inputsValidationMsg "Coinbase not mature enough" 114ul 1_000_000UL acs utxos tx keys
+    inputsValidationMsg "Coinbase not mature enough" (100ul + Chain.testParameters.coinbaseMaturity - 1ul) 1_000_000UL acs utxos tx keys
     |> shouldEqual

@@ -54,7 +54,7 @@ let rootAccountData = createTestAccount()
 let rootAccount, _ = rootAccountData
 
 let createTransaction account =
-    Result.get <| TestWallet.createTransaction (publicKeyHash account) {asset=Asset.Zen;amount=rootAmount} (account, snd rootAccountData)
+    Result.get <| TestWallet.createTransaction testParameters (publicKeyHash account) {asset=Asset.Zen;amount=rootAmount} (account, snd rootAccountData)
 
 
 // Default initial state of mempool and utxoset
@@ -81,9 +81,10 @@ let state = {
         }
     tipState =
         {
-           tip = ExtendedBlockHeader.empty
-           activeContractSet = acs
-           ema = ema
+            tip = ExtendedBlockHeader.empty
+            activeContractSet = acs
+            ema = ema
+            cgp = CGP.empty
         }
     initialBlockDownload = InitialBlockDownload.Inactive
     headers=0ul
@@ -97,7 +98,7 @@ let createChain (length:int) nonce start ema account =
             let parent = List.head blocks
             let timestamp = timestamp + ((uint64 i) * 1000UL * 60UL * 1UL)
             let tx = createTransaction account
-            let block = Block.createTemplate chain parent.header timestamp ema acs [Transaction.toExtended tx] Hash.zero
+            let block = Block.createTemplate chain parent.header timestamp ema acs CGP.empty [Transaction.toExtended tx] Hash.zero
             let block = {block with header ={ block.header with nonce = uint64 nonce,0UL}}
 
             let account = TestWallet.addTransaction (Transaction.hash tx) tx account
@@ -145,7 +146,8 @@ let ``genesis block accepted``() =
 
     BlockRepository.tryGetTip session
     |> should equal (Some (state'.tipState.tip,
-                           state'.tipState.ema))
+                           state'.tipState.ema,
+                           state'.tipState.cgp))
 
     BlockRepository.tryGetGenesisHeader session
     |> should equal (Some (state'.tipState.tip))
@@ -185,7 +187,7 @@ let ``validate new valid block which extended main chain``() =
         |> Writer.unwrap
 
     let tx = createTransaction rootAccount
-    let block = Block.createTemplate chain genesisBlock.header timestamp state.tipState.ema acs [Transaction.toExtended tx] Hash.zero
+    let block = Block.createTemplate chain genesisBlock.header timestamp state.tipState.ema acs CGP.empty [Transaction.toExtended tx] Hash.zero
     let blockHash = Block.hash block.header
 
 
@@ -204,7 +206,8 @@ let ``validate new valid block which extended main chain``() =
 
     BlockRepository.tryGetTip session
     |> should equal (Some (state'.tipState.tip,
-                           state'.tipState.ema))
+                           state'.tipState.ema,
+                           state'.tipState.cgp))
 
     let acs = ActiveContractSetRepository.get session
 
@@ -226,7 +229,7 @@ let ``validate new invalid block which try to extended main chain``() =
         |> Writer.unwrap
 
     let tx = createTransaction (fst rootAccountData)
-    let block = Block.createTemplate chain genesisBlock.header timestamp state.tipState.ema acs [Transaction.toExtended tx] Hash.zero
+    let block = Block.createTemplate chain genesisBlock.header timestamp state.tipState.ema acs CGP.empty [Transaction.toExtended tx] Hash.zero
     let block = {block with txMerkleRoot = Hash.zero}
 
     // Mark the block as new so we will also have network command
@@ -253,7 +256,7 @@ let ``validating orphan block yield a request for block from network``() =
     use session = DatabaseContext.createSession databaseContext
 
     let tx = createTransaction (fst rootAccountData)
-    let block = Block.createTemplate chain genesisBlock.header timestamp state.tipState.ema acs [Transaction.toExtended tx] Hash.zero
+    let block = Block.createTemplate chain genesisBlock.header timestamp state.tipState.ema acs CGP.empty [Transaction.toExtended tx] Hash.zero
 
     let events, state' =
         BlockHandler.validateBlock chain session.context.contractPath session timestamp None block false state
@@ -277,7 +280,7 @@ let ``validate new block which connect orphan chain which extend main chain``() 
     let tx = createTransaction (fst rootAccountData)
 
     let ema = EMA.add chain genesisBlock.header.timestamp ema
-    let block = Block.createTemplate chain genesisBlock.header timestamp ema acs [Transaction.toExtended tx] Hash.zero
+    let block = Block.createTemplate chain genesisBlock.header timestamp ema acs CGP.empty [Transaction.toExtended tx] Hash.zero
     let blockHash = Block.hash block.header
 
     // Sending orphan block first
@@ -298,7 +301,8 @@ let ``validate new block which connect orphan chain which extend main chain``() 
 
     BlockRepository.tryGetTip session
     |> should equal (Some (state'.tipState.tip,
-                           state'.tipState.ema))
+                           state'.tipState.ema,
+                           state'.tipState.cgp))
 
     let acs = ActiveContractSetRepository.get session
 
@@ -374,7 +378,8 @@ let ``orphan chain become longer than main chain``() =
 
     BlockRepository.tryGetTip session
     |> should equal (Some (state.tipState.tip,
-                           state.tipState.ema))
+                           state.tipState.ema,
+                           state.tipState.cgp))
 
     events |> should haveLength 7
     events.[0] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock alternativeChain.[1])))
@@ -639,7 +644,7 @@ let ``block with a contract activation is added to chain``() =
 
     let acs = ActiveContractSet.add contractId contract state.tipState.activeContractSet
 
-    let block = Block.createTemplate chain genesisBlock.header timestamp state.tipState.ema acs [Transaction.toExtended tx] Hash.zero
+    let block = Block.createTemplate chain genesisBlock.header timestamp state.tipState.ema acs CGP.empty [Transaction.toExtended tx] Hash.zero
 
     let events, state' =
             BlockHandler.validateBlock chain session.context.contractPath session timestamp None block false state
@@ -743,10 +748,10 @@ let ``Valid template for two transactions which don't depend on each other``() =
     let firstAmount = amount / 4UL
     let secondAmount = amount - firstAmount
     let splitTx =
-        TestWallet.createTransaction (publicKeyHash rootAccount) {asset=asset;amount=firstAmount} rootAccountData
+        TestWallet.createTransaction testParameters (publicKeyHash rootAccount) {asset=asset;amount=firstAmount} rootAccountData
         |>  Result.get
     let ema' = EMA.add chain genesisBlock.header.timestamp ema
-    let splitBlock = Block.createTemplate chain genesisBlock.header timestamp ema' acs [Transaction.toExtended splitTx] Hash.zero
+    let splitBlock = Block.createTemplate chain genesisBlock.header timestamp ema' acs CGP.empty [Transaction.toExtended splitTx] Hash.zero
 
     let account = TestWallet.addTransaction (Transaction.hash splitTx) splitTx rootAccount
     let ema'' = EMA.add chain timestamp ema'
@@ -777,7 +782,7 @@ let ``Valid template for two transactions which don't depend on each other``() =
         | [t1;t2] -> (t1,t2)
         | _ -> failwith "Wrong number of outputs"
 
-    let twoTxBlock = Block.createTemplate chain splitBlock.header (timestamp+100UL) splitState.tipState.ema acs [Transaction.toExtended tx1;Transaction.toExtended tx2] Hash.zero
+    let twoTxBlock = Block.createTemplate chain splitBlock.header (timestamp+100UL) splitState.tipState.ema acs CGP.empty [Transaction.toExtended tx1;Transaction.toExtended tx2] Hash.zero
     let oldHash = splitState.tipState.tip.hash
     let _, withTxsState =
         BlockHandler.validateBlock chain session.context.contractPath session (timestamp+100UL) None twoTxBlock false splitState
@@ -798,14 +803,14 @@ let ``Two transactions in the same block which depend on each other are valid``(
     let asset, amount = balances |> Map.toList |> List.head
     let firstAmount = amount
     let firstTx =
-        TestWallet.createTransaction (publicKeyHash rootAccount) {asset=asset;amount=firstAmount} rootAccountData
+        TestWallet.createTransaction testParameters (publicKeyHash rootAccount) {asset=asset;amount=firstAmount} rootAccountData
         |>  Result.get
     let account = TestWallet.addTransaction (Transaction.hash firstTx) firstTx rootAccount
     let secondTx =
-        TestWallet.createTransaction (publicKeyHash rootAccount) {asset=asset;amount=firstAmount} (account, snd rootAccountData)
+        TestWallet.createTransaction testParameters (publicKeyHash rootAccount) {asset=asset;amount=firstAmount} (account, snd rootAccountData)
         |>  Result.get
     let ema' = EMA.add chain genesisBlock.header.timestamp ema
-    let twoTxBlock = Block.createTemplate chain genesisBlock.header timestamp ema' acs [Transaction.toExtended firstTx;Transaction.toExtended secondTx] Hash.zero
+    let twoTxBlock = Block.createTemplate chain genesisBlock.header timestamp ema' acs CGP.empty [Transaction.toExtended firstTx;Transaction.toExtended secondTx] Hash.zero
     let oldHash = genesisState.tipState.tip.hash
 
     let _, twoTxState =
@@ -827,14 +832,14 @@ let ``Two transactions in the same block which depend on each other are invalid 
     let asset, amount = balances |> Map.toList |> List.head
     let firstAmount = amount
     let firstTx =
-        TestWallet.createTransaction (publicKeyHash rootAccount) {asset=asset;amount=firstAmount} rootAccountData
+        TestWallet.createTransaction testParameters (publicKeyHash rootAccount) {asset=asset;amount=firstAmount} rootAccountData
         |>  Result.get
     let account = TestWallet.addTransaction (Transaction.hash firstTx) firstTx rootAccount
     let secondTx =
-        TestWallet.createTransaction (publicKeyHash rootAccount) {asset=asset;amount=firstAmount} (account, snd rootAccountData)
+        TestWallet.createTransaction testParameters (publicKeyHash rootAccount) {asset=asset;amount=firstAmount} (account, snd rootAccountData)
         |>  Result.get
     let ema' = EMA.add chain genesisBlock.header.timestamp ema
-    let twoTxBlock = Block.createTemplate chain genesisBlock.header timestamp ema' acs [Transaction.toExtended secondTx;Transaction.toExtended firstTx] Hash.zero
+    let twoTxBlock = Block.createTemplate chain genesisBlock.header timestamp ema' acs CGP.empty [Transaction.toExtended secondTx;Transaction.toExtended firstTx] Hash.zero
     let oldHash = genesisState.tipState.tip.hash
 
     let _, twoTxState =
@@ -856,11 +861,11 @@ let ``Template builder uses two transactions in the same block which depend on e
     let asset, amount = balances |> Map.toList |> List.head
     let firstAmount = amount
     let firstTx =
-        TestWallet.createTransaction (publicKeyHash rootAccount) {asset=asset;amount=firstAmount} rootAccountData
+        TestWallet.createTransaction testParameters (publicKeyHash rootAccount) {asset=asset;amount=firstAmount} rootAccountData
         |>  Result.get
     let account = TestWallet.addTransaction (Transaction.hash firstTx) firstTx rootAccount
     let secondTx =
-        TestWallet.createTransaction (publicKeyHash rootAccount) {asset=asset;amount=firstAmount} (account, snd rootAccountData)
+        TestWallet.createTransaction testParameters (publicKeyHash rootAccount) {asset=asset;amount=firstAmount} (account, snd rootAccountData)
         |>  Result.get
     let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction <| Transaction.toExtended firstTx) session (timestamp+1UL) genesisState
     let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction <| Transaction.toExtended secondTx) session (timestamp+1UL) updatedState
@@ -868,7 +873,7 @@ let ``Template builder uses two transactions in the same block which depend on e
     let ema' = EMA.add chain timestamp ema
     let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList chain session updatedState (timestamp + 100_000UL) |> Result.get
 
-    let twoTxBlock = Block.createTemplate chain genesisBlock.header (timestamp+1UL) ema' memState.activeContractSet validatedTransactions Hash.zero
+    let twoTxBlock = Block.createTemplate chain genesisBlock.header (timestamp+1UL) ema' memState.activeContractSet CGP.empty validatedTransactions Hash.zero
     let oldHash = genesisState.tipState.tip.hash
     let _, twoTxState =
         BlockHandler.validateBlock chain session.context.contractPath session (timestamp+1UL) None twoTxBlock false genesisState
@@ -889,11 +894,11 @@ let ``Out of order dependent transactions are rearranged``() =
     let balances = TestWallet.getBalance rootAccount
     let asset, amount = balances |> Map.toList |> List.head
     let firstTx =
-        TestWallet.createTransaction (publicKeyHash rootAccount) {asset=asset;amount=amount} rootAccountData
+        TestWallet.createTransaction testParameters (publicKeyHash rootAccount) {asset=asset;amount=amount} rootAccountData
         |>  Result.get
     let account = TestWallet.addTransaction (Transaction.hash firstTx) firstTx rootAccount
     let secondTx =
-        TestWallet.createTransaction (publicKeyHash rootAccount) {asset=asset;amount=amount} (account, snd rootAccountData)
+        TestWallet.createTransaction testParameters (publicKeyHash rootAccount) {asset=asset;amount=amount} (account, snd rootAccountData)
         |>  Result.get
     let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction <| Transaction.toExtended firstTx) session (timestamp+1UL) genesisState
     let _, updatedState = Writer.unwrap <| Handler.handleCommand chain (Blockchain.Command.ValidateTransaction <| Transaction.toExtended secondTx) session (timestamp+1UL) updatedState
@@ -901,8 +906,8 @@ let ``Out of order dependent transactions are rearranged``() =
     let timestamp = updatedState.tipState.tip.header.timestamp
     let acs = updatedState.tipState.activeContractSet
     let txList = List.map (fun tx -> (Transaction.toExtended tx, 0I)) [firstTx;secondTx]
-    let _, validatedTransactions = BlockTemplateBuilder.selectOrderedTransactions chain session blockNumber (timestamp + 100_000UL) acs Map.empty txList
-    let _, validatedTransactions_ = BlockTemplateBuilder.selectOrderedTransactions chain session blockNumber (timestamp + 100_000UL) acs Map.empty <| List.rev txList
+    let _, validatedTransactions = BlockTemplateBuilder.selectOrderedTransactions chain session blockNumber (timestamp + 100_000UL) acs CGP.empty Map.empty txList
+    let _, validatedTransactions_ = BlockTemplateBuilder.selectOrderedTransactions chain session blockNumber (timestamp + 100_000UL) acs CGP.empty Map.empty <| List.rev txList
 
     List.length validatedTransactions |> should equal 2
     validatedTransactions |> should equal validatedTransactions_
