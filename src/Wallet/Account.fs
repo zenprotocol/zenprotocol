@@ -297,8 +297,8 @@ let addBlock dataAccess session blockHash block =
         |> List.mapi (fun index output -> uint32 index,output)
         |> List.choose (fun (index,output) ->
             match output.lock with
-            | Coinbase (_,pkHash) when (DataAccess.Addresses.contains dataAccess session pkHash) ->
-                Some (pkHash,index,output)
+            | Types.Vote (_,_,pkHash) when (DataAccess.Addresses.contains dataAccess session pkHash) -> Some (pkHash,index,output)
+            | Coinbase (_,pkHash) when (DataAccess.Addresses.contains dataAccess session pkHash) -> Some (pkHash,index,output)
             | PK pkHash when (DataAccess.Addresses.contains dataAccess session pkHash) ->
                 Some (pkHash,index,output)
             | _ -> None)

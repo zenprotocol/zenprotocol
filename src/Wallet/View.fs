@@ -66,6 +66,7 @@ let addMempoolTransaction dataAccess session txHash tx (set, outputs) =
         |> List.choose (fun (index,output) ->
             match output.lock with
             | Coinbase (_,pkHash)
+            | Vote (_,_,pkHash)
             | PK pkHash when (DataAccess.Addresses.contains dataAccess session pkHash) ->
                 Some (pkHash,index,output)
             | _ -> None)
