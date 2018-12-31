@@ -282,7 +282,35 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
         blockReward blockNumber state.tipState.cgp.allocation
         |> requestId.reply
         
+    | GetCGP ->
+        state.tipState.cgp
+        |> requestId.reply<CGP.T>
+    | GetCgpHistory ->
+        let currentInterval = state.tipState.tip.header.blockNumber / chain.intervalLength
+        
+        let getBlockState blockNumber =
+            let rec findBlock (header:ExtendedBlockHeader.T) =
+                if header.header.blockNumber = blockNumber then
+                    BlockRepository.getBlockState session header.hash
+                else
+                    BlockRepository.getHeader session header.header.parent
+                    |> findBlock
 
+            findBlock state.tipState.tip
+        
+        let rec getCGP interval cgpList =
+            if interval = 0ul then
+               cgpList
+            else
+                let blockState:BlockState.T = getBlockState (interval * chain.intervalLength)
+                
+                (blockState.cgp :: cgpList)
+                |> getCGP (interval - 1ul)
+
+        []
+        |> getCGP currentInterval
+        |> requestId.reply<CGP.T list>
+            
     logEndAction timestamp "request" request
 
     ret state

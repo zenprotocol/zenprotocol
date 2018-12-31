@@ -264,6 +264,39 @@ let getUnspentOutputs dataAccess session view confirmations =
     |> List.filter (fun output -> output.status = Unspent && Set.contains output.pkHash spendableAddresses )
     |> List.filter (filterOutputByConfirmations account confirmations)
     |> List.map (fun output -> output.outpoint,{lock=output.lock;spend=output.spend})
+    
+let getVotingUtilization (chainParams : Chain.ChainParameters) dataAccess session view tip =
+    let account = DataAccess.Account.get dataAccess session
+    
+    
+    let unspentOutputs =
+        getUnspentOutputs dataAccess session view 0ul
+        |> List.choose (function (_,output) -> Some output)
+            
+        
+    let utilized =
+        unspentOutputs
+        |>  List.choose (function
+             | { lock = Types.Vote (_,interval,_); spend = spend} when interval >= CGP.getInterval chainParams tip-> Some spend.amount 
+             | _ -> None)
+        |> List.sum  
+        
+    let outstanding =
+        unspentOutputs
+        |> List.choose (function
+                    | { lock = Coinbase (blockNumber,_); spend = spend} when (account.blockNumber + 1ul) - blockNumber >= chainParams.coinbaseMaturity -> Some spend.amount
+                    | { lock = PK _; spend = {amount= amount; asset = asset } } when asset = Asset.Zen -> Some amount
+                    | _ -> None)
+        |> List.sum
+        
+    let voteData =
+        unspentOutputs
+        |> List.choose (function
+            | {lock = Types.Vote (voteData,interval,_); spend = _ } when interval = CGP.getInterval chainParams tip -> Some voteData
+            | _ -> None)
+        |> List.tryHead
+
+    outstanding, utilized, voteData
 
 let addBlock dataAccess session blockHash block =
     let account = DataAccess.Account.get dataAccess session
