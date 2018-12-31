@@ -135,7 +135,7 @@ let ``creating, not enough tokens``() =
 
     let view = View.addMempoolTransaction dataAccess session (Transaction.hash tx) tx View.empty
 
-    let result = TransactionCreator.createTransaction testParameters dataAccess session view password [ { lock = (PK Hash.zero); spend = { asset = Asset.Zen; amount = 11UL } } ]
+    let result = TransactionCreator.createTransaction testParameters dataAccess session view password 0ul [ { lock = (PK Hash.zero); spend = { asset = Asset.Zen; amount = 11UL } } ]
 
     let expected:Result<Transaction,string> = Error "Not enough tokens"
 
@@ -154,7 +154,7 @@ let ``creating, no change``() =
     let bob = View.addMempoolTransaction dataAccess session (Transaction.hash tx) tx View.empty
 
     // sending money to alice
-    let result = TransactionCreator.createTransaction testParameters dataAccess session bob password [ { lock = lockToAlice; spend = { asset = Asset.Zen; amount = 10UL } } ]
+    let result = TransactionCreator.createTransaction testParameters dataAccess session bob password 0ul [ { lock = lockToAlice; spend = { asset = Asset.Zen; amount = 10UL } } ]
 
     match result with
     | Error x -> failwithf "expected transaction %s" x
@@ -176,7 +176,7 @@ let ``creating, with change``() =
     let bob = View.addMempoolTransaction dataAccess session (Transaction.hash tx) tx View.empty
 
     // sending money to alice
-    let result = TransactionCreator.createTransaction testParameters dataAccess session bob password [ { lock = lockToAlice; spend = { asset = Asset.Zen; amount = 7UL } } ]
+    let result = TransactionCreator.createTransaction testParameters dataAccess session bob password 0ul [ { lock = lockToAlice; spend = { asset = Asset.Zen; amount = 7UL } } ]
 
     match result with
     | Error x -> failwithf "expected transaction %s" x
@@ -203,7 +203,7 @@ let ``picking the correct asset``() =
     bob |> balanceShouldBe session Asset.Zen 10UL
 
     // sending money to alice
-    let result = TransactionCreator.createTransaction testParameters dataAccess session bob password [ { lock = lockToAlice; spend = { asset = Asset.Zen; amount = 7UL } } ]
+    let result = TransactionCreator.createTransaction testParameters dataAccess session bob password 0ul [ { lock = lockToAlice; spend = { asset = Asset.Zen; amount = 7UL } } ]
 
     match result with
     | Error x -> failwithf "expected transaction %s" x
@@ -230,7 +230,7 @@ let ``picking from multiple inputs``() =
     let bob = View.addMempoolTransaction dataAccess session (Transaction.hash tx) tx View.empty
 
     // sending money to alice
-    let result = TransactionCreator.createTransaction testParameters dataAccess session bob password [ { lock = lockToAlice; spend = { asset = Asset.Zen; amount = 10UL } } ]
+    let result = TransactionCreator.createTransaction testParameters dataAccess session bob password 0ul [ { lock = lockToAlice; spend = { asset = Asset.Zen; amount = 10UL } } ]
 
     match result with
         | Error x -> failwithf "expected transaction %s" x
@@ -256,7 +256,7 @@ let ``create execute contract transaction``() =
 
     let spends = Map.add Asset.Zen 1UL Map.empty
 
-    let result = TransactionCreator.createExecuteContractTransaction testParameters dataAccess session view executeContract password (ContractId (Version0,Hash.zero)) "" None true None spends
+    let result = TransactionCreator.createExecuteContractTransaction testParameters dataAccess session view executeContract password (ContractId (Version0,Hash.zero)) "" None true None spends 0ul
 
     result |> should be ok
 
@@ -285,7 +285,7 @@ let ``create execute contract transaction without explicitly spending any Zen sh
 
     let spends = Map.empty
 
-    let result = TransactionCreator.createExecuteContractTransaction testParameters dataAccess session view executeContract password (ContractId (Version0,Hash.zero)) "" None true None spends
+    let result = TransactionCreator.createExecuteContractTransaction testParameters dataAccess session view executeContract password (ContractId (Version0,Hash.zero)) "" None true None spends 0ul
 
     result |> should be ok
 
@@ -531,7 +531,7 @@ let ``wallet won't spend coinbase if not mature enough``() =
 
     let expected: Result<Transaction,string>= Error "Not enough tokens"
 
-    TransactionCreator.createTransaction testParameters dataAccess session view password [ { lock = (PK accountPKHash); spend = { asset = Asset.Zen; amount = 1UL } } ]
+    TransactionCreator.createTransaction testParameters dataAccess session view password 0ul [ { lock = (PK accountPKHash); spend = { asset = Asset.Zen; amount = 1UL } } ]
     |> should equal expected
 
 [<Test>]
@@ -556,7 +556,7 @@ let ``wallet spend coinbase with coinbase mature enough``() =
 
     let view = View.addMempoolTransaction dataAccess session originHash origin View.empty
 
-    TransactionCreator.createTransaction testParameters dataAccess session view password [ { lock = (PK accountPKHash); spend = { asset = Asset.Zen; amount = 1UL } } ]
+    TransactionCreator.createTransaction testParameters dataAccess session view password 0ul [ { lock = (PK accountPKHash); spend = { asset = Asset.Zen; amount = 1UL } } ]
     |> should be ok
 
 [<Test>]
@@ -591,7 +591,7 @@ let ``wallet spend coinbase when come from block``() =
 
     Account.addBlock dataAccess session (Block.hash block.header) block
 
-    TransactionCreator.createTransaction testParameters dataAccess session View.empty password [ { lock = (PK accountPKHash); spend = { asset = Asset.Zen; amount = 1UL } } ]
+    TransactionCreator.createTransaction testParameters dataAccess session View.empty password 0ul [ { lock = (PK accountPKHash); spend = { asset = Asset.Zen; amount = 1UL } } ]
     |> should be ok
 
 [<Test>]
@@ -698,7 +698,7 @@ let ``sign contract wintess``() =
 
     let spends = Map.add Asset.Zen 1UL Map.empty
 
-    let result = TransactionCreator.createExecuteContractTransaction testParameters dataAccess session view executeContract password (ContractId (Version0,Hash.zero)) "" None true (Some "m/0'") spends
+    let result = TransactionCreator.createExecuteContractTransaction testParameters dataAccess session view executeContract password (ContractId (Version0,Hash.zero)) "" None true (Some "m/0'") spends 0ul
 
     result |> should be ok
 
@@ -770,7 +770,7 @@ let ``creating and signing raw transaction``() =
 
     // sending money to alice
     let raw =
-        TransactionCreator.createRawTransaction testParameters dataAccess session bob None [ { lock = lockToAlice; spend = { asset = Asset.Zen; amount = 7UL } } ]
+        TransactionCreator.createRawTransaction testParameters dataAccess session bob None 0ul [ { lock = lockToAlice; spend = { asset = Asset.Zen; amount = 7UL } } ]
         |> Result.bind (TransactionCreator.signRawTransaction dataAccess session password)
 
     match raw with
