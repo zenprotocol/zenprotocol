@@ -255,8 +255,13 @@ let getBalance dataAccess session view confirmations =
 
 let getUnspentOutputs dataAccess session view confirmations =
     let account = DataAccess.Account.get dataAccess session
-
+    let spendableAddresses =
+        DataAccess.Addresses.getAll dataAccess session
+        |> List.filter (fun address -> address.addressType <> WatchOnly) // Both payment and change addresses
+        |> List.map (fun address -> address.pkHash)
+        |> Set.ofList
     View.Outputs.getAll view dataAccess session
+    |> List.filter (fun output -> output.status = Unspent && Set.contains output.pkHash spendableAddresses )
     |> List.filter (filterOutputByConfirmations account confirmations)
     |> List.map (fun output -> output.outpoint,{lock=output.lock;spend=output.spend})
 
@@ -500,5 +505,9 @@ let getHistory dataAccess session view skip take =
     |> List.map (fun (txHash,direction,spend,confirmations,_) -> txHash,direction,spend,confirmations)
     
 let getTransactionCount dataAccess session view =
-    List.length (View.Outputs.getAll view dataAccess session)
+    let account = DataAccess.Account.get dataAccess session
+
+    View.Outputs.getAll view dataAccess session
+    |> getOutputsInfo account.blockNumber
+    |> List.length
     
