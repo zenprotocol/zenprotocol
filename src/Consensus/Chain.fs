@@ -36,7 +36,7 @@ let mainParameters =
         genesisTime= new System.DateTime(2018,6,30,17,0,0,System.DateTimeKind.Utc) |> Infrastructure.Timestamp.fromDateTime // 1530378000000UL
         networkId=1000ul
         contractSacrificePerBytePerBlock=ContractSacrificePerBytePerBlock
-        versionExpiry= new System.DateTime(2019,2,1,0,0,0,System.DateTimeKind.Utc) |> Infrastructure.Timestamp.fromDateTime
+        versionExpiry= new System.DateTime(2019,8,1,0,0,0,System.DateTimeKind.Utc) |> Infrastructure.Timestamp.fromDateTime
     }
 
 let testParameters =
@@ -48,13 +48,13 @@ let testParameters =
         maxBlockWeight=1000_000_000I;
         sacrificePerByteBlock=1UL;
         genesisHashHash =
-            Hash.fromString "dc17b6963cb60a4766374d26740e48520ef8c925a1f04767619d53b4832b45bb"
+            Hash.fromString "5488069e4be0551a3c886543845c332633731c536853209c2dbe04c035946490"
             |> get
             |> Hash.computeOfHash
         genesisTime=1535968146719UL
-        networkId=2015ul
+        networkId=2016ul
         contractSacrificePerBytePerBlock=ContractSacrificePerBytePerBlock
-        versionExpiry= new System.DateTime(2200,1,1,0,0,0,System.DateTimeKind.Utc) |> Infrastructure.Timestamp.fromDateTime
+        versionExpiry=new System.DateTime(2200,1,1,0,0,0,System.DateTimeKind.Utc) |> Infrastructure.Timestamp.fromDateTime
     }
 
 let localGenesisHash = Hash.fromString "6d678ab961c8b47046da8d19c0de5be07eb0fe1e1e82ad9a5b32145b5d4811c7" |> get
