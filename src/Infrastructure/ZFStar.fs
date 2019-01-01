@@ -111,6 +111,34 @@ let initOutputDir moduleName =
     Directory.CreateDirectory oDir |> ignore
     oDir, oDir / moduleName
 
+
+let compatibilityFiles: Set<string> = Set.ofList [
+    "Zca055cc0af4d25ea1c8bbbf41444aadd68a168558397516b2f64727d87e72f97"
+    "Z112c1053b7713506aa8f00d643b19b1a67f29e345f9be6c8f3ad569e57426c86"
+    "Z60c9dc79adf6d6d5caf812a18e87e31b757ea2ebca4dba385ef8e3fc220760a6"
+    "Z108782fb49e44169ac3c3307841457e6332e2372cdccaa4ede6b41b57265d18e"
+    "Z4edb5daa76c613abbfa3294399f63490dafeef38d7284e5ef34f15f8d1e488b7"
+    "Za5094510fe0377146e07c34f7abc3109e81c05d62cd350ec00ca8c83e8926a72"
+
+    "Zf24db32aa1881956646d3ccbb647df71455de10cf98b635810e8870906a56b63"
+    "Zc59702cbb376b1ec097ba870eaa6e7eb304bc5889b7dcc7fa96e1fe3ef193f24"
+    "Zcfcfe6bba6775dd01b3b11f0d2b03b134ed678b75468d221866bf030f679118a"
+    "Z4a6784d03d556eb3b8051a16b0d84cb103f1de3c70e28ac2ef46c9cec5fc8ddd"
+    "Zd1951c95130928b1362db63cf712b99923cfe581f646af0a25c89bdadf4b2c8d"
+    "Z48ca75a61f391e77fb3142cb96d7bfd91f9c0151ff66b2a46c1ecce0033f066b"
+    "Z2f7ca11c62a0b30f3c57b1e37c1d4e13af5a876995dcc5c12a25bcad8058fee0"
+    "Zda0181b484e8e516dd288f4bcf3ea2db195452586de5c0364cfa0e8f4a732a8f"
+    "Z30b0e9de06f6b39efb3c4817e598fcab7de46f88bfdd2f3592fc0dca7f00f12f"
+    "Z2bd5c8f08ea6d7546eb892e535950fb1946a1af4d2765b9d58b9f96f8faaf760"
+    "Z12c3cbce97fbcea65cc1b89cbc9cb26566401e5f7b54d045648818c1234b4ee7"
+    "Z8a5f28e5d9175866b8b2f3e296400794b226e13572a73f95ed2461ac943b283d"
+    "Z5b8fbf5f70a8d7b46f2601794d2b16f1d9c009de526a80ffc44266b4c9fddc7e"
+    "Zd620b00ab006aece5d1eb6b390d9af9801943e41954f320510804beb7e67ef23"
+    "Zc2486d73b824f4412a819171d9e9f576f0c00fcdd1701759b9d54b1f22ffecfc"
+    "Zc94b79e9393cbdff85861706fdbc9048adef4eef888c509269ecc26afe7637da"
+    "Z504c9782738628e03ef347f9f094b214cea0fa12d49e3927743a849caaeb09e2"
+]
+
 let private extract code hints limits rlimit moduleName =
     let oDir, file = initOutputDir moduleName
     let originalFile = changeExtention ".orig.fst" file
@@ -141,6 +169,9 @@ let private extract code hints limits rlimit moduleName =
                 "--max_fuel"; maxFuel.ToString()
                 "--max_ifuel"; maxIFuel.ToString()
                 "--z3rlimit"; rlimit.ToString()
+                begin if Set.contains moduleName compatibilityFiles
+                      then "--lax"
+                      else "" end
                 ]
             |> wrapFStar "extract" extractedFile)
     finally
@@ -206,8 +237,9 @@ let recordHints code moduleName =
         elaborate originalFile elaboratedFile
         |> Result.bind (fun _ ->
             fstar oDir elaboratedFile [
-                 "--z3rlimit";(2723280u * 2u).ToString()
+                 "--z3rlimit";(2723280u * 4u).ToString()
                  "--use_cached_modules"
+                 "--use_hints"
                  "--record_hints"
                  ]
             |> wrapFStar "record hints" hintsFile)
