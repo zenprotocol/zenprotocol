@@ -75,48 +75,6 @@
     <Compile Include="TransactionValidation.fs" />
     <Compile Include="Block.fs" />
     <Compile Include="BlockHeader.fs" />
-    <Content Include="compatibility\v0_contract_hints\Z0000000012c3cbce97fbcea65cc1b89cbc9cb26566401e5f7b54d045648818c1234b4ee7">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="compatibility\v0_contract_hints\Z000000002bd5c8f08ea6d7546eb892e535950fb1946a1af4d2765b9d58b9f96f8faaf760">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="compatibility\v0_contract_hints\Z000000002f7ca11c62a0b30f3c57b1e37c1d4e13af5a876995dcc5c12a25bcad8058fee0">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="compatibility\v0_contract_hints\Z0000000030b0e9de06f6b39efb3c4817e598fcab7de46f88bfdd2f3592fc0dca7f00f12f">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="compatibility\v0_contract_hints\Z0000000048ca75a61f391e77fb3142cb96d7bfd91f9c0151ff66b2a46c1ecce0033f066b">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="compatibility\v0_contract_hints\Z000000004a6784d03d556eb3b8051a16b0d84cb103f1de3c70e28ac2ef46c9cec5fc8ddd">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="compatibility\v0_contract_hints\Z000000005b8fbf5f70a8d7b46f2601794d2b16f1d9c009de526a80ffc44266b4c9fddc7e">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="compatibility\v0_contract_hints\Z000000008a5f28e5d9175866b8b2f3e296400794b226e13572a73f95ed2461ac943b283d">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="compatibility\v0_contract_hints\Z00000000c59702cbb376b1ec097ba870eaa6e7eb304bc5889b7dcc7fa96e1fe3ef193f24">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="compatibility\v0_contract_hints\Z00000000cfcfe6bba6775dd01b3b11f0d2b03b134ed678b75468d221866bf030f679118a">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="compatibility\v0_contract_hints\Z00000000d1951c95130928b1362db63cf712b99923cfe581f646af0a25c89bdadf4b2c8d">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="compatibility\v0_contract_hints\Z00000000d620b00ab006aece5d1eb6b390d9af9801943e41954f320510804beb7e67ef23">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="compatibility\v0_contract_hints\Z00000000da0181b484e8e516dd288f4bcf3ea2db195452586de5c0364cfa0e8f4a732a8f">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="compatibility\v0_contract_hints\Z00000000f24db32aa1881956646d3ccbb647df71455de10cf98b635810e8870906a56b63">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Content Include="Consensus.fsproj.paket.template" />
     <Content Include="paket.references" />
     <ProjectReference Include="..\Infrastructure\Infrastructure.fsproj">
