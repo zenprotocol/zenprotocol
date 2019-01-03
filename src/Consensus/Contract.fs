@@ -1,5 +1,6 @@
 module Consensus.Contract
 
+open Consensus
 open Microsoft.FSharp.Core
 open System.Reflection
 open System.Text
@@ -78,15 +79,6 @@ with
 
 type T = Contract
 
-let compatibilityPath = 
-    (Platform.workingDirectory, "compatibility", "v0_contract_hints")
-    |> Path.Combine
-
-let compatibilityFiles = 
-    compatibilityPath
-    |> Directory.GetFiles
-    |> Array.map Path.GetFileName
-
 let private getMainFunction assembly =
     try
         let getProperty name =
@@ -164,31 +156,20 @@ let getFunctions assembly =
         wrapMainFn mainFn, wrapCostFn costFn
         )
 
-let compile (contractsPath:string)
-            (contract:ContractV0) =
-    let hash = computeHash Version0 contract.code
-
-    let contractId = ContractId (Version0,hash)
-
-    let hints =
-        match Array.tryFind ((=) (sprintf "Z%s" contractId.AsString)) compatibilityFiles with
-        | Some file -> 
-            (compatibilityPath, file)
-            |> Path.Combine
-            |> File.ReadAllText
-        | None -> 
-            contract.hints
-
-    hash
-    |> getModuleName
-    |> ZFStar.compile contractsPath contract.code hints contract.rlimit
-    |> Result.map (fun _ -> contractId)
-
 let recordHints (code:string) : Result<string, string> =
     code
     |> computeHash Version0
     |> getModuleName
     |> ZFStar.recordHints code
+
+let compile (contractsPath:string)
+            (contract:ContractV0) =
+    let hash = computeHash Version0 contract.code
+    let contractId = ContractId (Version0,hash)
+    let moduleName = getModuleName hash
+
+    ZFStar.compile contractsPath contract.code contract.hints contract.rlimit moduleName
+    |> Result.map (fun _ -> contractId)
 
 let getCost contract = contract.costFn
 
