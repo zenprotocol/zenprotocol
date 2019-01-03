@@ -128,6 +128,7 @@ let main argv =
     if List.contains Test (results.GetAllResults()) then
         config.Load("test.yaml")
     else
+        System.Environment.FailFast("not supported", null)
         config.Load("main.yaml")
 
     List.iter (fun arg ->
