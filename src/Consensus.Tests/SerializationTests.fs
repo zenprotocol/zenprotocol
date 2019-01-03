@@ -294,12 +294,45 @@ let ``Raw transactions equal extended transactions``(NonEmptyTransactions txs) =
 
     result
 
-let checkSize sizeFn write value =
+let checkSize sizeFn writeFn value =
     let size = sizeFn value
     let stream = Stream(Array.zeroCreate size)
-    write stream value
+    writeFn stream value
 
     stream.Offset = size
+
+let checkRoundtrip sizeFn writeFn readFn value =
+    let size = sizeFn value
+    let stream = Stream(Array.zeroCreate size)
+    writeFn stream value
+
+    readFn (Stream(stream.Buffer)) = value
+
+open Serialization
+
+[<Property>]
+let ``CGP wrote equal to Data.size``(data:CGP.T) =
+    checkSize CGP.size CGP.write data
+
+[<Property>]
+let ``Tally wrote equal to Data.size``(data:Tally.T) =
+    checkSize CGP.Tally.size CGP.Tally.write data
+
+[<Property>]
+let ``Lock wrote equal to Data.size``(data:VoteData) =
+    checkSize VoteData.size VoteData.write data
+
+[<Property>]
+let ``CGP serialization round trip produces same result``(data:CGP.T) =
+    checkRoundtrip CGP.size CGP.write CGP.read data
+
+[<Property>]
+let ``Tally serialization round trip produces same result``(data:Tally.T) =
+    checkRoundtrip CGP.Tally.size CGP.Tally.write CGP.Tally.read data
+
+[<Property>]
+let ``Lock serialization round trip produces same result``(data:VoteData) =
+    checkRoundtrip VoteData.size VoteData.write VoteData.read data
 
 [<Property>]
 let ``Data amount wrote equal to Data.size``(data:data) =

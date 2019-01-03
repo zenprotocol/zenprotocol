@@ -23,11 +23,11 @@ open Consensus.Tests.SampleContract
 open TestsInfrastructure.Constraints
 open Helper
 
-let chain = Chain.getChainParameters Chain.Local
+let chainParams = Chain.getChainParameters Chain.Local
 // Helper functions for the tests
 let getStringBytes (str : string) = System.Text.Encoding.UTF8.GetBytes str
 let createTransaction address amount account =
-    match TestWallet.createTransaction address { asset = Asset.Zen; amount = amount } account with
+    match TestWallet.createTransaction chainParams address { asset = Asset.Zen; amount = amount } account with
     | Result.Ok tx -> tx
     | Result.Error error -> failwith error
 let getTxOutpoints txHash tx = [ for i in 0 .. List.length tx.outputs - 1 -> {txHash=txHash;index= uint32 i} ]
@@ -63,7 +63,8 @@ let state = {
         {
             tip = ExtendedBlockHeader.empty
             activeContractSet = acs
-            ema=EMA.create chain
+            ema = EMA.create chainParams
+            cgp = CGP.empty
     }
     initialBlockDownload = InitialBlockDownload.Inactive
     headers=0ul
@@ -73,7 +74,7 @@ let state = {
 let ``valid transaction raise events and update state``() =
     use databaseContext = DatabaseContext.createTemporary "test"
     use session = DatabaseContext.createSession databaseContext
-    let result = Handler.handleCommand chain (ValidateTransaction <| Transaction.toExtended tx) session 1UL state
+    let result = Handler.handleCommand chainParams (ValidateTransaction <| Transaction.toExtended tx) session 1UL state
 
     let events, state' = Writer.unwrap result
 
@@ -97,7 +98,7 @@ let ``Invalid tx doesn't raise events or update state``() =
     use session = DatabaseContext.createSession databaseContext
     let invalidTx = {version=Version0;inputs=[];outputs=[];witnesses=[];contract=None}
 
-    let result = Handler.handleCommand chain (ValidateTransaction <| Transaction.toExtended invalidTx) session 1UL state
+    let result = Handler.handleCommand chainParams (ValidateTransaction <| Transaction.toExtended invalidTx) session 1UL state
 
     let events, state' = Writer.unwrap result
 
@@ -118,7 +119,7 @@ let ``tx already in mempool nothing happen`` () =
     use databaseContext = DatabaseContext.createTemporary "test"
 
     use session = DatabaseContext.createSession databaseContext
-    let result = Handler.handleCommand chain (ValidateTransaction rootTxExtended) session 1UL state
+    let result = Handler.handleCommand chainParams (ValidateTransaction rootTxExtended) session 1UL state
 
     let events, state' = Writer.unwrap result
 
@@ -137,7 +138,7 @@ let ``orphan tx added to orphan list``() =
     let utxoSet = UtxoSet.asDatabase
     let state = {state with memoryState={state.memoryState with utxoSet=utxoSet}}
 
-    let result = Handler.handleCommand chain (ValidateTransaction <| Transaction.toExtended tx) session 1UL state
+    let result = Handler.handleCommand chainParams (ValidateTransaction <| Transaction.toExtended tx) session 1UL state
 
     let events, state' = Writer.unwrap result
 
@@ -170,7 +171,7 @@ let ``origin tx hit mempool, orphan tx should be added to mempool``() =
     let tx2Hash = Transaction.hash tx2
 
     // Sending orphan transaction first, which should be added to orphan list
-    let result = Handler.handleCommand chain (ValidateTransaction <| Transaction.toExtended tx2) session 1UL state
+    let result = Handler.handleCommand chainParams (ValidateTransaction <| Transaction.toExtended tx2) session 1UL state
     let events, state' = Writer.unwrap result
 
     // Checking that the transaction is only in the mempool and no event were raised
@@ -180,7 +181,7 @@ let ``origin tx hit mempool, orphan tx should be added to mempool``() =
     OrphanPool.containsTransaction tx2Hash state'.memoryState.orphanPool |> should equal true
 
     // Sending origin, which should cause both transaction to be added to the mempool
-    let result' = Handler.handleCommand chain (ValidateTransaction <| Transaction.toExtended tx1) session 1UL state'
+    let result' = Handler.handleCommand chainParams (ValidateTransaction <| Transaction.toExtended tx1) session 1UL state'
     let events', state'' = Writer.unwrap result'
 
     // Checking that both transaction added to mempool and published
@@ -219,7 +220,7 @@ let ``orphan transaction is eventually invalid``() =
     let tx2Hash = Transaction.hash tx2
 
     // Sending orphan transaction first, which should be added to orphan list
-    let result = Handler.handleCommand chain (ValidateTransaction <| Transaction.toExtended tx2) session 1UL state
+    let result = Handler.handleCommand chainParams (ValidateTransaction <| Transaction.toExtended tx2) session 1UL state
     let events, state' = Writer.unwrap result
 
     // Checking that the transaction is only in the mempool and no event were raised
@@ -229,7 +230,7 @@ let ``orphan transaction is eventually invalid``() =
     OrphanPool.containsTransaction tx2Hash state'.memoryState.orphanPool |> should equal true
 
      // Sending origin, which should cause orphan transaction to be rejected and removed from orphan list
-    let result' = Handler.handleCommand chain (ValidateTransaction <| Transaction.toExtended tx1) session 1UL state'
+    let result' = Handler.handleCommand chainParams (ValidateTransaction <| Transaction.toExtended tx1) session 1UL state'
     let events', state'' = Writer.unwrap result'
 
     // Checking that the origin tx is published and orphan removed as invalid
@@ -269,9 +270,9 @@ let ``two orphan transaction spending same input``() =
 
     // Sending both tx2 and tx3, both should be added to orphan pool
     let result =
-        Handler.handleCommand chain (ValidateTransaction <| Transaction.toExtended tx2) session 1UL state
+        Handler.handleCommand chainParams (ValidateTransaction <| Transaction.toExtended tx2) session 1UL state
         >>=
-        Handler.handleCommand chain (ValidateTransaction <| Transaction.toExtended tx3) session 1UL
+        Handler.handleCommand chainParams (ValidateTransaction <| Transaction.toExtended tx3) session 1UL
 
     let events, state' = Writer.unwrap result
 
@@ -285,7 +286,7 @@ let ``two orphan transaction spending same input``() =
     OrphanPool.containsTransaction tx3Hash state'.memoryState.orphanPool |> should equal true
 
     // Sending origin, which should pick one of the transactions (we cannot know which one, for now at least)
-    let result' = Handler.handleCommand chain (ValidateTransaction <| Transaction.toExtended tx1) session 1UL state'
+    let result' = Handler.handleCommand chainParams (ValidateTransaction <| Transaction.toExtended tx1) session 1UL state'
     let events', state'' = Writer.unwrap result'
 
     // Checking that both transaction added to mempool and published
@@ -313,7 +314,7 @@ let ``Valid contract should be added to ActiveContractSet``() =
 
     let tx =
         let txResult = Result.bind (fun cWithId ->
-            TestWallet.createActivationTransactionFromContract chain cWithId 1ul rootAccount) contractWithId
+            TestWallet.createActivationTransactionFromContract chainParams cWithId 1ul rootAccount) contractWithId
         match txResult with
             | Result.Ok tx ->
                 tx
@@ -323,7 +324,7 @@ let ``Valid contract should be added to ActiveContractSet``() =
     let txHash = Transaction.hash tx
 
     let result =
-        Handler.handleCommand chain (ValidateTransaction <| Transaction.toExtended tx) session 1UL state
+        Handler.handleCommand chainParams (ValidateTransaction <| Transaction.toExtended tx) session 1UL state
 
     let events, state' = Writer.unwrap result
 
@@ -359,7 +360,7 @@ let ``Invalid contract should not be added to ActiveContractSet or mempool``() =
     let txHash = Transaction.hash tx
 
     let result =
-        Handler.handleCommand chain (ValidateTransaction <| Transaction.toExtended tx) session 1UL state
+        Handler.handleCommand chainParams (ValidateTransaction <| Transaction.toExtended tx) session 1UL state
 
     let events, state' = Writer.unwrap result
 
@@ -389,14 +390,14 @@ let ``contract activation arrived, running orphan transaction``() =
     let account = createTestAccount()
 
     let activationTransaction =
-        TestWallet.createActivationTransactionFromContract chain contractWithId 1ul account
+        TestWallet.createActivationTransactionFromContract chainParams contractWithId 1ul account
         |> getResult
     let activationTxHash = Transaction.hash activationTransaction
 
     let state = { state with memoryState = { state.memoryState with utxoSet = getSampleUtxoset utxoSet } }
 
     let _, stateWithContract =
-        Handler.handleCommand chain (ValidateTransaction <| Transaction.toExtended activationTransaction) session 1UL state
+        Handler.handleCommand chainParams (ValidateTransaction <| Transaction.toExtended activationTransaction) session 1UL state
         |> Writer.unwrap
 
     let txHash,tx =
@@ -410,14 +411,14 @@ let ``contract activation arrived, running orphan transaction``() =
         txHash, { tx with witnesses = pkWitness :: tx.witnesses }
 
     let events, state =
-        Handler.handleCommand chain (ValidateTransaction <| Transaction.toExtended tx) session 1UL state
+        Handler.handleCommand chainParams (ValidateTransaction <| Transaction.toExtended tx) session 1UL state
         |> Writer.unwrap
 
     events |> should haveLength 0
     OrphanPool.containsTransaction txHash state.memoryState.orphanPool |> should equal true
 
     let events, state =
-        Handler.handleCommand chain (ValidateTransaction <| Transaction.toExtended activationTransaction) session 1UL state
+        Handler.handleCommand chainParams (ValidateTransaction <| Transaction.toExtended activationTransaction) session 1UL state
         |> Writer.unwrap
 
     events |> should haveLength 2
@@ -452,13 +453,14 @@ let ``Transaction already in db but not part of the main chain``() =
             txMerkleRoot = Hash.zero
             activeContractSetMerkleRoot = Hash.zero
             witnessMerkleRoot = Hash.zero
+            cgpCommitment = None
             commitments = []
         }
 
     Collection.put session.context.blocks session.session extendedHeader.hash extendedHeader
     MultiCollection.put session.context.transactionBlocks session.session txHash extendedHeader.hash
 
-    let result = Handler.handleCommand chain (ValidateTransaction <| Transaction.toExtended tx) session 1UL state
+    let result = Handler.handleCommand chainParams (ValidateTransaction <| Transaction.toExtended tx) session 1UL state
 
     let events, state' = Writer.unwrap result
 
@@ -500,13 +502,14 @@ let ``Transaction already in db and part of the main chain is ignored``() =
             txMerkleRoot = Hash.zero
             activeContractSetMerkleRoot = Hash.zero
             witnessMerkleRoot = Hash.zero
+            cgpCommitment = None
             commitments = []
         }
 
     Collection.put session.context.blocks session.session extendedHeader.hash extendedHeader
     MultiCollection.put session.context.transactionBlocks session.session txHash extendedHeader.hash
 
-    let result = Handler.handleCommand chain (ValidateTransaction <| Transaction.toExtended tx) session 1UL state
+    let result = Handler.handleCommand chainParams (ValidateTransaction <| Transaction.toExtended tx) session 1UL state
 
     let events, state' = Writer.unwrap result
 

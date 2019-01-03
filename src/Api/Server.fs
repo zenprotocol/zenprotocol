@@ -16,7 +16,6 @@ open Consensus.Crypto
 open Logary.Message
 open Api.Helpers
 open FSharp.Data
-open Hopac.Extensions.Seq
 open FsBech32
 open Hash
 open Wallet
@@ -338,6 +337,20 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
             |> handleTxResult
         | Error error ->
             replyError error
+    | Post ("/wallet/vote/allocation", Some body) ->
+        match parseVoteAllocationJson body with
+        | Ok (allocation, password) ->
+            Wallet.createVoteTransaction client true allocation password
+            |> handleTxResult
+        | Error error ->
+            replyError error
+    | Post ("/wallet/vote/payout", Some body) ->
+        match parseVotePayoutJson chain body with
+        | Ok (payout, password) ->
+            Wallet.createVoteTransaction client true payout password
+            |> handleTxResult
+        | Error error ->
+            replyError error
     | Post ("/wallet/rawtransaction/create", Some body) ->
         match parseCreateRawTransactionJson chain body with
         | Ok outputs ->
@@ -442,6 +455,20 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
     | Post ("/wallet/resync", _) ->
         Wallet.resyncAccount client
         reply StatusCode.OK NoContent
+    | Get ("/blockchain/cgp", _) ->
+        let cgp = Blockchain.getCgp client
+        reply StatusCode.OK (JsonContent <| (cgpEncoder chain cgp))
+    | Get ("/blockchain/cgp/history", _) ->
+        let cgp = Blockchain.getCgpHistory client
+        reply StatusCode.OK (JsonContent <| (cgpHistoryEncoder chain cgp))
+    | Get ("/wallet/vote", _) ->
+        match Wallet.getVoteUtilization client with
+        | Ok (outstanding ,utilized, voteData) ->
+            voteUtilizationEncoder chain outstanding utilized voteData
+            |> JsonContent
+            |> reply StatusCode.OK
+        | Error error ->
+            replyError error
     | Post ("/blockchain/publishblock", Some body) ->
         match parsePublishBlockJson body with
         | Error error ->
@@ -641,7 +668,7 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
         | Some blockNumber ->
             let success,blockNumber = System.UInt32.TryParse blockNumber
             if success then
-                Block.blockReward blockNumber
+                Blockchain.getBlockReward client blockNumber
                 |> decimal
                 |> JsonValue.Number
                 |> JsonContent

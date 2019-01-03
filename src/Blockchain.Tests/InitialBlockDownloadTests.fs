@@ -133,6 +133,7 @@ let ``processing headers, all block in db``() =
             txMerkleRoot = Hash.zero;
             witnessMerkleRoot=Hash.zero;
             activeContractSetMerkleRoot=Hash.zero;
+            cgpCommitment=None
             commitments=[]
             transactions=[]
         }
@@ -326,6 +327,7 @@ let ``getting headers from genesis``() =
             txMerkleRoot = Hash.zero;
             witnessMerkleRoot=Hash.zero;
             activeContractSetMerkleRoot=Hash.zero;
+            cgpCommitment=None
             commitments=[]
             transactions=[]
         }
@@ -356,6 +358,7 @@ let ``getting headers from unknown hash``() =
             txMerkleRoot = Hash.zero;
             witnessMerkleRoot=Hash.zero;
             activeContractSetMerkleRoot=Hash.zero;
+            cgpCommitment=None
             commitments=[]
             transactions=[]
         }
@@ -386,6 +389,7 @@ let ``getting headers from none main chain hash``() =
             txMerkleRoot = Hash.zero;
             witnessMerkleRoot=Hash.zero;
             activeContractSetMerkleRoot=Hash.zero;
+            cgpCommitment=None
             commitments=[]
             transactions=[]
         }
@@ -398,6 +402,7 @@ let ``getting headers from none main chain hash``() =
         txMerkleRoot = Hash.zero;
         witnessMerkleRoot=Hash.zero;
         activeContractSetMerkleRoot=Hash.zero;
+        cgpCommitment=None
         commitments=[]
         transactions=[]
     }
@@ -429,6 +434,7 @@ let ``getting headers from middle``() =
             txMerkleRoot = Hash.zero;
             witnessMerkleRoot=Hash.zero;
             activeContractSetMerkleRoot=Hash.zero;
+            cgpCommitment=None
             commitments=[]
             transactions=[]
         }
@@ -459,6 +465,7 @@ let ``getting headers from multiple hashes``() =
             txMerkleRoot = Hash.zero;
             witnessMerkleRoot=Hash.zero;
             activeContractSetMerkleRoot=Hash.zero;
+            cgpCommitment=None
             commitments=[]
             transactions=[]
         }
@@ -471,6 +478,7 @@ let ``getting headers from multiple hashes``() =
         txMerkleRoot = Hash.zero;
         witnessMerkleRoot=Hash.zero;
         activeContractSetMerkleRoot=Hash.zero;
+        cgpCommitment=None
         commitments=[]
         transactions=[]
     }

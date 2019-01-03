@@ -7,11 +7,9 @@ open Zen.Types.Data
 open Infrastructure
 open FsBech32
 
-[<LiteralAttribute>]
-let CoinbaseMaturity = 100ul
-
 [<Literal>]
 let Version0 = 0ul
+let Version1 = 1ul
 
 type Outpoint = {
     txHash: Hash
@@ -52,6 +50,16 @@ type Input =
     | Outpoint of Outpoint
     | Mint of Spend
 
+type Recipient =
+    | PKRecipient of Hash
+    | ContractRecipient of ContractId
+
+type VoteData =
+    {
+        allocation: Option<byte>
+        payout: Option<Recipient * uint64>
+    }
+
 type Lock =
     | PK of Hash
     | Contract of ContractId
@@ -61,6 +69,7 @@ type Lock =
     | ExtensionSacrifice of ContractId
     | Destroy
     | HighVLock of identifier:uint32 * byte[]
+    | Vote of VoteData * interval:uint32 * pkhash:Hash
 
 type Output = {
     lock: Lock
@@ -163,12 +172,16 @@ type Block = {
     txMerkleRoot: Hash.Hash
     witnessMerkleRoot: Hash.Hash
     activeContractSetMerkleRoot: Hash.Hash
+    cgpCommitment: Hash.Hash option
     commitments: Hash.Hash list
     transactions: TransactionExtended list
-}
+} with
+    static member createCommitments txMerkleRoot witnessMerkleRoot acsMerkleRoot cgpCommitment rest =
+        [ txMerkleRoot; witnessMerkleRoot; acsMerkleRoot ] 
+        @ match cgpCommitment with | Some cgpCommitment -> [ cgpCommitment ] | None -> []
+        @ rest
 
 let Anonymous = Zen.Types.Main.Anonymous
 let ContractSender (ContractId (version, Hash.Hash cHash)) = Zen.Types.Main.Contract (version,cHash)
 let PKSender (Crypto.PublicKey publicKey) = Zen.Types.Main.PK publicKey
 type ContractContext = {blockNumber: uint32; timestamp: uint64}
-

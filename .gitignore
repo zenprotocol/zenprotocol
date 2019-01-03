@@ -341,3 +341,4 @@ data/
 package/*.tgz
 
 src/Consensus.Features.Tests/*.cs
+src/Consensus.Features.Tests/test-contracts/*

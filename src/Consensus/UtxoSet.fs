@@ -16,18 +16,22 @@ type T = Map<Outpoint, OutputStatus>
 /// Means that the utxoset is equal to the persisted utxoset
 let asDatabase = Map.empty
 
-let get getUTXO outpoint set =
+let get getUTXO set outpoint =
     match Map.tryFind outpoint set with
         | Some x-> x
         | None -> getUTXO outpoint
 
+let getOutput getUTXO set outpoint = 
+    get getUTXO set outpoint
+    |> function
+    | Unspent output -> output
+    | NoOutput 
+    | Spent _ ->
+        failwith "Expected output to be unspent"
+
 let handleTransaction getUTXO txHash tx set =
     let folder state input =
-        match get getUTXO input state with
-        | Unspent output -> Map.add input (Spent output) state
-        | NoOutput 
-        | Spent _ ->
-            failwith "Expected output to be unspent"
+        Map.add input (Spent <| getOutput getUTXO state input) state
 
     let outputsWithIndex = List.mapi (fun i output -> (uint32 i,output)) tx.outputs
 
@@ -54,7 +58,7 @@ let private fromOutputStatus status =
     | NoOutput -> None
 
 let tryGetOutput getUTXO utxoSet outpoint =
-    let status = get getUTXO outpoint utxoSet
+    let status = get getUTXO utxoSet outpoint
     fromOutputStatus status
 
 let tryGetOutputs getUTXO utxoSet inputs =
@@ -68,7 +72,7 @@ let getUtxosResult getUTXO inputs utxoSet =
     |> List.choose (function | Outpoint outpoint -> Some outpoint | Mint _ -> None)
     |> Result.traverseResultA
         (fun outpoint ->
-            match get getUTXO outpoint utxoSet with
+            match get getUTXO utxoSet outpoint with
             | Unspent output -> Ok output
             | err -> Error [err])
 
@@ -85,7 +89,7 @@ let undoBlock getUTXO block utxoSet =
             ex.tx.inputs
             |> List.choose (function | Outpoint outpoint -> Some outpoint | Mint _ -> None)
             |> List.fold (fun utxoSet input ->
-                match get getUTXO input utxoSet with
+                match get getUTXO utxoSet input with
                 | Spent output ->
                     Map.add input (Unspent output) utxoSet
                 | NoOutput
