@@ -286,6 +286,7 @@ let getVotingUtilization (chainParams : Chain.ChainParameters) dataAccess sessio
         |> List.choose (function
                     | { lock = Coinbase (blockNumber,_); spend = spend} when (account.blockNumber + 1ul) - blockNumber >= chainParams.coinbaseMaturity -> Some spend.amount
                     | { lock = PK _; spend = {amount= amount; asset = asset } } when asset = Asset.Zen -> Some amount
+                    | { lock = Types.Vote (_,interval,_); spend = spend } when interval < CGP.getInterval chainParams tip -> Some spend.amount 
                     | _ -> None)
         |> List.sum
         
