@@ -147,8 +147,8 @@ let main argv =
         | Test -> port <- 31567us
 #if DEBUG
         | Local idx -> port <- 20000us + idx
-        | _ -> ()
 #endif
+        | _ -> ()
         ) (results.GetAllResults())
 
     let getUri =
