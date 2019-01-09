@@ -80,10 +80,17 @@ let private collectInputs chainParams dataAccess session view account assetAmoun
     else
         Ok inputs
 
+let private getTxVersion =
+    List.exists (function
+        | ({ lock = Consensus.Types.Vote _; spend = _ }:Consensus.Types.Output) -> true
+        | _ -> false
+    )
+    >> function | true -> Version1 | false -> Version0
+
 let private existingVoteData outputs chainParams tip =
     outputs
     |> List.choose (function
-        | {lock = Vote (voteData,interval,_); spend = _ } when interval = CGP.getInterval chainParams tip ->
+        | ({lock = Vote (voteData,interval,_); spend = _ }:Consensus.Types.Output) when interval = CGP.getInterval chainParams tip ->
             Some voteData
         | _ -> 
             None)
@@ -187,7 +194,7 @@ let createVoteTransaction dataAccess session view chainParams tip password (allo
            Ok inputs
              
     let transaction = {
-        version=Version1
+        version=getTxVersion outputs
         inputs=inputs
         outputs = outputs 
         witnesses = []
@@ -237,7 +244,7 @@ let createTransactionFromOutputs chainParams dataAccess session view password co
         |> List.unzip
 
     let transaction = {
-        version=Version0
+        version=getTxVersion <| outputs @ changeOutputs
         inputs=inputs
         outputs = outputs @ changeOutputs
         witnesses = []
@@ -473,7 +480,7 @@ let createRawTransaction chainParams dataAccess session view contract tip output
         |> List.unzip
 
     let raw:RawTransaction = {
-        version=Version0
+        version=getTxVersion <| outputs @ changeOutputs
         inputs=inputs
         outputs = outputs @ changeOutputs
         witnesses = witnesses
