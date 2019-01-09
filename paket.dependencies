@@ -3,7 +3,7 @@ source https://nuget.org/api/v2
 
 framework: auto-detect
 
-nuget FSharp.Core 4.3.4
+nuget FSharp.Core
 nuget NUnit
 nuget FsUnit
 nuget FsCheck.NUnit >= 3.0.0-alpha2
