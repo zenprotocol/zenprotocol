@@ -365,6 +365,22 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
 
         | Error error ->
             replyError error
+    | Post ("/wallet/keys", Some body) ->
+        match parseCheckPasswordJson body with
+        | Ok password ->
+            match Wallet.getKeys client password with
+            | Ok map ->
+                Map.toArray map
+                |> Array.map (fun (publicKey, path) ->
+                    new PublicKeyDataJson.Root(PublicKey.toString publicKey, path))
+                |> Array.map (fun json -> json.JsonValue)
+                |> JsonValue.Array
+                |> JsonContent
+                |> reply StatusCode.OK
+            | Error error ->
+                replyError error
+        | Error error ->
+            replyError error
     // OBSOLETE: createrawtransaction is obsolete, please use create transaction
     | Post ("/wallet/createrawtransaction", Some body)
     | Post ("/wallet/createtransaction", Some body) ->
