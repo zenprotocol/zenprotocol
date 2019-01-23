@@ -11,7 +11,7 @@ nuget FAKE
 nuget FSharp.Compatibility.OCaml
 nuget FSharpx.Collections
 nuget AsyncIO >= 0.1.60
-nuget NetMQ >= 4.0.0.175-pre
+nuget NetMQ >= 4.0.0.207-pre
 nuget FsNetMQ >= 0.2.8.0
 nuget FsPickler
 nuget FSharp.Control.Reactive
