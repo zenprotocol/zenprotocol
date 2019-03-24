@@ -50,10 +50,11 @@ let ``AddressDB should show contract history``() =
     let contractId =
         Wallet.Address.decodeContract chain response.Address
         |> Result.get
-    
+
     getContractHistoryJson contractId 0 100
     |> post "addressdb/contract/history"
-    |> ContractCommandHistoryResultJson.Parse
+    |> JsonValue.Parse
+    |> JsonExtensions.AsArray
     |> parseContractCommandHistoryResultJson
     |> Array.map (fun (fst, _, _) -> fst)
     |> should contain "mock command"
