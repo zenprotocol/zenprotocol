@@ -5,6 +5,8 @@ open Api.Types
 open Consensus.Types
 open Consensus
 open Wallet
+open Zen.Types.Data
+open FsBech32
 
 let rec omitNullFields = function
     | JsonValue.Array items ->
@@ -55,7 +57,6 @@ let lockEncoder chain (lock:Lock) =
         HighVLockLockJson.Root ((int)identifier, FsBech32.Base16.encode data)
         |> fun j -> JsonValue.Record [| ("HighVLock", j.JsonValue) |]
         
-
 let outputEncoder chain (output:Output) =
     JsonValue.Record [|
         ("lock", lockEncoder chain output.lock);
@@ -115,3 +116,86 @@ let blockEncoder chain blockHash (bk:Block) =
             ("header", blockHeaderEncoder bk.header);
             ("transactions", txsJson)
         |]
+
+let dataEncoder chain data =
+
+    let dataName = function
+        | I64 _ -> "i64"
+        | Byte _ -> "byte"
+        | ByteArray _ -> "byteArray"
+        | U32 _ -> "u32"
+        | U64 _ -> "u64"
+        | String _ -> "string"
+        | Hash _ -> "hash"
+        | Lock _ -> "lock"
+        | Signature _ -> "signature"
+        | PublicKey _ -> "pk"
+        | Collection (Array _) -> "array"
+        | Collection (Dict _) -> "dict"
+        | Collection (List _) -> "list"
+    
+    let rec dataValue  = function
+        | I64 v ->
+            v
+            |> decimal
+            |> JsonValue.Number
+        | Byte v ->
+            v
+            |> decimal
+            |> JsonValue.Number
+        | ByteArray v ->
+            v
+            |> Array.map (decimal >> JsonValue.Number)
+            |> JsonValue.Array
+        | U32 v ->
+            v
+            |> decimal
+            |> JsonValue.Number
+        | U64 v ->
+            v
+            |> decimal
+            |> JsonValue.Number
+        | String v ->
+            v
+            |> ZFStar.fstToFsString
+            |> JsonValue.String
+        | Hash v ->
+            v
+            |> Base16.encode
+            |> JsonValue.String
+        | Lock v ->
+            v
+            |> ZFStar.fstToFsLock
+            |> lockEncoder chain
+        | Signature v ->
+            v
+            |> Base16.encode
+            |> JsonValue.String
+        | PublicKey v ->
+            v
+            |> Base16.encode
+            |> JsonValue.String
+        | Collection (Array v) ->
+            v
+            |> Array.map (fun data -> JsonValue.Record [| dataName data, dataValue data |])
+            |> JsonValue.Array
+        | Collection (Dict (v, _)) ->
+            v
+            |> Map.toArray
+            |> Array.map (fun (key, data) ->
+                JsonValue.Array [|
+                    key
+                    |> ZFStar.fstToFsString
+                    |> JsonValue.String
+                    JsonValue.Record [| dataName data, dataValue data |]
+                |]
+            )
+            |> JsonValue.Array
+        | Collection (List v) ->
+            v
+            |> ZFStar.fstToFsList
+            |> List.map (fun data -> JsonValue.Record [| dataName data, dataValue data |])
+            |> List.toArray
+            |> JsonValue.Array
+    
+    JsonValue.Record [| dataName data, dataValue data |]

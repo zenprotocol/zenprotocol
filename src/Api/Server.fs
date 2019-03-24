@@ -751,18 +751,21 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
         parseGetContractHistoryJson json
         >>= AddressDB.getContractHistory client
         <@> List.map (fun (command, messageBody, txHash) ->
-            new ContractCommandHistoryResultJson.Root(
-                command,
-                (match messageBody with
-                | Some data ->
-                    data
-                    |> Data.serialize
-                    |> Base16.encode
-                | None -> ""),
-                Consensus.Hash.toString txHash
-            )
+            [|
+                "command",
+                    command
+                    |> JsonValue.String
+                "messageBody",
+                    messageBody
+                    |> Option.map (dataEncoder chain)
+                    |> Option.defaultValue JsonValue.Null
+                "txHash",
+                    txHash
+                    |> Hash.toString 
+                    |> JsonValue.String
+            |]
+            |> JsonValue.Record
         )
-        <@> List.map (fun json -> json.JsonValue)
         <@> List.toArray
         <@> JsonValue.Array
         <@> JsonContent
