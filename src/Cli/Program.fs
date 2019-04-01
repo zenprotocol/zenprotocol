@@ -66,10 +66,9 @@ type NoArgs =
 
 type Arguments =
     | [<AltCommandLine("-p");UniqueAttribute>] Port of port:uint16
-    | [<AltCommandLine("-c");UniqueAttribute>] Chain of string
+    | [<AltCommandLine("-t")>] Test
 #if DEBUG
-    | [<AltCommandLine("-l1")>] Local1
-    | [<AltCommandLine("-l2")>] Local2
+    | Local of uint16
 #endif
     | [<CliPrefix(CliPrefix.None)>] Balance of ParseResults<NoArgs>
     | [<CliPrefix(CliPrefix.None)>] History of ParseResults<PaginationArgs>
@@ -98,11 +97,7 @@ type Arguments =
         member arg.Usage =
             match arg with
             | Port _ -> "port of zen-node API"
-            | Chain _ -> "select port by specify the chain (main/test/local). Default is main"
-#if DEBUG
-            | Local1 -> "use port of local1 testing node"
-            | Local2 -> "use port of local2 testing node"
-#endif
+            | Test _ -> "use testnet port"
             | Balance _ -> "get wallet balance"
             | History _ -> "list wallet transactions"
             | Address _ -> "get wallet address"
@@ -125,6 +120,7 @@ type Arguments =
             | RawTx_Sign _ -> "sign all possible inputs of the raw transaction and return the signed transaction"
             | RawTx_Publish _ -> "publish a fully signed raw transaction"
             | Wallet_Create _ -> "Generate new mnemonic phrase and creating a wallet. Use mnemonichhrase command to get the newly generated mnemonic phrase."
+            | _ -> ""
 
 
 let mutable port = 11567us
@@ -133,10 +129,10 @@ let mutable port = 11567us
 let getUri = sprintf "http://127.0.0.1:%d/%s" port
 
 let errorHandler =
-    let colorizer = function | ErrorCode.HelpText -> None 
+    let colorizer = function | ErrorCode.HelpText -> None
                              | _ -> Some ConsoleColor.Red
     ProcessExiter colorizer
-       
+
 let exit (errorMsg: string): 'a =
     (errorHandler :> IExiter).Exit(errorMsg, ErrorCode.AppSettings (*=1*))
 
@@ -151,7 +147,7 @@ let printResponse = getResponse >> printfn "%s"
 
 // read from console, hiding input text
 let readMasked(): string =
-    let rec read (acc: list<char>): string = 
+    let rec read (acc: list<char>): string =
         let keyInfo = Console.ReadKey(true)
         if keyInfo.Key = ConsoleKey.Enter then
             List.rev acc
@@ -176,7 +172,7 @@ let rec createWallet(): unit =
     let password1 = readPassword()
     printfn "Enter password again:"
     let password2 = readMasked()
-    if password1 <> password2 then 
+    if password1 <> password2 then
         printfn "Passwords do not match, please try again"; createWallet()
     else
         let words = NBitcoin.Mnemonic(NBitcoin.Wordlist.English, NBitcoin.WordCount.TwentyFour).Words
@@ -193,14 +189,11 @@ let main argv =
     List.iter (fun arg ->
         match arg with
         | Port p -> port <- p
-        | Chain chain when chain = "main" -> port <- 11567us
-        | Chain chain when chain = "test" -> port <- 31567us
-        | Chain chain when chain = "local" -> port <- 31567us
+        | Test -> port <- 31567us
 #if DEBUG
-        | Local1 -> port <- 36000us
-        | Local2 -> port <- 36001us
-#endif
+        | Local idx -> port <- 20000us + idx
         | _ -> ()
+#endif
         ) (results.GetAllResults())
 
     let saveRawToFile (response : HttpResponse) =
@@ -305,9 +298,9 @@ let main argv =
         | Some (Execute args) ->
             let address, command, messageBody, asset, amount =
                 args.GetResult <@ ExecuteContract_Arguments @>
-            
+
             let password = readPassword()
-            
+
             let messageBody = if messageBody = "None" || messageBody = "none" || messageBody = "null" then "" else messageBody
 
             "wallet/contract/execute"
