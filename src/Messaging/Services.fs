@@ -321,7 +321,7 @@ module Wallet =
 module AddressDB =
     open Wallet
 
-    type ContractHistoryResponse = List<string * data option * Hash>
+    type ContractHistoryResponse = List<string * data option * Hash * uint32> // command, messageBody, txHash, confirmations
 
     type Mode =
         | All

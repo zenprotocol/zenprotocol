@@ -5,7 +5,6 @@ open Infrastructure
 open DataAccess
 open Consensus
 open Types
-open Hash
 open Wallet.Serialization
 open AddressDB.Serialization
 open Consensus.Serialization
@@ -20,8 +19,9 @@ let DbVersion = 2
 type T = {
     outpointOutputs: Collection<Outpoint, DBOutput>
     addressOutpoints: MultiCollection<Address, Outpoint>
-    contractHistory: MultiCollection<ContractId,Hash * uint32>
-    contractData: Collection<Hash * uint32, string * data option>
+    contractHistory: MultiCollection<ContractId, WitnessPoint>
+    contractData: Collection<WitnessPoint, string * data option>
+    contractConfirmations: Collection<WitnessPoint, Wallet.Types.ConfirmationStatus>
     tip: SingleValue<Tip>
     dbVersion: SingleValue<int>
 }
@@ -30,12 +30,16 @@ let createContext dataPath =
     Platform.combine dataPath "addressDB"
     |> DatabaseContext.create DatabaseContext.Medium
 
+module WitnessPoint = Serialization.Outpoint
+
 let init databaseContext =
+
     use session = DatabaseContext.createSession databaseContext
     let outpointOutputs = Collection.create session "outpointOutputs" Outpoint.serialize Output.serialize Output.deserialize
     let addressOutpoints = MultiCollection.create session "addressOutpoints" Address.serialize Outpoint.serialize Outpoint.deserialize
-    let contractData = Collection.create session "contracData" ContractHistory.serialize ContractData.serialize ContractData.deserialize
-    let contractHistory = MultiCollection.create session "contractHistory" Serialization.ContractId.serialize ContractHistory.serialize ContractHistory.deserialize
+    let contractData = Collection.create session "contracData" WitnessPoint.serialize ContractData.serialize ContractData.deserialize
+    let contractHistory = MultiCollection.create session "contractHistory" Serialization.ContractId.serialize WitnessPoint.serialize WitnessPoint.deserialize
+    let contractConfirmations = Collection.create session "contractConfirmations" WitnessPoint.serialize ConfirmationStatus.serialize ConfirmationStatus.deserialize
     let tip = SingleValue.create databaseContext "blockchain" Tip.serialize Tip.deserialize
     let dbVersion = SingleValue.create databaseContext "dbVersion" Version.serialize Version.deserialize
 
@@ -55,6 +59,7 @@ let init databaseContext =
         addressOutpoints = addressOutpoints
         contractHistory = contractHistory
         contractData = contractData
+        contractConfirmations = contractConfirmations
         tip = tip
         dbVersion = dbVersion
     }
@@ -103,3 +108,8 @@ module ContractHistory =
     let delete t = MultiCollection.delete t.contractHistory
     let truncate t = MultiCollection.truncate t.contractHistory
 
+module ContractConfirmations =
+    let get t = Collection.get t.contractConfirmations
+    let put t = Collection.put t.contractConfirmations
+    let delete t = Collection.delete t.contractConfirmations
+    let truncate t = Collection.truncate t.contractConfirmations

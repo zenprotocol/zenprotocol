@@ -339,7 +339,8 @@ type ContractCommandHistoryResultJson = JsonProvider<"""
 [{
     "command": "command",
     "messageBody": "abcdef012346789",
-    "txHash": "abcdef012346789"
+    "txHash": "abcdef012346789",
+    "confirmations": 0
 }]""">
 
 type PublicKeyDataJson = JsonProvider<"""

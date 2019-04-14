@@ -31,20 +31,19 @@ let addContractHistory contractData contractId data =
         | None -> []
     Map.add contractId data contractData
     
-let addContractData contractData contractId data =
-    let data = 
-        data @
-        match Map.tryFind contractId contractData with 
-        | Some data -> data
-        | None -> []
-    Map.add contractId data contractData
+let setContractData contractData witnessPoint data =
+    Map.add witnessPoint data contractData
     
+let setContractConfirmationStatus contractData witnessPoint data =
+    Map.add witnessPoint data contractData
+
 type T =
     {
         outpointOutputs: Map<Outpoint, DBOutput>
         addressOutpoints: Map<Address, List<Outpoint>>
-        contractHistory: Map<ContractId, List<Hash * uint32>>
-        contractData: Map<Hash * uint32, List<string * data option>>
+        contractHistory: Map<ContractId, List<WitnessPoint>>
+        contractData: Map<WitnessPoint, string * data option>
+        contractConfirmations: Map<WitnessPoint, ConfirmationStatus>
     }
     with
         member this.getOutputs outputs = // add given (db) onto view (memory)
@@ -57,17 +56,17 @@ let empty = {
     addressOutpoints = Map.empty
     contractHistory = Map.empty
     contractData = Map.empty
+    contractConfirmations = Map.empty
 }
 
-let private witnessIndex tx =
-    List.tryFindIndex (fun witness ->
-        match witness with
-        | ContractWitness _ -> true
-        | _ -> false) tx.witnesses
-    |> ofOption "missing contract witness"
-    |> get
-    |> uint32
-
+let witnessPoint txHash tx cw =
+    {
+        txHash = txHash
+        index =
+            tx.witnesses
+            |> List.findIndex ((=) (ContractWitness cw))
+            |> uint32
+    }
 
 module OutpointOutputs =
     let get view dataAccess session outpoints =
@@ -89,8 +88,6 @@ module AddressOutpoints =
         AddressOutpoints.get dataAcesss session addresses @ get' view addresses
 
 module ContractHistory =
-    open AddressDB.Serialization
-
     let private get' view contractId =
         Map.tryFind contractId view.contractHistory
         |> function 
@@ -100,17 +97,18 @@ module ContractHistory =
         ContractHistory.get dataAccess session contractId @ get' view contractId
         
 module ContractData =
-    open AddressDB.Serialization
-    
-    let get view dataAccess session txHash witnessIndex =
-        match Map.tryFind (txHash, witnessIndex) view.contractData with 
-        | Some [command,data] -> (command, data, txHash)
-        | _ -> 
-            ContractData.get dataAccess session (txHash,witnessIndex)
-            |> fun (command, data) -> (command, data, txHash)   
+    let get view dataAccess session witnessPoint =
+        Map.tryFind witnessPoint view.contractData
+        |> Option.defaultWith (fun _ ->
+            ContractData.get dataAccess session witnessPoint)
+        |> fun (command, data) -> (command, data, witnessPoint.txHash)
 
-        
-        
+module ContractConfirmations =
+    let get view dataAccess session witnessPoint =
+        Map.tryFind witnessPoint view.contractConfirmations
+        |> Option.defaultWith (fun _ ->
+            ContractConfirmations.get dataAccess session witnessPoint)
+
 let mapTxOutputs tx txHash confirmationStatus =
     tx.outputs
     |> List.mapi (fun index output -> uint32 index, output)
@@ -152,16 +150,20 @@ let addMempoolTransaction dataAccess session txHash tx view =
             addressOutpoints = addAddressOutpoints view.addressOutpoints address [ outpoint ]
             contractHistory = view.contractHistory
             contractData = view.contractData
+            contractConfirmations = view.contractConfirmations
         }) view)
     |> Option.map (fun view ->
         tx.witnesses
         |> List.fold (fun view -> function 
             | ContractWitness cw ->
+                let witnessPoint = witnessPoint txHash tx cw
+                    
                 {
                     outpointOutputs = view.outpointOutputs
                     addressOutpoints = view.addressOutpoints
-                    contractHistory = addContractHistory view.contractHistory cw.contractId [ txHash, witnessIndex tx ]
-                    contractData = addContractData view.contractData (txHash, witnessIndex tx)  [cw.command, cw.messageBody]
+                    contractHistory = addContractHistory view.contractHistory cw.contractId [ witnessPoint ]
+                    contractData = setContractData view.contractData witnessPoint (cw.command, cw.messageBody)
+                    contractConfirmations = setContractConfirmationStatus view.contractConfirmations witnessPoint Unconfirmed
                 }                
             | _ ->
                 view
