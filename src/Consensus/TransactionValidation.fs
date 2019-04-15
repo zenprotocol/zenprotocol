@@ -144,6 +144,14 @@ let private checkAmounts (txSkeleton:TxSkeleton.T) =
     else
         Ok ()
 
+let private checkInputsVersion (txSkeleton:TxSkeleton.T) =
+    if List.exists (function
+        | TxSkeleton.PointedOutput (_, { lock = HighVLock _ }) -> true
+        | _ -> false) txSkeleton.pInputs then
+        GeneralError "high version inputs are invalid"
+    else
+        Ok()
+
 let checkWeight chain tx txSkeleton = 
     Weight.transactionWeight tx txSkeleton
     >>= (fun txWeight ->
@@ -342,6 +350,7 @@ let validateInContext chainParams getUTXO contractPath blockNumber timestamp acs
     let! outputs = tryGetUtxos getUTXO set ex.tx
     let txSkel = TxSkeleton.fromTransaction ex.tx outputs
 
+    do! checkInputsVersion txSkel
     do! checkWeight chainParams ex.tx txSkel
 
     do! checkAmounts txSkel
