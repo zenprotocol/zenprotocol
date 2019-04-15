@@ -236,6 +236,10 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             error
             |> reply<RawTransaction> requestId
             NoAccount
+        | GetKeys _ ->
+            error
+            |> reply<Map<PublicKey, string>> requestId
+            NoAccount
 
     | Exist view ->
         let chainParams = Consensus.Chain.getChainParameters chain
@@ -331,8 +335,6 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
 
             accountStatus
         | Sign (message, path, password) ->
-            let sign privateKey = Crypto.sign privateKey message
-
             Account.sign dataAccess session password path message
             |> reply<Crypto.Signature> requestId
 
@@ -399,6 +401,11 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
                 |> reply<unit> requestId
 
                 accountStatus
+        | GetKeys password ->
+            Account.getKeys dataAccess session password
+            |> reply<Map<PublicKey, string>> requestId
+
+            accountStatus
 
 type Wipe =
     | Full

@@ -222,7 +222,8 @@ module Wallet =
         | RemoveAccount of password:string
         | RawTransactionCreate of outputs:List<Hash * Spend>
         | RawTransactionSign of RawTransaction * password:string
-
+        | GetKeys of password:string
+        
     let serviceName = "wallet"
 
     //TODO: apply same convention to other services
@@ -313,6 +314,9 @@ module Wallet =
     let removeAccount client password =
         RemoveAccount password
         |> Request.send<Request,Result<unit,string>> client serviceName
+
+    let getKeys client password =
+        Request.send<Request, Result<Map<Crypto.PublicKey, string>,string>> client serviceName (GetKeys password)
 
 module AddressDB =
     open Wallet

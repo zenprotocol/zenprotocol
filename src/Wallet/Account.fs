@@ -179,7 +179,6 @@ let private filterOutputByConfirmations account confirmations output =
             blockNumber <= (account.blockNumber - confirmations) + 1ul
     | Unconfirmed -> confirmations = 0ul
 
-
 let getReceived dataAccess session view chain confirmations =
     let account = DataAccess.Account.get dataAccess session
 
@@ -498,7 +497,27 @@ let getHistory dataAccess session view skip take =
     |> List.sortWith txComparer
     |> paginate skip take
     |> List.map (fun (txHash,direction,spend,confirmations,_) -> txHash,direction,spend,confirmations)
+
     
 let getTransactionCount dataAccess session view =
     List.length (View.Outputs.getAll view dataAccess session)
     
+// returns list of pubickeys with their correlating HD paths
+let getKeys dataAccess session password =
+    let account = DataAccess.Account.get dataAccess session
+    
+    let getPublicKey path =
+        Secured.decrypt password account.secureMnemonicPhrase
+        >>= ExtendedKey.fromMnemonicPhrase
+        >>= ExtendedKey.derivePath path
+        >>= ExtendedKey.getPublicKey
+        <@> fun publicKey -> (publicKey, path)
+
+    DataAccess.Addresses.getAll dataAccess session
+    |> List.choose (function
+        | { addressType = addressType } when addressType <> WatchOnly
+            -> Some addressType
+        | _ -> None)
+    |> List.map getKeyPath
+    |> Result.traverseResultM getPublicKey
+    <@> Map.ofList
