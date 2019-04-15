@@ -3,6 +3,7 @@ module Node.Tests.Json
 open Consensus
 open Types
 open Api.Types
+open FSharp.Data
 open Infrastructure
 open Node.Tests
 
@@ -62,8 +63,8 @@ let getContractHistoryJson contractId skip take =
     )).JsonValue
 
 let parseContractCommandHistoryResultJson =
-    Array.map (fun (contractData:ContractCommandHistoryResultJson.Root) ->
-        contractData.Command,
-        contractData.MessageBody,
-        contractData.TxHash
+    Array.map (fun (contractData:JsonValue) ->
+        JsonExtensions.GetProperty (contractData, "command") |> JsonExtensions.AsString,
+        JsonExtensions.GetProperty (contractData, "messageBody"),
+        JsonExtensions.GetProperty (contractData, "txHash") |> JsonExtensions.AsString
     )
