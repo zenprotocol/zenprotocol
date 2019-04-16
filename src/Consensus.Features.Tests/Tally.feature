@@ -325,6 +325,28 @@ Feature: Tally
     
     Then voteTx validation should yield invalid amounts
 
+
+  Scenario: Voting with version 0 (should not be counted)
+
+    Given genesisTx locks 55 Zen to genesisKey1
+    Given genesisTx locks 88 Zen to genesisKey2
+    And genesis has genesisTx
+
+    And voteTx1 has the input genesisTx index 0
+    And voteTx1 votes on allocation of 5 with 55 Zen in interval 0 with version 0
+    And voteTx1 is signed with genesisKey1
+
+    And voteTx2 has the input genesisTx index 1
+    And voteTx2 votes on allocation of 8 with 88 Zen in interval 0 with version 1
+    And voteTx2 is signed with genesisKey2
+
+    When validating a block containing voteTx1,voteTx2 extending tip
+
+    # Only the 2nd vote counts (since it has the right version)
+    Then tally should have a total of 88 allocation votes
+    Then tally should have a total of 0 allocation vote for allocation of 5
+    Then tally should have a total of 88 allocation vote for allocation of 8
+    
     
     
 # -------------------------------------------------------------------------------------------------------------------- #
