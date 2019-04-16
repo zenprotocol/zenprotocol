@@ -224,6 +224,22 @@ type HighVLockLockJson = JsonProvider<"""
 }
 """>
 
+
+type AllocationVoteResult = JsonProvider<"""
+{
+    "amount": 50,
+    "count": 1234567890000
+}
+""">
+
+type PayoutVoteResult = JsonProvider<"""
+{ 
+    "recipient": "abcd1234",
+    "amount": 1234567890000,
+    "count": 1234567890000
+}
+""">
+
 type PayoutRequestJson = JsonProvider<"""
 {
     "payout": {},

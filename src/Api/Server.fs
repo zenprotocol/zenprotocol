@@ -471,6 +471,20 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
     | Post ("/wallet/resync", _) ->
         Wallet.resyncAccount client
         reply StatusCode.OK NoContent
+    | Get ("/blockchain/cgp", _) ->
+        let cgp = Blockchain.getCgp client
+        reply StatusCode.OK (JsonContent <| (cgpEncoder chain cgp))
+    | Get ("/blockchain/cgp/history", _) ->
+        let cgp = Blockchain.getCgpHistory client
+        reply StatusCode.OK (JsonContent <| (cgpHistoryEncoder chain cgp))
+    | Get ("/wallet/vote", _) ->
+        match Wallet.getVoteUtilization client with
+        | Ok (outstanding ,utilized, voteData) ->
+            voteUtilizationEncoder chain outstanding utilized voteData
+            |> JsonContent
+            |> reply StatusCode.OK
+        | Error error ->
+            replyError error
     | Post ("/blockchain/publishblock", Some body) ->
         match parsePublishBlockJson body with
         | Error error ->
