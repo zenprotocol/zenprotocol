@@ -43,12 +43,28 @@ let handleVote adding (vote:VoteData) amount (tally:T) =
 
     tally
 
-let getResult map =
+// Naive weighted median by sorting and searching (assumes the list of votes is nonempty) 
+let private weightedMedian (votes : seq<byte * uint64>) : byte =
+    let sortedVotes   = Seq.sortBy fst votes
+    let weights       = Seq.map snd sortedVotes
+    let totalWeight   = weights |> Seq.sum
+    let weightsBefore = Seq.scan (+) 0UL         weights
+    let weightsAfter  = Seq.scan (-) totalWeight weights
+    let coupledVotes  = Seq.zip3 weightsBefore sortedVotes (Seq.tail weightsAfter)
+    let cond (b,_,a)  = 2UL * b <= totalWeight  &&  2UL * a <= totalWeight
+    let l, wl         = Seq.find     cond coupledVotes |> fun (_,x,_) -> x
+    let h, wh         = Seq.findBack cond coupledVotes |> fun (_,x,_) -> x
+    byte ((uint64 l * wl + uint64 h * wh) / (wl + wh))
+
+let private getResultWith aggregator map =
     if Map.isEmpty map then
         None
     else
         map
         |> Map.toSeq
-        |> Seq.maxBy snd
-        |> fst
+        |> aggregator
         |> Some
+
+let getAllocationResult = getResultWith weightedMedian
+
+let getPayoutResult map = getResultWith (Seq.maxBy snd >> fst) map

@@ -971,14 +971,14 @@ module Binding =
         (if allocation = "none"
             then None
             else Some (byte allocation)  
-        ) ?= Tally.getResult (getTally state.tipState.cgp).allocation
+        ) ?= Tally.getAllocationResult (getTally state.tipState.cgp).allocation
 
     // Checks the chosen payout in the tally
     let [<Then>] ``tally payout result should be of (.*) Zen to (.*)`` amount addressKeyLabel =
-        Some (getRecipient addressKeyLabel, getAmount Asset.Zen amount) ?= Tally.getResult (getTally state.tipState.cgp).payout
+        Some (getRecipient addressKeyLabel, getAmount Asset.Zen amount) ?= Tally.getPayoutResult (getTally state.tipState.cgp).payout
     
     let [<Then>] ``tally payout result should be none(.*)`` (_ : string) =
-        None ?= Tally.getResult (getTally state.tipState.cgp).payout
+        None ?= Tally.getPayoutResult (getTally state.tipState.cgp).payout
 
     // Checks the CGP's allocation
     let [<Then>] ``CGP allocation should be (.*)`` allocation =

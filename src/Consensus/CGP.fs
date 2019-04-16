@@ -81,7 +81,7 @@ let update chainParams blockNumber =
     let setAllocation chainParams interval cgp =
         Map.tryFind interval cgp.tallies
         |> Option.map (fun tally -> tally.allocation)
-        |> Option.bind Tally.getResult
+        |> Option.bind Tally.getAllocationResult
         |> Option.map (fun allocation ->
             { cgp with
                 allocation =
@@ -99,7 +99,7 @@ let update chainParams blockNumber =
     let setPayout interval cgp =
         Map.tryFind interval cgp.tallies
         |> Option.map (fun tally -> tally.payout)
-        |> Option.bind Tally.getResult
+        |> Option.bind Tally.getPayoutResult
         |> Option.bind (fun (recipient, payoutAmount) -> 
             if payoutAmount > cgp.amount then
                 eventX "Not enough tokens in CGP ({cgpAmount}) for payout ({payoutAmount})"
