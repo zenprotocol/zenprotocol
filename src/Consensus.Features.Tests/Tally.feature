@@ -463,6 +463,52 @@ Feature: Tally
 
     Then tally allocation result should be 15
 
+    
+  Scenario: Should pick weighted median allocation
+
+    Given genesisTx locks 50 Zen to genesisKey1
+    And genesisTx locks 50 Zen to genesisKey2
+    And genesisTx locks 50 Zen to genesisKey3
+    And genesisTx locks 150 Zen to genesisKey4
+    And genesisTx locks 200 Zen to genesisKey5
+    And genesisTx locks 100 Zen to genesisKey6
+    And genesis has genesisTx
+
+    And voteTx1 has the input genesisTx index 0
+    And voteTx1 votes on allocation of 5 with 50 Zen in interval 0
+    And voteTx1 is signed with genesisKey1
+
+    And voteTx2 has the input genesisTx index 1
+    And voteTx2 votes on allocation of 5 with 50 Zen in interval 0
+    And voteTx2 is signed with genesisKey2
+
+    And voteTx3 has the input genesisTx index 2
+    And voteTx3 votes on allocation of 5 with 50 Zen in interval 0
+    And voteTx3 is signed with genesisKey3
+
+    And voteTx4 has the input genesisTx index 3
+    And voteTx4 votes on allocation of 15 with 150 Zen in interval 0
+    And voteTx4 is signed with genesisKey4
+
+    And voteTx5 has the input genesisTx index 4
+    And voteTx5 votes on allocation of 50 with 200 Zen in interval 0
+    And voteTx5 is signed with genesisKey5
+
+    And voteTx6 has the input genesisTx index 5
+    And voteTx6 votes on allocation of 75 with 100 Zen in interval 0
+    And voteTx6 is signed with genesisKey6
+
+    When validating a block containing voteTx2,voteTx4,voteTx6 extending tip
+    When validating a block containing voteTx1,voteTx3,voteTx5 extending tip
+
+    Then tally should have a total of 600 allocation votes
+    Then tally should have a total of 150 allocation vote for allocation of 5
+    Then tally should have a total of 150 allocation vote for allocation of 15
+    Then tally should have a total of 200 allocation vote for allocation of 50
+    Then tally should have a total of 100 allocation vote for allocation of 75
+
+    Then tally allocation result should be 35
+    
 
   Scenario: Should pick max address * amount (1)
 
