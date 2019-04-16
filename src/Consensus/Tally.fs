@@ -56,6 +56,10 @@ let private weightedMedian (votes : seq<byte * uint64>) : byte =
     let h, wh         = Seq.findBack cond coupledVotes |> fun (_,x,_) -> x
     byte ((uint64 l * wl + uint64 h * wh) / (wl + wh))
 
+#if DEBUG
+let weightedMedianTest = weightedMedian
+#endif
+
 let private getResultWith aggregator map =
     if Map.isEmpty map then
         None

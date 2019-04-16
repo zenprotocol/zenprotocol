@@ -72,6 +72,7 @@
     <Compile Include="ContractMessageTests.fs" />
     <Compile Include="SerializationTests.fs" />
     <Compile Include="TxSkeletonTests.fs" />
+    <Compile Include="TallyTests.fs" />
     <Compile Include="TransactionOverflowTests.fs" />
     <Compile Include="WitnessValidationTests.fs" />
     <Compile Include="EMATests.fs" />
