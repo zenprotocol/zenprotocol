@@ -90,13 +90,13 @@ let private getPeriod blockNumber =
     blockNumber / 800_000ul
     |> int
 
-let private initialBlockReward = 50.0 * 100_000_000.0
+let private initialBlockReward = 50UL * 100_000_000UL
 
 let blockReward blockNumber (allocationPortion : byte) =
-    let allocation = (100.0 - float allocationPortion) / 100.0
-
-    let initial = initialBlockReward * allocation
-    uint64 initial >>> getPeriod blockNumber
+    let allocation = 100UL - uint64 allocationPortion
+    
+    let initial = (initialBlockReward * allocation) / 100UL
+    initial >>> getPeriod blockNumber
 
 let blockAllocation (blockNumber:uint32) allocationPortion =
     (uint64 initialBlockReward >>> getPeriod blockNumber) - (blockReward blockNumber allocationPortion)
