@@ -58,6 +58,9 @@
     <Compile Include="BlockHeaderTests.fs" />
     <Compile Include="DifficultyTests.fs" />
     <Compile Include="CryptoTests.fs" />
+    <Compile Include="VoteLockBasicValidationTests.fs" />
+    <Compile Include="VoteLockIntervalTest.fs" />
+    <Compile Include="VoteLockTransferabilityTests.fs" />
     <Content Include="MerkleMountainRangeTests.fs" />
     <Compile Include="MerkleTreeTests.fs" />
     <Compile Include="SparseMerkleTreeTests.fs" />

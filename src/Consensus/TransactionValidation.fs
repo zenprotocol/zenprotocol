@@ -165,7 +165,7 @@ let private checkVoteLocks (txSkeleton:TxSkeleton.T) =
     let pkHashes =
         txSkeleton.outputs
         |> List.choose (function
-            | { spend = { amount = _; asset = asset }; lock = Vote (_, _, pkHash) } ->
+            | { lock = Vote (_, _, pkHash) } ->
                 Some pkHash
             | _ ->
                 None)
