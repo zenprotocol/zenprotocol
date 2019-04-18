@@ -85,11 +85,8 @@ type ConsensusGenerator =
 
             let acsMerkleRoot = ActiveContractSet.root ActiveContractSet.empty
 
-            let cgpCommitment = Option.bind Serialization.CGP.hash cgp
-
             let commitments =
                 [ txMerkleRoot; witnessMerkleRoot; acsMerkleRoot ]
-                @ match cgpCommitment with | Some cgpCommitment -> [ cgpCommitment ] | _ -> []
                 |> MerkleTree.computeRoot
 
             let header =
@@ -103,7 +100,12 @@ type ConsensusGenerator =
                     nonce=nonce;
                 }
 
-            return {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot;witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot;cgpCommitment=cgpCommitment}
+            return { header=header;
+                     transactions=transactions;
+                     commitments=[];
+                     txMerkleRoot=txMerkleRoot;
+                     witnessMerkleRoot=witnessMerkleRoot;
+                     activeContractSetMerkleRoot=acsMerkleRoot; }
         })
 
     static member TransactionExtended() =

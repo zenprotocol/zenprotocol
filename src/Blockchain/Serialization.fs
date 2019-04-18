@@ -130,9 +130,7 @@ module BigInt =
         BigInteger.fromBytes32 bytes
 
 module ExtendedBlockHeader =
-    let private commitments bk =
-        match bk.cgpCommitment with | Some cgpCommitment -> [ cgpCommitment ] | None -> []
-        @ bk.commitments
+    let private commitments bk = bk.commitments
 
     let size extendedBlockHeader =
         Hash.size
@@ -164,13 +162,6 @@ module ExtendedBlockHeader =
         let activeContractSetMerkleRoot = Hash.read stream
         let commitments = List.read Hash.read stream
 
-        let popOption =
-            function
-            | next :: rest -> Some next, rest
-            | [] -> None, []
-
-        let cgpCommitment, commitments = popOption commitments
-
         {
             hash = hash
             header = header
@@ -179,7 +170,6 @@ module ExtendedBlockHeader =
             txMerkleRoot = txMerkleRoot
             witnessMerkleRoot = witnessMerkleRoot
             activeContractSetMerkleRoot = activeContractSetMerkleRoot
-            cgpCommitment = cgpCommitment
             commitments = commitments
         }
 

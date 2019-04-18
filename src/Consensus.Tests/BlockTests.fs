@@ -49,7 +49,12 @@ let coinbase blockNumber transactions =
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``block with empty transactions failed validation``(header) =
 
-    let block = {header=header;transactions=[];commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero;cgpCommitment=None}
+    let block = { header=header;
+                  transactions=[];
+                  commitments=[];
+                  txMerkleRoot=Hash.zero;
+                  witnessMerkleRoot=Hash.zero;
+                  activeContractSetMerkleRoot=Hash.zero; }
 
     Block.validate chain block = Error "transactions is empty"
 
@@ -58,7 +63,12 @@ let ``block with invalid header failed validation``(header:BlockHeader) (NonEmpt
     let header = {header with difficulty = 402690497ul}
     let transactions = coinbase header.blockNumber transactions :: transactions
 
-    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero;cgpCommitment=None}
+    let block = { header=header;
+                  transactions=transactions;
+                  commitments=[];
+                  txMerkleRoot=Hash.zero;
+                  witnessMerkleRoot=Hash.zero;
+                  activeContractSetMerkleRoot=Hash.zero; }
 
     Block.validate chain block = Error "proof of work failed"
 
@@ -76,7 +86,12 @@ let ``block with one invalid transaction fail validation``(header) (NonEmptyTran
 
     let transactions = List.mapi (fun i tx -> if i = index then invalidTx else tx) transactions
 
-    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero;cgpCommitment=None}
+    let block = { header=header;
+                  transactions=transactions;
+                  commitments=[];
+                  txMerkleRoot=Hash.zero;
+                  witnessMerkleRoot=Hash.zero;
+                  activeContractSetMerkleRoot=Hash.zero; }
 
     let expected = Error (sprintf "transaction %A failed validation due to General \"structurally invalid input(s)\"" invalidTx.txHash)
 
@@ -100,7 +115,12 @@ let ``block with valid transactions pass validation``(header:BlockHeader) (NonEm
 
     let header = {header with difficulty = 0x20fffffful;commitments=commitments; }
 
-    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot; witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=Hash.zero;cgpCommitment=None}
+    let block = { header=header;
+                  transactions=transactions;
+                  commitments=[];
+                  txMerkleRoot=txMerkleRoot;
+                  witnessMerkleRoot=witnessMerkleRoot;
+                  activeContractSetMerkleRoot=Hash.zero }
 
     Block.validate chain block = Ok block
 
@@ -139,7 +159,12 @@ let ``connecting block should fail when commitments are wrong``(parent:BlockHead
 
     let transactions = [coinbase header.blockNumber []]
 
-    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero;cgpCommitment=None}
+    let block = { header=header;
+                  transactions=transactions;
+                  commitments=[];
+                  txMerkleRoot=Hash.zero;
+                  witnessMerkleRoot=Hash.zero;
+                  activeContractSetMerkleRoot=Hash.zero; }
 
     match Block.connect chain getUTXO getTx contractsPath parent (timestamp + 1UL) utxoSet cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block with
     | Ok _ -> Ok ()
@@ -362,7 +387,12 @@ let ``block with coinbase lock within a regular transaction should fail``() =
             nonce = 0UL,0UL
         }
 
-    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot; witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=Hash.zero;cgpCommitment=None}
+    let block = { header=header;
+                  transactions=transactions;
+                  commitments=[];
+                  txMerkleRoot=txMerkleRoot;
+                  witnessMerkleRoot=witnessMerkleRoot;
+                  activeContractSetMerkleRoot=Hash.zero; }
 
     let expected : Result<Block,string> = Error (sprintf "transaction %A failed validation due to General \"coinbase lock is not allowed within an ordinary transaction\"" <| Transaction.hash tx)
 
@@ -410,7 +440,12 @@ let ``block with wrong coinbase reward``() =
             nonce = 0UL,0UL
         }
 
-    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot; witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot;cgpCommitment=None}
+    let block = { header=header;
+                  transactions=transactions;
+                  commitments=[];
+                  txMerkleRoot=txMerkleRoot;
+                  witnessMerkleRoot=witnessMerkleRoot;
+                  activeContractSetMerkleRoot=acsMerkleRoot }
 
     Block.connect chain getUTXO getTx contractsPath parent timestamp UtxoSet.asDatabase CGP.empty ActiveContractSet.empty ContractCache.empty ema getContractState ContractStates.asDatabase block
     |> expectError "block reward is incorrect"
@@ -451,7 +486,12 @@ let ``coinbase lock have wrong blockNumber``() =
             nonce = 0UL,0UL
         }
 
-    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot; witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=Hash.zero;cgpCommitment=None}
+    let block = { header=header;
+                  transactions=transactions;
+                  commitments=[];
+                  txMerkleRoot=txMerkleRoot;
+                  witnessMerkleRoot=witnessMerkleRoot;
+                  activeContractSetMerkleRoot=Hash.zero; }
 
     let expected : Result<Block,string> =
         Error  "Block failed coinbase validation due to General \"within coinbase transaction all outputs must use coinbase lock\""
@@ -495,7 +535,12 @@ let ``block without coinbase``() =
             nonce = 0UL,0UL
         }
 
-    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot; witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=Hash.zero;cgpCommitment=None}
+    let block = { header=header;
+                  transactions=transactions;
+                  commitments=[];
+                  txMerkleRoot=txMerkleRoot;
+                  witnessMerkleRoot=witnessMerkleRoot;
+                  activeContractSetMerkleRoot=Hash.zero; }
 
     let expected : Result<Block,string> =
         Error  "Block failed coinbase validation due to General \"within coinbase transaction all outputs must use coinbase lock\""
@@ -548,7 +593,13 @@ let ``block with coinbase with multiple asset as reward should fail``() =
             nonce = 0UL,0UL
         }
 
-    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot; witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot;cgpCommitment=None}
+    let block = { header=header;
+                  transactions=transactions;
+                  commitments=[];
+                  txMerkleRoot=txMerkleRoot;
+                  witnessMerkleRoot=witnessMerkleRoot;
+                  activeContractSetMerkleRoot=acsMerkleRoot; }
+    
 
     Block.connect chain getUTXO getTx contractsPath parent timestamp UtxoSet.asDatabase CGP.empty ActiveContractSet.empty ContractCache.empty ema getContractState ContractStates.asDatabase block
     |> expectError "block reward is incorrect"
@@ -598,7 +649,13 @@ let ``coinbase reward split over multiple outputs``() =
             nonce = 0UL,0UL
         }
 
-    let block = {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot; witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot;cgpCommitment=None}
+    let block = { header=header;
+                  transactions=transactions;
+                  commitments=[];
+                  txMerkleRoot=txMerkleRoot;
+                  witnessMerkleRoot=witnessMerkleRoot;
+                  activeContractSetMerkleRoot=acsMerkleRoot; }
+     
 
     Block.connect chain getUTXO getTx contractsPath parent timestamp UtxoSet.asDatabase CGP.empty ActiveContractSet.empty ContractCache.empty ema getContractState ContractStates.asDatabase block
     |> should be ok

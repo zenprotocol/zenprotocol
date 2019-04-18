@@ -1490,13 +1490,13 @@ module Serialization =
     module Block =
         let size block =
             Header.size +
-            List.size (fun _ -> Hash.size) (Block.createCommitments block.txMerkleRoot block.witnessMerkleRoot block.activeContractSetMerkleRoot block.cgpCommitment block.commitments) +
+            List.size (fun _ -> Hash.size) (Block.createCommitments block.txMerkleRoot block.witnessMerkleRoot block.activeContractSetMerkleRoot block.commitments) +
             Seq.size TransactionExtended.size block.transactions
 
         let write stream bk =
             Header.write stream bk.header
             
-            Block.createCommitments bk.txMerkleRoot bk.witnessMerkleRoot bk.activeContractSetMerkleRoot bk.cgpCommitment bk.commitments
+            Block.createCommitments bk.txMerkleRoot bk.witnessMerkleRoot bk.activeContractSetMerkleRoot bk.commitments
             |> Seq.write Hash.write stream
             
             Seq.write TransactionExtended.write stream bk.transactions
@@ -1509,26 +1509,19 @@ module Serialization =
                 | next :: rest -> next, rest
                 | _ -> raise SerializationException
                 
-            let popOption =
-                function
-                | next :: rest -> Some next, rest
-                | _ -> None, []
-                
             let transactions = List.read TransactionExtended.read stream
 
             let txMerkleRoot, commitments = pop commitments
             let witnessMerkleRoot, commitments = pop commitments
             let activeContractSetMerkleRoot, commitments = pop commitments
-            let cgpCommitment, commitments = popOption commitments
 
             {
-                header = header
-                txMerkleRoot = txMerkleRoot
-                witnessMerkleRoot = witnessMerkleRoot
-                activeContractSetMerkleRoot = activeContractSetMerkleRoot
-                cgpCommitment = cgpCommitment
-                commitments = commitments
-                transactions = transactions
+                header = header;
+                txMerkleRoot = txMerkleRoot;
+                witnessMerkleRoot = witnessMerkleRoot;
+                activeContractSetMerkleRoot = activeContractSetMerkleRoot;
+                commitments = commitments;
+                transactions = transactions;
             }
 
     module CGP =
@@ -1619,15 +1612,6 @@ module Header =
 module Block =
     let serialize = serialize Block.size Block.write
     let deserialize = deserialize Block.read
-
-module CGP =
-    let hash cgp =
-        if CGP.isEmpty cgp then
-            None
-        else
-            serialize CGP.size CGP.write cgp
-            |> Hash.compute
-            |> Some
 
 module Data =
     let serialize = serialize Data.size Data.write

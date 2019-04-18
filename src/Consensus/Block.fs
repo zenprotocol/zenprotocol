@@ -59,10 +59,8 @@ let createGenesis (chain:Chain.ChainParameters) transactions nonce =
 
     let acsMerkleRoot = ActiveContractSet.root ActiveContractSet.empty
 
-    let cgpCommitment = None
-
     let commitments =
-        Block.createCommitments txMerkleRoot witnessMerkleRoot acsMerkleRoot cgpCommitment []
+        Block.createCommitments txMerkleRoot witnessMerkleRoot acsMerkleRoot []
         |> computeCommitmentsRoot
 
     let header =
@@ -76,7 +74,12 @@ let createGenesis (chain:Chain.ChainParameters) transactions nonce =
             nonce=nonce;
         }
 
-    {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot;witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot;cgpCommitment=cgpCommitment}
+    { header=header;
+      transactions=transactions;
+      commitments=[];
+      txMerkleRoot=txMerkleRoot;
+      witnessMerkleRoot=witnessMerkleRoot;
+      activeContractSetMerkleRoot=acsMerkleRoot; }
 
 let getBlockSacrificeAmount chain acs =
 
@@ -150,8 +153,6 @@ let getBlockCoinbase chain acs blockNumber transactions coinbasePkHash (cgp:CGP.
 let createTemplate chain (parent:BlockHeader) timestamp (ema:EMA.T) acs (cgp:CGP.T) transactions coinbasePkHash =
     let blockNumber = (parent.blockNumber + 1ul)
 
-    let cgpCommitment = CGP.hash cgp
-
     let coinbase = getBlockCoinbase chain acs blockNumber transactions coinbasePkHash cgp
 
     let transactions = coinbase :: transactions
@@ -176,7 +177,7 @@ let createTemplate chain (parent:BlockHeader) timestamp (ema:EMA.T) acs (cgp:CGP
 
     // TODO: add utxo commitments
     let commitments =
-        Block.createCommitments txMerkleRoot witnessMerkleRoot acsMerkleRoot cgpCommitment []
+        Block.createCommitments txMerkleRoot witnessMerkleRoot acsMerkleRoot []
         |> computeCommitmentsRoot
 
     let header =
@@ -190,7 +191,12 @@ let createTemplate chain (parent:BlockHeader) timestamp (ema:EMA.T) acs (cgp:CGP
             nonce=0UL,0UL;
         }
 
-    {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot;witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot;cgpCommitment=cgpCommitment}
+    { header=header;
+      transactions=transactions;
+      commitments=[];
+      txMerkleRoot=txMerkleRoot;
+      witnessMerkleRoot=witnessMerkleRoot;
+      activeContractSetMerkleRoot=acsMerkleRoot; }
 
 let validateHeader chain (header:BlockHeader) =
     if header.timestamp > chain.versionExpiry then
@@ -255,7 +261,7 @@ let validate chain =
 
         if txMerkleRoot = block.txMerkleRoot && witnessMerkleRoot = block.witnessMerkleRoot then
             let commitments =
-                Block.createCommitments block.txMerkleRoot block.witnessMerkleRoot block.activeContractSetMerkleRoot block.cgpCommitment block.commitments
+                Block.createCommitments block.txMerkleRoot block.witnessMerkleRoot block.activeContractSetMerkleRoot block.commitments
                 |> computeCommitmentsRoot
 
             if commitments = block.header.commitments then
@@ -375,11 +381,9 @@ let connect chainParams getUTXO getTx contractsPath (parent:BlockHeader) timesta
         let acs = ActiveContractSet.expireContracts block.header.blockNumber acs
         let acsMerkleRoot = ActiveContractSet.root acs
 
-        let cgpCommitment = CGP.hash cgp
-
         // we already validated txMerkleRoot and witness merkle root at the basic validation, re-calculate with acsMerkleRoot
         let commitments =
-            Block.createCommitments block.txMerkleRoot block.witnessMerkleRoot acsMerkleRoot cgpCommitment block.commitments
+            Block.createCommitments block.txMerkleRoot block.witnessMerkleRoot acsMerkleRoot block.commitments
             |> computeCommitmentsRoot
 
         // We ignore the known commitments in the block as we already calculated them

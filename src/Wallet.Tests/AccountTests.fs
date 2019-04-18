@@ -348,7 +348,6 @@ let ``account sync up``() =
         txMerkleRoot = Hash.zero
         witnessMerkleRoot = Hash.zero
         activeContractSetMerkleRoot = Hash.zero
-        cgpCommitment = None
         commitments= []
     }
 
@@ -391,7 +390,6 @@ let ``sync up from empty wallet``() =
         txMerkleRoot = Hash.zero
         witnessMerkleRoot = Hash.zero
         activeContractSetMerkleRoot = Hash.zero
-        cgpCommitment = None
         commitments = []
     }
 
@@ -460,7 +458,6 @@ let ``account reorg``() =
         txMerkleRoot = Hash.zero
         witnessMerkleRoot = Hash.zero
         activeContractSetMerkleRoot = Hash.zero
-        cgpCommitment = None
         commitments= []
     }
 
@@ -482,7 +479,6 @@ let ``account reorg``() =
        txMerkleRoot = Hash.zero
        witnessMerkleRoot = Hash.zero
        activeContractSetMerkleRoot = Hash.zero
-       cgpCommitment = None
        commitments= []
     }
 
@@ -586,7 +582,12 @@ let ``wallet spend coinbase when come from block``() =
             nonce = 0UL,0UL
         }
 
-    let block = {header=header;transactions=[Transaction.toExtended origin];commitments=[];txMerkleRoot=Hash.zero; witnessMerkleRoot=Hash.zero;activeContractSetMerkleRoot=Hash.zero;cgpCommitment=None}
+    let block = { header=header;
+                  transactions=[Transaction.toExtended origin];
+                  commitments=[];
+                  txMerkleRoot=Hash.zero;
+                  witnessMerkleRoot=Hash.zero;
+                  activeContractSetMerkleRoot=Hash.zero; }
 
     Account.addBlock dataAccess session (Block.hash block.header) block
 
@@ -620,7 +621,6 @@ let ``Should get expected history``() =
         txMerkleRoot = Hash.zero
         witnessMerkleRoot = Hash.zero
         activeContractSetMerkleRoot = Hash.zero
-        cgpCommitment = None
         commitments = []
     }
 

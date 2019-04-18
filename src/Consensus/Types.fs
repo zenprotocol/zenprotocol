@@ -172,13 +172,11 @@ type Block = {
     txMerkleRoot: Hash.Hash
     witnessMerkleRoot: Hash.Hash
     activeContractSetMerkleRoot: Hash.Hash
-    cgpCommitment: Hash.Hash option
     commitments: Hash.Hash list
     transactions: TransactionExtended list
 } with
-    static member createCommitments txMerkleRoot witnessMerkleRoot acsMerkleRoot cgpCommitment rest =
-        [ txMerkleRoot; witnessMerkleRoot; acsMerkleRoot ] 
-        @ match cgpCommitment with | Some cgpCommitment -> [ cgpCommitment ] | None -> []
+    static member createCommitments txMerkleRoot witnessMerkleRoot acsMerkleRoot rest =
+        [ txMerkleRoot; witnessMerkleRoot; acsMerkleRoot ]
         @ rest
 
 let Anonymous = Zen.Types.Main.Anonymous

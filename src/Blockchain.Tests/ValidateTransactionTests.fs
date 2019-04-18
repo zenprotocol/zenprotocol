@@ -453,7 +453,6 @@ let ``Transaction already in db but not part of the main chain``() =
             txMerkleRoot = Hash.zero
             activeContractSetMerkleRoot = Hash.zero
             witnessMerkleRoot = Hash.zero
-            cgpCommitment = None
             commitments = []
         }
 
@@ -502,7 +501,6 @@ let ``Transaction already in db and part of the main chain is ignored``() =
             txMerkleRoot = Hash.zero
             activeContractSetMerkleRoot = Hash.zero
             witnessMerkleRoot = Hash.zero
-            cgpCommitment = None
             commitments = []
         }
 

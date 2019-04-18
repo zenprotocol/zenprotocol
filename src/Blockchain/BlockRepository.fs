@@ -31,7 +31,6 @@ let getFullBlock session (block:ExtendedBlockHeader.T) =
         txMerkleRoot=block.txMerkleRoot
         witnessMerkleRoot=block.witnessMerkleRoot
         activeContractSetMerkleRoot=block.activeContractSetMerkleRoot
-        cgpCommitment=block.cgpCommitment
         commitments=block.commitments
         transactions=transactions
     }

@@ -23,7 +23,6 @@ type T = {
     txMerkleRoot: Hash.Hash
     witnessMerkleRoot: Hash.Hash
     activeContractSetMerkleRoot: Hash.Hash
-    cgpCommitment: Hash.Hash option
     commitments: Hash.Hash list
 }
 
@@ -43,7 +42,6 @@ let empty =
        txMerkleRoot = Hash.zero
        witnessMerkleRoot = Hash.zero
        activeContractSetMerkleRoot = Hash.zero
-       cgpCommitment = None
        commitments = []
    }
 
@@ -56,7 +54,6 @@ let createOrphan blockHash (block:Block) =
         txMerkleRoot = block.txMerkleRoot
         witnessMerkleRoot = block.witnessMerkleRoot
         activeContractSetMerkleRoot = block.activeContractSetMerkleRoot
-        cgpCommitment = block.cgpCommitment
         commitments = block.commitments
     }
 
@@ -71,7 +68,6 @@ let createGenesis blockHash (block:Block) =
         txMerkleRoot = block.txMerkleRoot
         witnessMerkleRoot = block.witnessMerkleRoot
         activeContractSetMerkleRoot = block.activeContractSetMerkleRoot
-        cgpCommitment = block.cgpCommitment
         commitments = block.commitments
     }
 
@@ -89,7 +85,6 @@ let private create status prevBlock blockHash (block:Block) =
             txMerkleRoot = block.txMerkleRoot
             witnessMerkleRoot = block.witnessMerkleRoot
             activeContractSetMerkleRoot = block.activeContractSetMerkleRoot
-            cgpCommitment = block.cgpCommitment
             commitments = block.commitments
         }
 

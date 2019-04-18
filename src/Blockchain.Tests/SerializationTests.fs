@@ -93,8 +93,6 @@ type BlockchainGenerators =
                 let! hash = Gen.arrayOfLength Hash.Length Arb.generate<byte>
                 return Hash hash
             }
-            
-            let cgpCommitment = match commitments with | cgpCommitment :: _ -> Some cgpCommitment | _ -> None
 
             return {
                 hash = Hash hash
@@ -104,7 +102,6 @@ type BlockchainGenerators =
                 txMerkleRoot = Hash txMerkleRoot
                 witnessMerkleRoot = Hash witnessMerkleRoot
                 activeContractSetMerkleRoot = Hash activeContractSetMerkleRoot
-                cgpCommitment = cgpCommitment
                 commitments = commitments
             }
         }
