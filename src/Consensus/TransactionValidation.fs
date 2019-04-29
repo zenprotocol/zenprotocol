@@ -256,6 +256,7 @@ let private checkStructure =
                 || isEmptyArr bytes
             | _ ->
                 false
+            
             || isInvalidSpend spend
         ) tx.outputs then
             GeneralError "structurally invalid output(s)"
@@ -267,6 +268,8 @@ let private checkStructure =
             | { lock = Vote ({ allocation = None; payout = None }, _, _); spend = _ } ->
                 true
             | { lock = Vote ({ allocation = Some x; payout = _ }, _, _); spend = _ } when x > 99uy ->
+                true
+            | { lock = Vote ({ allocation = _; payout = Some (_, amount) }, _, _); spend = _ } when amount = 0UL ->
                 true
             | { lock = Vote _; spend = spend } when spend.asset <> Asset.Zen ->
                 true
@@ -371,7 +374,7 @@ let validateCoinbase chain blockNumber =
             Ok tx
         | true, { lock = Contract _; spend = spend } when isZen spend ->
             Ok tx
-        | true, { lock = Coinbase (blockNumber',_); spend = _ } when blockNumber' = blockNumber ->
+        | true, { lock = Coinbase (blockNumber',_); spend = spend } when isZen spend && blockNumber' = blockNumber ->
             Ok tx
             (* could be in a payout block without an actual payout in the following cases:
                 1) payout blocks before the hard-fork

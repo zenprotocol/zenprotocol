@@ -62,6 +62,33 @@ let ``Should invalidate a transaction with voting lock with non Zen asset``() =
 
     makeTx Version1 lock spend
     |> expectError "structurally invalid vote locks(s)"
+    
+[<Test>]
+let ``Should invalidate a transaction with zero payout ``() =
+    let recipient = Recipient.PKRecipient <| Hash (Array.create 32 0uy)
+    let spend = { asset = Asset.Zen; amount = 10UL }
+    let lock = Vote ({ allocation = None; payout = Some <| (recipient, 0UL) }, 1u, Hash (Array.create 32 0uy))
+
+    makeTx Version1 lock spend
+    |> expectError "structurally invalid vote locks(s)"
+
+    let lock = Vote ({ allocation = None; payout = Some <| (recipient, 1UL) }, 1u, Hash (Array.create 32 0uy))
+
+    makeTx Version1 lock spend
+    |> expectOk
+
+     // With allocation
+     
+    let lock = Vote ({ allocation = Some 1uy; payout = Some <| (recipient, 0UL) }, 1u, Hash (Array.create 32 0uy))
+
+    makeTx Version1 lock spend
+    |> expectError "structurally invalid vote locks(s)"
+
+    let lock = Vote ({ allocation = Some 1uy; payout = Some <| (recipient, 1UL) }, 1u, Hash (Array.create 32 0uy))
+
+    makeTx Version1 lock spend
+    |> expectOk
+
 
 [<Test>]
 let ``Should invalidate a transaction with voting lock with empty vote``() =
