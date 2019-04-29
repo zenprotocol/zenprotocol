@@ -68,6 +68,8 @@ let requestHandler chain (requestId:RequestId) request dataAccess session view =
         Repository.getContractHistory dataAccess session view skip take contractId
         |> Ok
         |> reply<ContractHistoryResponse> requestId
+    |> ignore
+    
     view
 
 type Wipe =
