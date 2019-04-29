@@ -5,6 +5,7 @@
 open Operators.Checked
 
 open Consensus
+open Consensus.Crypto
 open Types
 open Hash
 open TxSkeleton
@@ -76,6 +77,10 @@ let fsToFstLock (outputLock:Types.Lock) : lock =
 let fsToFstOutpoint (o:Outpoint) : outpoint = {txHash = Hash.bytes o.txHash;index = o.index}
 
 let fsToFstPublicKey (Crypto.PublicKey pk) : publicKey = pk
+
+let fstToFsPublicKey (pk: publicKey) : Crypto.PublicKey  = Crypto.PublicKey pk
+
+let fstToFsSignature (signature: signature) : Crypto.Signature = Crypto.Signature signature
 
 let fsToFstSignature (Crypto.Signature signature) : signature = signature
 

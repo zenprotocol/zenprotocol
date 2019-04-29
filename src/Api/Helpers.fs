@@ -4,6 +4,7 @@ open FSharp.Data
 open Api.Types
 open Consensus.Types
 open Consensus
+open Consensus.Crypto
 open Wallet
 open Zen.Types.Data
 open FsBech32
@@ -169,11 +170,13 @@ let dataEncoder chain data =
             |> lockEncoder chain
         | Signature v ->
             v
-            |> Base16.encode
+            |> ZFStar.fstToFsSignature
+            |> Signature.toString
             |> JsonValue.String
         | PublicKey v ->
             v
-            |> Base16.encode
+            |> ZFStar.fstToFsPublicKey
+            |> PublicKey.toString
             |> JsonValue.String
         | Collection (Array v) ->
             v
