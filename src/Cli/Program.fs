@@ -398,8 +398,14 @@ let main argv =
         | _ -> ()
     with
     | :? Net.WebException as ex ->
-        use reader = new StreamReader(ex.Response.GetResponseStream())
-        exit (reader.ReadToEnd())
+        let message = ex.Message
+        if ex.Response <> null then
+            use reader = new StreamReader(ex.Response.GetResponseStream())
+            let body = reader.ReadToEnd()
+            if body = message then message else sprintf "%s %s" message (reader.ReadToEnd())
+        else
+            message
+        |> exit
     | :? AggregateException as ex ->
         exit (ex.Flatten().InnerException.Message)
     | ex ->
