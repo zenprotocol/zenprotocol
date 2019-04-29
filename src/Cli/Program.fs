@@ -92,6 +92,7 @@ type Arguments =
     | [<CliPrefix(CliPrefix.None)>] RawTx_Sign of ParseResults<RawTransactionSignArgs>
     | [<CliPrefix(CliPrefix.None)>] RawTx_Publish of ParseResults<RawTransactionPublishArgs>
     | [<CliPrefix(CliPrefix.None)>] Wallet_Create of ParseResults<NoArgs>
+    | [<CliPrefix(CliPrefix.None)>] Blockchain_Info of ParseResults<NoArgs>
 
     interface IArgParserTemplate with
         member arg.Usage =
@@ -102,7 +103,7 @@ type Arguments =
             | History _ -> "list wallet transactions"
             | Address _ -> "get wallet address"
             | Resync _ -> "resync wallet"
-            | Import _ -> "import wallet seed from mnemonic sentence."
+            | Import _ -> "import wallet seed from mnemonic sentence"
             | Send _ -> "send asset to address"
             | Activate _ -> "activate contract"
             | Extend _ -> "extend contract activation"
@@ -119,7 +120,8 @@ type Arguments =
             | RawTx_Create _ -> "create a raw transaction that pass the asset and amount to the address"
             | RawTx_Sign _ -> "sign all possible inputs of the raw transaction and return the signed transaction"
             | RawTx_Publish _ -> "publish a fully signed raw transaction"
-            | Wallet_Create _ -> "Generate new mnemonic phrase and creating a wallet. Use mnemonichhrase command to get the newly generated mnemonic phrase."
+            | Wallet_Create _ -> "create a wallet from a newly generated mnemonic phrase"
+            | Blockchain_Info _ -> "get blockchain info"
             | _ -> ""
 
 
@@ -127,7 +129,7 @@ let mutable port = 11567us
 //let mutable port = 31567us
 
 let getUri = sprintf "http://127.0.0.1:%d/%s" port
-
+    
 let errorHandler =
     let colorizer = function | ErrorCode.HelpText -> None
                              | _ -> Some ConsoleColor.Red
@@ -394,7 +396,19 @@ let main argv =
             |> TxHexJson.Root(raw).JsonValue.Request
             |> printResponse
         | Some (Wallet_Create _) -> createWallet()
-
+        | Some (Blockchain_Info _) ->
+            "blockchain/info"
+            |> getUri
+            |> BlockChainInfoJson.Load
+            |> fun json -> 
+                printfn "chain: %s\nblocks: %d\nheaders: %d\ndifficulty: %A\nmedianTime: %i\ninitialBlockDownload: %A\ntip: %A"
+                    json.Chain
+                    json.Blocks
+                    json.Headers
+                    json.Difficulty
+                    json.MedianTime
+                    json.InitialBlockDownload
+                    json.Tip
         | _ -> ()
     with
     | :? Net.WebException as ex ->
