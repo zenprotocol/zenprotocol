@@ -92,6 +92,7 @@ type Arguments =
     | [<CliPrefix(CliPrefix.None)>] RawTx_Sign of ParseResults<RawTransactionSignArgs>
     | [<CliPrefix(CliPrefix.None)>] RawTx_Publish of ParseResults<RawTransactionPublishArgs>
     | [<CliPrefix(CliPrefix.None)>] Wallet_Create of ParseResults<NoArgs>
+    | [<CliPrefix(CliPrefix.None)>] Blockchain_Info of ParseResults<NoArgs>
 
     interface IArgParserTemplate with
         member arg.Usage =
@@ -102,7 +103,7 @@ type Arguments =
             | History _ -> "list wallet transactions"
             | Address _ -> "get wallet address"
             | Resync _ -> "resync wallet"
-            | Import _ -> "import wallet seed from mnemonic sentence."
+            | Import _ -> "import wallet seed from mnemonic sentence"
             | Send _ -> "send asset to address"
             | Activate _ -> "activate contract"
             | Extend _ -> "extend contract activation"
@@ -119,15 +120,13 @@ type Arguments =
             | RawTx_Create _ -> "create a raw transaction that pass the asset and amount to the address"
             | RawTx_Sign _ -> "sign all possible inputs of the raw transaction and return the signed transaction"
             | RawTx_Publish _ -> "publish a fully signed raw transaction"
-            | Wallet_Create _ -> "Generate new mnemonic phrase and creating a wallet. Use mnemonichhrase command to get the newly generated mnemonic phrase."
+            | Wallet_Create _ -> "create a wallet from a newly generated mnemonic phrase"
+            | Blockchain_Info _ -> "get blockchain info"
             | _ -> ""
 
 
-let mutable port = 11567us
-//let mutable port = 31567us
-
-let getUri = sprintf "http://127.0.0.1:%d/%s" port
-
+let getUri' = sprintf "http://127.0.0.1:%d/%s"
+    
 let errorHandler =
     let colorizer = function | ErrorCode.HelpText -> None
                              | _ -> Some ConsoleColor.Red
@@ -167,35 +166,23 @@ let readPassword(): string =
     printfn "Enter password:"
     readMasked()
 
-// creates a wallet and password
-let rec createWallet(): unit =
-    let password1 = readPassword()
-    printfn "Enter password again:"
-    let password2 = readMasked()
-    if password1 <> password2 then
-        printfn "Passwords do not match, please try again"; createWallet()
-    else
-        let words = NBitcoin.Mnemonic(NBitcoin.Wordlist.English, NBitcoin.WordCount.TwentyFour).Words
-        getUri "wallet/import"
-        |> ImportSeedJson.Root(password1, words).JsonValue.Request
-        |> printResponse
-
 [<EntryPoint>]
 let main argv =
     let parser = ArgumentParser.Create<Arguments>(programName = "zen-ctl", errorHandler = errorHandler)
 
     let results = parser.ParseCommandLine argv
 
-    List.iter (fun arg ->
-        match arg with
-        | Port p -> port <- p
-        | Test -> port <- 31567us
+    let mutable getUri : (string -> string) = getUri' 11567us    
+    
+    List.iter (function
+        | Port p -> getUri <- getUri' p
+        | Test -> getUri <- getUri' 31567us
 #if DEBUG
-        | Local idx -> port <- 20000us + idx
-        | _ -> ()
+        | Local idx -> getUri <- getUri' (20000us + idx)
 #endif
+        | _ -> ()
         ) (results.GetAllResults())
-
+    
     let saveRawToFile (response : HttpResponse) =
         let text =
             match response.Body with
@@ -393,13 +380,44 @@ let main argv =
             |> getUri
             |> TxHexJson.Root(raw).JsonValue.Request
             |> printResponse
-        | Some (Wallet_Create _) -> createWallet()
-
+        | Some (Wallet_Create _) ->
+            // creates a wallet and password
+            let rec createWallet(): unit =
+                let password1 = readPassword()
+                printfn "Enter password again:"
+                let password2 = readMasked()
+                if password1 <> password2 then
+                    printfn "Passwords do not match, please try again"; createWallet()
+                else
+                    let words = NBitcoin.Mnemonic(NBitcoin.Wordlist.English, NBitcoin.WordCount.TwentyFour).Words
+                    getUri "wallet/import"
+                    |> ImportSeedJson.Root(password1, words).JsonValue.Request
+                    |> printResponse
+            createWallet()            
+        | Some (Blockchain_Info _) ->
+            "blockchain/info"
+            |> getUri
+            |> BlockChainInfoJson.Load
+            |> fun json -> 
+                printfn "chain: %s\nblocks: %d\nheaders: %d\ndifficulty: %A\nmedianTime: %i\ninitialBlockDownload: %A\ntip: %A"
+                    json.Chain
+                    json.Blocks
+                    json.Headers
+                    json.Difficulty
+                    json.MedianTime
+                    json.InitialBlockDownload
+                    json.Tip
         | _ -> ()
     with
     | :? Net.WebException as ex ->
-        use reader = new StreamReader(ex.Response.GetResponseStream())
-        exit (reader.ReadToEnd())
+        let message = ex.Message
+        if ex.Response <> null then
+            use reader = new StreamReader(ex.Response.GetResponseStream())
+            let body = reader.ReadToEnd()
+            if body = message then message else sprintf "%s %s" message (reader.ReadToEnd())
+        else
+            message
+        |> exit
     | :? AggregateException as ex ->
         exit (ex.Flatten().InnerException.Message)
     | ex ->
