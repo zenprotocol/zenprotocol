@@ -1,11 +1,8 @@
 module AddressDB.Serialization
 
-open FsNetMQ.Stream
-
 open Consensus
 open Serialization
 open Serialization
-open Hash
 open Wallet.Serialization
 
 open AddressDB.Types
@@ -119,24 +116,4 @@ module ContractData =
 
     let serialize = serialize size write
     let deserialize = deserialize read
-    
-module ContractHistory =
-    open System
-
-    let size (_:Hash, witnessIndex:uint32) =
-        Hash.size +
-        VarInt.size witnessIndex
-        
-    let write stream (txHash, witnessIndex) =
-        Hash.write stream txHash 
-        VarInt.write stream witnessIndex
-        
-    let read reader = 
-        let txHash = Hash.read reader
-        let witnessIndex = VarInt.read reader
-        txHash, witnessIndex
-        
-    let serialize = serialize size write
-    let deserialize = deserialize read
-        
     

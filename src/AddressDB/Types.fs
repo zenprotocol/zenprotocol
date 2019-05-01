@@ -24,3 +24,5 @@ type Tip =
         blockHash: Hash
         blockNumber: uint32
     }
+    
+type WitnessPoint = Outpoint // pointing to a witness within a transacion using its index

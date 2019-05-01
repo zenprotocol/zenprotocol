@@ -44,6 +44,9 @@ module ConfirmationStatus =
 
             Confirmed (blockNumber,blockHash,int blockIndex)
 
+    let serialize = serialize size write
+    let deserialize = deserialize read
+
 module Status =
     let size status =
         match status with
@@ -108,8 +111,6 @@ module Output =
     let deserialize = deserialize read
 
 module AddressType =
-    open DataAccess
-
     let size addressType =
         match addressType with
         | External index -> 1 + VarInt.size (uint32 index)
@@ -161,7 +162,6 @@ module Address =
         }
 
     let serialize = serialize size write
-
     let deserialize = deserialize read
 
 module ExtendedPublicKey =

@@ -13,7 +13,7 @@ type AddressType =
     | WatchOnly
 
 type ConfirmationStatus =
-    | Confirmed of uint32 * Hash * int
+    | Confirmed of uint32 * Hash * int // blockNumber,blockHash,blockIndex (tx index within block)
     | Unconfirmed
 
 type Status =

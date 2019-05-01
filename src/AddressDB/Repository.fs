@@ -34,17 +34,18 @@ let getBalance dataAccess session view mode addresses =
         | None -> Map.add output.spend.asset output.spend.amount balance
     ) Map.empty
 
+let getConfirmations blockNumber =
+    function
+    | Confirmed (blockNumber',_,blockIndex) ->
+        blockNumber - blockNumber' + 1ul, blockIndex
+    | Unconfirmed ->
+        0ul,0
+
 let getOutputsInfo blockNumber outputs = 
-    let getConfirmations confirmationStatus =
-        match confirmationStatus with
-        | Confirmed (blockNumber',_,blockIndex) ->
-            blockNumber - blockNumber' + 1ul, blockIndex
-        | Unconfirmed ->
-            0ul,0
 
     let incoming = List.map (fun (output:DBOutput) ->
         let txHash = output.outpoint.txHash
-        let confirmations,blockIndex = getConfirmations output.confirmationStatus
+        let confirmations,blockIndex = getConfirmations blockNumber output.confirmationStatus
 
         txHash, output.spend.asset, output.spend.amount |> bigint,confirmations,blockIndex) outputs
 
@@ -52,7 +53,7 @@ let getOutputsInfo blockNumber outputs =
         match output.status with
         | Unspent -> None
         | Spent (txHash,confirmationStatus) ->
-            let confirmations,blockIndex = getConfirmations confirmationStatus
+            let confirmations,blockIndex = getConfirmations blockNumber confirmationStatus
 
             (txHash, output.spend.asset, output.spend.amount |> bigint |> (*) -1I,confirmations,blockIndex)
             |> Some) outputs
@@ -81,10 +82,19 @@ let getHistory dataAccess session view skip take addresses =
     |> List.map (fun (txHash,direction,spend,confirmations,_) -> txHash,direction,spend,confirmations)
 
 let getContractHistory dataAccess session view skip take contractId =
-    View.ContractHistory.get view dataAccess session contractId
-    |> List.map (fun (txHash, witessIndex) -> View.ContractData.get view dataAccess session txHash witessIndex )
-    |> Wallet.Account.paginate skip take
+    let account = DataAccess.Tip.get dataAccess session
+
+    let confirmationsComparer a1 a2 =
+        Wallet.Account.confirmationsComparer (snd a1) (snd a2)
     
+    View.ContractHistory.get view dataAccess session contractId
+    |> List.map (fun witnessPoint ->
+        View.ContractData.get view dataAccess session witnessPoint,
+        View.ContractConfirmations.get view dataAccess session witnessPoint
+        |> getConfirmations account.blockNumber)
+    |> List.sortWith confirmationsComparer
+    |> Wallet.Account.paginate skip take
+    |> List.map (fun ((command, messageBody, txHash), (confirmations, _)) -> command, messageBody, txHash, confirmations)
     
 let private witnessIndex tx =
     List.tryFindIndex (fun witness ->
@@ -112,7 +122,9 @@ let addBlock dataAccess session blockHash block =
     block.transactions
     |> List.mapi (fun blockIndex ex -> blockIndex, ex.tx, ex.txHash)
     |> List.iter (fun (blockIndex, tx, txHash) ->
-        Confirmed (block.header.blockNumber, blockHash, blockIndex)
+        let confirmationStatus = Confirmed (block.header.blockNumber, blockHash, blockIndex)
+        
+        confirmationStatus
         |> View.mapTxOutputs tx txHash
         |> List.iter (fun (address, outpoint, output) ->
             DataAccess.OutpointOutputs.put dataAccess session outpoint output
@@ -124,7 +136,7 @@ let addBlock dataAccess session blockHash block =
             | Outpoint outpoint ->
                 match DataAccess.OutpointOutputs.tryGet dataAccess session outpoint with
                 | Some output ->
-                    { output with status = Spent (txHash, Confirmed (block.header.blockNumber, blockHash, blockIndex)) }
+                    { output with status = Spent (txHash, confirmationStatus) }
                     |> DataAccess.OutpointOutputs.put dataAccess session outpoint
                 | None ->
                     failwithf "AddressDB could not resolve outpoint"
@@ -134,8 +146,11 @@ let addBlock dataAccess session blockHash block =
         tx.witnesses
         |> List.iter (function 
             | ContractWitness cw -> 
-                DataAccess.ContractData.put dataAccess session (txHash, witnessIndex tx) (cw.command, cw.messageBody)
-                DataAccess.ContractHistory.put dataAccess session cw.contractId (txHash, witnessIndex tx)
+                let witnessPoint = View.witnessPoint txHash tx cw
+
+                DataAccess.ContractData.put dataAccess session witnessPoint (cw.command, cw.messageBody)
+                DataAccess.ContractHistory.put dataAccess session cw.contractId witnessPoint
+                DataAccess.ContractConfirmations.put dataAccess session witnessPoint confirmationStatus
             | _ -> 
                 ()
         )
@@ -156,7 +171,7 @@ let undoBlock dataAccess session blockHash block =
 
     List.rev block.transactions
     |> List.iter (fun ex ->
-        // Unmark outputs as spentg
+        // Unmark outputs as spent
         ex.tx.inputs
         |> List.iter (fun input ->
             match input with
@@ -185,8 +200,11 @@ let undoBlock dataAccess session blockHash block =
         ex.tx.witnesses
         |> List.iter (function 
             | ContractWitness cw ->
-                DataAccess.ContractData.delete dataAccess session (ex.txHash, witnessIndex ex.tx)
-                DataAccess.ContractHistory.delete dataAccess session cw.contractId (ex.txHash, witnessIndex ex.tx)    
+                let witnessPoint = View.witnessPoint ex.txHash ex.tx cw
+                
+                DataAccess.ContractData.delete dataAccess session witnessPoint
+                DataAccess.ContractHistory.delete dataAccess session cw.contractId witnessPoint
+                DataAccess.ContractConfirmations.delete dataAccess session witnessPoint
             | _ ->
                 ()
         )
@@ -237,3 +255,5 @@ let reset dataAccess session =
     DataAccess.OutpointOutputs.truncate dataAccess session
     DataAccess.AddressOutpoints.truncate dataAccess session
     DataAccess.ContractData.truncate dataAccess session
+    DataAccess.ContractConfirmations.truncate dataAccess session
+    

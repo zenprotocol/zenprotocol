@@ -654,16 +654,10 @@ let ``Should get expected history``() =
     // add tx3 to mempool
     let view = View.addMempoolTransaction dataAccess session tx3Hash tx3 View.empty
 
-    let expected = (tx3Hash, TransactionDirection.Out, {asset=Asset.Zen;amount= 3UL}, 0u) :: expected
+    let expected = expected @ [ (tx3Hash, TransactionDirection.Out, {asset=Asset.Zen;amount= 3UL}, 0u) ]
     let result = Account.getHistory dataAccess session view 0 10
 
-    printfn "%A" result
-
     result |> should equal expected
-
-
-
-//    should equal expected (Account.getHistory 0 10 account')
 
 [<Test>]
 let ``sign contract wintess``() =

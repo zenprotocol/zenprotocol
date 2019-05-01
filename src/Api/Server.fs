@@ -397,8 +397,8 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
         | Error error ->
             replyError error
     | Get ("/wallet/transactioncount", _) ->
-        match Wallet.getTransactionCount client with 
-        | Ok count -> 
+        match Wallet.getTransactionCount client with
+        | Ok count ->
                     count
                     |> decimal
                     |> JsonValue.Number
@@ -750,7 +750,7 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
     | Post("/addressdb/contract/history", Some json) ->
         parseGetContractHistoryJson json
         >>= AddressDB.getContractHistory client
-        <@> List.map (fun (command, messageBody, txHash) ->
+        <@> List.map (fun (command, messageBody, txHash, confirmations) ->
             [|
                 "command",
                     command
@@ -761,8 +761,12 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
                     |> Option.defaultValue JsonValue.Null
                 "txHash",
                     txHash
-                    |> Hash.toString 
+                    |> Hash.toString
                     |> JsonValue.String
+                "confirmations",
+                    confirmations
+                    |> decimal
+                    |> JsonValue.Number
             |]
             |> JsonValue.Record
         )
