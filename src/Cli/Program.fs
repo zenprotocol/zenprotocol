@@ -125,10 +125,7 @@ type Arguments =
             | _ -> ""
 
 
-let mutable port = 11567us
-//let mutable port = 31567us
-
-let getUri = sprintf "http://127.0.0.1:%d/%s" port
+let getUri' = sprintf "http://127.0.0.1:%d/%s"
     
 let errorHandler =
     let colorizer = function | ErrorCode.HelpText -> None
@@ -169,35 +166,23 @@ let readPassword(): string =
     printfn "Enter password:"
     readMasked()
 
-// creates a wallet and password
-let rec createWallet(): unit =
-    let password1 = readPassword()
-    printfn "Enter password again:"
-    let password2 = readMasked()
-    if password1 <> password2 then
-        printfn "Passwords do not match, please try again"; createWallet()
-    else
-        let words = NBitcoin.Mnemonic(NBitcoin.Wordlist.English, NBitcoin.WordCount.TwentyFour).Words
-        getUri "wallet/import"
-        |> ImportSeedJson.Root(password1, words).JsonValue.Request
-        |> printResponse
-
 [<EntryPoint>]
 let main argv =
     let parser = ArgumentParser.Create<Arguments>(programName = "zen-ctl", errorHandler = errorHandler)
 
     let results = parser.ParseCommandLine argv
 
-    List.iter (fun arg ->
-        match arg with
-        | Port p -> port <- p
-        | Test -> port <- 31567us
+    let mutable getUri : (string -> string) = getUri' 11567us    
+    
+    List.iter (function
+        | Port p -> getUri <- getUri' p
+        | Test -> getUri <- getUri' 31567us
 #if DEBUG
-        | Local idx -> port <- 20000us + idx
+        | Local idx -> getUri <- getUri' (20000us + idx)
 #endif
         | _ -> ()
         ) (results.GetAllResults())
-
+    
     let saveRawToFile (response : HttpResponse) =
         let text =
             match response.Body with
@@ -395,7 +380,20 @@ let main argv =
             |> getUri
             |> TxHexJson.Root(raw).JsonValue.Request
             |> printResponse
-        | Some (Wallet_Create _) -> createWallet()
+        | Some (Wallet_Create _) ->
+            // creates a wallet and password
+            let rec createWallet(): unit =
+                let password1 = readPassword()
+                printfn "Enter password again:"
+                let password2 = readMasked()
+                if password1 <> password2 then
+                    printfn "Passwords do not match, please try again"; createWallet()
+                else
+                    let words = NBitcoin.Mnemonic(NBitcoin.Wordlist.English, NBitcoin.WordCount.TwentyFour).Words
+                    getUri "wallet/import"
+                    |> ImportSeedJson.Root(password1, words).JsonValue.Request
+                    |> printResponse
+            createWallet()            
         | Some (Blockchain_Info _) ->
             "blockchain/info"
             |> getUri
