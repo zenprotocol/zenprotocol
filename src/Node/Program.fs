@@ -186,6 +186,14 @@ let main argv =
     let dataPath = Platform.combine config.dataPath config.chain
 
     use brokerActor = createBroker serviceBusAddress publisherAddress
+    
+    use apiActor =
+        if config.api.enabled then
+            Api.Main.main chain busName config.api.bind
+            |> Disposables.toDisposable
+        else
+            Disposables.empty
+            
     use blockchainActor = Blockchain.Main.main dataPath chainParams busName wipe
 
     use networkActor =
@@ -210,12 +218,6 @@ let main argv =
         else
             Disposables.empty
 
-    use apiActor =
-        if config.api.enabled then
-            Api.Main.main chain busName config.api.bind
-            |> Disposables.toDisposable
-        else
-            Disposables.empty
 
 #if DEBUG
     if chain = Chain.Local then
