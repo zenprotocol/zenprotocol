@@ -84,15 +84,20 @@ let getHistory dataAccess session view skip take addresses =
 let getContractHistory dataAccess session view skip take contractId =
     let account = DataAccess.Tip.get dataAccess session
 
-    let confirmationsComparer a1 a2 =
-        Wallet.Account.confirmationsComparer (snd a1) (snd a2)
+    let comparer a1 a2 =
+        let comparer (index1, block1) (index2, block2) = 
+            if index1 = index2 then
+                block2 - block1
+            else        
+                int (index2 - index1)
+        comparer (snd a1) (snd a2)
     
     View.ContractHistory.get view dataAccess session contractId
     |> List.map (fun witnessPoint ->
         View.ContractData.get view dataAccess session witnessPoint,
         View.ContractConfirmations.get view dataAccess session witnessPoint
         |> getConfirmations account.blockNumber)
-    |> List.sortWith confirmationsComparer
+    |> List.sortWith comparer
     |> Wallet.Account.paginate skip take
     |> List.map (fun ((command, messageBody, txHash), (confirmations, _)) -> command, messageBody, txHash, confirmations)
     
