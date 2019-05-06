@@ -475,15 +475,14 @@ let getOutputsInfo blockNumber outputs =
         else
             (txHash,TransactionDirection.Out, {asset=asset;amount = amount * -1I |> uint64}, confirmations, blockIndex))
     |> List.ofSeq
-
-let confirmationsComparer (confirmations1, blockIndex1) (confirmations2, blockIndex2) =
-    if confirmations1 = confirmations2 then
-        blockIndex2 - blockIndex1
-    else        
-        int (confirmations2 - confirmations1)
-
-let txComparer (_, _, _, blockNumber1, blockIndex1) (_, _, _, blockNumber2, blockIndex2) =
-    confirmationsComparer (blockNumber1, blockIndex1) (blockNumber2, blockIndex2)
+   
+let txComparer (_,_,_,x1,x2) (_,_,_,y1,y2) =
+    if x1 < y1 then
+        -1
+    elif x1 > y1 then
+       1
+    else
+        y2 - x2
 
 let paginate skip take list =
     list
