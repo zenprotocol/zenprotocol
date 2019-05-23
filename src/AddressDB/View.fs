@@ -114,7 +114,8 @@ let mapTxOutputs tx txHash confirmationStatus =
     |> List.mapi (fun index output -> uint32 index, output)
     |> List.choose (fun (index, output) ->
         match output.lock with
-        | Coinbase (_,pkHash) -> Some (Address.PK pkHash, index, output)
+        | Coinbase (_,pkHash)
+        | Vote (_,_, pkHash)
         | PK pkHash -> Some (Address.PK pkHash, index, output)
         | Contract contractId -> Some (Address.Contract contractId, index, output)
         | _ -> None)
