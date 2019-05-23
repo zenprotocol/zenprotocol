@@ -46,7 +46,7 @@ let main dataPath chainParams busName wipe =
         let tip, acs, ema, contractCache, cgp =
             use session = DatabaseContext.createSession databaseContext
             match BlockRepository.tryGetTip session with
-            | Some (tip,ema,tally) ->
+            | Some (tip,ema,cgp) ->
                 eventX "Loading tip from db #{blockNumber} {blockHash}"
                 >> setField "blockNumber" tip.header.blockNumber
                 >> setField "blockHash" (Hash.toString tip.hash)
@@ -60,7 +60,7 @@ let main dataPath chainParams busName wipe =
                 Seq.fold (fun contractCache contract ->
                     ContractCache.add contract contractCache)
                     ContractCache.empty (ActiveContractSet.getContracts acs),
-                tally
+                cgp
 
             | None ->
                 eventX "No tip in db"

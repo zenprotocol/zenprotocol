@@ -351,7 +351,7 @@ let validateBasic =
 
 let validateCoinbase chain blockNumber =
     let isPayout = CGP.isPayoutBlock chain blockNumber
-    let checkOnlyCoinbaseLocks blockNumber tx =
+    let checkOnlyCoinbaseLocks tx =
         let allCoinbase =
             tx.outputs
             |> if isPayout then List.tail else id
@@ -410,7 +410,7 @@ let validateCoinbase chain blockNumber =
     checkOutputsNotEmpty
     >=> checkNoInput
     >=> checkNoWitnesses
-    >=> checkOnlyCoinbaseLocks blockNumber
+    >=> checkOnlyCoinbaseLocks
     >=> checkPayout
     >=> checkNoContract
     >=> checkOutputsOverflow
