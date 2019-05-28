@@ -452,7 +452,7 @@ let getOutputsInfo blockNumber outputs =
         let txHash = output.outpoint.txHash
         let confirmations,blockIndex = getConfirmations output.confirmationStatus
 
-        txHash, output.spend.asset, output.spend.amount |> bigint,confirmations,blockIndex) outputs
+        txHash, output.spend.asset, output.spend.amount |> bigint,confirmations,blockIndex,output.lock) outputs
 
     let outgoing = List.choose (fun output ->
         match output.status with
@@ -460,23 +460,23 @@ let getOutputsInfo blockNumber outputs =
         | Spent (txHash,confirmationStatus) ->
             let confirmations,blockIndex = getConfirmations confirmationStatus
 
-            (txHash, output.spend.asset, output.spend.amount |> bigint |> (*) -1I,confirmations,blockIndex)
+            (txHash, output.spend.asset, output.spend.amount |> bigint |> (*) -1I,confirmations,blockIndex,output.lock)
             |> Some) outputs
 
     incoming @ outgoing
-    |> List.fold (fun txs (txHash, asset, amount, confirmations, blockIndex) ->
+    |> List.fold (fun txs (txHash, asset, amount, confirmations, blockIndex, lock) ->
         match Map.tryFind (txHash, asset) txs with
-        | None -> Map.add (txHash, asset) (amount, confirmations, blockIndex) txs
-        | Some (amount',_,_) -> Map.add (txHash, asset) (amount + amount', confirmations, blockIndex) txs) Map.empty
+        | None -> Map.add (txHash, asset) (amount, confirmations, blockIndex, lock) txs
+        | Some (amount',_,_,lock) -> Map.add (txHash, asset) (amount + amount', confirmations, blockIndex, lock) txs) Map.empty
     |> Map.toSeq
-    |> Seq.map (fun ((txHash, asset),(amount, confirmations, blockIndex)) ->
+    |> Seq.map (fun ((txHash, asset),(amount, confirmations, blockIndex, lock)) ->
         if amount >= 0I then
-            (txHash,TransactionDirection.In, {asset=asset;amount = uint64 amount}, confirmations, blockIndex)
+            (txHash,TransactionDirection.In, {asset=asset;amount = uint64 amount}, confirmations, blockIndex, lock)
         else
-            (txHash,TransactionDirection.Out, {asset=asset;amount = amount * -1I |> uint64}, confirmations, blockIndex))
+            (txHash,TransactionDirection.Out, {asset=asset;amount = amount * -1I |> uint64}, confirmations, blockIndex, lock))
     |> List.ofSeq
-   
-let txComparer (_,_,_,x1,x2) (_,_,_,y1,y2) =
+
+let txComparer (_,_,_,x1,x2,_) (_,_,_,y1,y2,_) =
     if x1 < y1 then
         -1
     elif x1 > y1 then
@@ -496,16 +496,15 @@ let getHistory dataAccess session view skip take =
     |> getOutputsInfo account.blockNumber
     |> List.sortWith txComparer
     |> paginate skip take
-    |> List.map (fun (txHash,direction,spend,confirmations,_) -> txHash,direction,spend,confirmations)
+    |> List.map (fun (txHash,direction,spend,confirmations,_,lock) -> txHash,direction,spend,confirmations,lock)
 
-    
 let getTransactionCount dataAccess session view =
     List.length (View.Outputs.getAll view dataAccess session)
-    
+
 // returns list of pubickeys with their correlating HD paths
 let getKeys dataAccess session password =
     let account = DataAccess.Account.get dataAccess session
-    
+
     let getPublicKey path =
         Secured.decrypt password account.secureMnemonicPhrase
         >>= ExtendedKey.fromMnemonicPhrase

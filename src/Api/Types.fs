@@ -136,7 +136,8 @@ type TransactionsResponseJson = JsonProvider<"""
         "txHash": "hash",
         "asset":"asset",
         "amount":2147483453648,
-        "confirmations": 0
+        "confirmations": 0,
+        "lock": "lock"
     }
 ]
 """>
