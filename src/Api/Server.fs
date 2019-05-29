@@ -413,10 +413,10 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
             | Ok txs ->
                 let json =
                     txs
-                    |> List.map (fun (txHash,direction, spend, confirmations) ->
+                    |> List.map (fun (txHash,direction, spend, confirmations, lock) ->
                         let amount = (if direction = TransactionDirection.In then 1L else -1L) * int64 spend.amount
 
-                        (new TransactionsResponseJson.Root(Hash.toString txHash, Asset.toString spend.asset, amount, int confirmations)).JsonValue)
+                        transactionHistoryEncoder chain txHash spend.asset amount confirmations lock)
                     |> List.toArray
                     |> JsonValue.Array
                 (new TransactionsResponseJson.Root(json)).JsonValue
@@ -731,10 +731,10 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
             | Ok txs ->
                 let json =
                     txs
-                    |> List.map (fun (txHash,direction, spend, confirmations) ->
+                    |> List.map (fun (txHash,direction, spend, confirmations, lock) ->
                         let amount = (if direction = TransactionDirection.In then 1L else -1L) * int64 spend.amount
 
-                        (new TransactionsResponseJson.Root(Hash.toString txHash, Asset.toString spend.asset, amount, int confirmations)).JsonValue)
+                        transactionHistoryEncoder chain txHash spend.asset amount confirmations lock)
                     |> List.toArray
                     |> JsonValue.Array
                 (new TransactionsResponseJson.Root(json)).JsonValue

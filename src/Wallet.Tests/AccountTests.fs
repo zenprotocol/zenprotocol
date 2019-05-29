@@ -642,8 +642,8 @@ let ``Should get expected history``() =
     let tx3 = {version=Version0;inputs=[Outpoint { txHash = tx2Hash; index = 1ul } ];outputs=[output3A;output3B];witnesses=[];contract=None}
 
     let expected = [
-        (tx2Hash, TransactionDirection.Out, {asset=Asset.Zen;amount= 2UL}, 1u);
-        (tx1Hash, TransactionDirection.In,{asset=Asset.Zen;amount= 10UL}, 1u) ]
+        (tx2Hash, TransactionDirection.Out, {asset=Asset.Zen;amount= 2UL}, 1u, PK accountPKHash);
+        (tx1Hash, TransactionDirection.In,{asset=Asset.Zen;amount= 10UL}, 1u, PK accountPKHash) ]
 
     let result = Account.getHistory dataAccess session View.empty 0 10
 
@@ -654,7 +654,7 @@ let ``Should get expected history``() =
     // add tx3 to mempool
     let view = View.addMempoolTransaction dataAccess session tx3Hash tx3 View.empty
 
-    let expected = (tx3Hash, TransactionDirection.Out, {asset=Asset.Zen;amount= 3UL}, 0u) :: expected
+    let expected = (tx3Hash, TransactionDirection.Out, {asset=Asset.Zen;amount= 3UL}, 0u, PK accountPKHash) :: expected
     let result = Account.getHistory dataAccess session view 0 10
 
     result |> should equal expected

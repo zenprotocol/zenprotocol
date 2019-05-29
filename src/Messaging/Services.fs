@@ -189,7 +189,7 @@ module Wallet =
         | In
         | Out
 
-    type TransactionsResponse = List<Hash*TransactionDirection*Spend*uint32>
+    type TransactionsResponse = List<Hash*TransactionDirection*Spend*uint32*Lock>
     type ActivateContractResponse = Transaction * ContractId
 
     type Command =

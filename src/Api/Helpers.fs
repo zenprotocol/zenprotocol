@@ -93,6 +93,17 @@ let transactionEncoder chain (tx:Transaction) =
             // witnesses not yet set
         |]
     |> omitNullFields
+    
+let transactionHistoryEncoder chain txHash asset (amount:int64) (confirmations:uint32) lock=
+    JsonValue.Record
+        [|
+            ("txHash",JsonValue.String (Hash.toString txHash));
+            ("asset", JsonValue.String (Asset.toString asset));
+            ("amount", JsonValue.Number (decimal amount))
+            ("confirmations", JsonValue.Number (decimal confirmations))
+            ("lock", lockEncoder chain lock)
+        |]
+    |> omitNullFields
 
 let blockHeaderEncoder (bh:BlockHeader) =
     BlockHeaderJson.Root (
