@@ -129,7 +129,7 @@ let run exe args =
 [<System.Runtime.InteropServices.DllImport("__Internal", EntryPoint="mono_get_runtime_build_info")>]
 extern string GetMonoVersion();
 
-let monoVersion =
+let monoVersion : Option<Version> =
     match isUnix,monoM with
     | true, Some _ ->
         let version = GetMonoVersion()
@@ -138,6 +138,7 @@ let monoVersion =
         (System.Convert.ToInt32 numbers.[0],
             System.Convert.ToInt32 numbers.[1],
             System.Convert.ToInt32 numbers.[2])
+        |> Version
         |> Some
 
     | _ -> None

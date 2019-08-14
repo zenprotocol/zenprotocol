@@ -104,8 +104,8 @@ let main argv =
             |> Log.error
 
             System.Environment.FailFast("Please install mono", null)
-        | Some (major,minor,_) ->
-            if major >= 5 && minor >= 10 then
+        | Some version ->
+            if version >= Version(5,10,0) then
                 eventX "Mono check passed"
                 |> Log.info
             else
