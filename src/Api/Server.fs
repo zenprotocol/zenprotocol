@@ -471,6 +471,10 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
     | Post ("/wallet/resync", _) ->
         Wallet.resyncAccount client
         reply StatusCode.OK NoContent
+    | Get ("/addressdb/resync", _)
+    | Post ("/addressdb/resync", _) ->
+        AddressDB.resyncAccount client
+        reply StatusCode.OK NoContent
     | Get ("/blockchain/cgp", _) ->
         let cgp = Blockchain.getCgp client
         reply StatusCode.OK (JsonContent <| (cgpEncoder chain cgp))

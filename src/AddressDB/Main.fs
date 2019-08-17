@@ -46,6 +46,12 @@ let rec private sync dataAccess session client =
             sync dataAccess session client
     | None -> View.empty
 
+let commandHandler client command dataAccess session view =
+    match command with
+    | Resync ->
+        Repository.reset dataAccess session
+        sync dataAccess session client
+
 let private reply<'a> (requestId:RequestId) (value : Result<'a,string>) =
     requestId.reply value
 
@@ -114,9 +120,10 @@ let main dataPath busName chain (wipe:Wipe) =
 
         let sbObservable =
             sbObservable
-            |> Observable.map (function
+            |> Observable.map (fun message ->
+                match message with
                 | ServiceBus.Agent.Request (requestId, r) -> requestHandler chain requestId r
-                | _ -> fun _ _ view -> view
+                | ServiceBus.Agent.Command command -> commandHandler client command
             )
                 
         let ebObservable =
