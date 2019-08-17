@@ -21,6 +21,14 @@ let private addSpend s m =
     | Some None -> m
     | None -> Map.add s.asset (0UL + s.amount) m
 
+let private isPayoutTransaction chainParams ex =
+    ex.tx.witnesses
+    |> List.filter (function
+        | ContractWitness cw -> cw.contractId = chainParams.cgpContractId
+        | _ -> false)
+    |>List.isEmpty
+    |> not
+
 let private foldSpends =
     List.fold (fun map s -> addSpend s map) Map.empty
 
@@ -161,8 +169,37 @@ let checkWeight chain tx txSkeleton =
             Error "transaction weight exceeds maximum")
     |> Result.mapError General
 
+    
+let private checkPayoutTx chainParams blockNumber (txSkeleton:TxSkeleton.T) (cgp:CGP.T) =
+    if CGP.isPayoutBlock chainParams blockNumber then
+        
+        let recipient, spends =
+            match cgp.payout with
+            | Some (recipient, spend) -> Some recipient, spend
+            | None -> None, []
+
+        let isPart spend =
+            txSkeleton.outputs
+            |> List.choose (function
+                | {lock=PK hash; spend = spend} ->
+                    match recipient with
+                    | Some (PKRecipient r)  when r = hash -> Some spend
+                    | _ -> None
+                | {lock=Contract cId; spend = spend} ->
+                    match recipient with
+                    | Some (ContractRecipient r)  when r = cId -> Some spend
+                    | _ -> None
+                | {lock= _; spend = spend} ->
+                     Some spend
+                | _ -> None)
+            |> List.contains spend
+            
+        if List.isEmpty spends || List.exists isPart spends then
+            GeneralError "transaction output do not reflect the cgp tally"
+        else
+            Ok ()
     else
-        Ok ()
+        GeneralError "CGP execution can be done only in the payout block"
         
 let private checkOutputsOverflow tx =
     if tx.outputs
@@ -308,38 +345,20 @@ let validateBasic =
     >=> checkActivationSacrifice
 
 let validateCoinbase chain blockNumber =
-    let isPayout = CGP.isPayoutBlock chain blockNumber
-    let checkOnlyCoinbaseLocks tx =
+    let checkOnlyCoinbaseOrContractLocks tx =
         let allCoinbase =
             tx.outputs
-            |> if isPayout then List.tail else id
             |> List.forall (fun output ->
-                match output.lock with
-                | Coinbase (blockNumber',_) when blockNumber' = blockNumber -> true
+                match output with
+                | {lock = Contract contractId; spend= _ } when chain.cgpContractId = contractId -> true
+                | {lock = Coinbase (blockNumber',_); spend= _ } when blockNumber' = blockNumber -> true
                 | _ -> false)
 
         if allCoinbase then
             Ok tx
         else
-            GeneralError "within coinbase transaction all outputs must use coinbase lock"
-
-    let checkPayout tx =
-        let isZen = function { amount = _; asset = asset } -> asset = Asset.Zen
-        match isPayout, List.head tx.outputs with
-        | false, _ ->
-            Ok tx
-        | true, { lock = PK _; spend = spend } when isZen spend ->
-            Ok tx
-        | true, { lock = Contract _; spend = spend } when isZen spend ->
-            Ok tx
-        | true, { lock = Coinbase (blockNumber',_); spend = spend } when isZen spend && blockNumber' = blockNumber ->
-            Ok tx
-            (* could be in a payout block without an actual payout in the following cases:
-                1) payout blocks before the hard-fork
-                2) the CGP can't satisfy any winning payout results
-                3) no payout votes exist *)
-        | _ ->
-            GeneralError "payout output mismatch"
+            eprintf "%A" tx
+            GeneralError "within coinbase transaction all outputs must use coinbase or contract lock"
 
     let checkNoInput tx =
         match tx.inputs with
@@ -368,8 +387,7 @@ let validateCoinbase chain blockNumber =
     checkOutputsNotEmpty
     >=> checkNoInput
     >=> checkNoWitnesses
-    >=> checkOnlyCoinbaseLocks
-    >=> checkPayout
+    >=> checkOnlyCoinbaseOrContractLocks
     >=> checkNoContract
     >=> checkOutputsOverflow
 

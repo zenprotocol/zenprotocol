@@ -212,6 +212,9 @@ module Serialization =
 
             loop 0ul
 
+        let serialize = serialize size write
+        let deserialize = deserialize read
+
     module Bytes =
         let size bytes =
             let length = Array.length bytes
@@ -304,11 +307,11 @@ module Serialization =
             Map.toList
             >> Seq.size sizeFn
 
-        let write stream writerFn =
+        let write writerFn stream =
             Map.toList
-            >> Seq.write stream writerFn
-        let read streamFn stream =
-            let l = List.read streamFn stream
+            >> Seq.write writerFn stream
+        let read readFn stream =
+            let l = List.read readFn stream
 
             let rec isSorted l =
                 match l with
@@ -319,6 +322,8 @@ module Serialization =
                 raise SerializationException
             else
                 Map.ofList l
+        let serialize sizefn writefn = serialize (size sizefn) (write writefn)
+        let deserialize readFn = deserialize (read readFn)
 
     module ContractId =
         let size (ContractId (version,_)) =
@@ -671,80 +676,126 @@ module Serialization =
             PublicKey.deserialize bytes
             |> ofOption
 
-    module VoteData =
-        module Allocation =
-            let size = Option.size (fun _ -> Byte.size)
-            let write stream = Option.write stream Byte.write
-            let read = Option.read Byte.read
+    module Allocation =
+        let size = Byte.size
+        let write stream = Byte.write stream
+        let read stream = Byte.read stream
+        let serialize = serialize (fun _ -> size) write
+        let deserialize = deserialize read
 
-        module Payout =
-            module Recipient =
-                [<Literal>]
-                let private PKIdentifier = 1uy
-                [<Literal>]
-                let private ContractIdentifier = 2uy
+    module Payout =
+        module Recipient =
+            [<Literal>]
+            let private PKIdentifier = 1uy
+            [<Literal>]
+            let private ContractIdentifier = 2uy
 
-                let size =
-                    function
-                    | PKRecipient _ -> Hash.size
-                    | ContractRecipient cid -> ContractId.size cid
-                    >> (+) Byte.size
+            let size =
+                function
+                | PKRecipient _ -> Hash.size
+                | ContractRecipient cid -> ContractId.size cid
+                >> (+) Byte.size
 
-                let private discriminator =
-                    function
-                    | PKRecipient _ -> PKIdentifier
-                    | ContractRecipient _ -> ContractIdentifier
+            let private discriminator =
+                function
+                | PKRecipient _ -> PKIdentifier
+                | ContractRecipient _ -> ContractIdentifier
 
-                let write stream = fun recipient ->
-                    Byte.write stream (discriminator recipient)
-                    match recipient with
-                    | PKRecipient pkHash -> 
-                        Hash.write stream pkHash
-                    | ContractRecipient contractId ->
-                        ContractId.write stream contractId
-
-                let read stream =
-                    let discriminator = Byte.read stream
-                    match discriminator with
-                    | PKIdentifier ->
-                        Hash.read stream
-                        |> PKRecipient
-                    | ContractIdentifier ->
-                        ContractId.read stream
-                        |> ContractRecipient
-                    | _ ->
-                        raise SerializationException
-
-            let size = fun (recipient, amount) ->
-                Recipient.size recipient + 
-                Amount.size amount
-
-            let write stream = fun (recipient, amount) ->
-                Recipient.write stream recipient
-                Amount.write stream amount
+            let write stream = fun recipient ->
+                Byte.write stream (discriminator recipient)
+                match recipient with
+                | PKRecipient pkHash ->
+                    Hash.write stream pkHash
+                | ContractRecipient contractId ->
+                    ContractId.write stream contractId
 
             let read stream =
-                Recipient.read stream,
-                Amount.read stream
+                let discriminator = Byte.read stream
+                match discriminator with
+                | PKIdentifier ->
+                    Hash.read stream
+                    |> PKRecipient
+                | ContractIdentifier ->
+                    ContractId.read stream
+                    |> ContractRecipient
+                | _ ->
+                    raise SerializationException
+        let size = fun (recipient, spend) ->
+            Recipient.size recipient +
+            List.size Spend.size spend
 
+        let write stream = fun (recipient, spend) ->
+            Recipient.write stream recipient
+            List.write Spend.write stream spend
+
+        let read stream =
+            Recipient.read stream,
+            List.read Spend.read stream
+        let serialize = serialize size write
+        let deserialize = deserialize read
+
+    module Winner =
         let size = fun { allocation = allocation; payout = payout } ->
-            Allocation.size allocation +
+            Option.size (fun _ ->  Allocation.size) allocation +
             Option.size Payout.size payout
 
         let write stream = fun { allocation = allocation; payout = payout } ->
-            Allocation.write stream allocation
+            Option.write stream (fun stream allocation -> Allocation.write stream allocation) allocation
             Option.write stream (fun stream payout -> Payout.write stream payout) payout
 
         let read stream =
             {
-                allocation = Allocation.read stream
+                allocation = Option.read Allocation.read stream
                 payout = Option.read Payout.read stream
             }
 
+        let serialize = serialize size write
+        let deserialize = deserialize read
+
+    module Ballot =
+        [<Literal>]
+        let private AllocationIdentifier = 1uy
+        [<Literal>]
+        let private PayoutIdentifier = 2uy
+
+        let size =
+            function
+            | Allocation _ -> Allocation.size
+            | Payout (recipient,spend) -> Payout.size (recipient,spend)
+            >> (+) Byte.size
+
+        let private discriminator =
+            function
+            | Allocation _ -> AllocationIdentifier
+            | Payout _ -> PayoutIdentifier
+
+        let write stream = fun ballot ->
+            Byte.write stream (discriminator ballot)
+            match ballot with
+            | Allocation allocation ->
+                Allocation.write stream allocation
+            | Payout (recipient,spend) ->
+                Payout.write stream (recipient,spend)
+
+        let read stream =
+            let discriminator = Byte.read stream
+            match discriminator with
+            | AllocationIdentifier ->
+                Allocation.read stream
+                |> Ballot.Allocation
+            | PayoutIdentifier ->
+                Payout.read stream
+                |> Ballot.Payout
+            | _ ->
+                raise SerializationException
+
+        let serialize = serialize size write
+        let deserialize = deserialize read
+
     module Lock =
         [<Literal>]
-        let LastReservedIdentifier = 9u
-        
+        let LastReservedIdentifier = 7u
+
         [<Literal>]
         let private PKIdentifier = 2u
         [<Literal>]
@@ -758,9 +809,7 @@ module Serialization =
         [<Literal>]
         let private ExtensionSacrificeIdentifier = 5u
         [<Literal>]
-        let private DestroyIdentifier = 7u
-        [<Literal>]
-        let private VoteIdentifier = LastReservedIdentifier // odd identifier - not spendable as HighV for older versions
+        let private DestroyIdentifier = LastReservedIdentifier
 
         let private identifier = function
             | PK _ -> PKIdentifier
@@ -770,9 +819,8 @@ module Serialization =
             | ActivationSacrifice -> ActivationSacrificeIdentifier
             | ExtensionSacrifice _ -> ExtensionSacrificeIdentifier
             | Destroy -> DestroyIdentifier
-            | Vote _ -> VoteIdentifier
             | HighVLock (identifier, _) -> identifier
-        
+
         let private sizeFn = function
             | PK _ -> Hash.size
             | Contract contractId -> ContractId.size contractId
@@ -781,10 +829,6 @@ module Serialization =
             | ActivationSacrifice
             | Destroy -> 0
             | Coinbase _ -> 4 + Hash.size
-            | Vote (data, blockNumber, _) ->
-                VoteData.size data +
-                VarInt.size blockNumber +
-                Hash.size
             | HighVLock (_, bytes) -> FixedSizeBytes.size bytes
 
         let size lock =
@@ -802,10 +846,6 @@ module Serialization =
             | Destroy -> ()
             | Coinbase (blockNumber, pkHash) ->
                 stream.writeNumber4 blockNumber
-                Hash.write stream pkHash
-            | Vote (data, blockNumber, pkHash) ->
-                VoteData.write stream data
-                VarInt.write stream blockNumber
                 Hash.write stream pkHash
             | HighVLock (_, bytes) ->
                 FixedSizeBytes.write stream bytes
@@ -839,11 +879,6 @@ module Serialization =
                 | ExtensionSacrificeIdentifier ->
                     let contractId = ContractId.read stream
                     Lock.ExtensionSacrifice contractId
-                | VoteIdentifier ->
-                    let data = VoteData.read stream
-                    let blockNumber = VarInt.read stream
-                    let pkHash = Hash.read stream
-                    Lock.Vote (data, blockNumber, pkHash)
                 | _ ->
                     let bytes = FixedSizeBytes.read (int count) stream
                     HighVLock (identifier, bytes)
@@ -1495,20 +1530,20 @@ module Serialization =
 
         let write stream bk =
             Header.write stream bk.header
-            
+
             Block.createCommitments bk.txMerkleRoot bk.witnessMerkleRoot bk.activeContractSetMerkleRoot bk.commitments
             |> Seq.write Hash.write stream
-            
+
             Seq.write TransactionExtended.write stream bk.transactions
         let read (stream:Stream) =
             let header = Header.read stream
             let commitments = List.read Hash.read stream
-            
-            let pop = 
+
+            let pop =
                 function
                 | next :: rest -> next, rest
                 | _ -> raise SerializationException
-                
+
             let transactions = List.read TransactionExtended.read stream
 
             let txMerkleRoot, commitments = pop commitments
@@ -1525,53 +1560,15 @@ module Serialization =
             }
 
     module CGP =
-        open VoteData
-        open Payout
-
-        module Tally =
-            let size = fun (tally:Tally.T) ->
-                Map.size (fun (_, votes) -> 
-                    Byte.size + 
-                    Amount.size votes) tally.allocation +
-                Map.size (fun ((recipient, amount), votes) -> 
-                    Recipient.size recipient + 
-                    Amount.size amount + 
-                    Amount.size votes) tally.payout
-        
-            let write (stream:Stream) = fun (tally:Tally.T) ->
-                Map.write (fun stream (allocation, votes)->
-                    Byte.write stream allocation
-                    Amount.write stream votes) stream tally.allocation
-                Map.write (fun stream ((recipient, amount), votes)->
-                    Recipient.write stream recipient
-                    Amount.write stream amount
-                    Amount.write stream votes) stream tally.payout
-        
-            let read (stream:Stream) =
-                {
-                    allocation = Map.read (fun stream -> Byte.read stream, Amount.read stream) stream
-                    payout = Map.read (fun stream -> VoteData.Payout.read stream, Amount.read stream) stream
-                } : Tally.T
-                
         let size = fun (cgp:CGP.T) ->
             Byte.size +
-            Amount.size cgp.amount +
-            Map.size (fun (interval, tally) -> 
-                VarInt.size interval + 
-                Tally.size tally) cgp.tallies +
             Option.size Payout.size cgp.payout
         let write (stream:Stream) = fun (cgp:CGP.T) ->
             Byte.write stream cgp.allocation
-            Amount.write stream cgp.amount
-            Map.write (fun stream (interval, tally)->
-                VarInt.write stream interval
-                Tally.write stream tally) stream cgp.tallies
             Option.write stream Payout.write cgp.payout
         let read (stream:Stream) =
             {
                 allocation = Byte.read stream
-                amount = Amount.read stream
-                tallies = Map.read (fun stream -> VarInt.read stream, Tally.read stream) stream
                 payout = Option.read Payout.read stream
             } : CGP.T
 
@@ -1692,4 +1689,3 @@ module TxSkeleton =
 
     let serialize = serialize size write
     let deserialize = deserialize read
-

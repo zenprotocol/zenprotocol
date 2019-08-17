@@ -1,4 +1,5 @@
 module Consensus.Chain
+open Consensus.Types
 open Infrastructure
 open Infrastructure.Result
 
@@ -24,7 +25,11 @@ type ChainParameters =
         versionExpiry:Timestamp.Timestamp
         coinbaseMaturity:uint32
         intervalLength:uint32
+        snapshot:uint32
         allocationCorrectionCap:byte
+        cgpContractId:ContractId
+        votingContractId:ContractId
+        upperAllocationBound: byte
     }
 
 let mainParameters =
@@ -41,8 +46,12 @@ let mainParameters =
         contractSacrificePerBytePerBlock=ContractSacrificePerBytePerBlock
         versionExpiry= new System.DateTime(2020,2,15,0,0,0,System.DateTimeKind.Utc) |> Infrastructure.Timestamp.fromDateTime
         intervalLength=10000ul
-        allocationCorrectionCap=50uy
+        snapshot=9000ul
+        allocationCorrectionCap=15uy
         coinbaseMaturity=100ul
+        cgpContractId= Option.get <| ContractId.fromString "00000000e2e56687e040718fa75210195a2ecbed6d5b2f9d53431b8ce3cba57588191b6a"
+        votingContractId= Option.get <| ContractId.fromString "00000000abbf8805a203197e4ad548e4eaa2b16f683c013e31d316f387ecf7adc65b3fb2"
+        upperAllocationBound=90uy
     }
 
 let testParameters =
@@ -62,8 +71,12 @@ let testParameters =
         contractSacrificePerBytePerBlock=ContractSacrificePerBytePerBlock
         versionExpiry= new System.DateTime(2200,1,1,0,0,0,System.DateTimeKind.Utc) |> Infrastructure.Timestamp.fromDateTime
         intervalLength=100ul
+        snapshot=90ul
         allocationCorrectionCap=5uy
         coinbaseMaturity=10ul
+        cgpContractId=Option.get <| ContractId.fromString "00000000eac6c58bed912ff310df9f6960e8ed5c28aac83b8a98964224bab1e06c779b93"
+        votingContractId= Option.get <| ContractId.fromString "00000000abbf8805a203197e4ad548e4eaa2b16f683c013e31d316f387ecf7adc65b3fb2" 
+        upperAllocationBound=90uy
     }
 
 let localGenesisHash = Hash.fromString "6d678ab961c8b47046da8d19c0de5be07eb0fe1e1e82ad9a5b32145b5d4811c7" |> get

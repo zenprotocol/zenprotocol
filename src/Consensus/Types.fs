@@ -54,9 +54,13 @@ type Recipient =
     | PKRecipient of Hash
     | ContractRecipient of ContractId
 
-type VoteData = {
+type Ballot = 
+    | Allocation of byte
+    | Payout of Recipient * Spend list
+    
+type Winner = {
     allocation: Option<byte>
-    payout: Option<Recipient * uint64>
+    payout: Option<Recipient * Spend list>
 }
 
 type Lock =
