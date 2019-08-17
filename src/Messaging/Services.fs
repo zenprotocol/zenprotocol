@@ -222,10 +222,11 @@ module Wallet =
         | GetTransactions of skip: int * take: int
         | GetBalance
         | ImportSeed of string list * password:string
-        | Send of publish:bool*outputs:List<Hash * Spend> * password:string
+        | Send of publish:bool*outputs:List<Lock * Spend> * password:string
         | ActivateContract of publish:bool*string * uint32 * password:string
         | ExtendContract of publish:bool*ContractId * uint32 * password:string
         | ExecuteContract of publish:bool*ContractId * string * data option * provideReturnAddress:bool * sign:string option * Map<Asset, uint64> * password:string
+        | ExecuteCGP of publish:bool * password:string
         | AccountExists
         | CheckPassword of password:string
         | GetPublicKey of path:string * password:string
@@ -276,6 +277,9 @@ module Wallet =
 
     let executeContract client publish address command messageBody provideReturnAddress sign spends password =
         send<Transaction> client serviceName (ExecuteContract (publish, address, command, messageBody, provideReturnAddress, sign, spends, password))
+
+    let executeCGP client publish password =
+        send<Transaction> client serviceName (ExecuteCGP (publish, password))
 
     let importSeed client words password =
         send<unit> client serviceName (ImportSeed (words, password))

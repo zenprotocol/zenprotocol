@@ -187,6 +187,10 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             error
             |> reply<Transaction> requestId
             NoAccount
+        | ExecuteCGP _ ->
+            error
+            |> reply<Transaction> requestId
+            NoAccount
         | GetPublicKey _ ->
             error
             |> reply<PublicKey> requestId
@@ -285,7 +289,7 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
         | Send (publish, outputs, password) ->
             let tx =
                 outputs
-                |> List.map (fun (hash, spend) -> { lock = PK hash; spend = spend })
+                |> List.map (fun (lock, spend) -> { lock = lock ; spend = spend })
                 |> TransactionCreator.createTransaction chainParams dataAccess session view password
 
             reply<Transaction> requestId tx
@@ -302,20 +306,19 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             reply<RawTransaction> requestId raw
             accountStatus
         | ActivateContract (publish, code, numberOfBlocks, password) ->
-            match Blockchain.getTip client with
-            | Some (_,header) ->
                 let tx =
-                    TransactionCreator.createActivateContractTransaction chainParams dataAccess session view chainParams password code numberOfBlocks header.blockNumber
+                    TransactionCreator.createActivateContractTransaction chainParams dataAccess session view chainParams password code numberOfBlocks
                     <@> fun tx -> tx, Consensus.Contract.makeContractId Version0 code
                 reply<ActivateContractResponse> requestId tx
                 publishTx dataAccess session client view publish (Result.map fst tx)
-            | None ->
-                Error "No tip"
-                |> reply<ActivateContractResponse> requestId
-                accountStatus
         | ExtendContract (publish, contractId, numberOfBlocks, password) ->
             let tx = TransactionCreator.createExtendContractTransaction dataAccess session view (Blockchain.getActiveContract client) chainParams password contractId numberOfBlocks
 
+            reply<Transaction> requestId tx
+            publishTx dataAccess session client view publish tx
+        | ExecuteCGP (publish, password) ->
+            let cgp = Blockchain.getCgp client
+            let tx = TransactionCreator.createExecuteCGP chainParams dataAccess session view (Blockchain.executeContract client) password cgp
             reply<Transaction> requestId tx
             publishTx dataAccess session client view publish tx
         | ExecuteContract (publish, contractId, command, data, provideReturnAddress, sign, spends, password) ->
@@ -472,3 +475,5 @@ let main dataPath busName chain (wipe:Wipe) =
             DataAccess.dispose dataAccess
             Disposables.dispose databaseContext), observable
     )
+
+

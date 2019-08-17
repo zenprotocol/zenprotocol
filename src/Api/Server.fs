@@ -453,6 +453,13 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
         | Ok (contractId, command, message, returnAddress, sign, spends, password) ->
             Wallet.executeContract client true contractId command message returnAddress sign spends password
             |> handleTxResult
+    | Post ("/wallet/contract/cgp", Some body) ->
+        match parseCheckPasswordJson body with
+        | Ok (password) ->
+            Wallet.executeCGP client true password
+            |> handleTxResult
+        | Error error ->
+            replyError error
     | Get ("/wallet/resync", _)
     | Post ("/wallet/resync", _) ->
         Wallet.resyncAccount client

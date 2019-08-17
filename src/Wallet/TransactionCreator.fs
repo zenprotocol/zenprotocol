@@ -292,7 +292,16 @@ let createExecuteContractTransaction chainParams dataAccess session view execute
     return! sign unsignedTx
 }
 
-let createActivateContractTransaction chainParams dataAccess session view chain password code (numberOfBlocks:uint32) tip =
+
+let createExecuteCGP chainParams dataAccess session (view:View.T) executeContract password (cgp:CGP.T) =
+    let contractId = chainParams.cgpContractId
+    let command = "Payout"
+    let outputs = Option.map CGP.internalizeRecipient cgp.payout
+    let data = Option.bind Consensus.CGP.Contract.createPayoutMsgBody outputs
+    createExecuteContractTransaction chainParams dataAccess session view executeContract password contractId command data false None Map.empty
+
+
+let createActivateContractTransaction chainParams dataAccess session view chain password code (numberOfBlocks:uint32) =
     result {
         let contractId = Contract.makeContractId Version0 code
 

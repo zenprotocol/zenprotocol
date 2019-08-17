@@ -37,14 +37,19 @@ let parseSendJson chain json =
             errors <- "Outputs is empty" :: errors
         else
             for output in json.Outputs do
-                Address.decodePK chain output.Address
-                |> function
+                match Address.decodeAny chain output.Address with
                 | Error err ->
                     errors <- ("Address is invalid: " + err) :: errors
-                | Ok pkHash ->
+                | Ok (Address.PK pkHash) ->
                     match getSpend output.Asset output.Amount with
                     | Ok spend ->
-                        outputs <- (pkHash, spend) :: outputs
+                        outputs <- (PK pkHash, spend) :: outputs
+                    | Error err ->
+                        errors <- err :: errors
+                | Ok (Address.Contract cId) ->
+                    match getSpend output.Asset output.Amount with
+                    | Ok spend ->
+                        outputs <- (Contract cId, spend) :: outputs
                     | Error err ->
                         errors <- err :: errors
 
