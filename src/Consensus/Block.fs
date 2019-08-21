@@ -1,14 +1,12 @@
 module Consensus.Block
-open MBrace.FsPickler.Combinators
 open Consensus
 open Types
 open Infrastructure
 open Result
 open Serialization
 open Chain
-open Consensus
-open Consensus
 open Consensus.Serialization.Serialization
+open Functional
 
 [<Literal>]
 let HeaderSize = 100
@@ -22,16 +20,6 @@ let genesisParent = {version=Version0;parent=Hash.zero;blockNumber=0ul;commitmen
 let result = new Result.ResultBuilder<string>()
 
 let private computeCommitmentsRoot = MerkleTree.computeRoot
-
-let private isPayoutTransaction chainParams ex =
-    ex.tx.witnesses
-    |> List.filter (fun witness ->
-        match witness with
-        | ContractWitness cw -> cw.contractId = chainParams.cgpContractId
-        | _ -> false)
-    |>List.isEmpty
-    |> not
-
 
 let hash =
     Header.serialize
@@ -103,17 +91,6 @@ let getBlockSacrificeAmount chain acs =
 
     Seq.sumBy computeContractSacrifice (ActiveContractSet.getContracts acs)
 
-let private getPayoutOutput = fun (recipient, (spend:Spend list)) ->
-    spend
-    |> List.map (fun spend -> 
-    {
-        lock =
-            match recipient with
-            | PKRecipient pkHash -> Lock.PK pkHash
-            | ContractRecipient cId -> Lock.Contract cId
-        spend = spend
-    })
-    
 let private getCgpCoinbase chain blockNumber (cgp:CGP.T) =
     if blockAllocation blockNumber cgp.allocation <> 0UL then
             let amount = blockAllocation blockNumber cgp.allocation
@@ -123,7 +100,7 @@ let private getCgpCoinbase chain blockNumber (cgp:CGP.T) =
             }]
         else
             []
-    
+
 let getBlockCoinbase chain acs blockNumber transactions coinbasePkHash (cgp:CGP.T) =
     // Get the coinbase outputs by summing the fees per asset and adding the block reward
     let coinbaseOutputs =
@@ -153,7 +130,7 @@ let getBlockCoinbase chain acs blockNumber transactions coinbasePkHash (cgp:CGP.
         |> Seq.toList
 
     let tx = {
-        version = Version1
+        version = Version0
         inputs = []
         outputs =  coinbaseOutputs @ getCgpCoinbase chain blockNumber cgp
         contract = None
@@ -228,7 +205,7 @@ let validateHeader chain (header:BlockHeader) =
 // TODO: Refactor to avoid chained state-passing style
 let validate chain =
     let checkTxNotEmpty (block:Block) =
-        if List.isEmpty block.transactions then Error "transactions is empty" else Ok block 
+        if List.isEmpty block.transactions then Error "transactions is empty" else Ok block
 
     let checkHeader (block:Block) =
         validateHeader chain block.header
@@ -240,7 +217,7 @@ let validate chain =
         else
             let coinbase = List.head block.transactions
 
-            match TransactionValidation.validateCoinbase chain block.header.blockNumber coinbase.tx with
+            match TransactionValidation.validateCoinbase block.header.blockNumber coinbase.tx with
             | Error error -> Error <| sprintf "Block failed coinbase validation due to %A" error
             | Ok _ -> Ok block
 
@@ -289,6 +266,57 @@ let validate chain =
     >=> checkTxBasic
     >=> checkCommitments
 
+let checkPayoutTx chainParams (cgp:CGP.T) (block:Block,ema) =
+
+    let internalizeRecipient ((recip, spends) : Recipient * List<Spend>) : List<Output> =
+        spends
+        |> List.map ( fun spend -> { lock = CGP.recipientToLock recip; spend = spend } )
+
+    let checkMessageBody (payout : Recipient * List<Spend>) (msgBody : Option<Zen.Types.Data.data>) : Result<unit, string> = result {
+        let! outputs =
+            msgBody
+            |> CGP.Contract.extractPayoutOutputs
+            |> Result.mapError (konst "Couldn't parse message body")
+
+        let winner =
+            internalizeRecipient payout
+
+        if List.sort outputs = List.sort winner
+            then return ()
+            else return! Error "Contract outputs are not the same as the payout winner"
+    }
+    
+    let extractPayoutWitnesses (ex : TransactionExtended) : List<ContractWitness> =
+        ex.tx.witnesses
+        |> List.choose (function ContractWitness cw when cw.contractId = chainParams.cgpContractId -> Some cw | _ -> None)
+        //|> List.pairWith ex.tx
+
+    if CGP.isPayoutBlock chainParams block.header.blockNumber then
+        let payoutWitnesses : List<ContractWitness> =
+            block.transactions
+            |> List.concatMap extractPayoutWitnesses
+
+        match payoutWitnesses with
+        | _ :: _ :: _ ->
+            Error "Multiple payout Txs"
+        | [] ->
+            match cgp.payout with
+            | None ->
+                Ok ()
+            | Some _ ->
+                Error "No payout Tx"
+        | [ cgpWitness ] ->
+            match cgp.payout with
+            | None ->
+                Error "There shouldn't be a payout - there is no payout winner"
+            | Some payout ->
+                cgpWitness.messageBody
+                |> checkMessageBody payout
+    else
+        Ok ()    // The CGP contract ensures there is never payout Tx outside the payout block
+    
+    |> Result.map (konst (block,ema))
+
 /// Apply block to UTXO, ACS and CGP; operation can fail
 let connect chainParams getUTXO contractsPath (parent:BlockHeader) timestamp utxoSet (cgp:CGP.T) acs contractCache ema getContractState contractStates  =
     let checkBlockNumber (block:Block) =
@@ -310,53 +338,8 @@ let connect chainParams getUTXO contractsPath (parent:BlockHeader) timestamp utx
         else
             Ok (block,nextEma)
 
-    let checkPayoutTX (block:Block,ema) =
-        let checkPayoutTx (ex:TransactionExtended) =
-            if CGP.isPayoutBlock chainParams block.header.blockNumber then
-                
-                let recipient, spends =
-                    match cgp.payout with
-                    | Some (recipient, spend) -> Some recipient, spend
-                    | None -> None, []
-        
-                let isPart spend =
-                    ex.tx.outputs
-                    |> List.choose (function
-                        | {lock=PK hash; spend = spend} ->
-                            match recipient with
-                            | Some (PKRecipient r)  when r = hash -> Some spend
-                            | _ -> None
-                        | {lock=Contract cId; spend = spend} ->
-                            match recipient with
-                            | Some (ContractRecipient r)  when r = cId -> Some spend
-                            | _ -> None
-                        | {lock= _; spend = spend} ->
-                             Some spend
-                        | _ -> None)
-                    |> List.contains spend
-                    
-                if List.isEmpty spends || List.exists isPart spends then
-                    Error "transaction output do not reflect the cgp winner"
-                else
-                    Ok (block,ema)
-            else
-                Error "CGP execution can be done only in the payout block"
-        if isGenesis chainParams block then
-            Ok (block,ema)
-        else
-            let payoutTX =
-                block.transactions
-                |> List.filter (isPayoutTransaction chainParams)
-                |> List.tryHead
-            
-            match payoutTX with
-            | Some tx ->
-                checkPayoutTx tx
-            | None ->
-                Ok (block,ema)
-
     let checkTxInputs (block,ema) =
-            
+
         if isGenesis chainParams block then
             let set = List.fold (fun set ex ->
                 UtxoSet.handleTransaction getUTXO ex.txHash ex.tx set) utxoSet block.transactions
@@ -377,7 +360,7 @@ let connect chainParams getUTXO contractsPath (parent:BlockHeader) timestamp utx
                 let set = UtxoSet.handleTransaction getUTXO ex.txHash ex.tx set
                 return block,set,acs,cgp,ema,contractCache,contractStates
             }) (Ok (block,set,acs,cgp,ema,contractCache,contractStates)) withoutCoinbase
-            
+
 
     let checkCoinbase (block,set,acs,(cgp:CGP.T),ema,contractCache,contractStates) =
         if isGenesis chainParams block then
@@ -389,7 +372,7 @@ let connect chainParams getUTXO contractsPath (parent:BlockHeader) timestamp utx
             let folder totals output =
                 let amount = defaultArg (Map.tryFind output.spend.asset totals) 0UL
                 Map.add output.spend.asset (output.spend.amount + amount) totals
-                
+
             // Compute the amount of reward per asset
             let coinbaseTotals = List.fold folder Map.empty coinbase.tx.outputs
 
@@ -415,13 +398,21 @@ let connect chainParams getUTXO contractsPath (parent:BlockHeader) timestamp utx
                         | {lock = Contract contractId; spend= _} when chainParams.cgpContractId = contractId -> true
                         | _ -> false)
                     |> List.fold folder Map.empty
+            let totalContractAmounts =
+                    coinbase.tx.outputs
+                    |> List.filter (function
+                        | {lock = Contract _; spend= _} -> true
+                        | _ -> false)
+                    |> List.fold folder Map.empty
             let amount =
-                match contractAmounts |> Map.tryFind Asset.Zen with
-                | Some amount -> amount
-                | None -> 0UL
-            
+                contractAmounts
+                |> Map.tryFind Asset.Zen
+                |> Option.defaultValue 0UL
+
             if coinbaseTotals <> blockRewardAndFees then
                 Error "block reward is incorrect"
+            elif totalContractAmounts <> contractAmounts then
+                Error "reward to cgp contract in invalid"
             elif amount <> (blockAllocation block.header.blockNumber cgp.allocation) then
                 Error "reward is not divided correctly"
             else
@@ -456,7 +447,7 @@ let connect chainParams getUTXO contractsPath (parent:BlockHeader) timestamp utx
     checkBlockNumber
     >=> checkDifficulty
     >=> checkWeight
-    >=> checkPayoutTX
+    >=> checkPayoutTx chainParams cgp
     >=> checkTxInputs
     >=> checkCoinbase
     >=> checkCommitments

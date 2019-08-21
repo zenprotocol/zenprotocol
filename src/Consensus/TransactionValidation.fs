@@ -21,14 +21,6 @@ let private addSpend s m =
     | Some None -> m
     | None -> Map.add s.asset (0UL + s.amount) m
 
-let private isPayoutTransaction chainParams ex =
-    ex.tx.witnesses
-    |> List.filter (function
-        | ContractWitness cw -> cw.contractId = chainParams.cgpContractId
-        | _ -> false)
-    |>List.isEmpty
-    |> not
-
 let private foldSpends =
     List.fold (fun map s -> addSpend s map) Map.empty
 
@@ -139,7 +131,11 @@ let private extendContracts chainParams acs tx = result {
         }) (Ok acs)
 }
 
+#if DEBUG
+let checkAmounts (txSkeleton:TxSkeleton.T) =
+#else
 let private checkAmounts (txSkeleton:TxSkeleton.T) =
+#endif
     let inputs = List.map (function | TxSkeleton.Input.PointedOutput (_, output) -> output.spend | TxSkeleton.Input.Mint spend -> spend) txSkeleton.pInputs
     let inputs, outputs = foldSpends inputs, foldSpends (List.map (fun o -> o.spend) txSkeleton.outputs)
 
@@ -168,38 +164,6 @@ let checkWeight chain tx txSkeleton =
         else
             Error "transaction weight exceeds maximum")
     |> Result.mapError General
-
-    
-let private checkPayoutTx chainParams blockNumber (txSkeleton:TxSkeleton.T) (cgp:CGP.T) =
-    if CGP.isPayoutBlock chainParams blockNumber then
-        
-        let recipient, spends =
-            match cgp.payout with
-            | Some (recipient, spend) -> Some recipient, spend
-            | None -> None, []
-
-        let isPart spend =
-            txSkeleton.outputs
-            |> List.choose (function
-                | {lock=PK hash; spend = spend} ->
-                    match recipient with
-                    | Some (PKRecipient r)  when r = hash -> Some spend
-                    | _ -> None
-                | {lock=Contract cId; spend = spend} ->
-                    match recipient with
-                    | Some (ContractRecipient r)  when r = cId -> Some spend
-                    | _ -> None
-                | {lock= _; spend = spend} ->
-                     Some spend
-                | _ -> None)
-            |> List.contains spend
-            
-        if List.isEmpty spends || List.exists isPart spends then
-            GeneralError "transaction output do not reflect the cgp tally"
-        else
-            Ok ()
-    else
-        GeneralError "CGP execution can be done only in the payout block"
         
 let private checkOutputsOverflow tx =
     if tx.outputs
@@ -220,12 +184,16 @@ let private checkMintsOnly tx =
         Ok tx
 
 let private checkVersion (tx:Transaction) =
-    if tx.version > Version1 then
+    if tx.version <> Version0 then
         GeneralError "unsupported transaction version"
     else
         Ok tx
 
+#if DEBUG
+let checkStructure =
+#else
 let private checkStructure =
+#endif
     let isInvalidSpend = fun { asset = (Asset (ContractId (version,cHash), subType)); amount = amount } ->
         cHash = Hash.zero && (subType <> Hash.zero || version <> Version0) ||
             amount = 0UL //Relieve for non spendables?
@@ -344,20 +312,19 @@ let validateBasic =
     >=> checkMintsOnly
     >=> checkActivationSacrifice
 
-let validateCoinbase chain blockNumber =
+let validateCoinbase blockNumber =
     let checkOnlyCoinbaseOrContractLocks tx =
         let allCoinbase =
             tx.outputs
             |> List.forall (fun output ->
                 match output with
-                | {lock = Contract contractId; spend= _ } when chain.cgpContractId = contractId -> true
+                | {lock = Contract _; spend= _ } -> true
                 | {lock = Coinbase (blockNumber',_); spend= _ } when blockNumber' = blockNumber -> true
                 | _ -> false)
 
         if allCoinbase then
             Ok tx
         else
-            eprintf "%A" tx
             GeneralError "within coinbase transaction all outputs must use coinbase or contract lock"
 
     let checkNoInput tx =
