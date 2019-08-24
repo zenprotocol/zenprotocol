@@ -906,8 +906,8 @@ let ``Out of order dependent transactions are rearranged``() =
     let timestamp = updatedState.tipState.tip.header.timestamp
     let acs = updatedState.tipState.activeContractSet
     let txList = List.map (fun tx -> (Transaction.toExtended tx, 0I)) [firstTx;secondTx]
-    let _, validatedTransactions = BlockTemplateBuilder.selectOrderedTransactions chain session blockNumber (timestamp + 100_000UL) acs CGP.empty Map.empty txList
-    let _, validatedTransactions_ = BlockTemplateBuilder.selectOrderedTransactions chain session blockNumber (timestamp + 100_000UL) acs CGP.empty Map.empty <| List.rev txList
+    let _, validatedTransactions = BlockTemplateBuilder.selectOrderedTransactions chain session blockNumber (timestamp + 100_000UL) acs Map.empty txList
+    let _, validatedTransactions_ = BlockTemplateBuilder.selectOrderedTransactions chain session blockNumber (timestamp + 100_000UL) acs Map.empty <| List.rev txList
 
     List.length validatedTransactions |> should equal 2
     validatedTransactions |> should equal validatedTransactions_

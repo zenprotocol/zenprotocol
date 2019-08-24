@@ -10,7 +10,6 @@ open Blockchain.State
 open Consensus
 
 let getUTXO = UtxoSetRepository.get
-let getTx = TransactionRepository.tryGetTransaction
 let getContractState = ContractStateRepository.get
 
 let result = new Result.ResultBuilder<string>()
@@ -29,28 +28,13 @@ let weights session state =
         >>= Weight.transactionWeight ex.tx
         <@> fun weight -> ex, weight)
 
-type BuilderState =
-    {
-        utxoSet: UtxoSet.T
-        activeContractSet: ActiveContractSet.T
-        mempool: MemPool.T
-        contractCache: ContractCache.T
-        contractStates: ContractStates.T
-        cgp: CGP.T
-    }
-    
-let selectOrderedTransactions (chain:Chain.ChainParameters) (session:DatabaseContext.Session) blockNumber timestamp acs cgp contractCache transactions =
+let selectOrderedTransactions (chain:Chain.ChainParameters) (session:DatabaseContext.Session) blockNumber timestamp acs contractCache transactions =
     let contractPath = session.context.contractPath
     let maxWeight = chain.maxBlockWeight
     let getUTXO = getUTXO session
     let blockNumber = blockNumber + 1ul
 
     let tryAddTransaction (state, added, notAdded, altered, weight) (ex,wt) =
-        let getTx = fun txhash ->
-            match List.tryFind (fun (ex:Types.TransactionExtended) -> ex.txHash = txhash) added with 
-            | Some ex -> Some ex
-            | None -> getTx session txhash
-
         let newWeight = weight+wt
         if newWeight > maxWeight then (state, added, notAdded, false, weight) else
         validateInContext chain getUTXO contractPath blockNumber timestamp
@@ -61,17 +45,9 @@ let selectOrderedTransactions (chain:Chain.ChainParameters) (session:DatabaseCon
             | Error _ ->
                 (state, added, notAdded, altered, weight)
             | Ok (tx, acs, contractCache, contractStates) ->
-                let cgp = CGP.handleTransaction (UtxoSet.getOutput getUTXO state.utxoSet) getTx ex.tx (CGP.getInterval chain blockNumber) state.cgp
                 let utxoSet = UtxoSet.handleTransaction getUTXO ex.txHash ex.tx state.utxoSet
                 let mempool = MemPool.add ex state.mempool
-                
-                { state with 
-                    activeContractSet = acs
-                    mempool = mempool
-                    utxoSet = utxoSet
-                    contractCache = contractCache
-                    contractStates = contractStates
-                    cgp = cgp }, tx :: added, notAdded, true, newWeight
+                ({state with activeContractSet=acs;mempool=mempool;utxoSet=utxoSet;contractCache=contractCache;contractStates=contractStates}, tx::added, notAdded, true, newWeight)
 
     let foldOverTransactions foldState txs =
         List.fold tryAddTransaction foldState txs
@@ -87,18 +63,18 @@ let selectOrderedTransactions (chain:Chain.ChainParameters) (session:DatabaseCon
     let initialState = {
         utxoSet = UtxoSet.asDatabase
         activeContractSet = acs
+        orphanPool = OrphanPool.create()
         mempool = MemPool.empty
         contractCache = contractCache
         contractStates = ContractStates.asDatabase
-        cgp = CGP.update chain blockNumber cgp
+        invalidTxHashes = Set.empty
     }
 
-    let state, txs = foldUntilUnchanged initialState transactions
+    foldUntilUnchanged initialState transactions
 
-    state, txs
 
 let makeTransactionList chain (session:DatabaseContext.Session) (state:State) timestamp = result {
     let! txs = weights session state 
     let txs = List.sortBy (fun (_,wt) -> wt) txs
-    return selectOrderedTransactions chain session state.tipState.tip.header.blockNumber timestamp state.tipState.activeContractSet state.tipState.cgp state.memoryState.contractCache txs
+    return selectOrderedTransactions chain session state.tipState.tip.header.blockNumber timestamp state.tipState.activeContractSet state.memoryState.contractCache txs
 }

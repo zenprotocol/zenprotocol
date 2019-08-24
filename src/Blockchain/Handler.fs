@@ -43,11 +43,16 @@ let handleCommand chainParams command session timestamp (state:State) =
 
     let result =
         match command with
+        | SetCGP winner ->
+            effectsWriter {
+                let cgp = CGP.update winner state.cgp
+                return {state with cgp = cgp}
+            }
         | ValidateTransaction ex ->
             effectsWriter {
                 let! memoryState =
                     TransactionHandler.validateTransaction chainParams session contractPath state.tipState.tip.header.blockNumber
-                        timestamp ex state.memoryState
+                        timestamp ex state
                 return {state with memoryState = memoryState}
             }
         | RequestMemPool peerId ->
@@ -130,7 +135,7 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
     | GetBlockTemplate pkHash ->
         BlockTemplateBuilder.makeTransactionList chain session state timestamp
         <@> fun (memState, validatedTransactions) ->
-            Block.createTemplate chain state.tipState.tip.header timestamp state.tipState.ema memState.activeContractSet memState.cgp validatedTransactions pkHash
+            Block.createTemplate chain state.tipState.tip.header timestamp state.tipState.ema memState.activeContractSet state.cgp validatedTransactions pkHash
         |> Result.get
         |> requestId.reply<Block>
     | GetBlock (mainChain,blockHash) ->
@@ -276,13 +281,14 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
         |> requestId.reply<Result<Hash.Hash,ValidationError.ValidationError>>
     | GetTotalZP ->
         [2ul..state.tipState.tip.header.blockNumber]
-        |> List.fold (fun sum blockNumber -> sum + blockReward blockNumber state.tipState.cgp.allocation) (20_000_000UL * 100_000_000UL)
+        |> List.fold (fun sum blockNumber -> sum + blockReward blockNumber state.cgp.allocation) (20_000_000UL * 100_000_000UL)
         |> requestId.reply
     | GetBlockReward blockNumber ->
-        blockReward blockNumber state.tipState.cgp.allocation
+        blockReward blockNumber state.cgp.allocation
+        |> (+) (blockAllocation blockNumber state.cgp.allocation)
         |> requestId.reply
     | GetCGP ->
-        state.tipState.cgp
+        state.cgp
         |> requestId.reply<CGP.T>
     | GetCgpHistory ->
         let currentInterval = state.tipState.tip.header.blockNumber / chain.intervalLength

@@ -9,7 +9,6 @@ type TipState =
         tip: ExtendedBlockHeader.T
         activeContractSet: ActiveContractSet.T
         ema: EMA.T
-        cgp: CGP.T
     }
 
 type MemoryState =
@@ -29,4 +28,5 @@ type State =
         memoryState: MemoryState
         initialBlockDownload:InitialBlockDownload.T
         headers: uint32
+        cgp: CGP.T
     }

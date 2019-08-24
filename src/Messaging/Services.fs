@@ -26,6 +26,7 @@ module Blockchain =
     }
 
     type Command =
+        | SetCGP of Option<Winner>
         | ValidateTransaction of Types.TransactionExtended
         | RequestMemPool of peerId:byte[]
         | RequestTransactions of peerId:byte[] * txHashes:Hash list
@@ -60,6 +61,9 @@ module Blockchain =
         | GetCgpHistory
 
     type Response = unit
+    
+    let setCGP client winner =
+        Command.send client serviceName (SetCGP winner)
 
     let validateTransaction client tx =
         Command.send client serviceName (ValidateTransaction tx)
@@ -352,6 +356,8 @@ module AddressDB =
         | GetContractHistory of contractId : ContractId * skip: int * take: int
 
     let serviceName = "addressDB"
+    let resyncAccount client =
+        Command.send client serviceName Resync
 
     //TODO: apply same convention to other services
     let private send<'a> client = Request.send<Request, Result<'a,string>> client serviceName

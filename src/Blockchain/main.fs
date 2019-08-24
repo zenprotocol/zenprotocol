@@ -77,7 +77,6 @@ let main dataPath chainParams busName wipe =
                 activeContractSet=acs
                 ema=ema
                 tip=tip
-                cgp=cgp
             }
 
         let memoryState =
@@ -97,6 +96,7 @@ let main dataPath chainParams busName wipe =
                 tipState = tipState;
                 headers=tip.header.blockNumber
                 initialBlockDownload = InitialBlockDownload.Inactive
+                cgp=cgp
             }
 
         let observable =
