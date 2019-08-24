@@ -58,29 +58,6 @@ let parseSendJson chain json =
     with _ as ex ->
         Error ("Json invalid: " + ex.Message)
 
-let parseVoteAllocationJson json =
-    let json = AllocationRequestJson.Parse json
-    if System.String.IsNullOrEmpty json.Password then
-        Error "Password is empty"
-    else 
-        Ok ({allocation = Some (byte json.Allocation); payout = None}, json.Password)
-        
-let parseVotePayoutJson chain json =
-    let json = PayoutRequestJson.Parse json
-    let payout = PayoutResultJson.Root json.Payout.JsonValue
-    let recipient = 
-        Address.decodeAny chain payout.Recipient
-        |> function
-        | Error error ->  Error ("Address is invalid: " + error)
-        | Ok hash -> 
-            match hash with
-            | Address.PK pkHash -> Ok {allocation = None; payout = Some ((PKRecipient pkHash), (uint64 payout.Amount))}
-            | Address.Contract contractId -> Ok {allocation = None; payout = Some ((ContractRecipient contractId), (uint64 payout.Amount))}
-    if System.String.IsNullOrEmpty json.Password then
-        Error "Password is empty"
-    else 
-        Ok (recipient |> get, json.Password)
-
 let parseCreateRawTransactionJson chain json =
     try
         let json = CreateRawTransactionJson.Parse json
@@ -262,7 +239,7 @@ let parsePublishBlockJson json =
             | None -> Error "invalid block"
         | JsonValue.Record record ->
             let tryFind name =
-                Array.tryFind (fun (name',value) -> name' = name) record
+                Array.tryFind (fun (name',_) -> name' = name) record
                 |> Option.bind (function
                     | _, JsonValue.String s -> Some s
                     | _ -> None)

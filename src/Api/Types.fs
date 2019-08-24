@@ -217,6 +217,7 @@ type ExtensionSacrificeLockJson = JsonProvider<"""
 }
 """>
 
+
 type HighVLockLockJson = JsonProvider<"""
 {
   "identifier":56, 
@@ -224,33 +225,11 @@ type HighVLockLockJson = JsonProvider<"""
 }
 """>
 
-
-type AllocationVoteResult = JsonProvider<"""
-{
-    "amount": 50,
-    "count": 1234567890000
-}
-""">
-
-type PayoutVoteResult = JsonProvider<"""
-{ 
-    "recipient": "abcd1234",
-    "amount": 1234567890000,
-    "count": 1234567890000
-}
-""">
-
-type PayoutRequestJson = JsonProvider<"""
-{
-    "payout": {},
-    "password": "password"
-}
-""">
-
 type PayoutResultJson = JsonProvider<"""
 {
     "recipient": "abcd1234",
-     "amount": 1234567890000
+     "amount": 1234567890000,
+     "asset": "asset"
 }
 """>
 
@@ -384,5 +363,12 @@ type PublicKeyDataJson = JsonProvider<"""
 {
     "publicKey": "address",
     "path": "path"
+}
+""">
+
+type WinnerTally = JsonProvider<"""
+{
+    "allocation": 10,
+    "payout": {}
 }
 """>

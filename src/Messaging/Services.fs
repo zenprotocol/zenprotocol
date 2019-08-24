@@ -174,7 +174,7 @@ module Blockchain =
         
     let getCgpHistory client =
         GetCgpHistory
-        |> Request.send<Request, CGP.T list> client serviceName
+        |> Request.send<Request, (uint32 * CGP.T) list> client serviceName
 
 module Network =
     type Command =

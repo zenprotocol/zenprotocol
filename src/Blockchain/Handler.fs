@@ -311,10 +311,12 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
 
                 (blockState.cgp :: cgpList)
                 |> getCGP (interval - 1ul)
-
-        []
-        |> getCGP currentInterval
-        |> requestId.reply<CGP.T list>
+        let listCgp =
+            []
+            |> getCGP currentInterval
+        listCgp
+        |> List.mapi (fun i cgp -> (uint32 i,cgp))
+        |> requestId.reply<(uint32 * CGP.T) list>
     |> ignore
            
     logEndAction timestamp "request" request

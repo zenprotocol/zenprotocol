@@ -337,20 +337,6 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
             |> handleTxResult
         | Error error ->
             replyError error
-    | Post ("/wallet/vote/allocation", Some body) ->
-        match parseVoteAllocationJson body with
-        | Ok (allocation, password) ->
-            Wallet.createVoteTransaction client true allocation password
-            |> handleTxResult
-        | Error error ->
-            replyError error
-    | Post ("/wallet/vote/payout", Some body) ->
-        match parseVotePayoutJson chain body with
-        | Ok (payout, password) ->
-            Wallet.createVoteTransaction client true payout password
-            |> handleTxResult
-        | Error error ->
-            replyError error
     | Post ("/wallet/rawtransaction/create", Some body) ->
         match parseCreateRawTransactionJson chain body with
         | Ok outputs ->
@@ -465,7 +451,7 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
         match parseContractExecuteJson chain body with
         | Error error -> replyError error
         | Ok (contractId, command, message, returnAddress, sign, spends, password) ->
-            Wallet.executeContract client true  contractId command message returnAddress sign spends password
+            Wallet.executeContract client true contractId command message returnAddress sign spends password
             |> handleTxResult
     | Get ("/wallet/resync", _)
     | Post ("/wallet/resync", _) ->
@@ -476,19 +462,16 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
         AddressDB.resyncAccount client
         reply StatusCode.OK NoContent
     | Get ("/blockchain/cgp", _) ->
-        let cgp = Blockchain.getCgp client
-        reply StatusCode.OK (JsonContent <| (cgpEncoder chain cgp))
+        match Blockchain.getTip client with
+        | Some (_,header) ->
+            let interval = CGP.getInterval (Chain.getChainParameters chain) header.blockNumber
+            let cgp = Blockchain.getCgp client
+            reply StatusCode.OK (JsonContent <| (cgpEncoder chain interval cgp))
+        | None ->
+            replyError "No tip"
     | Get ("/blockchain/cgp/history", _) ->
         let cgp = Blockchain.getCgpHistory client
         reply StatusCode.OK (JsonContent <| (cgpHistoryEncoder chain cgp))
-    | Get ("/wallet/vote", _) ->
-        match Wallet.getVoteUtilization client with
-        | Ok (outstanding ,utilized, voteData) ->
-            voteUtilizationEncoder chain outstanding utilized voteData
-            |> JsonContent
-            |> reply StatusCode.OK
-        | Error error ->
-            replyError error
     | Post ("/blockchain/publishblock", Some body) ->
         match parsePublishBlockJson body with
         | Error error ->

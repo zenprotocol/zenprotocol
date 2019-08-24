@@ -42,21 +42,7 @@ let inputEncoder (input:Input) =
 let recipientEncoder chain = function
         | PKRecipient pkHash -> Address.encode chain (Address.PK pkHash)
         | ContractRecipient contractId -> contractId.ToString()
-
-let voteDataEncoder chain (voteData:VoteData) =
-    let allocation =
-        match voteData.allocation with
-        | Some allocation -> JsonValue.Number (decimal allocation)
-        | None _ -> emptyRecord
-    let payout =
-        match voteData.payout with
-        | Some (recipient, amount) -> PayoutResultJson.Root(recipientEncoder chain recipient, int64 amount).JsonValue
-        | None _ -> emptyRecord
-    JsonValue.Record [|
-        ( "allocation",  allocation)
-        ( "payout", payout)
-    |]
-
+    
 let lockEncoder chain (lock:Lock) =
     match lock with
     | PK hash ->
@@ -77,14 +63,6 @@ let lockEncoder chain (lock:Lock) =
     | HighVLock (identifier, data) ->
         HighVLockLockJson.Root ((int)identifier, FsBech32.Base16.encode data)
         |> fun j -> JsonValue.Record [| ("HighVLock", j.JsonValue) |]
-    | Vote (voteData, interval, pkHash) ->
-        let voteProprierty =
-           JsonValue.Record [|
-               ( "voteData", voteDataEncoder chain voteData  )
-               ( "interval", JsonValue.Number ((decimal) interval))
-               ( "pkHash", JsonValue.String pkHash.AsString )
-            |]
-        JsonValue.Record [| ("Vote", voteProprierty) |] 
 
 let outputEncoder chain (output:Output) =
     JsonValue.Record [|
@@ -241,69 +219,29 @@ let dataEncoder chain data =
             |> JsonValue.Array
 
     JsonValue.Record [| dataName data, dataValue data |]
-    
-let allocationEncoder allocation =
-    let allocation =
-            allocation
-            |> Map.toSeq
-            |> Seq.map (fun (amount:byte, count:uint64) -> new AllocationVoteResult.Root(int amount, int64 count))
-            |> Seq.map (fun json -> json.JsonValue)
-            |> Seq.toArray
-    JsonValue.Record [| ("votes", JsonValue.Array (allocation)) |]
 
-let payoutEncoder chain payout =
-    let payout =
-        payout
-        |> Map.toSeq
-        |> Seq.map (fun ((recipient:Types.Recipient, amount: uint64), count: uint64) ->  PayoutVoteResult.Root(recipientEncoder chain recipient, int64 amount, int64 count))
-        |> Seq.map (fun json -> json.JsonValue)
-        |> Seq.toArray
-    JsonValue.Record [| ("votes", JsonValue.Array (payout)) |]
-
-let cgpEncoder chain (cgp:CGP.T) =
+let cgpEncoder chain (interval:uint32) (cgp:CGP.T)  =
     let result =
         match cgp.payout with
         | Some res ->
             res
-            |> (fun (recipient:Recipient, amount: uint64) -> PayoutResultJson.Root(recipientEncoder chain recipient, int64 amount))
-            |> fun j -> j.JsonValue
-        | _ -> emptyRecord
-    let tallies = 
-        cgp.tallies
-        |> Map.toSeq
-        |>Seq.map (fun (interval:uint32, tally:Tally.T) -> 
-        JsonValue.Record 
-            [|
-                ("interval", JsonValue.Number (decimal interval))
-                ("allocation", allocationEncoder tally.allocation)
-                ("payout", payoutEncoder chain tally.payout)
-            |])
-       |> Seq.toArray
+            |> (fun (recipient:Recipient, spend: Spend list) ->
+                spend
+                |> List.map (fun spend ->
+                    PayoutResultJson.Root(recipientEncoder chain recipient, int64 spend.amount, spend.asset.AsString)))
+            |> fun j ->  List.map (fun (x:PayoutResultJson.Root) -> x.JsonValue) j
+        | _ -> [emptyRecord]
     JsonValue.Record
         [|
-            ("tallies", JsonValue.Array(tallies))
-            ("resultAllocation", JsonValue.Number (decimal cgp.allocation))
-            ("resultPayout", result) 
-            ("fund", JsonValue.Number ((decimal) cgp.amount))
+            ("interval", JsonValue.Number ((decimal)interval))
+            ("allocation", JsonValue.Number (decimal cgp.allocation))
+            ("payout", result|> List.toArray |> JsonValue.Array)
         |]
     |> omitNullFields
 
-let cgpHistoryEncoder chain (cgp:CGP.T list) =
-    cgp
-    |> List.map (cgpEncoder chain)
+let cgpHistoryEncoder chain (cgpList:(uint32 * CGP.T) list) =
+    cgpList
+    |> List.map (fun (interval, cgp)  -> cgpEncoder chain interval cgp)
     |> List.toArray
     |> JsonValue.Array
     |> omitNullFields
-
-let voteUtilizationEncoder chain (outstanding:uint64) (utilized:uint64) voteData =
-    let voteJson =
-        match voteData with
-        | Some vote -> voteDataEncoder chain vote
-        | None -> JsonValue.Null
-    JsonValue.Record
-        [|
-            ("outstanding",  JsonValue.Number (decimal outstanding))
-            ("utilized", JsonValue.Number (decimal utilized));
-            ("vote", voteJson)
-        |]
-        
