@@ -16,8 +16,7 @@ let private validateInputs chainParams blockNumber timestamp acs getContractStat
                 Invalid <| General "contract version not supported"
             else
                 ContractV0.validate blockNumber timestamp acs getContractState contractStates txHash tx witnesses inputs
-        | PK pkHash
-        | Vote (_, _, pkHash) -> PK.validate contractStates txHash witnesses pkHash tail
+        | PK pkHash -> PK.validate contractStates txHash witnesses pkHash tail
         | Coinbase (coinbaseBlockNumber, pkHash) ->
             Coinbase.validate chainParams blockNumber contractStates txHash witnesses pkHash coinbaseBlockNumber tail
         | Fee

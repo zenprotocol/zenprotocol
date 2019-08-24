@@ -82,7 +82,6 @@ let fromRaw (raw:RawTransaction) =
 let isOutputSpendable output =
     match output.lock with
     | PK _
-    | Vote _
     | Coinbase _
     | Contract _ -> true
     | Fee

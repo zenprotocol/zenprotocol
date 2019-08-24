@@ -217,10 +217,8 @@ module Wallet =
         | GetTransactionCount
         | GetTransactions of skip: int * take: int
         | GetBalance
-        | GetVoteUtilization
         | ImportSeed of string list * password:string
         | Send of publish:bool*outputs:List<Hash * Spend> * password:string
-        | Vote of publish:bool * vote:VoteData * password:string 
         | ActivateContract of publish:bool*string * uint32 * password:string
         | ExtendContract of publish:bool*ContractId * uint32 * password:string
         | ExecuteContract of publish:bool*ContractId * string * data option * provideReturnAddress:bool * sign:string option * Map<Asset, uint64> * password:string
@@ -265,12 +263,6 @@ module Wallet =
 
     let createTransaction client publish outputs password =
         send<Transaction> client serviceName (Send (publish, outputs, password))
-    
-    let createVoteTransaction client publish voteData password =
-        send<Transaction> client serviceName (Vote (publish, voteData,password))
-        
-    let getVoteUtilization client =
-        send<uint64 * uint64 * VoteData option> client serviceName GetVoteUtilization
 
     let activateContract client publish code numberOfBlocks password =
         send<ActivateContractResponse> client serviceName (ActivateContract (publish, code, numberOfBlocks, password))

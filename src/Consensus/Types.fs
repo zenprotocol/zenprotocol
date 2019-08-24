@@ -68,7 +68,6 @@ type Lock =
     | ExtensionSacrifice of ContractId
     | Destroy
     | HighVLock of identifier:uint32 * byte[]
-    | Vote of VoteData * interval:uint32 * pkhash:Hash
 
 type Output = {
     lock: Lock

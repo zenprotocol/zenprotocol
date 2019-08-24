@@ -161,30 +161,6 @@ let checkWeight chain tx txSkeleton =
             Error "transaction weight exceeds maximum")
     |> Result.mapError General
 
-let private checkVoteLocks (txSkeleton:TxSkeleton.T) =
-    let pkHashes =
-        txSkeleton.outputs
-        |> List.choose (function
-            | { lock = Vote (_, _, pkHash) } ->
-                Some pkHash
-            | _ ->
-                None)
-
-    let isMissing pkHash =
-        txSkeleton.pInputs
-        |> List.choose (function
-            | TxSkeleton.Input.PointedOutput (_, output) -> Some output.lock
-            | _ -> None)
-        |> List.choose (function
-            | Coinbase (_, pkHash)
-            | PK pkHash
-            | Vote (_, _, pkHash) -> Some pkHash
-            | _ -> None)
-        |> List.contains pkHash
-        |> not
-
-    if List.exists isMissing pkHashes then
-        GeneralError "vote outputs should not be transferable"
     else
         Ok ()
         
@@ -263,24 +239,7 @@ let private checkStructure =
         else
             Ok tx
 
-    let checkVoteLocks = fun (tx:Transaction) ->
-        if tx.version = Version1 && List.exists (function
-            | { lock = Vote ({ allocation = None; payout = None }, _, _); spend = _ } ->
-                true
-            | { lock = Vote ({ allocation = Some x; payout = _ }, _, _); spend = _ } when x > 99uy ->
-                true
-            | { lock = Vote ({ allocation = _; payout = Some (_, amount) }, _, _); spend = _ } when amount = 0UL ->
-                true
-            | { lock = Vote _; spend = spend } when spend.asset <> Asset.Zen ->
-                true
-            | _ ->
-                false
-        ) tx.outputs then
-            GeneralError "structurally invalid vote locks(s)"
-        else
-            Ok tx
-
-    let checkWitnessesStructure = fun tx ->
+    let checkWitnessesStructure = fun (tx:Transaction) ->
         if List.isEmpty tx.witnesses || List.exists (function
             | ContractWitness cw ->
                 isNull cw.command || 
@@ -299,7 +258,6 @@ let private checkStructure =
     checkContractStructure
     >=> checkInputsStructrue
     >=> checkOutputsStructrue
-    >=> checkVoteLocks
     >=> checkWitnessesStructure
 
 let private checkNoCoinbaseLock tx =
@@ -424,9 +382,6 @@ let validateInContext chainParams getUTXO contractPath blockNumber timestamp acs
 
     do! checkAmounts txSkel
     
-    if ex.tx.version = Version1 then
-        do! checkVoteLocks txSkel
-        
     let! contractStates = InputValidation.StateMachine.validate chainParams blockNumber timestamp acs getContractState contractState ex.txHash ex.tx txSkel
 
     let! acs, contractCache = activateContract chainParams contractPath blockNumber acs contractCache ex.tx
