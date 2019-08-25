@@ -42,10 +42,11 @@ let mutable state = {
             tip = ExtendedBlockHeader.empty
             activeContractSet = acs
             ema = EMA.create chain
-            cgp = CGP.empty
         }
     initialBlockDownload = InitialBlockDownload.Inactive
     headers = 0ul
+    cgp = CGP.empty
+
 }
 
 let account = createTestAccount()
@@ -241,7 +242,7 @@ let ``Should execute contract chain and get a valid transaction``() =
         let txHash = Transaction.hash tx
 
         let events, memoryState =
-            TransactionHandler.validateTransaction chain session dataPath blockNumber timestamp (Transaction.toExtended tx) state.memoryState
+            TransactionHandler.validateTransaction chain session dataPath blockNumber timestamp (Transaction.toExtended tx) state
             |> Writer.unwrap
 
         //expect the transaction to be valid
@@ -259,7 +260,7 @@ let ``Should execute contract chain and get a valid transaction``() =
         let txHash = Transaction.hash tx
 
         let events, memoryState =
-            TransactionHandler.validateTransaction chain session dataPath blockNumber timestamp (Transaction.toExtended tx) state.memoryState
+            TransactionHandler.validateTransaction chain session dataPath blockNumber timestamp (Transaction.toExtended tx) state
             |> Writer.unwrap
 
         //expect the transaction to be invalid

@@ -30,9 +30,9 @@ let ``coinbase cannot have any locks other than coinbase lock``() =
          contract=None
       }
 
-    let expected:Result<Transaction,ValidationError> = Error (General "within coinbase transaction all outputs must use coinbase lock")
+    let expected:Result<Transaction,ValidationError> = Error (General "within coinbase transaction all outputs must use coinbase or contract lock")
 
-    TransactionValidation.validateCoinbase Chain.localParameters 15ul tx |> should equal expected
+    TransactionValidation.validateCoinbase 15ul tx |> should equal expected
 
 [<Test>]
 let ``coinbase with wrong block nubmer should fail``() =
@@ -45,9 +45,9 @@ let ``coinbase with wrong block nubmer should fail``() =
          contract=None
       }
 
-    let expected:Result<Transaction,ValidationError> = Error (General "within coinbase transaction all outputs must use coinbase lock")
+    let expected:Result<Transaction,ValidationError> = Error (General "within coinbase transaction all outputs must use coinbase or contract lock")
 
-    TransactionValidation.validateCoinbase Chain.localParameters 14ul tx |> should equal expected
+    TransactionValidation.validateCoinbase 14ul tx |> should equal expected
 
 [<Test>]
 let ``coinbase with inputs should fail``() =
@@ -62,7 +62,7 @@ let ``coinbase with inputs should fail``() =
 
     let expected:Result<Transaction,ValidationError> = Error (General "coinbase transaction must not have any inputs")
 
-    TransactionValidation.validateCoinbase Chain.localParameters 15ul tx |> should equal expected
+    TransactionValidation.validateCoinbase 15ul tx |> should equal expected
 
 [<Test>]
 let ``coinbase with witnesses fail``() =
@@ -77,7 +77,7 @@ let ``coinbase with witnesses fail``() =
 
     let expected:Result<Transaction,ValidationError> = Error (General  "coinbase transaction must not have any witnesses")
 
-    TransactionValidation.validateCoinbase Chain.localParameters 15ul tx |> should equal expected
+    TransactionValidation.validateCoinbase 15ul tx |> should equal expected
 
 [<Test>]
 let ``coinbase with contract should fail``() =
@@ -92,7 +92,7 @@ let ``coinbase with contract should fail``() =
 
     let expected:Result<Transaction,ValidationError> = Error (General "coinbase transaction cannot activate a contract")
 
-    TransactionValidation.validateCoinbase Chain.localParameters 15ul tx |> should equal expected
+    TransactionValidation.validateCoinbase 15ul tx |> should equal expected
 
 [<Test>]
 let ``valid coinbase should pass``() =
@@ -107,7 +107,7 @@ let ``valid coinbase should pass``() =
 
     let expected:Result<Transaction,ValidationError> = Ok tx
 
-    TransactionValidation.validateCoinbase Chain.localParameters 15ul tx |> should equal expected
+    TransactionValidation.validateCoinbase 15ul tx |> should equal expected
 
 [<Test>]
 let ``coinbase with two outputs should pass``() =
@@ -126,7 +126,7 @@ let ``coinbase with two outputs should pass``() =
 
     let expected:Result<Transaction,ValidationError> = Ok tx
 
-    TransactionValidation.validateCoinbase Chain.localParameters 15ul tx |> should equal expected
+    TransactionValidation.validateCoinbase 15ul tx |> should equal expected
 
 [<Test>]
 let ``coinbase with no outputs``() =
@@ -141,7 +141,7 @@ let ``coinbase with no outputs``() =
 
     let expected:Result<Transaction,ValidationError> = Error (General "outputs empty")
 
-    TransactionValidation.validateCoinbase Chain.localParameters 15ul tx |> should equal expected
+    TransactionValidation.validateCoinbase 15ul tx |> should equal expected
 
 [<Test>]
 let ``transaction spending coinbase with maturity should be valid``() =

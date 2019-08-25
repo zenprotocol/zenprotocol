@@ -56,7 +56,6 @@ let ``Contract activation without contract sacrifice should fail``() =
         |> Transaction.sign [rootKeyPair] TxHash
         |> Transaction.toExtended
 
-
     let expected:TxResult = General "Contract activation must include activation sacrifice" |> Error
 
     (validateInContext 1ul 1_000_000UL ActiveContractSet.empty ContractCache.empty utxoSet getContractState ContractStates.asDatabase tx, expected)

@@ -64,10 +64,10 @@ let state = {
             tip = ExtendedBlockHeader.empty
             activeContractSet = acs
             ema = EMA.create chainParams
-            cgp = CGP.empty
     }
     initialBlockDownload = InitialBlockDownload.Inactive
     headers=0ul
+    cgp = CGP.empty
 }
 
 [<Test>]

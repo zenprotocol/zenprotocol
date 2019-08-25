@@ -84,10 +84,10 @@ let state = {
             tip = ExtendedBlockHeader.empty
             activeContractSet = acs
             ema = ema
-            cgp = CGP.empty
         }
     initialBlockDownload = InitialBlockDownload.Inactive
     headers=0ul
+    cgp = CGP.empty
 }
 
 let createChain (length:int) nonce start ema account =
@@ -147,7 +147,7 @@ let ``genesis block accepted``() =
     BlockRepository.tryGetTip session
     |> should equal (Some (state'.tipState.tip,
                            state'.tipState.ema,
-                           state'.tipState.cgp))
+                           state'.cgp))
 
     BlockRepository.tryGetGenesisHeader session
     |> should equal (Some (state'.tipState.tip))
@@ -207,7 +207,7 @@ let ``validate new valid block which extended main chain``() =
     BlockRepository.tryGetTip session
     |> should equal (Some (state'.tipState.tip,
                            state'.tipState.ema,
-                           state'.tipState.cgp))
+                           state'.cgp))
 
     let acs = ActiveContractSetRepository.get session
 
@@ -302,7 +302,7 @@ let ``validate new block which connect orphan chain which extend main chain``() 
     BlockRepository.tryGetTip session
     |> should equal (Some (state'.tipState.tip,
                            state'.tipState.ema,
-                           state'.tipState.cgp))
+                           state'.cgp))
 
     let acs = ActiveContractSetRepository.get session
 
@@ -379,7 +379,7 @@ let ``orphan chain become longer than main chain``() =
     BlockRepository.tryGetTip session
     |> should equal (Some (state.tipState.tip,
                            state.tipState.ema,
-                           state.tipState.cgp))
+                           state.cgp))
 
     events |> should haveLength 7
     events.[0] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock alternativeChain.[1])))

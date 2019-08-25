@@ -209,8 +209,6 @@ type ConsensusGenerator =
             let! lock =
                 Arb.generate<Lock>
                 |> Gen.filter (function
-                | Vote ({ allocation = None; payout = None }, _, _) -> false
-                | Vote ({ allocation = Some x; payout = _ }, _, _) when x > 99uy -> false
                 | HighVLock (identifier, _) -> identifier > Serialization.Serialization.Lock.LastReservedIdentifier
                 | _ -> true)
             return Consensus.ZFStar.fsToFstLock lock
@@ -305,16 +303,12 @@ type ConsensusGenerator =
                     Arb.generate<Lock>
                     |> Gen.filter notCoinbaseLockOrAcivationSacrifice
                     |> Gen.filter (function
-                    | Vote ({ allocation = None; payout = None }, _, _) -> false
-                    | Vote ({ allocation = Some x; payout = _ }, _, _) when x > 99uy -> false
                     | HighVLock (identifier, _) -> identifier > Serialization.Serialization.Lock.LastReservedIdentifier
                     | _ -> true)
 
                 let! asset = 
                     gen {
                         match lock with 
-                        | Vote _ -> 
-                            return Asset.Zen 
                         | _ ->
                             let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
                             return Asset (ContractId (Version0, Hash.Hash asset), Hash.zero)
@@ -487,16 +481,12 @@ type ConsensusGenerator =
                     Arb.generate<Lock>
                     |> Gen.filter notCoinbaseLockOrAcivationSacrifice
                     |> Gen.filter (function
-                    | Vote ({ allocation = None; payout = None }, _, _) -> false
-                    | Vote ({ allocation = Some x; payout = _ }, _, _) when x > 99uy -> false
                     | HighVLock (identifier, _) -> identifier > Serialization.Serialization.Lock.LastReservedIdentifier
                     | _ -> true)
 
                 let! asset = 
                     gen {
                         match lock with 
-                        | Vote _ -> 
-                            return Asset.Zen
                         | _ ->
                             let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
                             return Asset (ContractId (Version0, Hash.Hash asset), Hash.zero)
@@ -631,16 +621,12 @@ type ConsensusGenerator =
                             Arb.generate<Lock>
                             |> Gen.filter notCoinbaseLock
                             |> Gen.filter (function
-                            | Vote ({ allocation = None; payout = None }, _, _) -> false
-                            | Vote ({ allocation = Some x; payout = _ }, _, _) when x > 99uy -> false
                             | HighVLock (identifier, _) -> identifier > Serialization.Serialization.Lock.LastReservedIdentifier
                             | _ -> true)
 
                         let! asset = 
                             gen {
                                 match lock with 
-                                | Vote _ -> 
-                                    return Asset.Zen 
                                 | _ ->
                                     let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
                                     return Asset (ContractId (Version0, Hash.Hash asset), Hash.zero)
@@ -669,16 +655,12 @@ type ConsensusGenerator =
                         let! lock =
                             Arb.generate<Lock>
                             |> Gen.filter (function
-                            | Vote ({ allocation = None; payout = None }, _, _) -> true
-                            | Vote ({ allocation = Some x; payout = _ }, _, _) when x > 99uy -> true
                             | HighVLock (identifier, _) -> identifier > Serialization.Serialization.Lock.LastReservedIdentifier
                             | _ -> true)
 
                         let! asset = 
                             gen {
                                 match lock with 
-                                | Vote _ -> 
-                                    return Asset.Zen 
                                 | _ ->
                                     let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
                                     return Asset (ContractId (Version0, Hash.Hash asset), Hash.zero)
@@ -705,16 +687,12 @@ type ConsensusGenerator =
                 let! lock =
                     Arb.generate<Lock>
                     |> Gen.filter (function
-                    | Vote ({ allocation = None; payout = None }, _, _) -> false
-                    | Vote ({ allocation = Some x; payout = _ }, _, _) when x > 99uy -> false
                     | HighVLock (identifier, _) -> identifier > Serialization.Serialization.Lock.LastReservedIdentifier
                     | _ -> true)
                     
                 let! asset = 
                     gen {
                         match lock with 
-                        | Vote _ -> 
-                            return Asset.Zen 
                         | _ ->
                             let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
                             return Asset (ContractId (Version0, Hash.Hash asset), Hash.zero)
