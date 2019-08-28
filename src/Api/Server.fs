@@ -16,6 +16,7 @@ open Consensus.Crypto
 open Logary.Message
 open Api.Helpers
 open Consensus.Chain
+open Consensus.Types
 open FSharp.Data
 open FsBech32
 open Hash
@@ -126,6 +127,31 @@ let publishTransaction client reply ex =
             sprintf "%A" error
             |> TextContent
             |> reply StatusCode.BadRequest
+let jsonRpcResult (result: JsonValue): JsonValue =
+    JsonValue.Record [| "result", result |]
+
+let jsonRpcError (errormsg: string): JsonValue =
+    JsonValue.Record [| "error", JsonValue.String errormsg |]
+
+let isGetWorkRequest: string -> bool = JsonValue.TryParse >> function
+    | None -> false
+    | Some json ->
+        match JsonExtensions.Properties json with
+        | [| ("method", JsonValue.String "getwork");
+             ("params", JsonValue.Array [||]);
+             ("id", JsonValue.Number _)|]
+            -> true
+        | _ -> false
+
+let isGetWorkSubmission: string -> bool = JsonValue.TryParse >> function
+    | None -> false
+    | Some json ->
+        match JsonExtensions.Properties json with
+        | [| ("method", JsonValue.String "getwork");
+             ("params", JsonValue.Array [|JsonValue.String hash|]);
+             ("id", JsonValue.Number _)|]
+            -> true
+        | _ -> false
 
 let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTemplateCache) =
     let replyError error =
@@ -868,6 +894,84 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
         <@> reply StatusCode.OK
         |> Result.mapError replyError
         |> ignore
+
+    | Post("", Some jsonstring) when isGetWorkRequest jsonstring ->
+        match Wallet.getAddressPKHash client with
+        | FSharp.Core.Ok pkHash ->
+            let block = Blockchain.getBlockTemplate client pkHash
+            let bytes = Block.serialize block
+            let header, body = Array.splitAt Block.HeaderSize bytes
+            let header =
+                let hdr = FsBech32.Base16.encode header
+                let fst80, nBits, last16 =
+                    hdr.Substring(0, 160), hdr.Substring(160, 8), hdr.Substring(168, 32)
+                let nBits =
+                    Seq.chunkBySize 2 nBits
+                    |> Seq.rev
+                    |> Seq.concat
+                    |> Array.ofSeq
+                    |> System.String
+                //fst80 + nBits + last16
+                hdr
+                |> JsonValue.String
+            let target = Difficulty.uncompress block.header.difficulty
+                         |> Hash.toString
+                         |> JsonValue.String
+            let jsonResult =
+                [| ("data", header); ("target", target) |]
+                |> JsonValue.Record
+            [| "result", jsonResult |]
+            |> JsonValue.Record
+            |> JsonContent
+            |> reply StatusCode.OK
+
+        | FSharp.Core.Error _ ->
+            [| "error", JsonValue.String "invalid address" |]
+            |> JsonValue.Record
+            |> JsonContent
+            |> reply StatusCode.OK
+
+    | Post("", Some jsonstring) when isGetWorkSubmission jsonstring ->
+        match Wallet.getAddressPKHash client with
+        | FSharp.Core.Error _ ->
+            jsonRpcError "invalid address"
+            |> JsonContent
+            |> reply StatusCode.OK
+        | FSharp.Core.Ok pkHash ->
+            let headerString=
+                (JsonValue.Parse jsonstring).GetProperty "params"
+                |> JsonExtensions.AsArray
+                |> Array.head
+                |> JsonExtensions.AsString
+            let header =
+                FsBech32.Base16.decode headerString
+                |> Option.bind Serialization.Header.deserialize
+
+            let jsonRpcResponse =
+                match header with
+                | None -> sprintf "BAD HEADER: \"%s\"" headerString
+                          |> jsonRpcError
+                | Some header ->
+                    let block = { Blockchain.getBlockTemplate client pkHash
+                                  with header=header }
+                    match BlockValidation.validate block (Chain.getChainParameters chain) with
+                    | Error _ -> sprintf "BAD HEADER: \"%s\"" headerString
+                                 |> jsonRpcError
+                    | Ok _->
+                        Blockchain.validateMinedBlock client block;
+                        eventX "New block mined: '{header}'"
+                        >> setField "header" headerString
+                        |> Log.info
+
+                        sprintf "ACCEPTED HEADER: %s" headerString
+                        |> JsonValue.String
+                        |> jsonRpcResult
+
+
+
+            JsonContent jsonRpcResponse
+            |> reply StatusCode.OK
+
     | _ ->
         reply StatusCode.BadRequest (TextContent "unmatched request")
 

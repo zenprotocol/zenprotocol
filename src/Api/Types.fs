@@ -211,8 +211,8 @@ type ContractLockJson = JsonProvider<"""
 
 type CoinbaseLockJson = JsonProvider<"""
 {
-  "blockNumber":100, 
-  "pkHash":"12..34", 
+  "blockNumber":100,
+  "pkHash":"12..34",
   "address":"zen1adb"
 }
 """>
@@ -227,7 +227,7 @@ type ExtensionSacrificeLockJson = JsonProvider<"""
 
 type HighVLockLockJson = JsonProvider<"""
 {
-  "identifier":56, 
+  "identifier":56,
   "data":"12..45"
 }
 """>
