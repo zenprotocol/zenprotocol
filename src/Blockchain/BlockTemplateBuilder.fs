@@ -27,15 +27,17 @@ let weights session state =
         <@> TxSkeleton.fromTransaction ex.tx
         >>= Weight.transactionWeight ex.tx
         <@> fun weight -> ex, weight)
-    
+
 let selectOrderedTransactions (chain:Chain.ChainParameters) (session:DatabaseContext.Session) blockNumber timestamp acs contractCache transactions =
     let contractPath = session.context.contractPath
     let maxWeight = chain.maxBlockWeight
+    let getUTXO = getUTXO session
+    let blockNumber = blockNumber + 1ul
 
     let tryAddTransaction (state, added, notAdded, altered, weight) (ex,wt) =
         let newWeight = weight+wt
         if newWeight > maxWeight then (state, added, notAdded, false, weight) else
-        validateInContext chain (getUTXO session) contractPath (blockNumber + 1ul) timestamp
+        validateInContext chain getUTXO contractPath blockNumber timestamp
             state.activeContractSet state.contractCache state.utxoSet (getContractState session) ContractStates.asDatabase ex
         |> function
             | Error (Orphan | ContractNotActive) ->
@@ -43,7 +45,7 @@ let selectOrderedTransactions (chain:Chain.ChainParameters) (session:DatabaseCon
             | Error _ ->
                 (state, added, notAdded, altered, weight)
             | Ok (tx, acs, contractCache, contractStates) ->
-                let utxoSet = UtxoSet.handleTransaction (getUTXO session) ex.txHash ex.tx state.utxoSet
+                let utxoSet = UtxoSet.handleTransaction getUTXO ex.txHash ex.tx state.utxoSet
                 let mempool = MemPool.add ex state.mempool
                 ({state with activeContractSet=acs;mempool=mempool;utxoSet=utxoSet;contractCache=contractCache;contractStates=contractStates}, tx::added, notAdded, true, newWeight)
 

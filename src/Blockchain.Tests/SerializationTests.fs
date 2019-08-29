@@ -52,6 +52,7 @@ type BlockchainGenerators =
                     ema = ema
                     activeContractSetUndoData = activeContractSetUndoData
                     contractStatesUndoData = contractStatesUndoData
+                    cgp = CGP.empty
                 } : BlockState.T)
         }
         |> Arb.fromGen

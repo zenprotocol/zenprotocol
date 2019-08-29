@@ -30,7 +30,7 @@ let ``coinbase cannot have any locks other than coinbase lock``() =
          contract=None
       }
 
-    let expected:Result<Transaction,ValidationError> = Error (General "within coinbase transaction all outputs must use coinbase lock")
+    let expected:Result<Transaction,ValidationError> = Error (General "within coinbase transaction all outputs must use coinbase or contract lock")
 
     TransactionValidation.validateCoinbase 15ul tx |> should equal expected
 
@@ -45,7 +45,7 @@ let ``coinbase with wrong block nubmer should fail``() =
          contract=None
       }
 
-    let expected:Result<Transaction,ValidationError> = Error (General "within coinbase transaction all outputs must use coinbase lock")
+    let expected:Result<Transaction,ValidationError> = Error (General "within coinbase transaction all outputs must use coinbase or contract lock")
 
     TransactionValidation.validateCoinbase 14ul tx |> should equal expected
 
@@ -163,7 +163,7 @@ let ``transaction spending coinbase with maturity should be valid``() =
 [<Test>]
 let ``transaction spending coinbase with no maturity should fail``() =
     let _, publicKey = keys.[0]
-    let outputLock = Coinbase (15ul,PublicKey.hash publicKey)
+    let outputLock = Coinbase (100ul, PublicKey.hash publicKey)
     let output = { lock = outputLock; spend = { asset = Asset.Zen; amount = 1UL } }
     let tx = {
         version = Version0
@@ -174,5 +174,5 @@ let ``transaction spending coinbase with no maturity should fail``() =
     }
     let utxos = Map.ofSeq [ testInput1, Unspent output ]
 
-    inputsValidationMsg "Coinbase not mature enough" 114ul 1_000_000UL acs utxos tx keys
+    inputsValidationMsg "Coinbase not mature enough" (100ul + Chain.testParameters.coinbaseMaturity - 1ul) 1_000_000UL acs utxos tx keys
     |> shouldEqual

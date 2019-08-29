@@ -20,3 +20,15 @@ let shuffle list : 'a list =
         arr.[i] <- arr.[j]
         arr.[j] <- v
     Array.toList arr
+
+let concatMap (f : 'a -> List<'b>) : List<'a> -> List<'b> =
+    List.map f >> List.concat
+
+let sequencePair ((s,xs) : 's * List<'a>) : List<'s * 'a> =
+    List.map (fun x -> (s,x)) xs 
+
+let pairWith (s : 's) (xs : List<'a>) : List<'s * 'a> =
+    sequencePair (s, xs)
+
+let traversePair (f : 'a -> List<'b>) ((s,x) : 's * 'a) : List<'s * 'b> =
+    sequencePair (s, f x)

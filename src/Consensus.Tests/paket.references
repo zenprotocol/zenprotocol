@@ -15,3 +15,5 @@ FsNetMQ
 SpecFlow.NUnit
 FsBech32
 Zulib
+CGPContract
+NBitcoin

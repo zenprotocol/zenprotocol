@@ -40,10 +40,11 @@ let mutable state = {
         {
             tip = ExtendedBlockHeader.empty
             activeContractSet = acs
-            ema=EMA.create chain
+            ema = EMA.create chain
         }
     initialBlockDownload = InitialBlockDownload.Inactive
     headers=0ul
+    cgp = CGP.empty
 }
 
 let account = createTestAccount()

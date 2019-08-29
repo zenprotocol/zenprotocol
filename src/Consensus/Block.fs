@@ -1,11 +1,12 @@
 module Consensus.Block
-open MBrace.FsPickler.Combinators
 open Consensus
 open Types
 open Infrastructure
 open Result
 open Serialization
 open Chain
+open Consensus.Serialization.Serialization
+open Functional
 
 [<Literal>]
 let HeaderSize = 100
@@ -17,9 +18,6 @@ let MaxTimeInFuture = 15UL * 60UL * 1000UL // 15 minutes in milliseconds
 let genesisParent = {version=Version0;parent=Hash.zero;blockNumber=0ul;commitments=Hash.zero;timestamp=0UL;difficulty=0ul;nonce=0UL,0UL}
 
 let result = new Result.ResultBuilder<string>()
-
-let private createCommitments txMerkleRoot witnessMerkleRoot acsMerkleRoot rest =
-    [ txMerkleRoot; witnessMerkleRoot; acsMerkleRoot; ] @ rest
 
 let private computeCommitmentsRoot = MerkleTree.computeRoot
 
@@ -49,11 +47,6 @@ let getChainWork (prevWork:bigint) header =
 
     prevWork + proof
 
-let blockReward blockNumber =
-    let period = (int blockNumber) / 800_000    // 800K blocks = 6 years
-    let initial = 50UL * 100_000_000UL
-    initial >>> period
-
 let createGenesis (chain:Chain.ChainParameters) transactions nonce =
     let txMerkleRoot =
         transactions
@@ -68,7 +61,7 @@ let createGenesis (chain:Chain.ChainParameters) transactions nonce =
     let acsMerkleRoot = ActiveContractSet.root ActiveContractSet.empty
 
     let commitments =
-        createCommitments txMerkleRoot witnessMerkleRoot acsMerkleRoot []
+        Block.createCommitments txMerkleRoot witnessMerkleRoot acsMerkleRoot []
         |> computeCommitmentsRoot
 
     let header =
@@ -82,7 +75,12 @@ let createGenesis (chain:Chain.ChainParameters) transactions nonce =
             nonce=nonce;
         }
 
-    {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot;witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot}
+    { header=header;
+      transactions=transactions;
+      commitments=[];
+      txMerkleRoot=txMerkleRoot;
+      witnessMerkleRoot=witnessMerkleRoot;
+      activeContractSetMerkleRoot=acsMerkleRoot; }
 
 let getBlockSacrificeAmount chain acs =
 
@@ -93,8 +91,17 @@ let getBlockSacrificeAmount chain acs =
 
     Seq.sumBy computeContractSacrifice (ActiveContractSet.getContracts acs)
 
+let private getCgpCoinbase chain blockNumber (cgp:CGP.T) =
+    if blockAllocation blockNumber cgp.allocation <> 0UL then
+            let amount = blockAllocation blockNumber cgp.allocation
+            [{
+                lock=Contract (chain.cgpContractId)
+                spend={asset=Asset.Zen;amount=amount}
+            }]
+        else
+            []
 
-let getBlockCoinbase chain acs blockNumber transactions coinbasePkHash =
+let getBlockCoinbase chain acs blockNumber transactions coinbasePkHash (cgp:CGP.T) =
     // Get the coinbase outputs by summing the fees per asset and adding the block reward
     let coinbaseOutputs =
         let blockRewardAndFees =
@@ -108,7 +115,7 @@ let getBlockCoinbase chain acs blockNumber transactions coinbasePkHash =
                       Map.add output.spend.asset (output.spend.amount + amount) totals) Map.empty
             let totalZen = defaultArg (Map.tryFind Asset.Zen blockFees) 0UL
             let blockSacrifice = getBlockSacrificeAmount chain acs
-            let blockReward = blockReward blockNumber
+            let blockReward = blockReward blockNumber cgp.allocation
 
             Map.add Asset.Zen (totalZen + blockReward + blockSacrifice) blockFees
 
@@ -125,16 +132,17 @@ let getBlockCoinbase chain acs blockNumber transactions coinbasePkHash =
     let tx = {
         version = Version0
         inputs = []
-        outputs = coinbaseOutputs
+        outputs =  coinbaseOutputs @ getCgpCoinbase chain blockNumber cgp
         contract = None
         witnesses = []
-    }        
-    
+    }
+
     Transaction.toExtended tx
 
-let createTemplate chain (parent:BlockHeader) timestamp (ema:EMA.T) acs transactions coinbasePkHash =
+let createTemplate chain (parent:BlockHeader) timestamp (ema:EMA.T) acs (cgp:CGP.T) transactions coinbasePkHash =
     let blockNumber = (parent.blockNumber + 1ul)
-    let coinbase = getBlockCoinbase chain acs blockNumber transactions coinbasePkHash
+
+    let coinbase = getBlockCoinbase chain acs blockNumber transactions coinbasePkHash cgp
 
     let transactions = coinbase :: transactions
 
@@ -158,12 +166,12 @@ let createTemplate chain (parent:BlockHeader) timestamp (ema:EMA.T) acs transact
 
     // TODO: add utxo commitments
     let commitments =
-        createCommitments txMerkleRoot witnessMerkleRoot acsMerkleRoot []
+        Block.createCommitments txMerkleRoot witnessMerkleRoot acsMerkleRoot []
         |> computeCommitmentsRoot
 
     let header =
         {
-            version=Version0;
+            version=Version1;
             parent=parentHash;
             blockNumber=blockNumber;
             commitments=commitments;
@@ -172,7 +180,12 @@ let createTemplate chain (parent:BlockHeader) timestamp (ema:EMA.T) acs transact
             nonce=0UL,0UL;
         }
 
-    {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot;witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot}
+    { header=header;
+      transactions=transactions;
+      commitments=[];
+      txMerkleRoot=txMerkleRoot;
+      witnessMerkleRoot=witnessMerkleRoot;
+      activeContractSetMerkleRoot=acsMerkleRoot; }
 
 let validateHeader chain (header:BlockHeader) =
     if header.timestamp > chain.versionExpiry then
@@ -237,7 +250,7 @@ let validate chain =
 
         if txMerkleRoot = block.txMerkleRoot && witnessMerkleRoot = block.witnessMerkleRoot then
             let commitments =
-                createCommitments block.txMerkleRoot block.witnessMerkleRoot block.activeContractSetMerkleRoot block.commitments
+                Block.createCommitments block.txMerkleRoot block.witnessMerkleRoot block.activeContractSetMerkleRoot block.commitments
                 |> computeCommitmentsRoot
 
             if commitments = block.header.commitments then
@@ -253,19 +266,70 @@ let validate chain =
     >=> checkTxBasic
     >=> checkCommitments
 
-/// Apply block to UTXO and ACS, operation can fail
-let connect chain getUTXO contractsPath (parent:BlockHeader) timestamp utxoSet acs contractCache ema getContractState contractStates =
+let checkPayoutTx chainParams (cgp:CGP.T) (block:Block,ema) =
+
+    let internalizeRecipient ((recip, spends) : Recipient * List<Spend>) : List<Output> =
+        spends
+        |> List.map ( fun spend -> { lock = CGP.recipientToLock recip; spend = spend } )
+
+    let checkMessageBody (payout : Recipient * List<Spend>) (msgBody : Option<Zen.Types.Data.data>) : Result<unit, string> = result {
+        let! outputs =
+            msgBody
+            |> CGP.Contract.extractPayoutOutputs
+            |> Result.mapError (konst "Couldn't parse message body")
+
+        let winner =
+            internalizeRecipient payout
+
+        if List.sort outputs = List.sort winner
+            then return ()
+            else return! Error "Contract outputs are not the same as the payout winner"
+    }
+    
+    let extractPayoutWitnesses (ex : TransactionExtended) : List<ContractWitness> =
+        ex.tx.witnesses
+        |> List.choose (function ContractWitness cw when cw.contractId = chainParams.cgpContractId -> Some cw | _ -> None)
+        //|> List.pairWith ex.tx
+
+    if CGP.isPayoutBlock chainParams block.header.blockNumber then
+        let payoutWitnesses : List<ContractWitness> =
+            block.transactions
+            |> List.concatMap extractPayoutWitnesses
+
+        match payoutWitnesses with
+        | _ :: _ :: _ ->
+            Error "Multiple payout Txs"
+        | [] ->
+            match cgp.payout with
+            | None ->
+                Ok ()
+            | Some _ ->
+                Error "No payout Tx"
+        | [ cgpWitness ] ->
+            match cgp.payout with
+            | None ->
+                Error "There shouldn't be a payout - there is no payout winner"
+            | Some payout ->
+                cgpWitness.messageBody
+                |> checkMessageBody payout
+    else
+        Ok ()    // The CGP contract ensures there is never payout Tx outside the payout block
+    
+    |> Result.map (konst (block,ema))
+
+/// Apply block to UTXO, ACS and CGP; operation can fail
+let connect chainParams getUTXO contractsPath (parent:BlockHeader) timestamp utxoSet (cgp:CGP.T) acs contractCache ema getContractState contractStates  =
     let checkBlockNumber (block:Block) =
         if parent.blockNumber + 1ul <> block.header.blockNumber then
             Error "blockNumber mismatch"
         else Ok block
 
     let checkDifficulty (block:Block) =
-        let nextEma = EMA.add chain block.header.timestamp ema
+        let nextEma = EMA.add chainParams block.header.timestamp ema
 
         if block.header.difficulty <> ema.difficulty then
             Error "incorrect proof of work"
-        elif isGenesis chain block then
+        elif isGenesis chainParams block then
             Ok (block,nextEma)
         elif block.header.timestamp <= EMA.earliest ema then
             Error "block's timestamp is too early"
@@ -275,10 +339,11 @@ let connect chain getUTXO contractsPath (parent:BlockHeader) timestamp utxoSet a
             Ok (block,nextEma)
 
     let checkTxInputs (block,ema) =
-        if isGenesis chain block then
-            let set = List.fold (fun set ex ->                
+
+        if isGenesis chainParams block then
+            let set = List.fold (fun set ex ->
                 UtxoSet.handleTransaction getUTXO ex.txHash ex.tx set) utxoSet block.transactions
-            Ok (block,set,acs,ema,contractCache,contractStates)
+            Ok (block,set,acs,CGP.empty,ema,contractCache,contractStates)
         else
             let coinbase = List.head block.transactions
             let withoutCoinbase = List.tail block.transactions
@@ -286,19 +351,20 @@ let connect chain getUTXO contractsPath (parent:BlockHeader) timestamp utxoSet a
             let set = UtxoSet.handleTransaction getUTXO coinbase.txHash coinbase.tx utxoSet
 
             List.fold (fun state ex -> result {
-                let! block,set,acs,ema,contractCache,contractStates = state
+                let! block,set,acs,cgp,ema,contractCache,contractStates = state
 
                 let! _,acs,contractCache,contractStates =
-                    TransactionValidation.validateInContext chain getUTXO contractsPath block.header.blockNumber block.header.timestamp acs contractCache set getContractState contractStates ex
+                    TransactionValidation.validateInContext chainParams getUTXO contractsPath block.header.blockNumber block.header.timestamp acs contractCache set getContractState contractStates ex
                     |> Result.mapError (sprintf "transactions failed inputs validation due to %A")
 
                 let set = UtxoSet.handleTransaction getUTXO ex.txHash ex.tx set
-                return block,set,acs,ema,contractCache,contractStates
-            }) (Ok (block,set,acs,ema,contractCache,contractStates)) withoutCoinbase
+                return block,set,acs,cgp,ema,contractCache,contractStates
+            }) (Ok (block,set,acs,cgp,ema,contractCache,contractStates)) withoutCoinbase
 
-    let checkCoinbase (block,set,acs,ema,contractCache,contractStates) =
-        if isGenesis chain block then
-            Ok (block,set,acs,ema,contractCache,contractStates)
+
+    let checkCoinbase (block,set,acs,(cgp:CGP.T),ema,contractCache,contractStates) =
+        if isGenesis chainParams block then
+            Ok (block,set,cgp,acs,ema,contractCache,contractStates)
         else
             let coinbase = List.head block.transactions
             let transactions = List.tail block.transactions
@@ -321,35 +387,56 @@ let connect chain getUTXO contractsPath (parent:BlockHeader) timestamp utxoSet a
 
                 let totalZen = defaultArg (Map.tryFind Asset.Zen blockFees) 0UL
 
-                let blockSacrifice = getBlockSacrificeAmount chain acs
-                let blockReward = blockReward block.header.blockNumber
+                let blockSacrifice = getBlockSacrificeAmount chainParams acs
+                let blockReward = blockReward block.header.blockNumber cgp.allocation
+                let allocationReward = blockAllocation block.header.blockNumber cgp.allocation
 
-                Map.add Asset.Zen (totalZen + blockSacrifice + blockReward) blockFees
+                Map.add Asset.Zen (totalZen + blockSacrifice + blockReward + allocationReward) blockFees
+            let contractAmounts =
+                    coinbase.tx.outputs
+                    |> List.filter (function
+                        | {lock = Contract contractId; spend= _} when chainParams.cgpContractId = contractId -> true
+                        | _ -> false)
+                    |> List.fold folder Map.empty
+            let totalContractAmounts =
+                    coinbase.tx.outputs
+                    |> List.filter (function
+                        | {lock = Contract _; spend= _} -> true
+                        | _ -> false)
+                    |> List.fold folder Map.empty
+            let amount =
+                contractAmounts
+                |> Map.tryFind Asset.Zen
+                |> Option.defaultValue 0UL
 
             if coinbaseTotals <> blockRewardAndFees then
                 Error "block reward is incorrect"
+            elif totalContractAmounts <> contractAmounts then
+                Error "reward to cgp contract in invalid"
+            elif amount <> (blockAllocation block.header.blockNumber cgp.allocation) then
+                Error "reward is not divided correctly"
             else
-                Ok (block,set,acs,ema,contractCache,contractStates)
+                Ok (block,set,cgp,acs,ema,contractCache,contractStates)
 
-    let checkCommitments (block,set,acs,ema,contractCache,contractStates) =
+    let checkCommitments (block,set,cgp,acs,ema,contractCache,contractStates) =
         let acs = ActiveContractSet.expireContracts block.header.blockNumber acs
         let acsMerkleRoot = ActiveContractSet.root acs
 
         // we already validated txMerkleRoot and witness merkle root at the basic validation, re-calculate with acsMerkleRoot
         let commitments =
-            createCommitments block.txMerkleRoot block.witnessMerkleRoot acsMerkleRoot block.commitments
+            Block.createCommitments block.txMerkleRoot block.witnessMerkleRoot acsMerkleRoot block.commitments
             |> computeCommitmentsRoot
 
         // We ignore the known commitments in the block as we already calculated them
         // Only check that the final commitment is correct
         if commitments = block.header.commitments then
-            Ok (block,set,acs,contractCache,ema,contractStates)
+            Ok (block,set,cgp,acs,contractCache,ema,contractStates)
         else
             Error "commitments mismatch"
 
     let checkWeight (block,nextEma) = result {
         let! weight = Weight.blockWeight getUTXO block utxoSet
-        let maxWeight = chain.maxBlockWeight
+        let maxWeight = chainParams.maxBlockWeight
         if weight <= maxWeight
         then
             return block,nextEma
@@ -360,6 +447,7 @@ let connect chain getUTXO contractsPath (parent:BlockHeader) timestamp utxoSet a
     checkBlockNumber
     >=> checkDifficulty
     >=> checkWeight
+    >=> checkPayoutTx chainParams cgp
     >=> checkTxInputs
     >=> checkCoinbase
     >=> checkCommitments

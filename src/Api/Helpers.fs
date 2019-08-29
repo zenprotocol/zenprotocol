@@ -23,6 +23,8 @@ let rec omitNullFields = function
         |> Array.map (fun (name,value) -> name, omitNullFields value)
         |> JsonValue.Record
     | value -> value
+    
+let emptyRecord = JsonValue.Record [| |]
 
 let spendEncoder spend =
     SpendJson.Root (spend.asset.AsString, (int64)spend.amount)
@@ -37,6 +39,10 @@ let inputEncoder (input:Input) =
         SpendJson.Root (spend.asset.AsString, (int64)spend.amount)
         |> fun j -> JsonValue.Record [| ("mint", j.JsonValue) |]
 
+let recipientEncoder chain = function
+        | PKRecipient pkHash -> Address.encode chain (Address.PK pkHash)
+        | ContractRecipient contractId -> contractId.ToString()
+    
 let lockEncoder chain (lock:Lock) =
     match lock with
     | PK hash ->
@@ -57,7 +63,7 @@ let lockEncoder chain (lock:Lock) =
     | HighVLock (identifier, data) ->
         HighVLockLockJson.Root ((int)identifier, FsBech32.Base16.encode data)
         |> fun j -> JsonValue.Record [| ("HighVLock", j.JsonValue) |]
-        
+
 let outputEncoder chain (output:Output) =
     JsonValue.Record [|
         ("lock", lockEncoder chain output.lock);
@@ -74,15 +80,15 @@ let pointedOutputEncoder chain (pointedOutput:PointedOutput) =
     |]
 
 let contractEncoder chain (tx:Transaction) =
-        match tx.contract with 
-        | Some (V0 c) -> 
+        match tx.contract with
+        | Some (V0 c) ->
             let contractId = Contract.makeContractId Version0 c.code
-                        
+
             let address = Address.encode chain (Address.Contract contractId)
-                    
+
             JsonValue.Record [| ("contractId", JsonValue.String (contractId.ToString())); ("address",JsonValue.String address); ("code",JsonValue.String c.code) |]
         | _ -> JsonValue.Null
-    
+
 let transactionEncoder chain (tx:Transaction) =
     JsonValue.Record
         [|
@@ -116,7 +122,7 @@ let blockHeaderEncoder (bh:BlockHeader) =
         commitments=bh.commitments.AsString
     ) |> fun j -> j.JsonValue
 
-let blockEncoder chain blockHash (bk:Block) =    
+let blockEncoder chain blockHash (bk:Block) =
     let txsJson =
         JsonValue.Record
             [| for ex in bk.transactions do
@@ -145,7 +151,7 @@ let dataEncoder chain data =
         | Collection (Array _) -> "array"
         | Collection (Dict _) -> "dict"
         | Collection (List _) -> "list"
-    
+
     let rec dataValue  = function
         | I64 v ->
             v
@@ -211,5 +217,31 @@ let dataEncoder chain data =
             |> List.map (fun data -> JsonValue.Record [| dataName data, dataValue data |])
             |> List.toArray
             |> JsonValue.Array
-    
+
     JsonValue.Record [| dataName data, dataValue data |]
+
+let cgpEncoder chain (interval:uint32) (cgp:CGP.T)  =
+    let result =
+        match cgp.payout with
+        | Some res ->
+            res
+            |> (fun (recipient:Recipient, spend: Spend list) ->
+                spend
+                |> List.map (fun spend ->
+                    PayoutResultJson.Root(recipientEncoder chain recipient, int64 spend.amount, spend.asset.AsString)))
+            |> fun j ->  List.map (fun (x:PayoutResultJson.Root) -> x.JsonValue) j
+        | _ -> [emptyRecord]
+    JsonValue.Record
+        [|
+            ("interval", JsonValue.Number ((decimal)interval))
+            ("allocation", JsonValue.Number (decimal cgp.allocation))
+            ("payout", result|> List.toArray |> JsonValue.Array)
+        |]
+    |> omitNullFields
+
+let cgpHistoryEncoder chain (cgpList:(uint32 * CGP.T) list) =
+    cgpList
+    |> List.map (fun (interval, cgp)  -> cgpEncoder chain interval cgp)
+    |> List.toArray
+    |> JsonValue.Array
+    |> omitNullFields

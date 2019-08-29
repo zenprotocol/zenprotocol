@@ -48,10 +48,11 @@ let saveFullBlock session blockHash (block:Block) =
     List.iter (fun ex ->
         MultiCollection.put session.context.transactionBlocks session.session ex.txHash blockHash) block.transactions
 
-let saveBlockState session blockHash (acsUndoData:ActiveContractSet.UndoData) contractStatesUndoData ema =
+let saveBlockState session blockHash (acsUndoData:ActiveContractSet.UndoData) contractStatesUndoData ema cgp =
     let blockState =
         {
             ema = ema
+            cgp = cgp
             activeContractSetUndoData = acsUndoData
             contractStatesUndoData = contractStatesUndoData
         }
@@ -80,7 +81,7 @@ let tryGetTip session =
         let header = getHeader session blockHash
         let blockState = getBlockState session blockHash
 
-        Some (header,blockState.ema)
+        Some (header,blockState.ema,blockState.cgp)
     | None -> None
 
 let updateTip session blockHash =

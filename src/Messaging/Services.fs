@@ -26,6 +26,7 @@ module Blockchain =
     }
 
     type Command =
+        | SetCGP of Option<Winner>
         | ValidateTransaction of Types.TransactionExtended
         | RequestMemPool of peerId:byte[]
         | RequestTransactions of peerId:byte[] * txHashes:Hash list
@@ -55,8 +56,14 @@ module Blockchain =
         | GetTransaction of Hash
         | CheckTransaction of TransactionExtended
         | GetTotalZP
+        | GetBlockReward of uint32
+        | GetCGP
+        | GetCgpHistory
 
     type Response = unit
+    
+    let setCGP client winner =
+        Command.send client serviceName (SetCGP winner)
 
     let validateTransaction client tx =
         Command.send client serviceName (ValidateTransaction tx)
@@ -157,6 +164,18 @@ module Blockchain =
         GetTotalZP
         |> Request.send<Request, uint64> client serviceName
 
+    let getBlockReward client blockNumber =
+        GetBlockReward blockNumber
+        |> Request.send<Request, uint64> client serviceName
+        
+    let getCgp client =
+        GetCGP 
+        |> Request.send<Request, CGP.T> client serviceName
+        
+    let getCgpHistory client =
+        GetCgpHistory
+        |> Request.send<Request, (uint32 * CGP.T) list> client serviceName
+
 module Network =
     type Command =
         | SendMemPool of peerId:byte[] * Hash list
@@ -203,10 +222,11 @@ module Wallet =
         | GetTransactions of skip: int * take: int
         | GetBalance
         | ImportSeed of string list * password:string
-        | Send of publish:bool*outputs:List<Hash * Spend> * password:string
+        | Send of publish:bool*outputs:List<Lock * Spend> * password:string
         | ActivateContract of publish:bool*string * uint32 * password:string
         | ExtendContract of publish:bool*ContractId * uint32 * password:string
         | ExecuteContract of publish:bool*ContractId * string * data option * provideReturnAddress:bool * sign:string option * Map<Asset, uint64> * password:string
+        | ExecuteCGP of publish:bool * password:string
         | AccountExists
         | CheckPassword of password:string
         | GetPublicKey of path:string * password:string
@@ -257,6 +277,9 @@ module Wallet =
 
     let executeContract client publish address command messageBody provideReturnAddress sign spends password =
         send<Transaction> client serviceName (ExecuteContract (publish, address, command, messageBody, provideReturnAddress, sign, spends, password))
+
+    let executeCGP client publish password =
+        send<Transaction> client serviceName (ExecuteCGP (publish, password))
 
     let importSeed client words password =
         send<unit> client serviceName (ImportSeed (words, password))
@@ -337,6 +360,8 @@ module AddressDB =
         | GetContractHistory of contractId : ContractId * skip: int * take: int
 
     let serviceName = "addressDB"
+    let resyncAccount client =
+        Command.send client serviceName Resync
 
     //TODO: apply same convention to other services
     let private send<'a> client = Request.send<Request, Result<'a,string>> client serviceName

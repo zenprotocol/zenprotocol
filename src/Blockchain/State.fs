@@ -3,6 +3,7 @@ module Blockchain.State
 open Consensus
 open Types
 
+   
 type TipState =
     {
         tip: ExtendedBlockHeader.T
@@ -27,4 +28,5 @@ type State =
         memoryState: MemoryState
         initialBlockDownload:InitialBlockDownload.T
         headers: uint32
+        cgp: CGP.T
     }

@@ -14,6 +14,7 @@ open State
 open DatabaseContext
 open Logary.Message
 open Infrastructure.Result
+open Chain
 
 let getUnionCaseName (x:'a) =
     match Microsoft.FSharp.Reflection.FSharpValue.GetUnionFields(x, typeof<'a>) with
@@ -42,11 +43,16 @@ let handleCommand chainParams command session timestamp (state:State) =
 
     let result =
         match command with
+        | SetCGP winner ->
+            effectsWriter {
+                let cgp = CGP.update winner state.cgp
+                return {state with cgp = cgp}
+            }
         | ValidateTransaction ex ->
             effectsWriter {
                 let! memoryState =
                     TransactionHandler.validateTransaction chainParams session contractPath state.tipState.tip.header.blockNumber
-                        timestamp ex state.memoryState
+                        timestamp ex state
                 return {state with memoryState = memoryState}
             }
         | RequestMemPool peerId ->
@@ -71,7 +77,7 @@ let handleCommand chainParams command session timestamp (state:State) =
             effectsWriter {
                 if not <| List.exists (fun txHash -> Set.contains txHash state.memoryState.invalidTxHashes) txHashes then
                     let missingTxHashes = List.filter (fun txHash -> not <| MemPool.containsTransaction txHash state.memoryState.mempool) txHashes
-    
+
                     if not <| List.isEmpty missingTxHashes then
                         do! getTransactions peerId missingTxHashes
 
@@ -129,7 +135,7 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
     | GetBlockTemplate pkHash ->
         BlockTemplateBuilder.makeTransactionList chain session state timestamp
         <@> fun (memState, validatedTransactions) ->
-            Block.createTemplate chain state.tipState.tip.header timestamp state.tipState.ema memState.activeContractSet validatedTransactions pkHash
+            Block.createTemplate chain state.tipState.tip.header timestamp state.tipState.ema memState.activeContractSet state.cgp validatedTransactions pkHash
         |> Result.get
         |> requestId.reply<Block>
     | GetBlock (mainChain,blockHash) ->
@@ -275,18 +281,52 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
         |> requestId.reply<Result<Hash.Hash,ValidationError.ValidationError>>
     | GetTotalZP ->
         [2ul..state.tipState.tip.header.blockNumber]
-        |> List.fold (fun sum blockNumber -> sum + Block.blockReward blockNumber) (20_000_000UL * 100_000_000UL)
+        |> List.fold (fun sum blockNumber -> sum + blockReward blockNumber state.cgp.allocation) (20_000_000UL * 100_000_000UL)
         |> requestId.reply
-    |> ignore
+    | GetBlockReward blockNumber ->
+        blockReward blockNumber state.cgp.allocation
+        |> (+) (blockAllocation blockNumber state.cgp.allocation)
+        |> requestId.reply
+    | GetCGP ->
+        state.cgp
+        |> requestId.reply<CGP.T>
+    | GetCgpHistory ->
+        let currentInterval = state.tipState.tip.header.blockNumber / chain.intervalLength
 
+        let getBlockState blockNumber =
+            let rec findBlock (header:ExtendedBlockHeader.T) =
+                if header.header.blockNumber = blockNumber then
+                    BlockRepository.getBlockState session header.hash
+                else
+                    BlockRepository.getHeader session header.header.parent
+                    |> findBlock
+
+            findBlock state.tipState.tip
+
+        let rec getCGP interval cgpList =
+            if interval = 0ul then
+               cgpList
+            else
+                let blockState:BlockState.T = getBlockState (interval * chain.intervalLength)
+
+                (blockState.cgp :: cgpList)
+                |> getCGP (interval - 1ul)
+        let listCgp =
+            []
+            |> getCGP currentInterval
+        listCgp
+        |> List.mapi (fun i cgp -> (uint32 i,cgp))
+        |> requestId.reply<(uint32 * CGP.T) list>
+    |> ignore
+           
     logEndAction timestamp "request" request
 
     ret state
 
-let handleEvent event session timestamp state =
+let handleEvent _ _ _ state =
     ret state
 
-let tick chain session timestamp state = effectsWriter {
+let tick _ _ timestamp state = effectsWriter {
     let! ibd = InitialBlockDownload.tick timestamp state.initialBlockDownload
 
     return {state with initialBlockDownload = ibd}

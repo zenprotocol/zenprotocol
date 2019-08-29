@@ -45,6 +45,7 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="BigEndianBitConverter.fs" />
+    <Compile Include="Functional.fs" />
     <Compile Include="Ref.fs" />
     <Compile Include="Result.fs" />
     <Compile Include="BigInteger.fs" />

@@ -30,7 +30,7 @@ let toExtended tx =
         raw=raw
     }
 
-let pushWitnesses witnesses tx =
+let pushWitnesses witnesses tx : Transaction=
     { tx with witnesses = witnesses @ tx.witnesses }
 
 let sign keyPairs initialSigHash tx =

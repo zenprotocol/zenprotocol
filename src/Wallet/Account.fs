@@ -256,6 +256,7 @@ let getUnspentOutputs dataAccess session view confirmations =
     let account = DataAccess.Account.get dataAccess session
 
     View.Outputs.getAll view dataAccess session
+    |> List.filter (fun output -> match output.status with | Unspent _-> true | _ -> false)
     |> List.filter (filterOutputByConfirmations account confirmations)
     |> List.map (fun output -> output.outpoint,{lock=output.lock;spend=output.spend})
 
@@ -291,8 +292,7 @@ let addBlock dataAccess session blockHash block =
         |> List.mapi (fun index output -> uint32 index,output)
         |> List.choose (fun (index,output) ->
             match output.lock with
-            | Coinbase (_,pkHash) when (DataAccess.Addresses.contains dataAccess session pkHash) ->
-                Some (pkHash,index,output)
+            | Coinbase (_,pkHash) when (DataAccess.Addresses.contains dataAccess session pkHash) -> Some (pkHash,index,output)
             | PK pkHash when (DataAccess.Addresses.contains dataAccess session pkHash) ->
                 Some (pkHash,index,output)
             | _ -> None)
@@ -499,7 +499,8 @@ let getHistory dataAccess session view skip take =
     |> List.map (fun (txHash,direction,spend,confirmations,_,lock) -> txHash,direction,spend,confirmations,lock)
 
 let getTransactionCount dataAccess session view =
-    List.length (View.Outputs.getAll view dataAccess session)
+    let account = DataAccess.Account.get dataAccess session
+    List.length (View.Outputs.getAll view dataAccess session |> getOutputsInfo account.blockNumber)
 
 // returns list of pubickeys with their correlating HD paths
 let getKeys dataAccess session password =

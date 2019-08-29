@@ -20,9 +20,9 @@ type T = {
     header: BlockHeader
     status: BlockStatus
     chainWork: bigint option
-    txMerkleRoot:Hash.Hash;
-    witnessMerkleRoot:Hash.Hash;
-    activeContractSetMerkleRoot:Hash.Hash;
+    txMerkleRoot: Hash.Hash
+    witnessMerkleRoot: Hash.Hash
+    activeContractSetMerkleRoot: Hash.Hash
     commitments: Hash.Hash list
 }
 

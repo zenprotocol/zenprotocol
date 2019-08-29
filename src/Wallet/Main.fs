@@ -187,6 +187,10 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             error
             |> reply<Transaction> requestId
             NoAccount
+        | ExecuteCGP _ ->
+            error
+            |> reply<Transaction> requestId
+            NoAccount
         | GetPublicKey _ ->
             error
             |> reply<PublicKey> requestId
@@ -285,19 +289,16 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
         | Send (publish, outputs, password) ->
             let tx =
                 outputs
-                |> List.map (fun (hash, spend) -> { lock = PK hash; spend = spend })
-                |> TransactionCreator.createTransaction dataAccess session view password
+                |> List.map (fun (lock, spend) -> { lock = lock ; spend = spend })
+                |> TransactionCreator.createTransaction chainParams dataAccess session view password
 
             reply<Transaction> requestId tx
             publishTx dataAccess session client view publish tx
-
         | RawTransactionCreate outputs ->
-            let raw =
-                outputs
-                |> List.map (fun (hash, spend) -> { lock = PK hash; spend = spend })
-                |> TransactionCreator.createRawTransaction dataAccess session view None
-
-            reply<RawTransaction> requestId raw
+            outputs
+            |> List.map (fun (hash, spend) -> { lock = PK hash; spend = spend })
+            |> TransactionCreator.createRawTransaction chainParams dataAccess session view None
+            |> reply<RawTransaction> requestId
             accountStatus
         | RawTransactionSign (raw,password) ->
             let raw = TransactionCreator.signRawTransaction dataAccess session password raw
@@ -305,23 +306,23 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             reply<RawTransaction> requestId raw
             accountStatus
         | ActivateContract (publish, code, numberOfBlocks, password) ->
-            let tx =
-
-                TransactionCreator.createActivateContractTransaction dataAccess session view chainParams password code numberOfBlocks
-                <@> fun tx -> tx, Consensus.Contract.makeContractId Version0 code
-
-            reply<ActivateContractResponse> requestId tx
-            publishTx dataAccess session client view publish (Result.map fst tx)
-
+                let tx =
+                    TransactionCreator.createActivateContractTransaction chainParams dataAccess session view chainParams password code numberOfBlocks
+                    <@> fun tx -> tx, Consensus.Contract.makeContractId Version0 code
+                reply<ActivateContractResponse> requestId tx
+                publishTx dataAccess session client view publish (Result.map fst tx)
         | ExtendContract (publish, contractId, numberOfBlocks, password) ->
             let tx = TransactionCreator.createExtendContractTransaction dataAccess session view (Blockchain.getActiveContract client) chainParams password contractId numberOfBlocks
 
             reply<Transaction> requestId tx
             publishTx dataAccess session client view publish tx
-
+        | ExecuteCGP (publish, password) ->
+            let cgp = Blockchain.getCgp client
+            let tx = TransactionCreator.createExecuteCGP chainParams dataAccess session view (Blockchain.executeContract client) password cgp
+            reply<Transaction> requestId tx
+            publishTx dataAccess session client view publish tx
         | ExecuteContract (publish, contractId, command, data, provideReturnAddress, sign, spends, password) ->
-            let tx = TransactionCreator.createExecuteContractTransaction dataAccess session view (Blockchain.executeContract client) password contractId command data provideReturnAddress sign spends
-
+            let tx = TransactionCreator.createExecuteContractTransaction chainParams dataAccess session view (Blockchain.executeContract client) password contractId command data provideReturnAddress sign spends
             reply<Transaction> requestId tx
             publishTx dataAccess session client view publish tx
         | AccountExists ->
@@ -474,3 +475,5 @@ let main dataPath busName chain (wipe:Wipe) =
             DataAccess.dispose dataAccess
             Disposables.dispose databaseContext), observable
     )
+
+

@@ -183,6 +183,8 @@ module PublicKey =
             | _ -> None
 
     let toString = serialize >> FsBech32.Base16.encode
+    
+    let fromString pk = FsBech32.Base16.decode pk |> Option.bind deserialize
 
     let hash = serialize >> Hash.compute
 

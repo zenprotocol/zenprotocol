@@ -23,12 +23,11 @@ let private result = new ResultBuilder<string>()
 
 let private (?=) expected actual =
     actual |> should equal expected
-    //printfn "\nActual: %A\nExpected: %A" actual expected
 
 [<Literal>]
 let rlimit = 2723280u
 
-let chain = { Chain.getChainParameters Chain.Local with proofOfWorkLimit = Difficulty.uncompress 553648127u; genesisTime = (Timestamp.now()) - 1_000_000UL }
+let defaultChain = { Chain.getChainParameters Chain.Local with proofOfWorkLimit = Difficulty.uncompress 553648127u; genesisTime = (Timestamp.now()) - 1_000_000UL }
 
 let tempDir () =
     Path.Combine
@@ -63,26 +62,35 @@ let clean() =
 
 [<Binding>]
 module Binding =
+    open Consensus.Chain
     open Consensus.Serialization
-
+    
     type TestingState = {
-        blocks : Map<string, BlockHeader>
-        acs: Map<BlockHeader, ActiveContractSet.T>
+        chain     : ChainParameters
+        blocks    : Map<string, Block>
+        acs       : Map<BlockHeader, ActiveContractSet.T>
+        cgp       : Map<BlockHeader, CGP.T>
+        missing   : Map<string, Block>
         contracts : Map<string, ContractId * ContractV0>
-        keys : Map<string, KeyPair>
-        txs : Map<string, Transaction>
-        txLists : Map<string, Transaction list>
-        data : Map<string, Zen.Types.Data.data>
+        keys      : Map<string, KeyPair>
+        txs       : Map<string, Transaction>
+        txLists   : Map<string, Transaction list>
+        data      : Map<string, Zen.Types.Data.data>
+        assets    : Map<string, Asset>
     }
-
+    
     let mutable testingState = {
-        blocks = Map.empty
-        acs = Map.empty
+        chain     = defaultChain
+        blocks    = Map.empty
+        acs       = Map.empty
+        cgp       = Map.empty
+        missing   = Map.empty
         contracts = Map.empty
-        keys = Map.empty
-        txs = Map.empty
-        txLists = Map.empty
-        data = Map.empty
+        keys      = Map.empty
+        txs       = Map.empty
+        txLists   = Map.empty
+        data      = Map.empty
+        assets    = Map.empty
     }
 
     let getEmptyState() =
@@ -98,20 +106,21 @@ module Binding =
         }
 
         let memoryState : MemoryState = {
-            utxoSet = UtxoSet.asDatabase
+            utxoSet           = UtxoSet.asDatabase
             activeContractSet = ActiveContractSet.empty
-            orphanPool = OrphanPool.create()
-            mempool = MemPool.empty
-            contractCache = ContractCache.empty
-            contractStates = ContractStates.asDatabase
-            invalidTxHashes = Set.empty
+            orphanPool        = OrphanPool.create()
+            mempool           = MemPool.empty
+            contractCache     = ContractCache.empty
+            contractStates    = ContractStates.asDatabase
+            invalidTxHashes   = Set.empty
         }
 
         {
-            tipState = tipState
-            memoryState = memoryState
+            tipState             = tipState
+            memoryState          = memoryState
             initialBlockDownload = InitialBlockDownload.Inactive
-            headers = 0ul
+            headers              = 0ul
+            cgp = CGP.empty
         }
 
     let mutable state : Blockchain.State.State = getEmptyState()
@@ -129,12 +138,31 @@ module Binding =
         let m = Regex.Match(input, pattern)
         if m.Success then Some(List.tail [ for g in m.Groups -> g.Value ])
         else None
+        
+    let updateAsset assetLabel asset =
+        testingState <- { testingState with assets = Map.add assetLabel asset testingState.assets }
 
+    let tryFindAsset assetLabel =
+        Map.tryFind assetLabel testingState.assets
+    
+    let findAsset assetLabel =
+        match Map.tryFind assetLabel testingState.assets with
+        | Some asset ->
+            asset
+        | None ->
+            failwithf "Couldn't find asset: %s" assetLabel
+    
     let updateTx txLabel tx =
         testingState <- { testingState with txs = Map.add txLabel tx testingState.txs }
         tx
 
-    let tryFindTx txLabel = Map.tryFind txLabel testingState.txs
+    let tryFindTx txLabel =
+        Map.tryFind txLabel testingState.txs
+
+    let tryFindTxByHash txHash =
+        testingState.txs
+        |> Map.tryFindKey (fun _ tx -> Transaction.hash tx = txHash)
+        |> Option.bind tryFindTx
 
     let tryFindTxList txLabel = Map.tryFind txLabel testingState.txLists
 
@@ -149,6 +177,7 @@ module Binding =
 
     let findBlockLabel block =
         testingState.blocks
+        |> Map.map (fun _ bk -> bk.header)
         |> Map.tryFindKey (fun _ block' -> block = block')
 
     let getContractId contractLabel =
@@ -232,6 +261,15 @@ module Binding =
             { inputs = []; witnesses = []; outputs = []; version = Version0; contract = None }
             |> updateTx txLabel
 
+    let initAsset assetLabel =
+        let contractId =
+            (assetLabel:string)
+            |> System.Text.Encoding.ASCII.GetBytes
+            |> Hash.compute
+            |> fun hash -> ContractId (1u, hash)
+        
+        Asset.defaultOf contractId
+    
     let initKey keyLabel =
         let context = Native.secp256k1_context_create (Native.SECP256K1_CONTEXT_SIGN ||| Native.SECP256K1_CONTEXT_VERIFY)
 
@@ -299,8 +337,21 @@ module Binding =
             |> PublicKey.hash
             |> Lock.PK
 
+    let mockAsset label =
+        if label = "Zen" || label = "zen" || label = "ZEN"
+            then Asset.Zen
+            else
+                match tryFindAsset label with
+                | Some asset ->
+                    asset
+                | None ->
+                    initAsset label
+    
+    let getSpend amount asset =
+        [{ amount = amount; asset = asset }]
+    
     let getOutput amount asset keyLabel = {
-        spend = { amount = amount; asset = getAsset asset }
+        spend = List.head (getSpend amount (getAsset asset))
         lock = getLock keyLabel
     }
 
@@ -308,14 +359,15 @@ module Binding =
         if sender = "anonymous" then
             None
         else
-//            match tryFindContract sender with
-//            | Some contract ->
-//                Contract.makeContractId Version0 contract.code
-//                |> Consensus.Types.ContractSender
-//            | None ->
             initKey sender
             |> snd
             |> Some
+            
+    let getRecipient addressKeyLabel =
+        match getLock addressKeyLabel with
+        | Lock.PK pkHash -> PKRecipient pkHash
+        | Lock.Contract cId -> ContractRecipient cId
+        | _ -> failwith "unexpected"
 
     let [<BeforeTestRun>] beforeTestRun () =
         clean()
@@ -325,17 +377,37 @@ module Binding =
     let [<BeforeScenario>] setupScenario () =
         createDatabaseContext()
         testingState <- {
-            blocks = Map.empty
-            acs = Map.empty
+            chain     = defaultChain
+            blocks    = Map.empty
+            acs       = Map.empty
+            cgp       = Map.empty
+            missing   = Map.empty
             contracts = testingState.contracts
-            keys = Map.empty
-            txs = Map.empty
-            txLists = Map.empty
-            data = Map.empty
+            keys      = Map.empty
+            txs       = Map.empty
+            txLists   = Map.empty
+            data      = Map.empty
+            assets    = Map.empty
         }
         let contractCache = state.memoryState.contractCache
         state <- getEmptyState()
         state <- { state with memoryState = { state.memoryState with contractCache = contractCache } }
+
+    // Setting chain params
+    let [<Given>] ``chain params`` (table: Table) =
+        for row in table.Rows do
+            let key = row.GetString "Key"
+            let value = row.GetString "Value"
+
+            match key with
+            | "interval" ->
+                testingState <- { testingState with chain = { testingState.chain with intervalLength = UInt32.Parse value } }
+            | "allocationCorrectionCap" ->
+                testingState <- { testingState with chain = { testingState.chain with allocationCorrectionCap = Byte.Parse value } }
+            | "coinbaseMaturity" ->
+                testingState <- { testingState with chain = { testingState.chain with coinbaseMaturity = UInt32.Parse value } }
+            | _ ->
+                failwith "unidentified option"
 
     // Initializes a utxoset
     let [<Given>] ``utxoset`` (table: Table) =
@@ -414,7 +486,7 @@ module Binding =
             | other -> failwithf "unexpected execute option %A" other
 
         executeContract contractLabel inputTxLabel outputTxLabel command sender messageBody
-
+    
     // Adding a single output
     // or adding a change output for an asset
     let [<Given>] ``(.*) locks (.*) (.*) to (.*)`` txLabel amount asset keyLabel =
@@ -447,6 +519,20 @@ module Binding =
         |> updateTx txLabel
         |> ignore
 
+    let private getFirstPKAddress tx =
+        let findOutput (outpoint:Outpoint) =
+            tryFindTxByHash outpoint.txHash
+            |> Option.map (fun tx -> tx.outputs.[int outpoint.index].lock)
+
+        tx.inputs
+        |> List.find (function | Outpoint _ -> true | _ -> false)
+        |> function | Outpoint outpoint -> outpoint | _ -> failwith "expected outpoint"
+        |> findOutput
+        |> function
+        | Some (PK pkHash) -> pkHash
+        | Some other -> failwithf "expected PK lock, got %A" other
+        | None -> failwithf "could not get first PK hash"
+    
     // Adding contract activation outputs (ActivationSacrifice and Fee)
     let [<Given>] ``(.*) activates (.*) for (.*) block(?:|s)`` txLabel contractLabel blocks =
         let tx = initTx txLabel
@@ -454,7 +540,7 @@ module Binding =
         let _, contract = getContractRecord contractLabel
         let codeLength = String.length contract.code |> uint64
         let activationFee = contract.queries * rlimit /100ul |> uint64
-        let activationSacrifice = chain.sacrificePerByteBlock * codeLength * (uint64 blocks)
+        let activationSacrifice = testingState.chain.sacrificePerByteBlock * codeLength * (uint64 blocks)
 
         let outputs =
             [ { spend = { amount = activationSacrifice; asset = Asset.Zen }; lock = ActivationSacrifice }
@@ -470,7 +556,7 @@ module Binding =
 
         let contractId, contract = getContractRecord contractLabel
         let codeLength = String.length contract.code |> uint64
-        let extensionSacrifice = chain.sacrificePerByteBlock * codeLength * (uint64 blocks)
+        let extensionSacrifice = testingState.chain.sacrificePerByteBlock * codeLength * (uint64 blocks)
 
         let outputs =
             [ { spend = { amount = extensionSacrifice; asset = Asset.Zen }; lock = ExtensionSacrifice contractId } ]
@@ -600,12 +686,12 @@ module Binding =
             |> List.map findTx
             |> List.map Transaction.toExtended
 
-        let genesisBlock = Block.createGenesis chain rootTxs (0UL,0UL)
+        let genesisBlock = Block.createGenesis testingState.chain rootTxs (0UL,0UL)
         let genesisHash = Block.hash genesisBlock.header
 
-        testingState <- { testingState with blocks = Map.add "genesis" genesisBlock.header testingState.blocks }
+        testingState <- { testingState with blocks = Map.add "genesis" genesisBlock testingState.blocks }
 
-        let chain = { chain with genesisHashHash = Hash.computeOfHash genesisHash }
+        let chain = { testingState.chain with genesisHashHash = Hash.computeOfHash genesisHash }
         let state' = { state with tipState = { state.tipState with ema = EMA.create chain }}
 
         let events, state' =
@@ -617,78 +703,143 @@ module Binding =
 
         state <- state'
 
-    let extendChain' newBlockLabel txs parentBlockLabel =
+    let extendChain' newBlockLabel txs parentBlockLabel (includeInChain : bool) =
+        
         let createBlock state =
+            eprintfn "=== createBlock . 1 ==="
             let parent =
                 if parentBlockLabel = "tip" then
                     state.tipState.tip.header
                 else
                     match Map.tryFind parentBlockLabel testingState.blocks with
-                    | Some block -> block
-                    | None -> failwithf "could not resolve parent block %A" parentBlockLabel
-
-            let parentAcs =
+                    | Some block -> block.header
+                    | None ->
+                        failwithf "could not resolve parent block %A" parentBlockLabel
+            eprintfn "=== createBlock . 2 ==="
+            let initialAcs =
                 match Map.tryFind parent testingState.acs with
                 | Some acs -> acs
                 | None -> ActiveContractSet.empty
+            eprintfn "=== createBlock . 3 ==="
+            let initialCgp =
+                match Map.tryFind parent testingState.cgp with
+                | Some cgp -> cgp
+                | None -> CGP.empty
+            eprintfn "=== createBlock . 4 ==="
+            let builderState, txs' =
+                List.mapi (fun i tx -> Transaction.toExtended tx, bigint i) txs // fake weights
+                |> BlockTemplateBuilder.selectOrderedTransactions testingState.chain session parent.blockNumber (Timestamp.now()) initialAcs state.memoryState.contractCache
+            eprintfn "=== createBlock . 5 ==="
+            // if some transactions could not make it into the block, force them in anyway
+            let forceAddedTxs =
+                let isPassedValidation tx = List.contains tx txs'
 
-            let newAcs =
-                List.fold (fun acs tx ->
-                    try
-                        match TransactionValidation.validateInContext chain (fun outpoint ->
-                            let outputStatus = getUTXO session outpoint
-                            match outputStatus with
-                            | UtxoSet.OutputStatus.NoOutput -> failwithf "no output: constructing block %A" newBlockLabel
-                            | UtxoSet.OutputStatus.Spent output ->  UtxoSet.OutputStatus.Unspent output
-                            | UtxoSet.OutputStatus.Unspent output ->  UtxoSet.OutputStatus.Unspent output) session.context.contractPath (parent.blockNumber + 1ul) (Timestamp.now())
-                            acs state.memoryState.contractCache Map.empty (getContractState session) ContractStates.asDatabase (Transaction.toExtended tx) with
-                        | Ok (_,acs,_,_) -> acs
-                        | Error err -> failwithf "Tx failed validation: %A %A constructing block %A" (Transaction.hash tx) err newBlockLabel
-                    with _ as ex ->
-                        acs
-                ) parentAcs txs
-
-            let rawblock = Block.createTemplate chain parent (Timestamp.now() + (uint64 parent.blockNumber)*1_000_000UL) state.tipState.ema newAcs (List.map Transaction.toExtended txs) Hash.zero
-
+                txs
+                |> List.map Transaction.toExtended
+                |> List.fold (fun forceAddedTxs tx ->
+                    if isPassedValidation tx then
+                        forceAddedTxs
+                    else
+                        tx :: forceAddedTxs
+                ) []
+            eprintfn "=== createBlock . 6 ==="
+            let rawblock =
+                Block.createTemplate
+                    testingState.chain
+                    parent
+                    (Timestamp.now() + (uint64 parent.blockNumber)*1_000_000UL)
+                    state.tipState.ema
+                    builderState.activeContractSet
+                    CGP.empty
+                    (txs' @ forceAddedTxs)
+                    Hash.zero
+            eprintfn "=== createBlock . 7 ==="
             let rec addPow bk ctr =
                 if ctr > 20 then failwith "You're testing with a real blockchain difficulty. Try setting the proofOfWorkLimit to the lowest value."
-                match Block.validateHeader chain bk.header with
+                match Block.validateHeader testingState.chain bk.header with
                 | Ok _ -> bk
                 | _ -> addPow {bk with header = {bk.header with nonce=(fst bk.header.nonce, snd bk.header.nonce + 1UL)}} (ctr+1)
-
+            eprintfn "=== createBlock . 8 ==="
             let block = addPow rawblock 0
-
+            eprintfn "=== createBlock . 9 ==="
             // Save the ACS, so that when extending a chain using a parent - the right amount of sacrifice in the coinbase would be calculated
-            testingState <- { testingState with acs = Map.add block.header newAcs testingState.acs }
-
+            testingState <- { testingState with acs = Map.add block.header builderState.activeContractSet testingState.acs }
+            eprintfn "=== createBlock . 10 ==="
+            // Save the CGP, so that when extending a chain using a parent - the right coinbase reward would be calculated
+            testingState <- { testingState with cgp = Map.add block.header CGP.empty testingState.cgp }
+            eprintfn "=== createBlock . 11 ==="
             block
 
         let block = createBlock state
-
+        eprintfn "=== block = createBlock state ==="
         match newBlockLabel with
         | Some label ->
-            testingState <- { testingState with blocks = Map.add label block.header testingState.blocks }
+            eprintfn "=== match newBlockLabel with | Some label -> ... ==="
+            testingState <- { testingState with blocks = Map.add label block testingState.blocks }
         | _ -> ()
-
-        let _, state' =
-            BlockHandler.validateBlock chain session.context.contractPath session (Timestamp.now() + 100_000_000UL) None block false state
-            |> Infrastructure.Writer.unwrap
-
+        eprintfn "=== match newBlockLabel -| ==="
       //  events |> should contain (EffectsWriter.EventEffect (BlockAdded (Block.hash block.header, block)))
 
-        state <- state'
+        if includeInChain
+            then
+                eprintfn "=== if includeInChain then ==="
+                let _, state' =
+                    BlockHandler.validateBlock testingState.chain session.context.contractPath session (Timestamp.now() + 100_000_000UL) None block false state
+                    |> Infrastructure.Writer.unwrap
+            
+                state <- state'
+            else
+                eprintfn "=== if includeInChain else ==="
+                match newBlockLabel with
+                | None -> ()
+                | Some label ->
+                    testingState <- { testingState with missing = Map.add label block testingState.missing }
         block
-
-    let extendChain newBlockLabel txLabels parentBlockLabel =
-        let txs =
-            match tryFindTxList txLabels with
+    
+    let [<When>] ``reconnecting block (.*)`` blockLabel =
+         let block =
+             match Map.tryFind blockLabel testingState.missing with
+             | Some block -> block
+             | None -> failwithf "The block {%A} isn't declared as missing" blockLabel
+         
+         testingState <- { testingState with missing = Map.remove blockLabel testingState.missing }
+    
+         let _, state' =
+             BlockHandler.validateBlock testingState.chain session.context.contractPath session (Timestamp.now() + 100_000_000UL) None block false state
+             |> Infrastructure.Writer.unwrap
+             
+         state <- state'
+         
+         block
+        
+    let prepareTxs txLabels =
+        match tryFindTxList txLabels with
             | Some txList -> txList
             | None ->
                 txLabels
                 |> split
-                |> List.map findTx
+                |> List.map findTx 
 
-        extendChain' newBlockLabel txs parentBlockLabel
+    let extendChain newBlockLabel txLabels parentBlockLabel =
+        extendChain' newBlockLabel (prepareTxs txLabels) parentBlockLabel true
+    
+    let createMissing newBlockLabel txLabels parentBlockLabel =
+        extendChain' newBlockLabel (prepareTxs txLabels) parentBlockLabel false
+
+    let generateChain parentBlockLabel newBlockLabel blockLabelPrefix (chainLength : uint32) =
+        assert (chainLength > 0ul)
+
+        let range = [1ul .. chainLength-1ul]
+        let bkIds = parentBlockLabel :: ((List.map (fun n -> sprintf "%s%i" blockLabelPrefix n) range) |> List.add newBlockLabel)
+        let bkPairs = List.zip (List.take (List.length bkIds - 1) bkIds) (List.tail bkIds)
+
+        List.fold (fun () (id1, id2) -> extendChain' (Some id2) [] id1 |> ignore) () bkPairs
+
+    let [<When>] ``Chain for (.*) blocks from (.*) to (.*) with prefix (.*)`` numBlocks parentBlockLabel newBlockLabel blockLabelPrefix =
+            generateChain parentBlockLabel newBlockLabel blockLabelPrefix <| numBlocks
+
+    let [<When>] ``Chain an interval from (.*) to (.*) with prefix (.*)`` parentBlockLabel newBlockLabel blockLabelPrefix =
+        generateChain parentBlockLabel newBlockLabel blockLabelPrefix <| testingState.chain.intervalLength
 
     // Extend a chain
     let [<When>] ``validating a block containing (.*) extending (.*)`` txLabels parentBlockLabel =
@@ -702,6 +853,26 @@ module Binding =
     let [<When>] ``validating an empty block (.*) extending (.*)`` newBlockLabel parentBlockLabel =
         extendChain (Some newBlockLabel) "" parentBlockLabel
 
+    // Extend a chain (using no block label, empty block)
+    let [<When>] ``validating an empty block extending (.*)`` parentBlockLabel =
+        extendChain None "" parentBlockLabel
+    
+    // Create a missing block (all of its children will be orphans)
+    let [<When>] ``validating a detached block containing (.*) extending (.*)`` txLabels parentBlockLabel =
+        createMissing None txLabels parentBlockLabel
+    
+    // Create a missing block (using block label)
+    let [<When>] ``validating a detached block (.*) containing (.*) extending (.*)`` newBlockLabel txLabels parentBlockLabel =
+        createMissing (Some newBlockLabel) txLabels parentBlockLabel
+
+    // Create a missing block (using block label, empty block)
+    let [<When>] ``validating a detached empty block (.*) extending (.*)`` newBlockLabel parentBlockLabel =
+        createMissing (Some newBlockLabel) "" parentBlockLabel
+
+    // Create a missing block (using no block label, empty block)
+    let [<When>] ``validating a detached empty block extending (.*)`` parentBlockLabel =
+        createMissing None "" parentBlockLabel
+
     let validate txLabel =
         let tx = findTx txLabel
 
@@ -711,7 +882,7 @@ module Binding =
         TransactionValidation.validateBasic tx
         <@> Transaction.toExtended
         >>= (TransactionValidation.validateInContext
-            chain
+            testingState.chain
             (getUTXO session)
             session.context.contractPath
             1ul
@@ -721,6 +892,7 @@ module Binding =
             state.memoryState.utxoSet
             (getContractState session)
             ContractStates.asDatabase)
+            
 
     // Checks that tx passes validation
     let [<Then>] ``(.*) should pass validation`` txLabel =
@@ -769,7 +941,18 @@ module Binding =
     // Checks that a contract's state is none
     let [<Then>] ``state of (.*) should be none`` contractLabel =
         checkContractState contractLabel None
+    
+    // Checks the CGP's allocation
+    let [<Then>] ``CGP allocation should be (.*)`` allocation =
+       byte allocation ?= state.cgp.allocation
 
+    // Checks the CGP's payout
+    let [<Then>] ``CGP payout should be of (.*) Zen to (.*)`` amount addressKeyLabel =
+        Some (getRecipient addressKeyLabel, getAmount Asset.Zen amount) ?= state.cgp.payout
+        
+    let [<Then>] ``CGP payout should be none(.*)`` (_ : string) =
+        None ?= state.cgp.payout
+        
     // Checks the tip
     let [<Then>] ``tip should be (.*)`` (blockLabel : string) =
         match findBlockLabel state.tipState.tip.header with
@@ -818,10 +1001,10 @@ module Binding =
         let item = list.[sourceIndex]
         List.concat [ prefix; [ item ]; suffix ]
 
-    let malleateTxOutput malleateFn index tx =
+    let malleateTxOutput malleateFn index (tx:Transaction) =
         { tx with outputs = malleateListItem tx.outputs malleateFn index }
 
-    let malleateTxWitnessItem malleateFn index tx =
+    let malleateTxWitnessItem malleateFn index (tx:Transaction) =
         { tx with witnesses = malleateListItem tx.witnesses malleateFn index }
 
     // re-signs a tx
@@ -865,3 +1048,66 @@ module Binding =
             | ContractWitness w -> fn w |> ContractWitness
             | _ -> failwithf "unexpected witness type for index %A" index
         malleateTx destTxLabel sourceTxLabel (malleateTxWitnessItem fn index)
+
+    let findBlockOutputs =
+        findBlock
+        >> fun bk -> bk.transactions
+        >> List.head
+        >> fun ex -> ex.tx.outputs
+
+    // check miner reward
+    let [<Then>] ``coinbase reward in block (.*) should be (.*) Zen`` blockLabel expectedAmount =
+        blockLabel
+        |> findBlockOutputs
+        |> List.choose (function
+            | { lock = Coinbase _; spend = spend } -> Some spend.amount
+            | _ -> None)
+        |> List.sum
+        |> (?=) (uint64 <| getAmount Asset.Zen expectedAmount)
+        
+    let findPayout (outputs : Output list) : (Recipient * uint64) option =
+        let extractRecipient output =
+            match output.lock with
+            | PK hash ->
+                Error (PKRecipient hash, output.spend.amount)
+            | Contract contractId ->
+                Error (ContractRecipient contractId, output.spend.amount)
+            | _ ->
+                Ok ()
+        let ofError res =
+            match res with
+            | Ok _      -> None
+            | Error err -> Some err  
+        Result.traverseResultM extractRecipient outputs |> ofError
+
+    let [<Then>] ``there should be a payout on block (.*)`` blockLabel =
+        blockLabel
+        |> findBlockOutputs
+        |> findPayout
+        |> function
+           | Some _ -> ()
+           | None   -> failwithf "There is no payout in block %A" blockLabel
+           
+    let [<Then>] ``there shouldn't be a payout on block (.*)`` blockLabel =
+        blockLabel
+        |> findBlockOutputs
+        |> findPayout
+        |> function
+           | Some _ -> failwithf "There is a payout in block %A" blockLabel
+           | None   -> ()
+
+    // check payout
+    let [<Then>] ``coinbase payout in block (.*) should be (.*) Zen to (.*)`` blockLabel (expectedAmount : uint64) addressKeyLabel =
+        blockLabel
+        |> findBlockOutputs
+        |> findPayout
+        |> function
+           | Some (recip, amount) ->
+                recip ?= getRecipient addressKeyLabel
+                amount ?= (getAmount Asset.Zen expectedAmount)
+           | None -> failwithf "no payout on block %s" blockLabel
+           
+    let [<Then>] ``TODO(.*)`` (msg : string) : unit =
+        match msg with
+        | "" -> failwith "Not implemented"
+        | _  -> failwithf "TODO: %s" msg

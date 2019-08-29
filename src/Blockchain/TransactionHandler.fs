@@ -17,7 +17,7 @@ open Result
 let getUTXO = UtxoSetRepository.get
 let getContractState = ContractStateRepository.get
 
-let private validateOrphanTransaction chainParams session contractPath blockNumber timestamp state ex  =
+let private validateOrphanTransaction chainParams session contractPath blockNumber timestamp state ex =
     effectsWriter
         {
             match TransactionValidation.validateInContext chainParams (getUTXO session) contractPath (blockNumber + 1ul) timestamp
@@ -63,9 +63,9 @@ let private validateOrphanTransaction chainParams session contractPath blockNumb
                 return {state with orphanPool = orphanPool}
         }
 
-let rec validateOrphanTransactions chainParams session contractPath blockNumber timestamp state =
+let rec validateOrphanTransactions chainParams session contractPath blockNumber timestamp state=
     effectsWriter {
-        let! state' = OrphanPool.foldWriter (validateOrphanTransaction chainParams session contractPath blockNumber timestamp) state state.orphanPool
+        let! state' = OrphanPool.foldWriter (validateOrphanTransaction chainParams session contractPath blockNumber timestamp) state state.orphanPool 
 
         // if orphan pool changed we run again until there is no change
         if state'.orphanPool <> state.orphanPool then
@@ -113,7 +113,7 @@ let validateInputs chainParams session contractPath blockNumber timestamp ex sta
                 |> Log.info
 
                 return state
-            | Ok (tx, acs, contractCache, contractStates) ->
+            | Ok (_, acs, contractCache, contractStates) ->
                 let utxoSet = UtxoSet.handleTransaction (getUTXO session) ex.txHash ex.tx state.utxoSet
                 let mempool = MemPool.add ex state.mempool
 
@@ -136,12 +136,12 @@ let validateInputs chainParams session contractPath blockNumber timestamp ex sta
                 return! validateOrphanTransactions chainParams session contractPath blockNumber timestamp state
         }
 
-let validateTransaction chainParams session contractPath blockNumber timestamp ex (state:MemoryState) =
+let validateTransaction chainParams session contractPath blockNumber timestamp ex (state:State) =
     effectsWriter {        
-        if MemPool.containsTransaction ex.txHash state.mempool ||
-           OrphanPool.containsTransaction ex.txHash state.orphanPool ||
+        if MemPool.containsTransaction ex.txHash state.memoryState.mempool ||
+           OrphanPool.containsTransaction ex.txHash state.memoryState.orphanPool ||
            TransactionRepository.isPartOfMainChain session ex.txHash then
-            return state
+            return state.memoryState
         else
             match TransactionValidation.validateBasic ex.tx with
             | Error error ->
@@ -150,9 +150,9 @@ let validateTransaction chainParams session contractPath blockNumber timestamp e
                 >> setField "error" (error.ToString())
                 |> Log.info
 
-                return state
+                return state.memoryState
             | Ok _ ->
-                return! validateInputs chainParams session contractPath blockNumber timestamp ex state true
+                return! validateInputs chainParams session contractPath blockNumber timestamp ex state.memoryState true
     }
 
 let executeContract session txSkeleton timestamp contractId command sender messageBody state commitToState =

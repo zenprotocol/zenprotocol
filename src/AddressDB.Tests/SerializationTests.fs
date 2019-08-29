@@ -14,6 +14,8 @@ open AddressDB.Serialization
 open FsUnit
 open Serialization
 
+let LastReservedLockIdentifier = Serialization.Serialization.Lock.LastReservedIdentifier
+
 type AddressDBGenerators =
     static member DBOutputGenerator() =
         gen {
@@ -22,7 +24,8 @@ type AddressDBGenerators =
             let! lock =
                 Arb.generate<Lock>
                 |> Gen.filter (function
-                | HighVLock (identifier, _) -> identifier > 7u // last reserved identifier
+                | HighVLock (identifier, _) -> identifier > LastReservedLockIdentifier
+
                 | _ -> true)
             let! outpoint = Arb.generate<Outpoint>
             let! status = Arb.generate<Status>

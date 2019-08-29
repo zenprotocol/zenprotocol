@@ -16,7 +16,6 @@ open Consensus.Crypto
 open Logary.Message
 open Api.Helpers
 open FSharp.Data
-open Hopac.Extensions.Seq
 open FsBech32
 open Hash
 open Wallet
@@ -452,12 +451,34 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
         match parseContractExecuteJson chain body with
         | Error error -> replyError error
         | Ok (contractId, command, message, returnAddress, sign, spends, password) ->
-            Wallet.executeContract client true  contractId command message returnAddress sign spends password
+            Wallet.executeContract client true contractId command message returnAddress sign spends password
             |> handleTxResult
+    | Post ("/wallet/contract/cgp", Some body) ->
+        match parseCheckPasswordJson body with
+        | Ok (password) ->
+            Wallet.executeCGP client true password
+            |> handleTxResult
+        | Error error ->
+            replyError error
     | Get ("/wallet/resync", _)
     | Post ("/wallet/resync", _) ->
         Wallet.resyncAccount client
         reply StatusCode.OK NoContent
+    | Get ("/addressdb/resync", _)
+    | Post ("/addressdb/resync", _) ->
+        AddressDB.resyncAccount client
+        reply StatusCode.OK NoContent
+    | Get ("/blockchain/cgp", _) ->
+        match Blockchain.getTip client with
+        | Some (_,header) ->
+            let interval = CGP.getInterval (Chain.getChainParameters chain) header.blockNumber
+            let cgp = Blockchain.getCgp client
+            reply StatusCode.OK (JsonContent <| (cgpEncoder chain interval cgp))
+        | None ->
+            replyError "No tip"
+    | Get ("/blockchain/cgp/history", _) ->
+        let cgp = Blockchain.getCgpHistory client
+        reply StatusCode.OK (JsonContent <| (cgpHistoryEncoder chain cgp))
     | Post ("/blockchain/publishblock", Some body) ->
         match parsePublishBlockJson body with
         | Error error ->
@@ -657,7 +678,7 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
         | Some blockNumber ->
             let success,blockNumber = System.UInt32.TryParse blockNumber
             if success then
-                Block.blockReward blockNumber
+                Blockchain.getBlockReward client blockNumber
                 |> decimal
                 |> JsonValue.Number
                 |> JsonContent

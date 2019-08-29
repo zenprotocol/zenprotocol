@@ -116,4 +116,4 @@ let ``Unspendable outputs should not be added to utxoset``() =
 
     let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO txHash tx
 
-    UtxoSet.get getUTXO outpoint utxoSet |> should equal NoOutput
+    UtxoSet.get getUTXO utxoSet outpoint |> should equal NoOutput

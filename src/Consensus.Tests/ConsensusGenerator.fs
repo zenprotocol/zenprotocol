@@ -5,6 +5,7 @@ open Consensus
 open Types
 open Crypto
 open Zen.Types.Data
+open Chain
 
 type UniqueHashes = UniqueHashes of list<Hash.Hash>
 
@@ -41,7 +42,7 @@ type ConsensusGenerator =
         |> Arb.fromGen
 
     static member Block() =
-        gen {
+        Arb.fromGen (gen {
             let! transactions =
                 Arb.generate<TransactionExtended list>
                 |> Gen.map (fun txs -> List.distinct txs)
@@ -50,7 +51,11 @@ type ConsensusGenerator =
             let! timestamp = Arb.generate<uint64>
             let! coinbasePkHash = Arb.generate<Hash.Hash>
             let! blockNumber = Arb.generate<uint32> |> Gen.filter(fun i -> i > 1ul)
-            let reward = Block.blockReward blockNumber
+            let! nonce = Arb.generate<uint64 * uint64>
+            let! difficulty = Arb.generate<uint32>
+            
+            let! cgp = Arb.generate<CGP.T Option>
+            let reward = blockReward blockNumber (match cgp with | Some cgp -> cgp.allocation | _ -> 0uy)
 
             let coinbase = Transaction.toExtended {
                 version = Version0
@@ -81,7 +86,7 @@ type ConsensusGenerator =
             let acsMerkleRoot = ActiveContractSet.root ActiveContractSet.empty
 
             let commitments =
-                [ txMerkleRoot; witnessMerkleRoot; acsMerkleRoot; ]
+                [ txMerkleRoot; witnessMerkleRoot; acsMerkleRoot ]
                 |> MerkleTree.computeRoot
 
             let header =
@@ -91,12 +96,17 @@ type ConsensusGenerator =
                     blockNumber=blockNumber;
                     commitments=commitments;
                     timestamp=timestamp;
-                    difficulty=0x20fffffful;
-                    nonce=0UL,0UL;
+                    difficulty=difficulty;
+                    nonce=nonce;
                 }
 
-            return {header=header;transactions=transactions;commitments=[];txMerkleRoot=txMerkleRoot;witnessMerkleRoot=witnessMerkleRoot;activeContractSetMerkleRoot=acsMerkleRoot}
-        }
+            return { header=header;
+                     transactions=transactions;
+                     commitments=[];
+                     txMerkleRoot=txMerkleRoot;
+                     witnessMerkleRoot=witnessMerkleRoot;
+                     activeContractSetMerkleRoot=acsMerkleRoot; }
+        })
 
     static member TransactionExtended() =
         Arb.fromGen (gen {
@@ -199,7 +209,7 @@ type ConsensusGenerator =
             let! lock =
                 Arb.generate<Lock>
                 |> Gen.filter (function
-                | HighVLock (identifier, _) -> identifier > 7u // last reserved identifier
+                | HighVLock (identifier, _) -> identifier > Serialization.Serialization.Lock.LastReservedIdentifier
                 | _ -> true)
             return Consensus.ZFStar.fsToFstLock lock
         }
@@ -293,10 +303,17 @@ type ConsensusGenerator =
                     Arb.generate<Lock>
                     |> Gen.filter notCoinbaseLockOrAcivationSacrifice
                     |> Gen.filter (function
-                    | HighVLock (identifier, _) -> identifier > 7u // last reserved identifier
+                    | HighVLock (identifier, _) -> identifier > Serialization.Serialization.Lock.LastReservedIdentifier
                     | _ -> true)
-                let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
-                let asset = Asset (ContractId (Version0, Hash.Hash asset), Hash.zero)
+
+                let! asset = 
+                    gen {
+                        match lock with 
+                        | _ ->
+                            let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+                            return Asset (ContractId (Version0, Hash.Hash asset), Hash.zero)
+                    }
+
                 let! amount = Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
 
                 return {lock=lock;spend={asset=asset;amount=amount}}
@@ -464,10 +481,17 @@ type ConsensusGenerator =
                     Arb.generate<Lock>
                     |> Gen.filter notCoinbaseLockOrAcivationSacrifice
                     |> Gen.filter (function
-                    | HighVLock (identifier, _) -> identifier > 7u // last reserved identifier
+                    | HighVLock (identifier, _) -> identifier > Serialization.Serialization.Lock.LastReservedIdentifier
                     | _ -> true)
-                let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
-                let asset = Asset (ContractId (Version0, Hash.Hash asset), Hash.zero)
+
+                let! asset = 
+                    gen {
+                        match lock with 
+                        | _ ->
+                            let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+                            return Asset (ContractId (Version0, Hash.Hash asset), Hash.zero)
+                    }
+
                 let! amount = Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
 
                 return {lock=lock;spend={asset=asset;amount=amount}}
@@ -597,10 +621,17 @@ type ConsensusGenerator =
                             Arb.generate<Lock>
                             |> Gen.filter notCoinbaseLock
                             |> Gen.filter (function
-                            | HighVLock (identifier, _) -> identifier > 7u // last reserved identifier
+                            | HighVLock (identifier, _) -> identifier > Serialization.Serialization.Lock.LastReservedIdentifier
                             | _ -> true)
-                        let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
-                        let asset = Asset (ContractId (Version0,Hash.Hash asset), Hash.zero)
+
+                        let! asset = 
+                            gen {
+                                match lock with 
+                                | _ ->
+                                    let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+                                    return Asset (ContractId (Version0, Hash.Hash asset), Hash.zero)
+                            }
+                            
                         let! amount = Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
 
                         let output = {lock=lock;spend={asset=asset;amount=amount}}
@@ -624,10 +655,17 @@ type ConsensusGenerator =
                         let! lock =
                             Arb.generate<Lock>
                             |> Gen.filter (function
-                            | HighVLock (identifier, _) -> identifier > 7u // last reserved identifier
+                            | HighVLock (identifier, _) -> identifier > Serialization.Serialization.Lock.LastReservedIdentifier
                             | _ -> true)
-                        let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
-                        let asset = Asset (ContractId (Version0, Hash.Hash asset), Hash.zero)
+
+                        let! asset = 
+                            gen {
+                                match lock with 
+                                | _ ->
+                                    let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+                                    return Asset (ContractId (Version0, Hash.Hash asset), Hash.zero)
+                            }
+
                         let! amount = Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
 
                         return {lock=lock;spend={asset=asset;amount=amount}}
@@ -649,11 +687,17 @@ type ConsensusGenerator =
                 let! lock =
                     Arb.generate<Lock>
                     |> Gen.filter (function
-                    | HighVLock (identifier, _) -> identifier > 7u // last reserved identifier
+                    | HighVLock (identifier, _) -> identifier > Serialization.Serialization.Lock.LastReservedIdentifier
                     | _ -> true)
+                    
+                let! asset = 
+                    gen {
+                        match lock with 
+                        | _ ->
+                            let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
+                            return Asset (ContractId (Version0, Hash.Hash asset), Hash.zero)
+                    }
 
-                let! asset = Gen.arrayOfLength Hash.Length Arb.generate<byte>
-                let asset = Asset (ContractId (Version0, Hash.Hash asset), Hash.zero)
                 let! amount = Arb.generate<uint64> |> Gen.filter ((<>) 0UL)
 
                 let output = {lock=lock;spend={asset=asset;amount=amount}}

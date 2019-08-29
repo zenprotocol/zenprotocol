@@ -131,7 +131,11 @@ let private extendContracts chainParams acs tx = result {
         }) (Ok acs)
 }
 
+#if DEBUG
+let checkAmounts (txSkeleton:TxSkeleton.T) =
+#else
 let private checkAmounts (txSkeleton:TxSkeleton.T) =
+#endif
     let inputs = List.map (function | TxSkeleton.Input.PointedOutput (_, output) -> output.spend | TxSkeleton.Input.Mint spend -> spend) txSkeleton.pInputs
     let inputs, outputs = foldSpends inputs, foldSpends (List.map (fun o -> o.spend) txSkeleton.outputs)
 
@@ -160,7 +164,7 @@ let checkWeight chain tx txSkeleton =
         else
             Error "transaction weight exceeds maximum")
     |> Result.mapError General
-
+        
 let private checkOutputsOverflow tx =
     if tx.outputs
         |> List.map (fun o -> o.spend)
@@ -185,7 +189,11 @@ let private checkVersion (tx:Transaction) =
     else
         Ok tx
 
+#if DEBUG
+let checkStructure =
+#else
 let private checkStructure =
+#endif
     let isInvalidSpend = fun { asset = (Asset (ContractId (version,cHash), subType)); amount = amount } ->
         cHash = Hash.zero && (subType <> Hash.zero || version <> Version0) ||
             amount = 0UL //Relieve for non spendables?
@@ -225,16 +233,18 @@ let private checkStructure =
         if List.isEmpty tx.outputs || List.exists (fun { lock = lock; spend = spend } ->
             match lock with
             | HighVLock (identifier, bytes) ->
-                identifier <= 7u // last reserved identifier for lock types
+                identifier <= Serialization.Serialization.Lock.LastReservedIdentifier
                 || isEmptyArr bytes
-            | _ -> false
+            | _ ->
+                false
+            
             || isInvalidSpend spend
         ) tx.outputs then
             GeneralError "structurally invalid output(s)"
         else
             Ok tx
 
-    let checkWitnessesStructure = fun tx ->
+    let checkWitnessesStructure = fun (tx:Transaction) ->
         if List.isEmpty tx.witnesses || List.exists (function
             | ContractWitness cw ->
                 isNull cw.command || 
@@ -283,7 +293,7 @@ let private checkActivationSacrifice tx =
         else
             GeneralError "tx with a contract must include an activation sacrifice"
 
-    
+
 let private tryGetUtxos getUTXO utxoSet tx =
     getUtxosResult getUTXO tx.inputs utxoSet
     |> Result.mapError (fun errors ->
@@ -303,24 +313,26 @@ let validateBasic =
     >=> checkActivationSacrifice
 
 let validateCoinbase blockNumber =
-    let checkOnlyCoinbaseLocks blockNumber tx =
+    let checkOnlyCoinbaseOrContractLocks tx =
         let allCoinbase =
-            List.forall (fun output ->
-                match output.lock with
-                | Coinbase (blockNumber',_) when blockNumber' = blockNumber -> true
-                | _ -> false) tx.outputs
+            tx.outputs
+            |> List.forall (fun output ->
+                match output with
+                | {lock = Contract _; spend= _ } -> true
+                | {lock = Coinbase (blockNumber',_); spend= _ } when blockNumber' = blockNumber -> true
+                | _ -> false)
 
         if allCoinbase then
             Ok tx
         else
-            GeneralError "within coinbase transaction all outputs must use coinbase lock"
+            GeneralError "within coinbase transaction all outputs must use coinbase or contract lock"
 
-    let checkNoInputWithinCoinbaseTx tx =
+    let checkNoInput tx =
         match tx.inputs with
         | [] -> Ok tx
         | _ -> GeneralError "coinbase transaction must not have any inputs"
 
-    let checkNoContractInCoinbase tx =
+    let checkNoContract tx =
         if Option.isSome tx.contract then
             GeneralError "coinbase transaction cannot activate a contract"
         else
@@ -340,10 +352,10 @@ let validateCoinbase blockNumber =
             Ok tx
 
     checkOutputsNotEmpty
-    >=> checkNoInputWithinCoinbaseTx
+    >=> checkNoInput
     >=> checkNoWitnesses
-    >=> checkOnlyCoinbaseLocks blockNumber
-    >=> checkNoContractInCoinbase
+    >=> checkOnlyCoinbaseOrContractLocks
+    >=> checkNoContract
     >=> checkOutputsOverflow
 
 let validateInContext chainParams getUTXO contractPath blockNumber timestamp acs contractCache set getContractState contractState ex = result {
@@ -354,7 +366,8 @@ let validateInContext chainParams getUTXO contractPath blockNumber timestamp acs
     do! checkWeight chainParams ex.tx txSkel
 
     do! checkAmounts txSkel
-    let! contractStates = InputValidation.StateMachine.validate blockNumber timestamp acs getContractState contractState ex.txHash ex.tx txSkel
+    
+    let! contractStates = InputValidation.StateMachine.validate chainParams blockNumber timestamp acs getContractState contractState ex.txHash ex.tx txSkel
 
     let! acs, contractCache = activateContract chainParams contractPath blockNumber acs contractCache ex.tx
     let! acs = extendContracts chainParams acs ex.tx
