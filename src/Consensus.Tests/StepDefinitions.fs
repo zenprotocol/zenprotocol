@@ -756,7 +756,7 @@ module Binding =
             eprintfn "=== createBlock . 7 ==="
             let rec addPow bk ctr =
                 if ctr > 20 then failwith "You're testing with a real blockchain difficulty. Try setting the proofOfWorkLimit to the lowest value."
-                match Block.validateHeader testingState.chain bk.header with
+                match BlockValidation.Header.validate testingState.chain bk.header with
                 | Ok _ -> bk
                 | _ -> addPow {bk with header = {bk.header with nonce=(fst bk.header.nonce, snd bk.header.nonce + 1UL)}} (ctr+1)
             eprintfn "=== createBlock . 8 ==="

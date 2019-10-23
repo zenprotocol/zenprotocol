@@ -82,8 +82,27 @@ let private connectChain chainParams contractPath timestamp session (origin:Exte
             validTip,(utxoSet,cgp,acs,ema,mempool,contractCache,contractStates)
         else
             let block = BlockRepository.getFullBlock session tip
+            
+            let connState : BlockConnection.State = {
+                utxoSet        = utxoSet
+                acs            = acs
+                cgp            = cgp
+                ema            = ema
+                contractCache  = contractCache
+                contractStates = contractStates
+            }
+            
+            let connEnv : BlockConnection.Env = {
+                chainParams      = chainParams
+                timestamp        = timestamp
+                getUTXO          = getUTXO session
+                getContractState = getContractState session
+                contractsPath    = contractPath
+                parent           = validTip.header
+                block            = block
+            }
 
-            match Block.connect chainParams (getUTXO session) contractPath validTip.header timestamp utxoSet cgp acs contractCache ema (getContractState session) contractStates block with
+            match BlockConnection.connect connState connEnv with
             | Error error ->
                 BlockRepository.saveHeader session (ExtendedBlockHeader.invalid tip)
 
@@ -94,15 +113,15 @@ let private connectChain chainParams contractPath timestamp session (origin:Exte
                 |> Log.info
 
                 validTip,(utxoSet,cgp,acs,ema,mempool,contractCache,contractStates)
-            | Ok (block,utxoSet,cgp,acs',contractCache,ema,contractStates') ->
-                let acsUndoData = ActiveContractSet.getUndoData acs' acs
-                let contractStatesUndoData = ContractStates.getUndoData (getContractState session) contractStates' contractStates
+            | Ok (block, connState) ->
+                let acsUndoData = ActiveContractSet.getUndoData connState.acs acs
+                let contractStatesUndoData = ContractStates.getUndoData (getContractState session) connState.contractStates contractStates
 
-                BlockRepository.saveBlockState session tip.hash acsUndoData contractStatesUndoData ema cgp
+                BlockRepository.saveBlockState session tip.hash acsUndoData contractStatesUndoData connState.ema connState.cgp
 
                 let mempool = MemPool.handleBlock block mempool
 
-                tip,(utxoSet,cgp,acs',ema,mempool,contractCache,contractStates')) (origin, originState) headers
+                tip,(connState.utxoSet,connState.cgp,connState.acs,connState.ema,mempool,connState.contractCache,connState.contractStates)) (origin, originState) headers
 
 let private connectLongestChain chainParams contractPath timestamp session origin originState chains minChainWork =
     let connectChain tip (best,state) =
@@ -303,8 +322,27 @@ let private rollForwardChain chainParams contractPath timestamp state session bl
 
 let private handleGenesisBlock chainParams contractPath session timestamp (state:State) blockHash block =
     effectsWriter {
-        match Block.connect chainParams (getUTXO session) contractPath Block.genesisParent timestamp UtxoSet.asDatabase CGP.empty
-                ActiveContractSet.empty state.memoryState.contractCache (EMA.create chainParams) (getContractState session) ContractStates.asDatabase block with
+        
+        let connState : BlockConnection.State = {
+            utxoSet        = UtxoSet.asDatabase
+            acs            = ActiveContractSet.empty
+            cgp            = CGP.empty
+            ema            = EMA.create chainParams
+            contractCache  = state.memoryState.contractCache
+            contractStates = ContractStates.asDatabase
+        }
+        
+        let connEnv : BlockConnection.Env = {
+            chainParams      = chainParams
+            timestamp        = timestamp
+            getUTXO          = getUTXO session
+            getContractState = getContractState session
+            contractsPath    = contractPath
+            parent           = Block.genesisParent
+            block            = block
+        }
+        
+        match BlockConnection.connect connState connEnv with
         | Error error ->
             eventX "Failed connecting genesis block {hash} due to {error}"
             >> setField "hash" (block.header |> Block.hash |> Hash.toString)
@@ -314,7 +352,7 @@ let private handleGenesisBlock chainParams contractPath session timestamp (state
             let! ibd = InitialBlockDownload.invalid timestamp blockHash state.initialBlockDownload
 
             return {state with initialBlockDownload = ibd}
-        | Ok (block,utxoSet,cgp,acs,contractCache,ema,contractStates) ->
+        | Ok (block, connState) ->
 
             eventX "BlockHandler: Genesis block received"
             |> Log.info
@@ -323,26 +361,26 @@ let private handleGenesisBlock chainParams contractPath session timestamp (state
             BlockRepository.saveHeader session extendedHeader
             BlockRepository.saveFullBlock session blockHash block
 
-            let acsUndoData = ActiveContractSet.getUndoData acs state.tipState.activeContractSet
-            let contractStatesUndoData = ContractStates.getUndoData (getContractState session) contractStates ContractStates.asDatabase
+            let acsUndoData = ActiveContractSet.getUndoData connState.acs state.tipState.activeContractSet
+            let contractStatesUndoData = ContractStates.getUndoData (getContractState session) connState.contractStates ContractStates.asDatabase
 
-            BlockRepository.saveBlockState session blockHash acsUndoData contractStatesUndoData ema cgp
+            BlockRepository.saveBlockState session blockHash acsUndoData contractStatesUndoData connState.ema connState.cgp
 
             BlockRepository.updateTip session extendedHeader.hash
             BlockRepository.saveGenesisHash session extendedHeader.hash
 
-            UtxoSetRepository.save session utxoSet
-            ContractStateRepository.save session contractStates
-            ActiveContractSetRepository.save session acs
-            let acs = ActiveContractSet.clearChanges acs
+            UtxoSetRepository.save session connState.utxoSet
+            ContractStateRepository.save session connState.contractStates
+            ActiveContractSetRepository.save session connState.acs
+            let acs = ActiveContractSet.clearChanges connState.acs
 
             do! publish (BlockAdded (blockHash, block))
 
             let! ibd = InitialBlockDownload.received timestamp blockHash state.initialBlockDownload
 
-            let state = {state with cgp=cgp; initialBlockDownload = ibd; memoryState = { state.memoryState with contractStates = contractStates; contractCache = contractCache }}
+            let state = {state with cgp=connState.cgp; initialBlockDownload = ibd; memoryState = { state.memoryState with contractStates = connState.contractStates; contractCache = connState.contractCache }}
 
-            return! rollForwardChain chainParams contractPath timestamp state session block extendedHeader acs ema cgp
+            return! rollForwardChain chainParams contractPath timestamp state session block extendedHeader acs connState.ema connState.cgp
     }
 
 // Handle new block that is extending the main chain
@@ -350,8 +388,27 @@ let private handleGenesisBlock chainParams contractPath session timestamp (state
 // So we also have to unorphan any chain and find longest chain
 let private handleMainChain chain contractPath session timestamp (state:State) (parent:ExtendedBlockHeader.T) blockHash block =
     effectsWriter {
-        match Block.connect chain (getUTXO session) contractPath parent.header timestamp UtxoSet.asDatabase state.cgp
-                state.tipState.activeContractSet state.memoryState.contractCache state.tipState.ema (getContractState session) ContractStates.asDatabase block with
+        
+        let connState : BlockConnection.State = {
+            utxoSet        = UtxoSet.asDatabase
+            acs            = state.tipState.activeContractSet
+            cgp            = state.cgp
+            ema            = state.tipState.ema
+            contractCache  = state.memoryState.contractCache
+            contractStates = ContractStates.asDatabase
+        }
+        
+        let connEnv : BlockConnection.Env = {
+            chainParams      = chain
+            timestamp        = timestamp
+            getUTXO          = getUTXO session
+            getContractState = getContractState session
+            contractsPath    = contractPath
+            parent           = parent.header
+            block            = block
+        }
+        
+        match BlockConnection.connect connState connEnv with
         | Error error ->
             eventX "Failed connecting block #{blockNumber} {hash} due to {error}"
             >> setField "blockNumber" block.header.blockNumber
@@ -363,7 +420,7 @@ let private handleMainChain chain contractPath session timestamp (state:State) (
             let state = { state with initialBlockDownload = initialBlockDownload }
 
             return state
-        | Ok (block,utxoSet,cgp,acs,contractCache,ema,contractStates) ->
+        | Ok (block, connState) ->
             eventX "BlockHandler: New block #{blockNumber} {timestamp} with {txs} txs 0x{difficulty} {blockHash}"
             >> setField "blockNumber" block.header.blockNumber
             >> setField "timestamp" (Timestamp.toString timestamp)
@@ -374,24 +431,24 @@ let private handleMainChain chain contractPath session timestamp (state:State) (
 
             let! initialBlockDownload = InitialBlockDownload.received timestamp blockHash state.initialBlockDownload
             let state = { state with initialBlockDownload = initialBlockDownload;
-                                     memoryState = { state.memoryState with contractCache = contractCache }}
+                                     memoryState = { state.memoryState with contractCache = connState.contractCache }}
 
             let extendedHeader = ExtendedBlockHeader.createMain parent blockHash block
 
             BlockRepository.saveHeader session extendedHeader
             BlockRepository.saveFullBlock session blockHash block
 
-            let acsUndoData = ActiveContractSet.getUndoData acs state.tipState.activeContractSet
-            let contractStatesUndoData = ContractStates.getUndoData (getContractState session) contractStates ContractStates.asDatabase
+            let acsUndoData = ActiveContractSet.getUndoData connState.acs state.tipState.activeContractSet
+            let contractStatesUndoData = ContractStates.getUndoData (getContractState session) connState.contractStates ContractStates.asDatabase
 
-            BlockRepository.saveBlockState session extendedHeader.hash acsUndoData contractStatesUndoData ema cgp
+            BlockRepository.saveBlockState session extendedHeader.hash acsUndoData contractStatesUndoData connState.ema connState.cgp
 
             BlockRepository.updateTip session extendedHeader.hash
 
-            UtxoSetRepository.save session utxoSet
-            ContractStateRepository.save session contractStates
-            ActiveContractSetRepository.save session acs
-            let acs = ActiveContractSet.clearChanges acs
+            UtxoSetRepository.save session connState.utxoSet
+            ContractStateRepository.save session connState.contractStates
+            ActiveContractSetRepository.save session connState.acs
+            let acs = ActiveContractSet.clearChanges connState.acs
 
             eventX "BlockHandler: BlockAdded #{blockNumber}"
             >> setField "blockNumber" block.header.blockNumber
@@ -401,7 +458,7 @@ let private handleMainChain chain contractPath session timestamp (state:State) (
             // Pulishing event of the new block
             do! publish (BlockAdded (blockHash, block))
 
-            return! rollForwardChain chain contractPath timestamp state session block extendedHeader acs ema cgp
+            return! rollForwardChain chain contractPath timestamp state session block extendedHeader acs connState.ema connState.cgp
     }
 
 // New block that is extending one of the fork chains
@@ -509,7 +566,7 @@ let validateBlock chainParams contractPath session timestamp peerId block mined 
         >> setField "txs" (List.length block.transactions)
         >> setField "hash" (Hash.toString blockHash)
         |> Log.info
-        match Block.validate chainParams block with
+        match BlockValidation.validate block chainParams with
         | Error error ->
             eventX "Block {hash} failed validation due to {error}"
             >> setField "hash" (Hash.toString blockHash)
@@ -612,7 +669,7 @@ let private handleHeader chain session timestamp get header state =
             else
                 return state
         | None ->
-            match Block.validateHeader chain header with
+            match BlockValidation.Header.validate chain header with
             | Ok header ->
                 eventX "Request block #{blockNumber} {blockHash} from peers"
                 >> setField "blockNumber" header.blockNumber

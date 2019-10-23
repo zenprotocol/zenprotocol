@@ -154,7 +154,7 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
 
     let validateBlock block =
         Blockchain.validateMinedBlock client block
-        match Block.validate (Chain.getChainParameters chain) block with
+        match BlockValidation.validate block (Chain.getChainParameters chain) with
         | Ok _ ->
             Block.hash block.header
             |> Hash.toString

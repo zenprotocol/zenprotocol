@@ -16,14 +16,14 @@ let ``validating block header with invalid proof of work``(header: BlockHeader) 
 
     let expected :Result<BlockHeader, string> = Error "proof of work failed"
 
-    Block.validateHeader Chain.localParameters header = expected
+    BlockValidation.Header.validate Chain.localParameters header = expected
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``validating block header with correct proof of work``(header:BlockHeader) =
     // changing the difficulty to easiest one
     let header = {header with difficulty = 0x20fffffful }
 
-    Block.validateHeader Chain.localParameters header = Ok header
+    BlockValidation.Header.validate Chain.localParameters header = Ok header
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``seralizing and deserialing yield same header``(header:BlockHeader) =
@@ -48,7 +48,7 @@ let ``header with timestamp after the version expiry``() =
         nonce=0UL,0UL
     }
 
-    let result = Block.validateHeader testParameters header
+    let result = BlockValidation.Header.validate testParameters header
 
     let expected:Result<BlockHeader,string> = Error "expired node version, please upgrade"
 

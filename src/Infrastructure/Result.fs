@@ -30,6 +30,8 @@ type ResultBuilder<'err>() =
         try this.ReturnFrom(m)
         finally recover()
 
+let result<'err> = new ResultBuilder<'err>()
+
 let isOk<'res,'err> : Result<'res,'err> -> bool = function | Ok _ -> true | Error _ -> false
 let isError<'res,'err> : Result<'res,'err> -> bool = isOk >> not
 
@@ -63,3 +65,7 @@ let get = function | Ok x -> x | Error err -> failwithf "%A" err
 let ofOption error = function
     | Some value -> Ok value
     | None -> Error error
+
+let foldM (f : 's -> 'a -> Result<'s,'err>) (s : Result<'s,'err>) (xs : seq<'a>) : Result<'s,'err> =
+    let folder s x = Result.bind (fun s -> f s x) s
+    in Seq.fold folder s xs

@@ -49,6 +49,7 @@
     <Compile Include="MerkleTree.fs" />
     <Compile Include="SparseMerkleTree.fs" />
     <Compile Include="Types.fs" />
+    <Compile Include="Fund.fs" />
     <Compile Include="ContractId.fs" />
     <Compile Include="Asset.fs" />
     <Compile Include="Difficulty.fs" />
@@ -73,6 +74,8 @@
     <Compile Include="InputValidation\StateMachine.fs" />
     <Compile Include="TransactionValidation.fs" />
     <Compile Include="Block.fs" />
+    <Compile Include="BlockValidation.fs" />
+    <Compile Include="BlockConnection.fs" />
     <Compile Include="BlockHeader.fs" />
     <Content Include="compatibility\v0_contract_hints\Z0000000012c3cbce97fbcea65cc1b89cbc9cb26566401e5f7b54d045648818c1234b4ee7">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

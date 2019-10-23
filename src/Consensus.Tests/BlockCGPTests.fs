@@ -26,6 +26,25 @@ let context0 = { blockNumber=1u; timestamp = 1UL }
 let contractPath =
     NUnit.Framework.TestContext.CurrentContext.TestDirectory
 
+let env block : BlockConnection.Env = {
+    chainParams      = chainParams
+    timestamp        = timestamp
+    getUTXO          = (fun _ -> failwith "shouldn't be used")
+    getContractState = (fun _ -> failwith "shouldn't be used")
+    contractsPath    = contractPath
+    parent           = block.header
+    block            = block
+}
+
+let state cgp ema : BlockConnection.State = {
+    utxoSet        = Map.empty
+    acs            = ActiveContractSet.empty
+    cgp            = cgp
+    ema            = ema
+    contractCache  = Map.empty
+    contractStates = Map.empty
+}
+
 let shouldFailWith expectedMsg =
     function
     | Ok _ -> failwithf "\nexpected error msg: %A\nbut was:  Ok" expectedMsg
@@ -261,9 +280,9 @@ let ``valid payout`` () =
         }
     
     let test3 =
-        Block.checkPayoutTx chainParams cgp (block,ema)
+        BlockConnection.PayoutTx.check (state cgp ema) (env block)
     
-    test1 *> test2 *> test3
+    test1 *> test2  *> test3
     |> function
     | Ok _ -> ()
     | Error msg -> failwithf "Error: %s" msg
@@ -308,9 +327,9 @@ let ``multiple payout Txs`` () =
         }
     
     let test3 =
-        Block.checkPayoutTx chainParams cgp (block,ema)
+        BlockConnection.PayoutTx.check (state cgp ema) (env block)
     
-    test1 *> test2 *> test3
+    test1 *> test2  *> test3
     |> function
     | Ok _ -> failwithf "There should have been an error, but there wasn't one"
     | Error msg when msg = "Multiple payout Txs" -> ()
@@ -356,9 +375,9 @@ let ``different winner asset`` () =
         }
     
     let test3 =
-        Block.checkPayoutTx chainParams cgp (block,ema)
+        BlockConnection.PayoutTx.check (state cgp ema) (env block)
     
-    test1 *> test2 *> test3
+    test1 *> test2  *> test3
     |> function
     | Ok _ -> failwithf "There should have been an error, but there wasn't one"
     | Error msg when msg = "Contract outputs are not the same as the payout winner" -> ()
@@ -404,9 +423,9 @@ let ``different winner amount`` () =
         }
     
     let test3 =
-        Block.checkPayoutTx chainParams cgp (block,ema)
+        BlockConnection.PayoutTx.check (state cgp ema) (env block)
     
-    test1 *> test2 *> test3
+    test1 *> test2  *> test3
     |> function
     | Ok _ -> failwithf "There should have been an error, but there wasn't one"
     | Error msg when msg = "Contract outputs are not the same as the payout winner" -> ()
@@ -452,9 +471,9 @@ let ``different winner recipient`` () =
         }
     
     let test3 =
-        Block.checkPayoutTx chainParams cgp (block,ema)
+        BlockConnection.PayoutTx.check (state cgp ema) (env block)
     
-    test1 *> test2 *> test3
+    test1 *> test2  *> test3
     |> function
     | Ok _ -> failwithf "There should have been an error, but there wasn't one"
     | Error msg when msg = "Contract outputs are not the same as the payout winner" -> ()
@@ -500,9 +519,9 @@ let ``different winner - extra spends`` () =
         }
     
     let test3 =
-        Block.checkPayoutTx chainParams cgp (block,ema)
+        BlockConnection.PayoutTx.check (state cgp ema) (env block)
     
-    test1 *> test2 *> test3
+    test1 *> test2  *> test3
     |> function
     | Ok _ -> failwithf "There should have been an error, but there wasn't one"
     | Error msg when msg = "Contract outputs are not the same as the payout winner" -> ()
@@ -548,9 +567,9 @@ let ``same winner - different order`` () =
         }
     
     let test3 =
-        Block.checkPayoutTx chainParams cgp (block,ema)
+        BlockConnection.PayoutTx.check (state cgp ema) (env block)
     
-    test1 *> test2 *> test3
+    test1 *> test2  *> test3
     |> function
     | Ok _ -> ()
     | Error msg -> failwithf "Error: %s" msg
@@ -595,9 +614,9 @@ let ``different winner - distributed spends`` () =
         }
     
     let test3 =
-        Block.checkPayoutTx chainParams cgp (block,ema)
+        BlockConnection.PayoutTx.check (state cgp ema) (env block)
     
-    test1 *> test2 *> test3
+    test1 *> test2  *> test3
     |> function
     | Ok _ -> failwithf "There should have been an error, but there wasn't one"
     | Error msg when msg = "Contract outputs are not the same as the payout winner" -> ()
@@ -661,7 +680,7 @@ let ``no payout when there should be`` () =
         }
     
     let test3 =
-        Block.checkPayoutTx chainParams cgp (block,ema)
+        BlockConnection.PayoutTx.check (state cgp ema) (env block)
     
     test1 *> test2 *> test3
     |> function
@@ -725,7 +744,26 @@ let ``valid connect`` ()  =
             transactions                = [coinbaseTx; ex]
         }
     
-    Block.connect chainParams (generateGetUTXO utxos) contractPath parent 1UL utxos cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = utxos
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chainParams
+        timestamp        = 1UL
+        getUTXO          = generateGetUTXO utxos
+        getContractState = getContractState
+        contractsPath    = contractPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> function
     | Ok _ -> ()
     | Error msg -> failwithf "Error: %s" msg
@@ -794,7 +832,26 @@ let ``connect with invalid coinbase - CGP overflow`` ()  =
             transactions                = [coinbaseTx; ex]
         }
     
-    Block.connect chainParams (generateGetUTXO utxos) contractPath parent 1UL utxos cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = utxos
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chainParams
+        timestamp        = 1UL
+        getUTXO          = generateGetUTXO utxos
+        getContractState = getContractState
+        contractsPath    = contractPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> function
     | Ok _ -> failwithf "There should have been an error, but there wasn't one"
     | Error msg when msg = "block reward is incorrect" -> ()
@@ -864,7 +921,26 @@ let ``connect with invalid coinbase - miner overflow`` ()  =
             transactions                = [coinbaseTx; ex]
         }
     
-    Block.connect chainParams (generateGetUTXO utxos) contractPath parent 1UL utxos cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = utxos
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chainParams
+        timestamp        = 1UL
+        getUTXO          = generateGetUTXO utxos
+        getContractState = getContractState
+        contractsPath    = contractPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> function
     | Ok _ -> failwithf "There should have been an error, but there wasn't one"
     | Error msg when msg = "block reward is incorrect" -> ()
@@ -934,7 +1010,26 @@ let ``connect with invalid coinbase - cgp gets too much`` ()  =
             transactions                = [coinbaseTx; ex]
         }
     
-    Block.connect chainParams (generateGetUTXO utxos) contractPath parent 1UL utxos cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = utxos
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chainParams
+        timestamp        = 1UL
+        getUTXO          = generateGetUTXO utxos
+        getContractState = getContractState
+        contractsPath    = contractPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> function
     | Ok _ -> failwithf "There should have been an error, but there wasn't one"
     | Error msg when msg = "reward is not divided correctly" -> ()
@@ -1004,7 +1099,26 @@ let ``connect with invalid coinbase - miner gets too much`` ()  =
             transactions                = [coinbaseTx; ex]
         }
     
-    Block.connect chainParams (generateGetUTXO utxos) contractPath parent 1UL utxos cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = utxos
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chainParams
+        timestamp        = 1UL
+        getUTXO          = generateGetUTXO utxos
+        getContractState = getContractState
+        contractsPath    = contractPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> function
     | Ok _ -> failwithf "There should have been an error, but there wasn't one"
     | Error msg when msg = "reward is not divided correctly" -> ()
@@ -1074,7 +1188,26 @@ let ``coinbase creation - non-ZP asset`` () =
             transactions                = [coinbaseTx; ex]
         }
     
-    Block.connect chainParams (generateGetUTXO utxos) contractPath parent 1UL utxos cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = utxos
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chainParams
+        timestamp        = 1UL
+        getUTXO          = generateGetUTXO utxos
+        getContractState = getContractState
+        contractsPath    = contractPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> function
     | Ok _ -> failwithf "There should have been an error, but there wasn't one"
     | Error msg when msg = "block reward is incorrect" -> ()
@@ -1144,7 +1277,26 @@ let ``coinbase creation - non-CGP contract`` () =
             transactions                = [coinbaseTx; ex]
         }
     
-    Block.connect chainParams (generateGetUTXO utxos) contractPath parent 1UL utxos cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = utxos
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chainParams
+        timestamp        = 1UL
+        getUTXO          = generateGetUTXO utxos
+        getContractState = getContractState
+        contractsPath    = contractPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> function
     | Ok _ -> failwithf "There should have been an error, but there wasn't one"
     | Error msg when msg = "reward to cgp contract in invalid" -> ()
@@ -1297,7 +1449,26 @@ let ``no unreported payout vulnerability`` () =
             transactions                = [coinbaseTx; ex]
         }
     
-    Block.connect chainParams (generateGetUTXO utxos) contractPath parent 1UL utxos cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = utxos
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chainParams
+        timestamp        = 1UL
+        getUTXO          = generateGetUTXO utxos
+        getContractState = getContractState
+        contractsPath    = contractPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> function
     | Ok _ -> failwithf "There should have been an error, but there wasn't one"
     | Error msg when msg = "transactions failed inputs validation due to General \"invalid amounts\"" -> ()
