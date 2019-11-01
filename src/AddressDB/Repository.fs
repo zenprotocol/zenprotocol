@@ -71,6 +71,12 @@ let getOutputsInfo blockNumber outputs =
             (txHash,TransactionDirection.Out, {asset=asset;amount = amount * -1I |> uint64}, confirmations, blockIndex, lock))
     |> List.ofSeq
 
+let getTransactionCount dataAccess session view blockNumber addresses =
+        let outputs =
+            View.AddressOutpoints.get view dataAccess session addresses
+            |> View.OutpointOutputs.get view dataAccess session
+        List.length (outputs |> getOutputsInfo blockNumber)
+        
 let getHistory dataAccess session view skip take addresses =
     let account = DataAccess.Tip.get dataAccess session
     

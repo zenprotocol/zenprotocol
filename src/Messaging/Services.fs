@@ -358,6 +358,7 @@ module AddressDB =
         | GetOutputs of addresses:string list * Mode
         | GetTransactions of addresses:string list * skip: int * take: int
         | GetContractHistory of contractId : ContractId * skip: int * take: int
+        | GetTransactionCount of addresses:string list * uint32
 
     let serviceName = "addressDB"
     let resyncAccount client =
@@ -381,3 +382,7 @@ module AddressDB =
     let getContractHistory client args =
         GetContractHistory args
         |> send<ContractHistoryResponse> client
+        
+    let getTransactionCount client args =
+        GetTransactionCount args
+        |> send<int> client

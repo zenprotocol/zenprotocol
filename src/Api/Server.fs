@@ -768,6 +768,22 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
         |> JsonValue.Number
         |> JsonContent
         |> reply StatusCode.OK
+    | Post("/addressdb/transactioncount", Some json) ->
+        match parseTransactionCountJson chain json with
+        | Error error -> replyError error
+        | Ok address ->
+            match Blockchain.getTip client with
+            | Some (_,header) ->
+                match AddressDB.getTransactionCount client (address,header.blockNumber) with
+                | Ok count ->
+                    count
+                    |> decimal
+                    |> JsonValue.Number
+                    |> JsonContent
+                    |> reply StatusCode.OK
+                | Error error -> replyError error
+            | None ->
+                replyError "No tip"
     | Post("/addressdb/contract/history", Some json) ->
         parseGetContractHistoryJson json
         >>= AddressDB.getContractHistory client
