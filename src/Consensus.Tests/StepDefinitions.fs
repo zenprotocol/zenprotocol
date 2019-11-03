@@ -693,9 +693,17 @@ module Binding =
 
         let chain = { testingState.chain with genesisHashHash = Hash.computeOfHash genesisHash }
         let state' = { state with tipState = { state.tipState with ema = EMA.create chain }}
-
+        
+        let env : Environment.Env =
+            {
+                chainParams   = chain
+                contractsPath = session.context.contractPath
+                timestamp     = Timestamp.now() + 1000_000_000UL
+                session       = session
+            }
+        
         let events, state' =
-            BlockHandler.validateBlock chain session.context.contractPath session (Timestamp.now() + 1000_000_000UL) None genesisBlock false state'
+            BlockHandler.validateBlock env None genesisBlock state'
             |> Infrastructure.Writer.unwrap
 
         events |> should contain (EffectsWriter.EventEffect (BlockAdded (genesisHash, genesisBlock)))
@@ -783,8 +791,17 @@ module Binding =
         if includeInChain
             then
                 eprintfn "=== if includeInChain then ==="
+                
+                let env : Environment.Env =
+                    {
+                        chainParams   = testingState.chain
+                        contractsPath = session.context.contractPath
+                        timestamp     = Timestamp.now() + 100_000_000UL
+                        session       = session
+                    }
+                
                 let _, state' =
-                    BlockHandler.validateBlock testingState.chain session.context.contractPath session (Timestamp.now() + 100_000_000UL) None block false state
+                    BlockHandler.validateBlock env None block state
                     |> Infrastructure.Writer.unwrap
             
                 state <- state'
@@ -803,9 +820,17 @@ module Binding =
              | None -> failwithf "The block {%A} isn't declared as missing" blockLabel
          
          testingState <- { testingState with missing = Map.remove blockLabel testingState.missing }
+         
+         let env : Environment.Env =
+            {
+                chainParams   = testingState.chain
+                contractsPath = session.context.contractPath
+                timestamp     = Timestamp.now() + 100_000_000UL
+                session       = session
+            }
     
          let _, state' =
-             BlockHandler.validateBlock testingState.chain session.context.contractPath session (Timestamp.now() + 100_000_000UL) None block false state
+             BlockHandler.validateBlock env None block state
              |> Infrastructure.Writer.unwrap
              
          state <- state'

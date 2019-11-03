@@ -5,7 +5,6 @@ open Result
 open Writer
 open ServiceBus.Agent
 open Messaging.Services
-open Messaging.Events
 open Consensus
 open Blockchain
 open EffectsWriter
@@ -13,8 +12,8 @@ open Consensus.Types
 open State
 open DatabaseContext
 open Logary.Message
-open Infrastructure.Result
 open Chain
+open Environment
 
 let getUnionCaseName (x:'a) =
     match Microsoft.FSharp.Reflection.FSharpValue.GetUnionFields(x, typeof<'a>) with
@@ -40,6 +39,14 @@ let handleCommand chainParams command session timestamp (state:State) =
     logStartAction "command" command
 
     let contractPath = session.context.contractPath
+    
+    let env : Env =
+        {
+            chainParams   = chainParams
+            contractsPath = contractPath
+            timestamp     = timestamp
+            session       = session
+        }
 
     let result =
         match command with
@@ -84,13 +91,13 @@ let handleCommand chainParams command session timestamp (state:State) =
                 return state
             }
         | ValidateBlock (peerId,block) ->
-            BlockHandler.validateBlock chainParams contractPath session timestamp (Some peerId) block false state
+            BlockHandler.validateBlock env (Some peerId) block state
         | ValidateMinedBlock block ->
-            BlockHandler.validateBlock chainParams contractPath session timestamp None block true state
+            BlockHandler.validateBlock env None block state
         | HandleTip (peerId,header) ->
-            BlockHandler.handleTip chainParams session timestamp peerId header state
+            BlockHandler.handleTip env peerId header state
         | ValidateNewBlockHeader (peerId, header) ->
-            BlockHandler.handleNewBlockHeader chainParams session timestamp peerId header state
+            BlockHandler.handleNewBlockHeader env peerId header state
         | RequestTip peerId ->
             effectsWriter {
                 if state.tipState.tip <> ExtendedBlockHeader.empty then

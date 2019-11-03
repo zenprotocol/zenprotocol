@@ -120,13 +120,29 @@ let createChainFromGenesis length nonce =
     createChain length nonce genesisBlock ema rootAccount
 
 let getGenesisState session =
-    BlockHandler.validateBlock chain session.context.contractPath session timestamp None genesisBlock false state
+    let env : Environment.Env =
+        {
+            chainParams   = chain
+            contractsPath = session.context.contractPath
+            timestamp     = timestamp
+            session       = session
+        }
+    
+    BlockHandler.validateBlock env None genesisBlock state
     |> Writer.unwrap
     |> snd
 
 let validateChain session blocks state =
     List.fold (fun (_,state) block ->
-        BlockHandler.validateBlock chain session.context.contractPath session block.header.timestamp None block false state
+        let env : Environment.Env =
+            {
+                chainParams   = chain
+                contractsPath = session.context.contractPath
+                timestamp     = block.header.timestamp
+                session       = session
+            }
+        
+        BlockHandler.validateBlock env None block state
         |> Writer.unwrap) ([], state) blocks
 
 [<Test>]
@@ -136,9 +152,17 @@ let ``genesis block accepted``() =
 
     let block = Block.createGenesis chain [rootTxExtended] (0UL,0UL)
     let blockHash = Block.hash block.header
+    
+    let env : Environment.Env =
+        {
+            chainParams   = chain
+            contractsPath = session.context.contractPath
+            timestamp     = timestamp
+            session       = session
+        }
 
     let events, state' =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp None block false state
+        BlockHandler.validateBlock env None block state
         |> Writer.unwrap
 
     events |> should haveLength 3
@@ -167,8 +191,17 @@ let ``wrong genesis block should be rejected``() =
 
     use session = DatabaseContext.createSession databaseContext
     let block = Block.createGenesis chain [rootTxExtended] (0UL,1UL)
+    
+    let env : Environment.Env =
+        {
+            chainParams   = chain
+            contractsPath = session.context.contractPath
+            timestamp     = timestamp
+            session       = session
+        }
+    
     let events, state' =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp None block false state
+        BlockHandler.validateBlock env None block state
         |> Writer.unwrap
 
     events |> should haveLength 0
@@ -182,22 +215,29 @@ let ``validate new valid block which extended main chain``() =
     use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
 
+    let env : Environment.Env =
+        {
+            chainParams   = chain
+            contractsPath = session.context.contractPath
+            timestamp     = timestamp
+            session       = session
+        }
+    
     let _, state =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp None genesisBlock false state
+        BlockHandler.validateBlock env None genesisBlock state
         |> Writer.unwrap
 
     let tx = createTransaction rootAccount
     let block = Block.createTemplate chain genesisBlock.header timestamp state.tipState.ema acs CGP.empty [Transaction.toExtended tx] Hash.zero
     let blockHash = Block.hash block.header
-
-
+    
     // Mark the block as new so we will also have network command
     let _, state =
-        BlockHandler.handleNewBlockHeader chain session timestamp (Array.empty) block.header state
+        BlockHandler.handleNewBlockHeader env (Array.empty) block.header state
         |> Writer.unwrap
 
     let events, state' =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp None block false state
+        BlockHandler.validateBlock env None block state
         |> Writer.unwrap
 
     events |> should haveLength 3
@@ -224,8 +264,16 @@ let ``validate new invalid block which try to extended main chain``() =
     use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
 
+    let env : Environment.Env =
+        {
+            chainParams   = chain
+            contractsPath = session.context.contractPath
+            timestamp     = timestamp
+            session       = session
+        }
+    
     let _, state =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp None genesisBlock false state
+        BlockHandler.validateBlock env None genesisBlock state
         |> Writer.unwrap
 
     let tx = createTransaction (fst rootAccountData)
@@ -234,11 +282,11 @@ let ``validate new invalid block which try to extended main chain``() =
 
     // Mark the block as new so we will also have network command
     let _, state =
-        BlockHandler.handleNewBlockHeader chain session timestamp (Array.empty) block.header state
+        BlockHandler.handleNewBlockHeader env (Array.empty) block.header state
         |> Writer.unwrap
 
     let events, state' =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp None block false state
+        BlockHandler.validateBlock env None block state
         |> Writer.unwrap
 
     events |> should haveLength 0
@@ -257,9 +305,17 @@ let ``validating orphan block yield a request for block from network``() =
 
     let tx = createTransaction (fst rootAccountData)
     let block = Block.createTemplate chain genesisBlock.header timestamp state.tipState.ema acs CGP.empty [Transaction.toExtended tx] Hash.zero
+    
+    let env : Environment.Env =
+        {
+            chainParams   = chain
+            contractsPath = session.context.contractPath
+            timestamp     = timestamp
+            session       = session
+        }
 
     let events, state' =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp None block false state
+        BlockHandler.validateBlock env None block state
         |> Writer.unwrap
 
     events |> should haveLength 1
@@ -282,15 +338,23 @@ let ``validate new block which connect orphan chain which extend main chain``() 
     let ema = EMA.add chain genesisBlock.header.timestamp ema
     let block = Block.createTemplate chain genesisBlock.header timestamp ema acs CGP.empty [Transaction.toExtended tx] Hash.zero
     let blockHash = Block.hash block.header
+    
+    let env : Environment.Env =
+        {
+            chainParams   = chain
+            contractsPath = session.context.contractPath
+            timestamp     = timestamp
+            session       = session
+        }
 
     // Sending orphan block first
     let _, state =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp None block false state
+        BlockHandler.validateBlock env None block state
         |> Writer.unwrap
 
     // Now sending the genesis, which should roll forward the chain
     let events, state' =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp None genesisBlock false state
+        BlockHandler.validateBlock env None genesisBlock state
         |> Writer.unwrap
 
     events |> should haveLength 4
@@ -645,9 +709,17 @@ let ``block with a contract activation is added to chain``() =
     let acs = ActiveContractSet.add contractId contract state.tipState.activeContractSet
 
     let block = Block.createTemplate chain genesisBlock.header timestamp state.tipState.ema acs CGP.empty [Transaction.toExtended tx] Hash.zero
+    
+    let env : Environment.Env =
+        {
+            chainParams   = chain
+            contractsPath = session.context.contractPath
+            timestamp     = timestamp
+            session       = session
+        }
 
     let events, state' =
-            BlockHandler.validateBlock chain session.context.contractPath session timestamp None block false state
+            BlockHandler.validateBlock env None block state
             |> Writer.unwrap
 
     events |> should haveLength 3
@@ -669,8 +741,16 @@ let ``validate new block header should ask for block``() =
         |> fst
         |> List.head
 
+    let env : Environment.Env =
+        {
+            chainParams   = chain
+            contractsPath = session.context.contractPath
+            timestamp     = timestamp
+            session       = session
+        }
+    
     let events, _ =
-        BlockHandler.handleNewBlockHeader chain session timestamp Array.empty block.header state
+        BlockHandler.handleNewBlockHeader env Array.empty block.header state
         |> Writer.unwrap
 
     events |> should haveLength 1
@@ -688,11 +768,19 @@ let ``new block should publish to network``() =
         |> fst
         |> List.head
 
+    let env : Environment.Env =
+        {
+            chainParams   = chain
+            contractsPath = session.context.contractPath
+            timestamp     = timestamp
+            session       = session
+        }
+    
     let _, state =
-        BlockHandler.handleNewBlockHeader chain session timestamp Array.empty block.header state
+        BlockHandler.handleNewBlockHeader env Array.empty block.header state
         |> Writer.unwrap
     let events, _ =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp None block false state
+        BlockHandler.validateBlock env None block state
         |> Writer.unwrap
 
     events |> should contain (EffectsWriter.NetworkCommand (PublishBlock block.header))
@@ -709,8 +797,16 @@ let ``mined block should publish to network``() =
         |> fst
         |> List.head
 
+    let env : Environment.Env =
+        {
+            chainParams   = chain
+            contractsPath = session.context.contractPath
+            timestamp     = timestamp
+            session       = session
+        }
+    
     let events, _ =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp None block true state
+        BlockHandler.validateBlock env None block state
         |> Writer.unwrap
 
     events |> should contain (EffectsWriter.NetworkCommand (PublishBlock block.header))
@@ -727,8 +823,16 @@ let ``validate new tip should ask for block``() =
         |> fst
         |> List.head
 
+    let env : Environment.Env =
+        {
+            chainParams   = chain
+            contractsPath = session.context.contractPath
+            timestamp     = timestamp
+            session       = session
+        }
+    
     let events, _ =
-        BlockHandler.handleTip chain session timestamp Array.empty block.header state
+        BlockHandler.handleTip env Array.empty block.header state
         |> Writer.unwrap
 
     events |> should haveLength 1
@@ -738,9 +842,17 @@ let ``validate new tip should ask for block``() =
 let ``Valid template for two transactions which don't depend on each other``() =
     use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
+    
+    let env : Environment.Env =
+        {
+            chainParams   = chain
+            contractsPath = session.context.contractPath
+            timestamp     = timestamp
+            session       = session
+        }
 
     let _, genesisState =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp None genesisBlock false state
+        BlockHandler.validateBlock env None genesisBlock state
         |> Writer.unwrap
 
     let balances = TestWallet.getBalance rootAccount
@@ -758,7 +870,7 @@ let ``Valid template for two transactions which don't depend on each other``() =
     ema''.delayed.Length |> should equal 2
 
     let _, splitState =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp None splitBlock false genesisState
+        BlockHandler.validateBlock env None splitBlock genesisState
         |> Writer.unwrap
     let splitOutputs = TestWallet.getUnspentOutputs account |> fst
 
@@ -782,10 +894,18 @@ let ``Valid template for two transactions which don't depend on each other``() =
         | [t1;t2] -> (t1,t2)
         | _ -> failwith "Wrong number of outputs"
 
+    let env : Environment.Env =
+        {
+            chainParams   = chain
+            contractsPath = session.context.contractPath
+            timestamp     = timestamp+100UL
+            session       = session
+        }
+    
     let twoTxBlock = Block.createTemplate chain splitBlock.header (timestamp+100UL) splitState.tipState.ema acs CGP.empty [Transaction.toExtended tx1;Transaction.toExtended tx2] Hash.zero
     let oldHash = splitState.tipState.tip.hash
     let _, withTxsState =
-        BlockHandler.validateBlock chain session.context.contractPath session (timestamp+100UL) None twoTxBlock false splitState
+        BlockHandler.validateBlock env None twoTxBlock splitState
         |> Writer.unwrap
     withTxsState.tipState.tip.hash |> should not' (equal oldHash)
     withTxsState.tipState.tip.hash |> should equal (Block.hash twoTxBlock.header)
@@ -795,8 +915,16 @@ let ``Two transactions in the same block which depend on each other are valid``(
     use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
 
+    let env : Environment.Env =
+        {
+            chainParams   = chain
+            contractsPath = session.context.contractPath
+            timestamp     = timestamp
+            session       = session
+        }
+    
     let _, genesisState =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp None genesisBlock false state
+        BlockHandler.validateBlock env None genesisBlock state
         |> Writer.unwrap
 
     let balances = TestWallet.getBalance rootAccount
@@ -813,8 +941,16 @@ let ``Two transactions in the same block which depend on each other are valid``(
     let twoTxBlock = Block.createTemplate chain genesisBlock.header timestamp ema' acs CGP.empty [Transaction.toExtended firstTx;Transaction.toExtended secondTx] Hash.zero
     let oldHash = genesisState.tipState.tip.hash
 
+    let env : Environment.Env =
+        {
+            chainParams   = chain
+            contractsPath = session.context.contractPath
+            timestamp     = timestamp
+            session       = session
+        }
+    
     let _, twoTxState =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp None twoTxBlock false genesisState
+        BlockHandler.validateBlock env None twoTxBlock genesisState
         |> Writer.unwrap
     twoTxState.tipState.tip.hash |> should not' (equal oldHash)
     twoTxState.tipState.tip.hash |> should equal (Block.hash twoTxBlock.header)
@@ -824,8 +960,16 @@ let ``Two transactions in the same block which depend on each other are invalid 
     use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
 
+    let env : Environment.Env =
+        {
+            chainParams   = chain
+            contractsPath = session.context.contractPath
+            timestamp     = timestamp
+            session       = session
+        }
+    
     let _, genesisState =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp None genesisBlock false state
+        BlockHandler.validateBlock env None genesisBlock state
         |> Writer.unwrap
 
     let balances = TestWallet.getBalance rootAccount
@@ -842,8 +986,16 @@ let ``Two transactions in the same block which depend on each other are invalid 
     let twoTxBlock = Block.createTemplate chain genesisBlock.header timestamp ema' acs CGP.empty [Transaction.toExtended secondTx;Transaction.toExtended firstTx] Hash.zero
     let oldHash = genesisState.tipState.tip.hash
 
+    let env : Environment.Env =
+        {
+            chainParams   = chain
+            contractsPath = session.context.contractPath
+            timestamp     = timestamp
+            session       = session
+        }
+    
     let _, twoTxState =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp None twoTxBlock false genesisState
+        BlockHandler.validateBlock env None twoTxBlock genesisState
         |> Writer.unwrap
     twoTxState.tipState.tip.hash |> should not' (equal (Block.hash twoTxBlock.header))
     twoTxState.tipState.tip.hash |> should equal oldHash
@@ -853,8 +1005,16 @@ let ``Template builder uses two transactions in the same block which depend on e
     use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
 
+    let env : Environment.Env =
+        {
+            chainParams   = chain
+            contractsPath = session.context.contractPath
+            timestamp     = timestamp
+            session       = session
+        }
+    
     let _, genesisState =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp None genesisBlock false state
+        BlockHandler.validateBlock env None genesisBlock state
         |> Writer.unwrap
 
     let balances = TestWallet.getBalance rootAccount
@@ -872,11 +1032,19 @@ let ``Template builder uses two transactions in the same block which depend on e
     let timestamp = genesisBlock.header.timestamp
     let ema' = EMA.add chain timestamp ema
     let memState, validatedTransactions = BlockTemplateBuilder.makeTransactionList chain session updatedState (timestamp + 100_000UL) |> Result.get
-
+    
+    let env : Environment.Env =
+        {
+            chainParams   = chain
+            contractsPath = session.context.contractPath
+            timestamp     = timestamp+1UL
+            session       = session
+        }
+    
     let twoTxBlock = Block.createTemplate chain genesisBlock.header (timestamp+1UL) ema' memState.activeContractSet CGP.empty validatedTransactions Hash.zero
     let oldHash = genesisState.tipState.tip.hash
     let _, twoTxState =
-        BlockHandler.validateBlock chain session.context.contractPath session (timestamp+1UL) None twoTxBlock false genesisState
+        BlockHandler.validateBlock env None twoTxBlock genesisState
         |> Writer.unwrap
     twoTxState.tipState.tip.hash |> should not' (equal oldHash)
     twoTxState.tipState.tip.hash |> should equal (Block.hash twoTxBlock.header)
@@ -887,8 +1055,17 @@ let ``Out of order dependent transactions are rearranged``() =
     use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
 
+    
+    let env : Environment.Env =
+        {
+            chainParams   = chain
+            contractsPath = session.context.contractPath
+            timestamp     = timestamp
+            session       = session
+        }
+    
     let _, genesisState =
-        BlockHandler.validateBlock chain session.context.contractPath session timestamp None genesisBlock false state
+        BlockHandler.validateBlock env None genesisBlock state
         |> Writer.unwrap
 
     let balances = TestWallet.getBalance rootAccount

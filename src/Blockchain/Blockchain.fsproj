@@ -47,6 +47,7 @@
     <Compile Include="ExtendedBlockHeader.fs" />
     <Compile Include="Serialization.fs" />
     <Compile Include="DatabaseContext.fs" />
+    <Compile Include="Environment.fs" />
     <Compile Include="TransactionRepository.fs" />
     <Compile Include="UtxoSetRepository.fs" />
     <Compile Include="ContractUtxoRepository.fs" />
@@ -60,6 +61,8 @@
     <Compile Include="InitialBlockDownload.fs" />
     <Compile Include="State.fs" />
     <Compile Include="TransactionHandler.fs" />
+    <Compile Include="ChainConnection.fs" />
+    <Compile Include="Chain.fs" />
     <Compile Include="BlockHandler.fs" />
     <Compile Include="BlockTemplateBuilder.fs" />
     <Compile Include="Handler.fs" />

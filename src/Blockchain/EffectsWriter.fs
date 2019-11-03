@@ -12,7 +12,7 @@ type Effect =
     | EventEffect of Event
     | NetworkCommand of Network.Command
 
-type EffectsWriter<'a> = Writer<'a, Effect>
+type EffectsWriter<'a> = Writer<Effect, 'a>
 
 let publish (event:Event) = Writer([EventEffect event],())
 

@@ -48,14 +48,15 @@ let saveFullBlock session blockHash (block:Block) =
     List.iter (fun ex ->
         MultiCollection.put session.context.transactionBlocks session.session ex.txHash blockHash) block.transactions
 
-let saveBlockState session blockHash (acsUndoData:ActiveContractSet.UndoData) contractStatesUndoData ema cgp =
-    let blockState =
-        {
-            ema = ema
-            cgp = cgp
-            activeContractSetUndoData = acsUndoData
-            contractStatesUndoData = contractStatesUndoData
-        }
+//let saveBlockState session blockHash (acsUndoData:ActiveContractSet.UndoData) contractStatesUndoData ema cgp =
+let saveBlockState (session : Session) (blockHash : Hash.Hash) (blockState : BlockState.T) : unit =
+    // let blockState =
+    //     {
+    //         ema = ema
+    //         cgp = cgp
+    //         activeContractSetUndoData = acsUndoData
+    //         contractStatesUndoData = contractStatesUndoData
+    //     }
 
     Collection.put session.context.blockState session.session blockHash blockState
 

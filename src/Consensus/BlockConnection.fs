@@ -10,24 +10,28 @@ open Consensus.Serialization.Serialization
 open Functional
 open Block
 
-type Env = {
-    chainParams      : ChainParameters
-    timestamp        : uint64
-    getUTXO          : Outpoint -> UtxoSet.OutputStatus
-    getContractState : ContractId -> Zen.Types.Data.data option
-    contractsPath    : string
-    parent           : BlockHeader
-    block            : Block
-}
+// Static connection environment - doesn't change during connection 
+type Env =
+    {
+        chainParams      : ChainParameters
+        timestamp        : uint64
+        getUTXO          : Outpoint -> UtxoSet.OutputStatus
+        getContractState : ContractId -> Zen.Types.Data.data option
+        contractsPath    : string
+        parent           : BlockHeader
+        block            : Block
+    }
 
-type State = {
-    utxoSet        : UtxoSet.T
-    acs            : ActiveContractSet.T
-    cgp            : CGP.T
-    ema            : EMA.T
-    contractCache  : ContractCache.T
-    contractStates : ContractStates.T
-}
+// Dynamic connection state - changes during connection
+type State =
+    {
+        utxoSet        : UtxoSet.T
+        acs            : ActiveContractSet.T
+        cgp            : CGP.T
+        ema            : EMA.T
+        contractCache  : ContractCache.T
+        contractStates : ContractStates.T
+    }
 
 type Check = State -> Env -> Result<State, string>
 
