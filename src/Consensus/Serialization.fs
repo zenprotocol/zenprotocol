@@ -734,24 +734,6 @@ module Serialization =
         let serialize = serialize size write
         let deserialize = deserialize read
 
-    module Winner =
-        let size = fun { allocation = allocation; payout = payout } ->
-            Option.size (fun _ ->  Allocation.size) allocation +
-            Option.size Payout.size payout
-
-        let write stream = fun { allocation = allocation; payout = payout } ->
-            Option.write stream (fun stream allocation -> Allocation.write stream allocation) allocation
-            Option.write stream (fun stream payout -> Payout.write stream payout) payout
-
-        let read stream =
-            {
-                allocation = Option.read Allocation.read stream
-                payout = Option.read Payout.read stream
-            }
-
-        let serialize = serialize size write
-        let deserialize = deserialize read
-
     module Ballot =
         [<Literal>]
         let private AllocationIdentifier = 1uy

@@ -243,69 +243,11 @@ module Weight =
 
 module PayoutTx =
     
-    let private internalizeRecipient
-        ( (recip, spends) : Recipient * List<Spend> )
-        : List<Output> =
-        
-        spends
-        |> List.map ( fun spend -> { lock = CGP.recipientToLock recip; spend = spend } )
-    
-    let private checkMessageBody
-        ( payout  : Recipient * List<Spend>     )
-        ( msgBody : Option<Zen.Types.Data.data> )
-        : Result<unit, string> = result {
-        
-        let! outputs =
-            msgBody
-            |> CGP.Contract.extractPayoutOutputs
-            |> Result.mapError (konst "Couldn't parse message body")
-        
-        let winner =
-            internalizeRecipient payout
-        
-        if List.sort outputs = List.sort winner
-            then return ()
-            else return! Error "Contract outputs are not the same as the payout winner"
-        }
-    
-    let private extractPayoutWitnesses
-        ( chainParams : ChainParameters     )
-        ( ex          : TransactionExtended )
-        : List<ContractWitness> =
-        
-        ex.tx.witnesses
-        |> List.choose
-               begin function
-               | ContractWitness cw when cw.contractId = chainParams.cgpContractId ->
-                   Some cw
-               | _ ->
-                   None
-               end
-    
     let check
         : Check = fun state env ->
         
         if CGP.isPayoutBlock env.chainParams env.block.header.blockNumber then
-            let payoutWitnesses : List<ContractWitness> =
-                env.block.transactions
-                |> List.concatMap (extractPayoutWitnesses env.chainParams)
-    
-            match payoutWitnesses with
-            | _ :: _ :: _ ->
-                Error "Multiple payout Txs"
-            | [] ->
-                match state.cgp.payout with
-                | None ->
-                    Ok ()
-                | Some _ ->
-                    Error "No payout Tx"
-            | [ cgpWitness ] ->
-                match state.cgp.payout with
-                | None ->
-                    Error "There shouldn't be a payout - there is no payout winner"
-                | Some payout ->
-                    cgpWitness.messageBody
-                    |> checkMessageBody payout
+            CGP.Connection.checkPayoutWitness env.chainParams env.block.transactions state.cgp
         else
             Ok ()    // The CGP contract ensures there is never payout Tx outside the payout block
         
