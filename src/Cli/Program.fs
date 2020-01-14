@@ -3,6 +3,10 @@ open System
 open System.IO
 open FSharp.Data
 open Api.Types
+open Cli
+open Cli.Util
+open Cli.Request.Request
+open Cli.Request.Load
 
 type PaginationArgs =
     | [<MainCommand("COMMAND");ExactlyOnce>] Pagination_Arguments of skip:int * take:int
@@ -58,6 +62,10 @@ type RawTransactionPublishArgs =
     | [<MainCommand("COMMAND");ExactlyOnce>] RawTransactionPublish_Arguments of file:string
     interface IArgParserTemplate with
         member arg.Usage = ""
+type SignArgs =
+    | [<MainCommand("COMMAND");ExactlyOnce>] Sign_Arguments of message:string * path:string
+    interface IArgParserTemplate with
+        member arg.Usage = ""
 
 type NoArgs =
     | [<Hidden>] NoArg
@@ -93,6 +101,8 @@ type Arguments =
     | [<CliPrefix(CliPrefix.None)>] RawTx_Publish of ParseResults<RawTransactionPublishArgs>
     | [<CliPrefix(CliPrefix.None)>] Wallet_Create of ParseResults<NoArgs>
     | [<CliPrefix(CliPrefix.None)>] Blockchain_Info of ParseResults<NoArgs>
+    | [<CliPrefix(CliPrefix.None)>] WalletKeys of ParseResults<NoArgs>
+    | [<CliPrefix(CliPrefix.None)>] SignMessage of ParseResults<SignArgs>
 
     interface IArgParserTemplate with
         member arg.Usage =
@@ -122,27 +132,8 @@ type Arguments =
             | RawTx_Publish _ -> "publish a fully signed raw transaction"
             | Wallet_Create _ -> "create a wallet from a newly generated mnemonic phrase"
             | Blockchain_Info _ -> "get blockchain info"
-            | _ -> ""
-
-
-let getUri' = sprintf "http://127.0.0.1:%d/%s"
-    
-let errorHandler =
-    let colorizer = function | ErrorCode.HelpText -> None
-                             | _ -> Some ConsoleColor.Red
-    ProcessExiter colorizer
-
-let exit (errorMsg: string): 'a =
-    (errorHandler :> IExiter).Exit(errorMsg, ErrorCode.AppSettings (*=1*))
-
-let getResponse ({Body=body;StatusCode=statusCode}: HttpResponse) =
-        let text = match body with
-                   | Text text -> text
-                   | Binary bytes -> Text.Encoding.ASCII.GetString bytes
-
-        if statusCode <> 200 then exit text else text
-
-let printResponse = getResponse >> printfn "%s"
+            | WalletKeys _ -> "get wallet keys"
+            | SignMessage _ -> "get wallet keys"
 
 // read from console, hiding input text
 let readMasked(): string =
@@ -168,21 +159,21 @@ let readPassword(): string =
 
 [<EntryPoint>]
 let main argv =
-    let parser = ArgumentParser.Create<Arguments>(programName = "zen-ctl", errorHandler = errorHandler)
+    let parser = ArgumentParser.Create<Arguments>(programName = "zen-cli", errorHandler = errorHandler)
 
     let results = parser.ParseCommandLine argv
 
-    let mutable getUri : (string -> string) = getUri' 11567us    
-    
+    let mutable getUri : (string -> string) = getUri' "11567"
+
     List.iter (function
-        | Port p -> getUri <- getUri' p
-        | Test -> getUri <- getUri' 31567us
+        | Port p -> getUri <- getUri' (string p)
+        | Test -> getUri <- getUri' "31567"
 #if DEBUG
-        | Local idx -> getUri <- getUri' (20000us + idx)
+        | Local idx -> getUri <- getUri' (port (int idx))
 #endif
         | _ -> ()
         ) (results.GetAllResults())
-    
+
     let saveRawToFile (response : HttpResponse) =
         let text =
             match response.Body with
@@ -203,59 +194,42 @@ let main argv =
         | Some (Send args) ->
             let asset, amount, address= args.GetResult <@ Send_Arguments @>
             let password = readPassword()
-            "wallet/send"
-            |> getUri
-            |> SendRequestJson.Root(
-                [| SendRequestJson.Output(address, asset, amount) |],
-                password
-                ).JsonValue.Request
+            Request.Request.send getUri address asset amount password
             |> printResponse
         | Some (Balance _) ->
             let balance =
-                "wallet/balance"
-                |> getUri
-                |> BalanceResponseJson.Load
+                balance getUri
 
             printfn "Asset\t\t| Balance"
             printfn "============================"
 
-            Array.iter (fun (assertBalance:BalanceResponseJson.Root) ->
-                printfn " %s\t| %d" assertBalance.Asset assertBalance.Balance) balance
+            Array.iter (fun (asset, assetBalance) ->
+                printfn " %s\t| %d" asset assetBalance) balance
         | Some (History args) ->
             let skip, take = args.GetResult <@ Pagination_Arguments @>
             let transactions =
-                sprintf "wallet/transactions?skip=%d&take=%d" skip take
-                |> getUri
-                |> TransactionsResponseJson.Load
+                walletTransaction getUri skip take
 
             printfn "TxHash\t| Asset\t| Amount\t|Confirmations"
             printfn "==================================================="
 
-            Array.iter (fun (entry:TransactionsResponseJson.Root) ->
-                printfn "%s\t%s\t%d\t%d" entry.TxHash entry.Asset entry.Amount entry.Confirmations
+            Array.iter (fun (txHash, asset, amount, confirmations) ->
+                printfn "%s\t%s\t%d\t%d" txHash asset amount confirmations
             ) transactions
         | Some (Address _) ->
             let result =
-                "wallet/address"
-                |> getUri
-                |> Http.Request
-                |> getResponse
+                address getUri
                 |> JsonValue.String
             printfn "%s" (result.AsString())
         | Some (Resync _) ->
-            "wallet/resync"
-            |> getUri
-            |> Http.Request
+            resync getUri
             |> printResponse
         | Some (Import _) ->
             printfn "Enter seed words, separated by spaces"
             let words = Console.ReadLine().Split [|' '|]
             let pass = readPassword()
-            "wallet/import"
-            |> getUri
-            |> ImportSeedJson.Root(pass, words).JsonValue.Request
+            import getUri words pass
             |> printResponse
-
         | Some (Activate args) ->
             let file, numberOfBlocks = args.GetResult <@ ActivateContract_Arguments @>
             let password = readPassword()
@@ -265,22 +239,14 @@ let main argv =
             | true ->
                 let code = File.ReadAllText file
                 let result =
-                    "wallet/contract/activate"
-                    |> getUri
-                    |> ContractActivateRequestJson.Root(
-                        code, numberOfBlocks, password
-                        ).JsonValue.Request
-                    |> getResponse
+                    activateContract getUri code numberOfBlocks password
                     |> ContractActivateResponseJson.Parse
 
                 printfn "Contract activated.\nAddress: %s\nContract Id: %s" result.Address result.ContractId
         | Some (Extend args) ->
             let address, numberOfBlocks = args.GetResult <@ ExtendContract_Arguments @>
             let password = readPassword()
-            "wallet/contract/extend"
-            |> getUri
-            |> ContractExtendRequestJson.Root(address, numberOfBlocks, password)
-               .JsonValue.Request
+            extend getUri address numberOfBlocks password
             |> printResponse
         | Some (Execute args) ->
             let address, command, messageBody, asset, amount =
@@ -288,97 +254,63 @@ let main argv =
 
             let password = readPassword()
 
-            let messageBody = if messageBody = "None" || messageBody = "none" || messageBody = "null" then "" else messageBody
 
-            "wallet/contract/execute"
-            |> getUri
-            |> ContractExecuteRequestJson.Root(
-                    address, command, messageBody,
-                    ContractExecuteRequestJson.Options(true, ""),
-                    [| ContractExecuteRequestJson.Spend(asset, amount) |],
-                    password
-               ).JsonValue.Request
+            execute getUri address command messageBody asset amount password
             |> printResponse
         | Some (Active _) ->
             let activeContracts =
-                "contract/active"
-                |> getUri
-                |> ActiveContractsResponseJson.Load
+                 activeContracts getUri
 
             printfn "Address\t\t| Contract Id\t\t | Expire"
             printfn "========================================="
 
-            Array.iter (fun (activeContract:ActiveContractsResponseJson.Root) ->
-                printfn " %s %s\t| %d" activeContract.Address activeContract.ContractId activeContract.Expire) activeContracts
+            Array.iter (fun (address,contractId, expire, _) ->
+                printfn " %s %s\t| %d" address contractId expire) activeContracts
         | Some (PublishBlock args) ->
             let block = args.GetResult <@ PublishBlock_Arguments @>
-            "blockchain/publishblock"
-            |> getUri
-            |> PublishBlockJson.Root(block).JsonValue.Request
+            publishBlock getUri block
             |> printResponse
         | Some (AccountExists _) ->
-            "wallet/exists"
-            |> getUri
-            |> Http.Request
+            walletExists getUri
             |> printResponse
         | Some (CheckPassword _) ->
             let password = readPassword()
-            "wallet/checkpassword"
-            |> getUri
-            |> CheckPasswordJson.Root(password).JsonValue.Request
+            checkPassword getUri password
             |> printResponse
         | Some (MnemonicPhrase _) ->
             let password = readPassword()
-            "wallet/mnemonicphrase"
-            |> getUri
-            |> CheckPasswordJson.Root(password).JsonValue.Request
+            mnemonicPhrase getUri password
             |> printResponse
         | Some (ImportZenPublicKey args) ->
             let publicKey = args.GetResult <@ ImportPublicKey_Arguments @>
-            "wallet/importzenpublickey"
-            |> getUri
-            |> ImportZenPublicKey.Root(publicKey).JsonValue.Request
+            importZenPublicKey getUri publicKey
             |> printResponse
         | Some (ExportZenPublicKey _) ->
-            "wallet/zenpublickey"
-            |> getUri
-            |> Http.Request
+            exportZenPublicKey getUri
             |> printResponse
         | Some (RemoveWallet _) ->
             let password = readPassword()
-            "wallet/remove"
-            |> getUri
-            |> CheckPasswordJson.Root(password).JsonValue.Request
+            removeWallet getUri password
             |> printResponse
         | Some (PublicKey args) ->
             let path = args.GetResult <@ PublicKey_Arguments @>
             let password = readPassword()
-            "wallet/publickey"
-            |> getUri
-            |> GetPublicKeyJson.Root(path, password).JsonValue.Request
+            publicKey getUri path password
             |> printResponse
         | Some (RawTx_Create args) ->
             let asset, amount, address = args.GetResult <@ RawTransactionCreate_Arguments @>
-            "wallet/rawtransaction/create"
-            |> getUri
-            |> CreateRawTransactionJson.Root(
-                [| CreateRawTransactionJson.Output(address, asset, amount) |]
-                ).JsonValue.Request
+            createRawTxRequest getUri asset amount address
             |> saveRawToFile
         | Some (RawTx_Sign args) ->
             let file = args.GetResult <@ RawTransactionSign_Arguments @>
             let raw = System.IO.File.ReadAllText file
             let password = readPassword()
-            "wallet/rawtransaction/sign"
-            |> getUri
-            |> SignRawTransactionJson.Root(raw, password).JsonValue.Request
+            signRawTxRequest getUri raw password
             |> saveRawToFile
         | Some (RawTx_Publish args) ->
             let file = args.GetResult <@ RawTransactionPublish_Arguments @>
             let raw = System.IO.File.ReadAllText file
-            "wallet/rawtransaction/publish"
-            |> getUri
-            |> TxHexJson.Root(raw).JsonValue.Request
+            publishRawTx getUri raw
             |> printResponse
         | Some (Wallet_Create _) ->
             // creates a wallet and password
@@ -390,23 +322,27 @@ let main argv =
                     printfn "Passwords do not match, please try again"; createWallet()
                 else
                     let words = NBitcoin.Mnemonic(NBitcoin.Wordlist.English, NBitcoin.WordCount.TwentyFour).Words
-                    getUri "wallet/import"
-                    |> ImportSeedJson.Root(password1, words).JsonValue.Request
+                    import getUri words password1
                     |> printResponse
-            createWallet()            
+            createWallet()
         | Some (Blockchain_Info _) ->
-            "blockchain/info"
-            |> getUri
-            |> BlockChainInfoJson.Load
-            |> fun json -> 
+            blockchainInfo getUri
+            |> fun json ->
                 printfn "chain: %s\nblocks: %d\nheaders: %d\ndifficulty: %A\nmedianTime: %i\ninitialBlockDownload: %A\ntip: %A"
-                    json.Chain
-                    json.Blocks
-                    json.Headers
-                    json.Difficulty
-                    json.MedianTime
-                    json.InitialBlockDownload
-                    json.Tip
+                    json.chain
+                    json.blocks
+                    json.headers
+                    json.difficulty
+                    json.medianTime
+                    json.initialBlockDownload
+                    json.tipBlockHash
+        | Some (WalletKeys _) ->
+            walletKeys getUri (readPassword())
+            |> printResponse
+        | Some (SignMessage args) ->
+            let message, path = args.GetResult <@ Sign_Arguments @>
+            signMessage getUri message path (readPassword())
+            |> printResponse
         | _ -> ()
     with
     | :? Net.WebException as ex ->

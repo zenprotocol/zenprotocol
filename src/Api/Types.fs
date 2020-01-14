@@ -228,8 +228,7 @@ type HighVLockLockJson = JsonProvider<"""
 type PayoutResultJson = JsonProvider<"""
 {
     "recipient": "abcd1234",
-     "amount": 1234567890000,
-     "asset": "asset"
+    "spendlist": []
 }
 """>
 
@@ -360,10 +359,10 @@ type ContractCommandHistoryResultJson = JsonProvider<"""
 }]""">
 
 type PublicKeyDataJson = JsonProvider<"""
-{
+[{
     "publicKey": "address",
     "path": "path"
-}
+}]
 """>
 
 type WinnerTally = JsonProvider<"""

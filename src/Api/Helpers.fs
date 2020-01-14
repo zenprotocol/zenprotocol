@@ -226,16 +226,17 @@ let cgpEncoder chain (interval:uint32) (cgp:CGP.T)  =
         | Some res ->
             res
             |> (fun (recipient:Recipient, spend: Spend list) ->
-                spend
+                (recipientEncoder chain recipient, spend
                 |> List.map (fun spend ->
-                    PayoutResultJson.Root(recipientEncoder chain recipient, int64 spend.amount, spend.asset.AsString)))
-            |> fun j ->  List.map (fun (x:PayoutResultJson.Root) -> x.JsonValue) j
-        | _ -> [emptyRecord]
+                    SpendJson.Root(spend.asset.AsString, int64 spend.amount).JsonValue)
+                |> List.toArray) )
+            |> (fun (r,s) -> PayoutResultJson.Root(r,s).JsonValue)
+        | _ -> emptyRecord
     JsonValue.Record
         [|
             ("interval", JsonValue.Number ((decimal)interval))
             ("allocation", JsonValue.Number (decimal cgp.allocation))
-            ("payout", result|> List.toArray |> JsonValue.Array)
+            ("payout", result)
         |]
     |> omitNullFields
 
