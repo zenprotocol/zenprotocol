@@ -1,7 +1,9 @@
-module Blockchain.TallyRepository
+module Blockchain.Tally.Repository
 
 open DataAccess
-open DatabaseContext
+open Blockchain.DatabaseContext
+open Wallet
+
 
 module PKBalance =
     let get (session : Session) = Collection.get session.context.pkbalance
@@ -69,3 +71,10 @@ module Winner =
     let truncate (session : Session) = Collection.truncate session.context.winner
 
     let contains (session : Session) = Collection.containsKey session.context.winner
+
+module VoteTip =
+    let tryGet (session : Session) = SingleValue.tryGet session.context.voteTip
+
+    let put (session : Session) = SingleValue.put session.context.voteTip
+
+    let delete (session : Session) = SingleValue.delete session.context.voteTip

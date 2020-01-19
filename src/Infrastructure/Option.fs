@@ -24,3 +24,11 @@ let ofResult =
     function
     | Ok res -> Some res
     | Error _ -> None
+
+let ofBool b =
+    if b then Some () else None
+
+let validateWith (predicate : 'b -> bool) (x : 'b) : Option<'b> =
+    predicate x
+    |> ofBool
+    |> Option.map (fun _ -> x)

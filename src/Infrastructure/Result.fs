@@ -69,3 +69,14 @@ let ofOption error = function
 let foldM (f : 's -> 'a -> Result<'s,'err>) (s : Result<'s,'err>) (xs : seq<'a>) : Result<'s,'err> =
     let folder s x = Result.bind (fun s -> f s x) s
     in Seq.fold folder s xs
+
+let cases (f : 'a -> 'c) (g : 'b -> 'c) : Result<'a,'b> -> 'c =
+    function
+    | Ok x    -> f x
+    | Error y -> g y
+
+let fromOk (f : 'a -> 'b) : Result<'a,'b> -> 'b =
+    cases f id
+
+let fromError (f : 'a -> 'b) : Result<'b,'a> -> 'b =
+    cases id f

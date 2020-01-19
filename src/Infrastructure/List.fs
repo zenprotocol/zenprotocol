@@ -32,3 +32,8 @@ let pairWith (s : 's) (xs : List<'a>) : List<'s * 'a> =
 
 let traversePair (f : 'a -> List<'b>) ((s,x) : 's * 'a) : List<'s * 'b> =
     sequencePair (s, f x)
+
+let isSingleton =
+    function
+    | [_] -> true
+    | _   -> false

@@ -16,7 +16,15 @@ open Blockchain.DatabaseContext
 open Consensus.Tests.SampleContract
 open Consensus.Contract
 open Consensus.Tests
+open Tests.ContractCode
+open Api.Types
 
+open System
+open Blockchain.Tally
+open Blockchain.Tests
+open Consensus.Tests
+open Consensus.Tests
+open Consensus.Tests
 open TestsInfrastructure.Constraints
 open Messaging.Services
 open Helper
@@ -24,12 +32,12 @@ open Helper
 let (>>=) = Writer.bind
 let chain = Chain.getChainParameters Chain.Local
 let timestamp = 1515594186383UL + 1UL
+let (>>>=) x f = Result.bind f x
+module CryptoSig = Crypto.Signature
+module CryptoPub = Crypto.PublicKey
 
-module Result =
-    let get =
-        function
-        | Ok x -> x
-        | Error y -> failwithf "%A" y
+let result = Result.ResultBuilder<string>()
+let publicKeyRoot = """[{"publicKey":"02b43a1cb4cb6472e1fcd71b237eb9c1378335cd200dd07536594348d9e450967e","path":"m/44'/258'/0'/0/0"},{"publicKey":"029ae9b49e60259958302fab6c9be333775fd7ada72f11643218dcf23e5f37ec92","path":"m/44'/258'/0'/1/0"}]"""
 
 let tempDir () = System.IO.Path.Combine
                     [| System.IO.Path.GetTempPath(); System.IO.Path.GetRandomFileName() |]
@@ -51,7 +59,7 @@ let isAccountInSet session (account:TestWallet.T) =
     areOutpointsInSet session outpoints
 
 let rootAccountData = createTestAccount()
-let rootAccount, _ = rootAccountData
+let rootAccount, rootExtendedKey = rootAccountData
 
 let createTransaction account =
     Result.get <| TestWallet.createTransaction testParameters (publicKeyHash account) {asset=Asset.Zen;amount=rootAmount} (account, snd rootAccountData)
@@ -87,8 +95,9 @@ let state = {
         }
     initialBlockDownload = InitialBlockDownload.Inactive
     headers=0ul
-    cgp = CGP.empty
+    cgp = {allocation = 0uy; payout= None}
 }
+
 
 let createChain (length:int) nonce start ema account =
 
@@ -233,7 +242,7 @@ let ``validate new valid block which extended main chain``() =
     
     // Mark the block as new so we will also have network command
     let _, state =
-        BlockHandler.handleNewBlockHeader env (Array.empty) block.header state
+        BlockHandler.validateNewBlockHeader env (Array.empty) block.header state
         |> Writer.unwrap
 
     let events, state' =
@@ -282,7 +291,7 @@ let ``validate new invalid block which try to extended main chain``() =
 
     // Mark the block as new so we will also have network command
     let _, state =
-        BlockHandler.handleNewBlockHeader env (Array.empty) block.header state
+        BlockHandler.validateNewBlockHeader env (Array.empty) block.header state
         |> Writer.unwrap
 
     let events, state' =
@@ -482,7 +491,6 @@ let ``new block extend fork chain which become longest``() =
     let events,state = validateChain session mainChain state
 
     let tip = List.last mainChain
-
     events |> should haveLength 5
 
     events.[0] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock alternativeChain.[0])))
@@ -577,7 +585,7 @@ let ``2 orphan chains, two longer than main, one is longer``() =
     isAccountInSet session sideChainAccount UtxoSet.asDatabase |> should equal true
 
 [<Test>]
-let ``2 orphan chains, two longer than main, longest is invalid, should pick second long``() =
+let ``2 orphan chains longer than main, longest is invalid, should pick second long``() =
     use databaseContext = DatabaseContext.createEmpty (tempDir())
 
     use session = DatabaseContext.createSession databaseContext
@@ -597,11 +605,11 @@ let ``2 orphan chains, two longer than main, longest is invalid, should pick sec
     // validate all chains
     let _,state = validateChain session mainChain state
     let _,state = validateChain session sideChain1 state
-    let _,state = validateChain session sideChain2 state
+    let _,state = validateChain session sideChain2 state 
     let events, state = validateChain session orphanChain state
 
     let tip = List.last sideChain2
-
+    
     events |> should haveLength 7
     events.[0] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock mainChain.[1])))
     events.[1] |> should equal (EffectsWriter.EventEffect (BlockRemoved (hashBlock mainChain.[0])))
@@ -750,7 +758,7 @@ let ``validate new block header should ask for block``() =
         }
     
     let events, _ =
-        BlockHandler.handleNewBlockHeader env Array.empty block.header state
+        BlockHandler.validateNewBlockHeader env Array.empty block.header state
         |> Writer.unwrap
 
     events |> should haveLength 1
@@ -777,7 +785,7 @@ let ``new block should publish to network``() =
         }
     
     let _, state =
-        BlockHandler.handleNewBlockHeader env Array.empty block.header state
+        BlockHandler.validateNewBlockHeader env Array.empty block.header state
         |> Writer.unwrap
     let events, _ =
         BlockHandler.validateBlock env None block state
@@ -876,9 +884,16 @@ let ``Valid template for two transactions which don't depend on each other``() =
 
     let txOfPOutput (outpoint, output) =
         let spend = output.spend
-        let outputs = [{spend=spend;lock=PK (publicKeyHash rootAccount)}]
+        let pkHash, pair  = 
+            if spend.amount <> firstAmount then
+                publicKeyChangeHash rootAccount,
+                rootChangeKeyPair
+            else
+                publicKeyHash rootAccount,
+                rootKeyPair
+        let outputs = [{spend=spend;lock=PK pkHash}]
         Transaction.sign
-            [ rootKeyPair ] TxHash
+            [ pair ] TxHash
             {
                 version = Version0;
                 inputs = [Outpoint outpoint];
