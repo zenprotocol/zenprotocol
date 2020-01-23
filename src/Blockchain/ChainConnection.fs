@@ -6,9 +6,13 @@ open Types
 open Infrastructure
 open Logary.Message
 open Environment
+open Blockchain.Tally
 
 module ExtHeader = ExtendedBlockHeader
 
+type Operation =
+    | Main
+    | Fork
 
 type ExtHeader = ExtHeader.T
 
@@ -28,6 +32,7 @@ type OriginState =
 
 let private connectTip
     ( env       : Env         )
+    ( op        : Operation   )
     ( origState : OriginState )
     ( tip       : ExtHeader   )
     : OriginState =
@@ -57,8 +62,22 @@ let private connectTip
                 parent           = origState.header.header
                 block            = block
             }
+
+            let cgp =
+                match op with
+                | Main ->
+                    if CGP.isPayoutBlock env.chainParams block.header.blockNumber then
+                        let interval = CGP.getInterval  env.chainParams block.header.blockNumber
+                        let winner   = Tally.Handler.getWinner env.session interval
+                        CGP.update winner origState.cgp
+                    else
+                        origState.cgp
+                | Fork ->
+                    origState.cgp
+                        
+            let connection = {origState.connection with cgp = cgp }
             
-            match BlockConnection.connect origState.connection connEnv with
+            match BlockConnection.connect connection connEnv with
             
             | Error error ->
                 
@@ -74,6 +93,7 @@ let private connectTip
                 
             | Ok (block, connState) ->
                 
+    
                 BlockRepository.saveBlockState env.session tip.hash
                     {
                         ema =
@@ -95,42 +115,70 @@ let private connectTip
                         MemPool.handleBlock block origState.mempool
                 }
 
+let rec private connectTips
+    ( env       : Env             )
+    ( op        : Operation       )
+    ( origState : OriginState     )
+    ( tips      : ExtHeader list  )
+    : OriginState
+    =
+    let mutable state = origState
+    match op with
+    | Main ->
+        for tip in tips do
+            let block =
+                BlockRepository.getFullBlock env.session tip
+            Handler.addBlock env.session env .chainParams block
+            state <- connectTip env op state tip
+        for tip in List.rev tips do
+            let block =
+                BlockRepository.getFullBlock env.session tip
+            Handler.removeBlock env.session env.chainParams block
+    | Fork ->
+        for tip in tips do
+            state <- connectTip env op state tip
+    state
+
+let private getHeaders (env : Env) (origHeader : ExtHeader) (tipHeader : ExtHeader) : ExtHeader list =
+    let rec getHeadersAux (tipHeader : ExtHeader) (headers : ExtHeader list) : ExtHeader list =
+        if tipHeader.header = origHeader.header then
+            headers
+        else
+            let parent = BlockRepository.getHeader env.session tipHeader.header.parent
+
+            getHeadersAux parent (tipHeader :: headers)
+    getHeadersAux tipHeader []
+
 // Connect the entire chain, returning the valid tip along with state
 let private connectChain
     ( env       : Env         )
+    ( op        : Operation   )
     ( origState : OriginState )
     ( tip       : ExtHeader   )
     : OriginState =
     
-    let rec getHeaders (header : ExtHeader) (headers : ExtHeader list) : ExtHeader list =
-        if header.header = origState.header.header then
-            headers
-        else
-            let parent = BlockRepository.getHeader env.session header.header.parent
-
-            getHeaders parent (header :: headers)
+    let headers = getHeaders env origState.header tip
     
-    let headers = getHeaders tip []
-    
-    List.fold (connectTip env) origState headers
-
+    connectTips env op origState headers
+//if the chains is singelton then just add without over checking the different chains
 let connectLongestChain
     ( env          : Env            )
     ( origState    : OriginState    )
     ( chains       : ExtHeader list )
     ( minChainWork : bigint         )
+    ( op           : Operation      )
     : OriginState option =
     
     let connect (bestState : OriginState) (tip : ExtHeader) : OriginState =
         // We are checking twice if current is longer than the bestChain, once before connecting and once after
         if ExtHeader.chainWork tip > ExtHeader.chainWork bestState.header then
             let state =
-                connectChain env origState tip
+                connectChain env op origState tip
             
             if ExtHeader.chainWork state.header > ExtHeader.chainWork bestState.header then
                 state
             else
-                { state with header = bestState.header }
+                bestState
         else
             bestState
     
@@ -138,6 +186,12 @@ let connectLongestChain
         List.fold connect origState chains
     
     if ExtHeader.chainWork bestState.header > minChainWork then
+        match op with
+        | Main ->
+            getHeaders env origState.header bestState.header
+            |> Tally.Handler.addTallyBlockFromHeaders env
+        | Fork ->
+            ()
         Some bestState
     else
         None

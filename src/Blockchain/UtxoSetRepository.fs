@@ -1,12 +1,10 @@
 module Blockchain.UtxoSetRepository
 open Blockchain
 
-open Consensus
 open Consensus.Types
 open Consensus.UtxoSet
 open DataAccess
 open DatabaseContext
-open FStar
 
 let get (session:Session) outpoint =
     match Collection.tryGet session.context.utxoSet session.session outpoint with

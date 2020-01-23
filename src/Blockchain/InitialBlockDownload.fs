@@ -10,7 +10,7 @@ open Logary.Message
 
 let treshhold = 500ul
 
-let LastTickTimeout = 3UL * Second 
+let LastTickTimeout = 3UL * Second
 
 let NoResponseTimeout = 10UL * Second
 

@@ -1,7 +1,6 @@
 module Blockchain.State
 
 open Consensus
-open Types
 
    
 type TipState =

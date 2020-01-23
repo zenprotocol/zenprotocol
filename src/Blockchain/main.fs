@@ -7,8 +7,60 @@ open Infrastructure
 open Messaging.Services.Blockchain
 open Messaging.Events
 open Consensus
+open Consensus.Chain
 open State
 open Logary.Message
+
+[<Literal>]
+let SyncOffset = 10000
+
+[<Literal>]
+let SyncFreq = 4000
+
+let updateTally
+    ( dataPath     : string         )
+    ( chainParams : ChainParameters )
+    ( tip         : Hash.Hash       )
+    : unit =
+        let databaseContext = DatabaseContext.create dataPath
+        
+        use mutable session = DatabaseContext.createSession databaseContext
+        
+        let handleGenesis genesis =
+            genesis
+            |> BlockRepository.getFullBlock session
+            |> Tally.Handler.addBlock session chainParams
+        
+        let startingBlock =
+            match Tally.Repository.VoteTip.tryGet session session.session with
+            | Some tip' ->
+                tip'
+                |> BlockRepository.getHeader session
+            | None ->
+                match BlockRepository.tryGetGenesisHeader session with
+                | Some genesis ->
+                    handleGenesis genesis
+                    genesis
+                | None ->
+                    failwith "There was an error when upgrading your database, please use the wipe flag" 
+
+        let tipHeader =
+            tip
+            |> BlockRepository.getHeader session
+        
+        let headers = Chain.getSubChain session startingBlock tipHeader
+        
+        for i , header in Seq.zip (Seq.initInfinite id) headers do
+            
+            if i >= SyncOffset && (i - SyncOffset) % SyncFreq = 0 then
+                DataAccess.Session.commit session.session
+                session <- DatabaseContext.createSession databaseContext
+            
+            let block =
+                BlockRepository.getFullBlock session header
+                
+            Tally.Handler.addBlock session chainParams block
+            
 
 let main dataPath chainParams busName wipe =
     let dataPath = Platform.combine dataPath "blockchaindb"
@@ -42,9 +94,36 @@ let main dataPath chainParams busName wipe =
                 Handler.tick chainParams)
 
         let databaseContext = DatabaseContext.create dataPath
-
+        
+        use session = DatabaseContext.createSession databaseContext
+        
+        let tip =
+            BlockRepository.tryGetJustTip session
+            |> Option.defaultValue Hash.zero
+        
+        match DataAccess.SingleValue.tryGet databaseContext.dbVersion session.session with
+        | None ->
+            DataAccess.SingleValue.put databaseContext.dbVersion session.session DatabaseContext.DbVersion
+        | Some 0
+        | Some 1 ->
+            eventX "Found an old DbVersion, update in process..."
+            |> Log.warning
+            updateTally dataPath chainParams tip
+        | Some DatabaseContext.DbVersion ->
+            ()
+        | Some version ->
+            failwithf "Blockchain: wrong db version, expected %d but got %d" DatabaseContext.DbVersion version
+        
+        let tallyTip =
+            Tally.Repository.VoteTip.tryGet session session.session
+            |> Option.defaultValue Hash.zero
+            
+        if tallyTip <> tip then
+            updateTally dataPath chainParams tip
+        else
+            ()
+        
         let tip, acs, ema, contractCache, cgp =
-            use session = DatabaseContext.createSession databaseContext
             match BlockRepository.tryGetTip session with
             | Some (tip,ema,cgp) ->
                 eventX "Loading tip from db #{blockNumber} {blockHash}"
@@ -53,6 +132,7 @@ let main dataPath chainParams busName wipe =
                 |> Log.info
 
                 let acs = ActiveContractSetRepository.get session
+                
 
                 tip,
                 acs,

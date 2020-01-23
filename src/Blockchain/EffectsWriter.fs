@@ -1,7 +1,5 @@
 module Blockchain.EffectsWriter
 
-open System.Globalization
-open Consensus
 open Infrastructure.Writer
 open Infrastructure.EventBus
 open Infrastructure.ServiceBus.Client
@@ -73,4 +71,4 @@ let run (Writer (effects, x)) publisher client =
 
     x
 
-let effectsWriter = new WriterBuilder<Effect>()
+let effectsWriter = WriterBuilder<Effect>()

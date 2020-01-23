@@ -1,7 +1,6 @@
 module Blockchain.BlockState
 
 open Consensus
-open Consensus.Types
 
 type T =
     {

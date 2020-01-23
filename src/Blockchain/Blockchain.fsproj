@@ -43,10 +43,14 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="Tally_Types.fs" />
+    <Compile Include="Tally.fs" />
+    <Compile Include="Tally_VoteParser.fs" />
     <Compile Include="BlockState.fs" />
     <Compile Include="ExtendedBlockHeader.fs" />
     <Compile Include="Serialization.fs" />
     <Compile Include="DatabaseContext.fs" />
+    <Compile Include="Tally_Repository.fs" />
     <Compile Include="Environment.fs" />
     <Compile Include="TransactionRepository.fs" />
     <Compile Include="UtxoSetRepository.fs" />
@@ -61,8 +65,9 @@
     <Compile Include="InitialBlockDownload.fs" />
     <Compile Include="State.fs" />
     <Compile Include="TransactionHandler.fs" />
-    <Compile Include="ChainConnection.fs" />
     <Compile Include="Chain.fs" />
+    <Compile Include="Tally_Handler.fs" />
+    <Compile Include="ChainConnection.fs" />
     <Compile Include="BlockHandler.fs" />
     <Compile Include="BlockTemplateBuilder.fs" />
     <Compile Include="Handler.fs" />
@@ -177,6 +182,17 @@
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
       <ItemGroup>
+        <Reference Include="FSharp.Control.AsyncSeq">
+          <HintPath>..\..\packages\FSharp.Control.AsyncSeq\lib\net45\FSharp.Control.AsyncSeq.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
+      <ItemGroup>
         <Reference Include="FSharp.Control.Reactive">
           <HintPath>..\..\packages\FSharp.Control.Reactive\lib\net46\FSharp.Control.Reactive.dll</HintPath>
           <Private>True</Private>
@@ -199,8 +215,30 @@
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
       <ItemGroup>
+        <Reference Include="FSharpx.Async">
+          <HintPath>..\..\packages\FSharpx.Async\lib\net45\FSharpx.Async.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
+      <ItemGroup>
         <Reference Include="FSharpx.Collections">
           <HintPath>..\..\packages\FSharpx.Collections\lib\net40\FSharpx.Collections.dll</HintPath>
+          <Private>True</Private>
+          <Paket>True</Paket>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
+  <Choose>
+    <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
+      <ItemGroup>
+        <Reference Include="FSharpx.Extras">
+          <HintPath>..\..\packages\FSharpx.Extras\lib\net45\FSharpx.Extras.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>

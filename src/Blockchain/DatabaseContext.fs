@@ -1,19 +1,21 @@
 module Blockchain.DatabaseContext
 
-open Blockchain.Serialization
+open Blockchain
 open Blockchain.Serialization
 open DataAccess
 open Consensus
 open Types
 open UtxoSet
 open FStar
-open ContractStates
 open Infrastructure
 open Result
 open Serialization
+open Serialization
+open Blockchain.Tally.Types
+open Logary.Message
 
 [<Literal>]
-let DbVersion = 1
+let DbVersion = 2
 
 type T =
     {
@@ -32,6 +34,14 @@ type T =
         transactionBlocks:MultiCollection<Hash.Hash, Hash.Hash>
         contractPath:string
         dbVersion:SingleValue<int>
+        //TODO move to contract context
+        pkbalance: Collection<Interval, PKBalance>
+        allocationVoters: Collection<Interval, PKAllocation>
+        payoutVoters: Collection<Interval, PKPayout>
+        winner: Collection<Interval, Winner>
+        funds: Collection<Interval, Fund.T>
+        voteUtxo: Collection<Interval, VoteUtxo>
+        voteTip: SingleValue<Hash.Hash>
     }
     interface System.IDisposable with
         member x.Dispose () =
@@ -60,7 +70,36 @@ let createSession context : Session =
         session=session
         context=context
     }
-
+    
+/// Use this for wipe clean the DB and resync from genesis
+let updateVersion (t:T) session =
+    Collection.truncate t.utxoSet session
+    Collection.truncate t.contractStates session
+    Collection.truncate t.activeContractSet session
+    Collection.truncate t.blocks session
+    Collection.truncate t.blockState session
+    Collection.truncate t.blockTransactions session
+    Collection.truncate t.transactions session
+    MultiCollection.truncate t.contractUtxo session
+    MultiCollection.truncate t.transactionBlocks session
+    SingleValue.delete t.tip session
+    SingleValue.put t.dbVersion session DbVersion
+    
+/// Use this if contract version was updated
+let updateVersionClean t session =
+    Platform.cleanDirectory t.contractPath
+    Collection.getAll t.activeContractSet session
+    |> List.iter (fun contractKey ->
+        let (ContractId (_, contractHash)) = contractKey.contractId
+        let moduleName = Contract.getModuleName contractHash
+        
+        Infrastructure.ZFStar.recordHints contractKey.code moduleName
+        <@> (fun hints -> 
+            Infrastructure.ZFStar.compile t.contractPath contractKey.code hints (2723280u * 10u) moduleName
+        )
+        |> Result.mapError (failwithf "could not recompile contract %A due to %A. try using 'wipe'" contractKey.contractId)
+        |> ignore
+    )
 let create dataPath =
     let contractPath = Platform.combine dataPath "contracts"
     let databaseContext = DataAccess.DatabaseContext.create DataAccess.DatabaseContext.Large (Platform.combine dataPath "blockchain")
@@ -125,49 +164,64 @@ let create dataPath =
         SingleValue.create databaseContext "dbVersion"
             Version.serialize
             Version.deserialize
-
-    match SingleValue.tryGet dbVersion session with
-    | None ->
-        SingleValue.put dbVersion session DbVersion
-    | Some 0 ->
-        Platform.cleanDirectory contractPath
-        Collection.getAll activeContractSet session
-        |> List.iter (fun contractKey ->
-            let (ContractId (_, contractHash)) = contractKey.contractId
-            let moduleName = Contract.getModuleName contractHash
+    
+    let pkbalance =
+        Collection.create session "pkbalance" VarInt.serialize
+            PKBalance.serialize
+            PKBalance.deserialize
             
-            Infrastructure.ZFStar.recordHints contractKey.code moduleName
-            <@> (fun hints -> 
-                Infrastructure.ZFStar.compile contractPath contractKey.code hints (2723280u * 10u) moduleName
-            )
-            |> Result.mapError (failwithf "could not recompile contract %A due to %A. try using 'wipe'" contractKey.contractId)
-            |> ignore
-        )
-        SingleValue.put dbVersion session DbVersion
-    | Some DbVersion ->
-        ()
-    | Some version ->
-        failwithf "Blockchain: wrong db version, expected %d but got %d" DbVersion version
+    let allocationVoters =
+        Collection.create session "allocationVoters" VarInt.serialize
+            PKAllocation.serialize
+            PKAllocation.deserialize
+            
+    let payoutVoters =
+        Collection.create session "payoutVoters" VarInt.serialize
+            PKPayout.serialize
+            PKPayout.deserialize
+    let winner =
+         Collection.create session "winners" VarInt.serialize
+             Winner.serialize
+             Winner.deserialize
+    let funds =
+        Collection.create session "funds" VarInt.serialize
+            Fund.serialize
+            Fund.deserialize
+    let voteUtxo =
+        Collection.create session "voteUtxo" VarInt.serialize
+            VoteUtxo.serialize
+            VoteUtxo.deserialize
+
+    let voteTip = SingleValue.create databaseContext "voteTip" Hash.bytes (Hash.Hash >> Some)
+
+    let t = 
+        {
+            databaseContext = databaseContext
+            tip=tip
+            genesis=genesis
+            utxoSet=utxoSet
+            activeContractSet=activeContractSet
+            contractStates=contractStates
+            contractUtxo=contractUtxo
+            blocks=blocks
+            blockChildrenIndex=blockChildrenIndex
+            blockState=blockState
+            blockTransactions=blockTransactions
+            transactions=transactions
+            transactionBlocks = transactionBlocks
+            contractPath=contractPath
+            dbVersion = dbVersion
+            pkbalance = pkbalance
+            allocationVoters = allocationVoters
+            payoutVoters = payoutVoters
+            winner = winner
+            funds = funds
+            voteUtxo = voteUtxo
+            voteTip = voteTip
+        }
 
     Session.commit session
-
-    {
-        databaseContext = databaseContext
-        tip=tip
-        genesis=genesis
-        utxoSet=utxoSet
-        activeContractSet=activeContractSet
-        contractStates=contractStates
-        contractUtxo=contractUtxo
-        blocks=blocks
-        blockChildrenIndex=blockChildrenIndex
-        blockState=blockState
-        blockTransactions=blockTransactions
-        transactions=transactions
-        transactionBlocks = transactionBlocks
-        contractPath=contractPath
-        dbVersion = dbVersion
-    }
+    t
 
 let createEmpty pathToFolder =
     if System.IO.Directory.Exists pathToFolder then

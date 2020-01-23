@@ -26,7 +26,6 @@ module Blockchain =
     }
 
     type Command =
-        | SetCGP of Option<Winner>
         | ValidateTransaction of Types.TransactionExtended
         | RequestMemPool of peerId:byte[]
         | RequestTransactions of peerId:byte[] * txHashes:Hash list
@@ -62,9 +61,6 @@ module Blockchain =
 
     type Response = unit
     
-    let setCGP client winner =
-        Command.send client serviceName (SetCGP winner)
-
     let validateTransaction client tx =
         Command.send client serviceName (ValidateTransaction tx)
 

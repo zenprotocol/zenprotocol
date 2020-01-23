@@ -2,36 +2,29 @@ module Blockchain.Chain
 
 
 open Blockchain
-open Blockchain.ChainConnection
 open Consensus
 open Types
 open Infrastructure
 open Blockchain.EffectsWriter
-open Consensus.Chain
-open Messaging
-open Events
 open State
 open Logary.Message
-open Environment
 
 module ExtHeader = ExtendedBlockHeader
 
 type ExtHeader = ExtHeader.T
 
-
+//need a new name for this
 let updateTip
     ( session   : DatabaseContext.Session )
     ( connState : BlockConnection.State   )
     ( header    : ExtHeader               )
-    : ActiveContractSet.T =
+    : unit =
     BlockRepository.updateTip session header.hash
 
     UtxoSetRepository           .save session connState.utxoSet
     ContractStateRepository     .save session connState.contractStates
     ActiveContractSetRepository .save session connState.acs
     
-    ActiveContractSet.clearChanges connState.acs
-
 
 // Change the status of the entire chain from the root orphan block up to all tips from Orphan to Connected
 let unorphanChain

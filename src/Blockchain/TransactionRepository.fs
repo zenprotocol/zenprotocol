@@ -3,7 +3,6 @@ open Blockchain
 
 open DataAccess
 open DatabaseContext
-open Consensus.Types
 
 let tryGetTransaction (session:Session) txHash = Collection.tryGet session.context.transactions session.session txHash
 

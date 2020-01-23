@@ -1,6 +1,5 @@
 module Blockchain.MemPool
 
-open Blockchain
 open Consensus
 open Consensus.Types
 
