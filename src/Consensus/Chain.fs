@@ -38,7 +38,7 @@ let mainParameters =
         proofOfWorkLimit=Difficulty.uncompress 0x1c1ddec6ul;
         blockInterval=236682UL;
         smoothingFactor=28I;
-        maxBlockWeight=2000_000_000I;
+        maxBlockWeight=8_000_000_000I;
         sacrificePerByteBlock=1UL;
         genesisHashHash=Hash.fromString "eea8718b5edf1f621cd6e495a6b2f0aada2b18f075aa0159d55ee648279b3c5e" |> get;
         genesisTime= new System.DateTime(2018,6,30,17,0,0,System.DateTimeKind.Utc) |> Infrastructure.Timestamp.fromDateTime // 1530378000000UL
@@ -60,7 +60,7 @@ let testParameters =
         proofOfWorkLimit=Difficulty.uncompress 0x1dfffffful;
         blockInterval=236682UL;
         smoothingFactor=28I;
-        maxBlockWeight=1000_000_000I;
+        maxBlockWeight=8_000_000_000I;
         sacrificePerByteBlock=1UL;
         genesisHashHash =
             Hash.fromString "5488069e4be0551a3c886543845c332633731c536853209c2dbe04c035946490"
