@@ -329,8 +329,6 @@ module Handler =
         
         let tipHash = Tally.Repository.VoteTip.tryGet dataAccess dataAccess.session |> Option.defaultValue Hash.zero
         
-        //let tipHash = BlockRepository.tryGetJustTip dataAccess |> Option.defaultValue (Hash.zero)
-        
         match op with
         | Add ->
             if tipHash <> block.header.parent then
@@ -399,12 +397,8 @@ let updateTallyBlockFromHeaders op env headers =
             match op with
             | Add ->
                 addBlock env.session env.chainParams block
-                //Tally.Repository.VoteTip.put env.session env.session.session header.hash
-                //BlockRepository.updateTip env.session header.hash
 
             | Remove ->
-                //Tally.Repository.VoteTip.put env.session env.session.session header.hash
-                //BlockRepository.updateTip env.session header.hash
                 removeBlock env.session env.chainParams block
 
 
