@@ -28,6 +28,10 @@ let ``validateCoibaseRatio coinbase correction cap`` () =
           lowerCoinbaseBound    = CoinbaseRatio 10uy
           lastCoinbaseRatio     = CoinbaseRatio 20uy
           lastFund              = Map.empty
+          nomineesBallots       = Map.empty
+          balances              = Map.empty
+          allocationBallots     = Map.empty
+          payoutBallots         = Map.empty
      }
      
      let vote = 20uy
@@ -74,6 +78,10 @@ let ``validateCoibaseRatio lower coinbase bound`` () =
           lowerCoinbaseBound    = CoinbaseRatio 20uy
           lastCoinbaseRatio     = CoinbaseRatio 22uy
           lastFund              = Map.empty
+          nomineesBallots       = Map.empty
+          balances              = Map.empty
+          allocationBallots     = Map.empty
+          payoutBallots         = Map.empty
      }
      
      let vote = 22uy
@@ -97,6 +105,10 @@ let ``validateCoibaseRatio lower coinbase bound`` () =
           lowerCoinbaseBound    = CoinbaseRatio 5uy
           lastCoinbaseRatio     = CoinbaseRatio 8uy
           lastFund              = Map.empty
+          nomineesBallots       = Map.empty
+          balances              = Map.empty
+          allocationBallots     = Map.empty
+          payoutBallots         = Map.empty
      }
      
      let vote = 8uy
@@ -127,6 +139,10 @@ let ``validateCoibaseRatio upper coinbase bound`` () =
           lowerCoinbaseBound    = CoinbaseRatio 20uy
           lastCoinbaseRatio     = CoinbaseRatio 98uy
           lastFund              = Map.empty
+          nomineesBallots       = Map.empty
+          balances              = Map.empty
+          allocationBallots     = Map.empty
+          payoutBallots         = Map.empty
      }
      
      let vote = 99uy
@@ -150,6 +166,10 @@ let ``validatePayout tests`` () =
           lowerCoinbaseBound    = CoinbaseRatio 10uy
           lastCoinbaseRatio     = CoinbaseRatio 20uy
           lastFund              = Map.empty
+          nomineesBallots       = Map.empty
+          balances              = Map.empty
+          allocationBallots     = Map.empty
+          payoutBallots         = Map.empty
      }
      
      let vote = (someone, [])
@@ -181,10 +201,10 @@ let ``validatePayout tests`` () =
      |> ``should be`` None
      
      let env = { env with lastFund =
-          Map.empty
-          |> Map.add Asset.Zen 2UL
-          |> Map.add asset0 5UL
-          }
+                              Map.empty
+                              |> Map.add Asset.Zen 2UL
+                              |> Map.add asset0 5UL
+                              }
      
      let vote = (someone, [{asset=Asset.Zen; amount=1UL}])
      validatePayout env vote
@@ -286,17 +306,15 @@ let ``validate Tally`` () =
           lowerCoinbaseBound    = CoinbaseRatio 10uy
           lastCoinbaseRatio     = CoinbaseRatio 100uy
           lastFund              =
-               List.fold (fun map n -> Map.add assets 500UL map) Map.empty [1..100] 
+               List.fold (fun map n -> Map.add assets 500UL map) Map.empty [1..100]
+          nomineesBallots       = Map.empty
+          balances              = Map.add (genPkHash) 50UL Map.empty
+          allocationBallots     = Map.add (genPk ) 1uy Map.empty
+          payoutBallots         =
+               Map.add (genPk) (PKRecipient (genPk |> PublicKey.hash), [1] |> List.map (fun n -> {asset=assets; amount=1UL *(uint64 n)})) Map.empty
      }
      
-     let balances =
-          Map.add (genPkHash) 50UL Map.empty
-     let allocationBallots =
-          Map.add (genPk ) 1uy Map.empty
-     let payoutBallots =
-          Map.add (genPk) (PKRecipient (genPk |> PublicKey.hash), [1] |> List.map (fun n -> {asset=assets; amount=1UL *(uint64 n)})) Map.empty
-     
-     let tally = createTally env (balances : Map<PKHash, uint64>) (allocationBallots : Map<PK, allocation>) (payoutBallots : Map<PK, payout>)
+     let tally = createTally env
      
      let winner:Option<Winner> = Some {payout = Some (PKRecipient (genPk |> PublicKey.hash),[{asset=assets; amount=1UL}]); allocation = Some 1uy}
      

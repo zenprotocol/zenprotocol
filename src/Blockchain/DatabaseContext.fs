@@ -38,6 +38,7 @@ type T =
         pkbalance: Collection<Interval, PKBalance>
         allocationVoters: Collection<Interval, PKAllocation>
         payoutVoters: Collection<Interval, PKPayout>
+        nomineesVoters: Collection<Interval,PKPayout>
         winner: Collection<Interval, Winner>
         funds: Collection<Interval, Fund.T>
         voteUtxo: Collection<Interval, VoteUtxo>
@@ -179,6 +180,12 @@ let create dataPath =
         Collection.create session "payoutVoters" VarInt.serialize
             PKPayout.serialize
             PKPayout.deserialize
+            
+    let nomineesVoters =
+        Collection.create session "nomineesVoters" VarInt.serialize
+            PKPayout.serialize
+            PKPayout.deserialize
+    
     let winner =
          Collection.create session "winners" VarInt.serialize
              Winner.serialize
@@ -192,8 +199,10 @@ let create dataPath =
             VoteUtxo.serialize
             VoteUtxo.deserialize
 
-    let voteTip = SingleValue.create databaseContext "voteTip" Hash.bytes (Hash.Hash >> Some)
-
+    let voteTip =
+        SingleValue.create databaseContext "voteTip" Hash.bytes
+            (Hash.Hash >> Some)
+    
     let t = 
         {
             databaseContext = databaseContext
@@ -214,6 +223,7 @@ let create dataPath =
             pkbalance = pkbalance
             allocationVoters = allocationVoters
             payoutVoters = payoutVoters
+            nomineesVoters = nomineesVoters
             winner = winner
             funds = funds
             voteUtxo = voteUtxo

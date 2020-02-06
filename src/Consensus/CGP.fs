@@ -34,6 +34,9 @@ let getSnapshotBlock chainParams interval =
 let isPayoutBlock chainParams blockNumber =
     blockNumber % chainParams.intervalLength = chainParams.coinbaseMaturity
 
+let endOfNominationBlock chainParams interval =
+    getSnapshotBlock chainParams interval + chainParams.nomination
+
 let getLastIntervalBlock (chainParams : ChainParameters) (interval : uint32) : uint32 =
     chainParams.intervalLength * interval
 

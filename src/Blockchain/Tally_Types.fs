@@ -22,4 +22,6 @@ type Payout = Recipient * Spend list
 type PKAllocation= Map<PublicKey,Allocation>
 type PKPayout = Map<PublicKey,Payout>
 
+type NomineesBalance = Map<Payout,uint64>
+
 type VoteUtxo = Map<Outpoint,OutputStatus>

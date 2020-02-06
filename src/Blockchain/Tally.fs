@@ -10,6 +10,9 @@ open Consensus.Crypto
 open Consensus.Serialization.Serialization
 open Infrastructure.Functional
 
+[<Literal>]
+let Quorum = 100_000_000_000_000UL
+
 type allocation = byte
 
 type payout = Recipient * Spend list
@@ -33,6 +36,10 @@ type Env =
         lowerCoinbaseBound    : CoinbaseRatio
         lastCoinbaseRatio     : CoinbaseRatio
         lastFund              : Fund.T
+        nomineesBallots       : Map<PK, payout>
+        balances              : Map<PKHash, uint64>
+        allocationBallots     : Map<PK, allocation>
+        payoutBallots         : Map<PK, payout>
     }
 
 let empty : T =
@@ -203,14 +210,20 @@ let aggregateAssets spends =
     |> Map.toList
     |> List.map (fun (asset, amount) -> { asset = asset ; amount = amount })
 
-let createTally (env : Env) (balances : Map<PKHash, uint64>) (allocationBallots : Map<PK, allocation>) (payoutBallots : Map<PK, payout>) : T =
+let createTally (env : Env) : T =
     
     // Ensures that no payout contains multiple spends of the same asset
     let uniquePayoutBallots =
-        Map.map (konst <| secondMap aggregateAssets) payoutBallots
+        Map.map (konst <| secondMap aggregateAssets) env.payoutBallots
     
-    let allocationVotes = integrateBallots balances allocationBallots
-    let payoutVotes     = integrateBallots balances uniquePayoutBallots
+    // Ensures that no nominees contains multiple spends of the same asset
+    let uniqueNomineesBallots =
+        Map.map (konst <| secondMap aggregateAssets) env.nomineesBallots
+    
+    let allocationVotes = integrateBallots env.balances env.allocationBallots
+    let payoutVotes     = integrateBallots env.balances uniquePayoutBallots
+    let nominieeVotes   = integrateBallots env.balances uniqueNomineesBallots
+    
     
     mergeBallots env allocationVotes payoutVotes
 

@@ -26,6 +26,7 @@ type ChainParameters =
         coinbaseMaturity:uint32
         intervalLength:uint32
         snapshot:uint32
+        nomination:uint32
         allocationCorrectionCap:byte
         cgpContractId:ContractId
         votingContractId:ContractId
@@ -47,6 +48,7 @@ let mainParameters =
         versionExpiry= new System.DateTime(2020,4,15,0,0,0,System.DateTimeKind.Utc) |> Infrastructure.Timestamp.fromDateTime
         intervalLength=10000ul
         snapshot=9000ul
+        nomination=500ul
         allocationCorrectionCap=15uy
         coinbaseMaturity=100ul
         cgpContractId= Option.get <| ContractId.fromString "00000000e2e56687e040718fa75210195a2ecbed6d5b2f9d53431b8ce3cba57588191b6a"
@@ -72,6 +74,7 @@ let testParameters =
         versionExpiry= new System.DateTime(2200,1,1,0,0,0,System.DateTimeKind.Utc) |> Infrastructure.Timestamp.fromDateTime
         intervalLength=100ul
         snapshot=90ul
+        nomination=50ul
         allocationCorrectionCap=15uy
         coinbaseMaturity=10ul
         cgpContractId=Option.get <| ContractId.fromString "00000000eac6c58bed912ff310df9f6960e8ed5c28aac83b8a98964224bab1e06c779b93"
