@@ -390,3 +390,16 @@ module Winner =
 
     let serialize = serialize size write
     let deserialize = deserialize read
+    
+module Nominees =
+    let size : Payout list -> int =
+        List.size Payout.size
+    
+    let write stream =
+        List.write Payout.write stream
+        
+    let read stream : Payout list =
+        List.read Payout.read stream
+        
+    let serialize = serialize size write
+    let deserialize = deserialize read

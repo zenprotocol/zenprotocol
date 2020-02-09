@@ -39,6 +39,7 @@ type T =
         allocationVoters: Collection<Interval, PKAllocation>
         payoutVoters: Collection<Interval, PKPayout>
         nomineesVoters: Collection<Interval,PKPayout>
+        nomineesWinner: Collection<Interval, Nominees>
         winner: Collection<Interval, Winner>
         funds: Collection<Interval, Fund.T>
         voteUtxo: Collection<Interval, VoteUtxo>
@@ -185,6 +186,11 @@ let create dataPath =
         Collection.create session "nomineesVoters" VarInt.serialize
             PKPayout.serialize
             PKPayout.deserialize
+            
+    let nomineesWinner =
+        Collection.create session "nomineesWinner" VarInt.serialize
+            Nominees.serialize
+            Nominees.deserialize
     
     let winner =
          Collection.create session "winners" VarInt.serialize
@@ -224,6 +230,7 @@ let create dataPath =
             allocationVoters = allocationVoters
             payoutVoters = payoutVoters
             nomineesVoters = nomineesVoters
+            nomineesWinner = nomineesWinner
             winner = winner
             funds = funds
             voteUtxo = voteUtxo
