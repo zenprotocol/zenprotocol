@@ -1,6 +1,7 @@
 module Tally.Tests.TallyTests
 
 open Blockchain.Tally.Tally
+open Blockchain.Tally.Voting
 open Consensus.Types
 open Consensus
 open Crypto

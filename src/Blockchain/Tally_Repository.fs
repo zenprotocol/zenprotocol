@@ -49,7 +49,7 @@ module PKPayout =
 
     let contains (session : Session) = Collection.containsKey session.context.payoutVoters
 
-module Nominees =
+module PKNominee =
     let get (session : Session) = Collection.get session.context.nomineesVoters
 
     let tryGet (session : Session) = Collection.tryGet session.context.nomineesVoters
@@ -59,6 +59,18 @@ module Nominees =
     let truncate (session : Session) = Collection.truncate session.context.nomineesVoters
 
     let contains (session : Session) = Collection.containsKey session.context.nomineesVoters
+
+module Nominees =
+    let get (session : Session) = Collection.get session.context.nomineesWinner
+
+    let tryGet (session : Session) = Collection.tryGet session.context.nomineesWinner
+    let put (session : Session) = Collection.put session.context.nomineesWinner
+
+    let delete (session : Session) = Collection.delete session.context.nomineesWinner
+    let truncate (session : Session) = Collection.truncate session.context.nomineesWinner
+
+    let contains (session : Session) = Collection.containsKey session.context.nomineesWinner
+
 
 module Fund =
     let get (session : Session) = Collection.get session.context.funds

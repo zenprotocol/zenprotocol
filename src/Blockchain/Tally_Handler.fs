@@ -25,16 +25,7 @@ module DA =
             : Fund.T =
             Fund.tryGet dataAccess dataAccess.session interval
             |> Option.defaultValue Map.empty
-            
-    module Nominees =
-        
-        let get 
-            ( dataAccess: DatabaseContext.Session )
-            ( interval  : Interval )
-            : PKPayout =
-            Nominees.tryGet dataAccess dataAccess.session interval
-            |> Option.defaultValue Map.empty
-
+    
     module PKBalance =
         
         let get 
@@ -42,6 +33,15 @@ module DA =
             ( interval  : Interval )
             : PKBalance =
             PKBalance.tryGet dataAccess dataAccess.session interval
+            |> Option.defaultValue Map.empty
+            
+    module PKNominee =
+        
+        let get 
+            ( dataAccess: DatabaseContext.Session )
+            ( interval  : Interval )
+            : PKPayout =
+            PKNominee.tryGet dataAccess dataAccess.session interval
             |> Option.defaultValue Map.empty
 
     module PKAllocation =
@@ -62,20 +62,18 @@ module DA =
             PKPayout.tryGet dataAccess dataAccess.session interval
             |> Option.defaultValue Map.empty
 
-
-    
     module Tally =
         
-        let get dataAccess chainParams interval lastAllocation =
+        let get dataAccess (chainParams : ChainParameters) interval lastAllocation =
             
             let lastFund =
                 Fund.get dataAccess interval
-                
-            let nomineesBallots =
-                Nominees.get dataAccess interval
-
+            
             let balances =
                 PKBalance.get dataAccess interval
+            
+            let nomineesBallots =
+                PKNominee.get dataAccess interval
             
             let allocationBallots =
                 PKAllocation.get dataAccess interval
@@ -85,6 +83,8 @@ module DA =
             
             let env : Tally.Env =
                 {
+                    cgpContractId         = chainParams.cgpContractId
+                    nominationThreshold   = chainParams.payoutNominationThreshold
                     coinbaseCorrectionCap = Tally.allocationToCoinbaseRatio chainParams.allocationCorrectionCap
                     lowerCoinbaseBound    = Tally.allocationToCoinbaseRatio chainParams.upperAllocationBound
                     lastCoinbaseRatio     = Tally.allocationToCoinbaseRatio lastAllocation
@@ -95,7 +95,7 @@ module DA =
                     payoutBallots         = payoutBallots
                 }
             
-            Tally.createTally env
+            Voting.createTally env
             
 let getWinner
     ( dataAccess: DatabaseContext.Session )
@@ -250,6 +250,40 @@ module Handler =
             |> List.choose (uncurry <| VoteParser.parseMessageBody chainParams blockNumber)
             |> List.iter (uncurry <| setBallot op dataAccess interval)
     
+    module PKNominee =
+        
+        let private setNomine op dataAccess interval =
+            set op
+                (PKNominee.tryGet dataAccess dataAccess.session interval
+                 |> Option.defaultValue Map.empty)
+                (PKNominee.put dataAccess dataAccess.session interval)
+        
+        let private setNominees op dataAccess interval : Ballot -> Crypto.PublicKey list -> unit =
+            function
+            | Ballot.Payout (recipient, spends) ->
+                setNomine op dataAccess interval (recipient,spends)
+            | _ ->
+                konst ()
+        
+        let update op dataAccess interval chainParams block =
+            
+            lazy
+            
+            let blockNumber = block.header.blockNumber
+            block.transactions
+            |> List.concatMap (fun ex -> ex.tx.witnesses)
+            |> List.choose (votingWitnesses chainParams)
+            |> List.choose (uncurry <| VoteParser.parseMessageBody chainParams blockNumber)
+            |> List.iter (uncurry <| setNominees op dataAccess interval)
+    
+    module Nominees =
+        
+        let update op dataAccess interval chainParams block =
+            
+            lazy
+                
+            ()
+    
     module VoteUtxo =
         
         let private addBlock
@@ -340,7 +374,7 @@ module Handler =
             | Add ->
                 let lastAllocation = getFirstAllocation dataAccess interval
                 let tally = DA.Tally.get dataAccess chainParams (interval - 1u) lastAllocation
-                let winner = Tally.getWinner tally 
+                let winner = Voting.getWinner tally 
                 
                 let withLastAllocation winner =
                     { winner with allocation = Some <| Option.defaultValue lastAllocation winner.allocation }
@@ -354,32 +388,6 @@ module Handler =
                 {allocation= None; payout= None}
                 |> Winner.put dataAccess dataAccess.session interval
     
-    module Nominees =
-        
-        let private setNomine op dataAccess interval =
-            set op
-                (Nominees.tryGet dataAccess dataAccess.session interval
-                 |> Option.defaultValue Map.empty)
-                (Nominees.put dataAccess dataAccess.session interval)
-        
-        let private setNominees op dataAccess interval : Ballot -> Crypto.PublicKey list -> unit =
-            function
-            | Ballot.Payout (recipient, spends) ->
-                setNomine op dataAccess interval (recipient,spends)
-            | _ ->
-                konst ()
-        
-        let update op dataAccess interval chainParams block =
-            
-            lazy
-            
-            let blockNumber = block.header.blockNumber
-            block.transactions
-            |> List.concatMap (fun ex -> ex.tx.witnesses)
-            |> List.choose (votingWitnesses chainParams)
-            |> List.choose (uncurry <| VoteParser.parseMessageBody chainParams blockNumber)
-            |> List.iter (uncurry <| setNominees op dataAccess interval)
-
     
     let log op chainParams block =
         let operation = match op with | Add -> "adding" |Remove -> "removing"
@@ -424,7 +432,7 @@ module Handler =
                 then yield PKBalance .update op dataAccess interval chainParams
                      yield Fund      .update op dataAccess interval chainParams
             if snapshot < blockNumber && blockNumber <= endOfNomination
-                then yield Nominees  .update op dataAccess interval chainParams block
+                then yield PKNominee .update op dataAccess interval chainParams block
             if endOfNomination < blockNumber && blockNumber <= endOfInterval
                 then yield PKBallot  .update op dataAccess interval chainParams block
             if true 
