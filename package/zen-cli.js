@@ -15,7 +15,8 @@ function start(args) {
     if (process.platform !== "win32") {
         args.unshift(nodePath);
         node = proc.spawn('mono', args, {
-            cwd: workingDirectory
+            cwd: workingDirectory,
+            stdio: ['inherit', process.stdout, process.stderr]
         });
     }
     else {
@@ -29,8 +30,6 @@ function start(args) {
 
 const node = start(process.argv.slice(2));
 
-node.stdout.pipe(process.stdout);
-node.stderr.pipe(process.stderr);
 
 node.on('exit', function (code) {
     process.exit(code);
