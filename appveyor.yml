@@ -52,5 +52,5 @@ deploy:
   - provider: NuGet
     server: https://www.myget.org/F/zenprotocol/api/v2/package
     api_key:
-      secure: NXHrOCrqi+xkgZZs3a1JbDUlpuGYj875BECy0JbevbzpjIsmvvRd+iL0nTBfxPQK
+      secure: tyLfoWjP8lgJNO8kBD1NQX4twHj/GVSwTUm/GG2yVAM3Ir3F3d7jzFEThgeFE96e
     skip_symbols: true
