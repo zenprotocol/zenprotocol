@@ -1,9 +1,14 @@
 module Consensus.Chain
 open Consensus.Types
+open FSharp.Compatibility.OCaml
 open Infrastructure
 open Infrastructure.Result
 
+[<Literal>]
 let ContractSacrificePerBytePerBlock = 1UL
+
+[<Literal>]
+let PeriodSize = 800_000ul
 
 type Chain =
     | Main
@@ -31,7 +36,8 @@ type ChainParameters =
         cgpContractId:ContractId
         votingContractId:ContractId
         upperAllocationBound: byte
-        payoutNominationThreshold: uint64
+        thresholdFactor: uint64
+        genesisTotal: uint64
     }
 
 let mainParameters =
@@ -55,7 +61,8 @@ let mainParameters =
         cgpContractId= Option.get <| ContractId.fromString "00000000e2e56687e040718fa75210195a2ecbed6d5b2f9d53431b8ce3cba57588191b6a"
         votingContractId= Option.get <| ContractId.fromString "00000000abbf8805a203197e4ad548e4eaa2b16f683c013e31d316f387ecf7adc65b3fb2"
         upperAllocationBound=90uy
-        payoutNominationThreshold= 100_000_000_000_000UL
+        thresholdFactor=3UL / 100UL
+        genesisTotal=20_000_000UL * 100_000_000UL
     }
 
 let testParameters =
@@ -82,7 +89,8 @@ let testParameters =
         cgpContractId=Option.get <| ContractId.fromString "00000000eac6c58bed912ff310df9f6960e8ed5c28aac83b8a98964224bab1e06c779b93"
         votingContractId= Option.get <| ContractId.fromString "00000000e89738718a802a7d217941882efe8e585e20b20901391bc37af25fac2f22c8ab" 
         upperAllocationBound=90uy
-        payoutNominationThreshold= 100_000_000_000_000UL
+        thresholdFactor= 3UL / 100UL
+        genesisTotal=1UL
     }
 
 let localGenesisHash = Hash.fromString "6d678ab961c8b47046da8d19c0de5be07eb0fe1e1e82ad9a5b32145b5d4811c7" |> get
@@ -98,6 +106,7 @@ let localParameters = {
         genesisTime=1515594186383UL
         networkId=1002ul
         versionExpiry=System.UInt64.MaxValue
+        thresholdFactor= 1UL / 500UL 
 }
 
 let getChainParameters = function
@@ -105,17 +114,51 @@ let getChainParameters = function
     | Test -> testParameters
     | Local -> localParameters
 
-let private getPeriod blockNumber =
-    blockNumber / 800_000ul
-    |> int
+let getPeriod blockNumber =
+    if blockNumber < 2ul then 0ul
+     else (blockNumber - 2ul) / 800_000ul
 
-let private initialBlockReward = 50UL * 100_000_000UL
+let getBlockInPeriod blockNumber =
+    if blockNumber < 2ul then 0ul
+    else (blockNumber - 2ul) % 800_000ul
+
+let initialBlockReward = 50UL * 100_000_000UL
 
 let blockReward blockNumber (allocationPortion : byte) =
     let allocation = 100UL - uint64 allocationPortion
     
     let initial = (initialBlockReward * allocation) / 100UL
-    initial >>> getPeriod blockNumber
+    initial >>> int (getPeriod blockNumber)
+
+let blockTotalReward blockNumber =
+    initialBlockReward >>> int (getPeriod blockNumber)
 
 let blockAllocation (blockNumber:uint32) allocationPortion =
-    (uint64 initialBlockReward >>> getPeriod blockNumber) - (blockReward blockNumber allocationPortion)
+    (blockTotalReward blockNumber) - (blockReward blockNumber allocationPortion)    
+
+let getCurrentZPIssuance chainParams (blockNumber:uint32) =
+    if blockNumber < 2ul then
+        chainParams.genesisTotal
+    else
+        let period = getPeriod blockNumber
+        if period = 0ul then
+            chainParams.genesisTotal + initialBlockReward * uint64 (blockNumber - 1ul)
+        else
+            let sumOfKalapasPerPeriod =
+                if period < 10ul then
+                    //    Up to period 10 we can simplify the sum
+                    (initialBlockReward <<< 1) - (initialBlockReward >>> (int period - 1))
+                else
+                    //    From period 10 onwards the simplification doesn't work
+                    //    because it assumes fractions of Kalapas
+                    let first9Periods =
+                        (initialBlockReward <<< 1) - (initialBlockReward >>> 8)
+                    let period10onwards =
+                        seq { for k in 9 .. (int period - 1) do yield initialBlockReward >>> k }
+                        |> Seq.sum
+                    first9Periods + period10onwards
+            let pastPeriods =
+                uint64 PeriodSize * sumOfKalapasPerPeriod
+            let currentPeriod =
+                uint64 (getBlockInPeriod blockNumber + 1ul) * (initialBlockReward >>> int period)
+            chainParams.genesisTotal + pastPeriods + currentPeriod

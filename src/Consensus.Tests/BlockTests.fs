@@ -22,6 +22,19 @@ let difficulty = 0x20fffffful
 
 let chain = getChainParameters Chain.Local
 
+    
+    
+[<Property>]
+let ``should compute same number`` (period : uint32) (bn:uint32) =
+    let blockNumber = 800_000ul * period + bn
+    
+    
+    let oldImplementation chainParams (blockNumber:uint32) =
+        [2ul..blockNumber]
+        |> List.fold (fun sum blockNumber -> sum + blockTotalReward blockNumber) chainParams.genesisTotal
+    
+    Chain.getCurrentZPIssuance chain blockNumber = oldImplementation chain blockNumber
+
 let contractsPath = System.IO.Path.Combine
                         [| System.IO.Path.GetTempPath(); System.IO.Path.GetRandomFileName() |]
 
