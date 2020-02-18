@@ -19,24 +19,36 @@ type Env =
         balances        : Map<PKHash, uint64>
     }
 
-
 let private (>>=) = FSharpx.Option.(>>=)
 
 let private (|@>) x f = Option.map f x
 
-let isUnique (ls : List<'a>) : bool =
-    let rec onSorted : List<'a> -> bool =
-        function
-        | [] ->
-            true
-        | (_ :: []) ->
-            true
-        | (x :: y :: xs) ->
-            x <> y && onSorted (y :: xs)
-    
-    ls
-    |> List.sort
-    |> onSorted
+let rec isSortedBy (f : 'a -> 'key) (ls : 'a list) : bool =
+    match ls with
+    | [] ->
+        true
+    | [_] ->
+        true
+    | x :: y :: xs ->
+        // this is tail recursive assuming the `&&` operator is lazy.
+        f x <= f y && isSortedBy f (y :: xs)
+
+/// WARNING: has a precondition that the input list `ls` is sorted!!!
+/// (we intentionally don't sort it so the responsibility of sorting will be on the user)
+/// TODO: refactor this to enforce precondition by using encapsulation and smart constructors.
+#if DEBUG
+let rec sortedIsUnique_SEE_WARNING : 'a list -> bool =
+#else
+let rec private sortedIsUnique_SEE_WARNING : 'a list -> bool =
+#endif
+    function
+    | [] ->
+        true
+    | (_ :: []) ->
+        true
+    | (x :: y :: xs) ->
+        // this is tail recursive assuming the `&&` operator is lazy.
+        x <> y && sortedIsUnique_SEE_WARNING (y :: xs)
 
 let validatePayoutNominee (env : Env) ((_, spends) as vote : payout) : Option<payout> =
     
@@ -69,13 +81,17 @@ let validatePayoutNominee (env : Env) ((_, spends) as vote : payout) : Option<pa
         let len = List.length spends
         check (1 <= len && len <= 100)
     
+    let checkSorted : Check =
+        check (isSortedBy (fun spend -> spend.asset) spends)
+    
     let checkUniqueness : Check =
-        check (isUnique spends)
+        check (sortedIsUnique_SEE_WARNING spends)
     
     Some ()
     *> checkNonZeros
     *> checkSpendableFunds
     *> checkSize
+    *> checkSorted
     *> checkUniqueness
     |<- vote
 

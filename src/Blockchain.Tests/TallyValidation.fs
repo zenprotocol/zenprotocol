@@ -405,13 +405,20 @@ let ``weighted median never fails`` (votes : List<byte * uint64>) =
      weightedMedianTest votes |> ignore
 
 [<Property>]
+let ``isSortedBy validates sorted lists`` (xs : int list) =
+     isSortedBy id (List.sort xs)
+
+[<Property>]
+let ``isSortedBy invalidates unsorted lists`` (xs : int list) =
+     xs = List.sort xs
+     || not (isSortedBy id xs)
+
+[<Property>]
 let ``isUnique validates unique lists`` (xs : int list) =
-     isUnique (List.distinct xs)
+     sortedIsUnique_SEE_WARNING (List.distinct <| List.sort xs)
 
 [<Property>]
 let ``isUnique invalidates non-unique lists`` (x : int) (xs : int list) (ys : int list) (zs : int list) =
-     not (isUnique (xs @ [x] @ ys @ [x] @ zs))
-
-
+     not (sortedIsUnique_SEE_WARNING <| List.sort (xs @ [x] @ ys @ [x] @ zs))
 
 #endif
