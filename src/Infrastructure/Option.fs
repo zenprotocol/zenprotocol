@@ -28,7 +28,32 @@ let ofResult =
 let ofBool b =
     if b then Some () else None
 
+let toBool o =
+    match o with | Some _ -> true | None -> false
+
 let validateWith (predicate : 'b -> bool) (x : 'b) : Option<'b> =
     predicate x
     |> ofBool
     |> Option.map (fun _ -> x)
+
+
+module OptionBool =
+    
+    type OptionBool = Option<unit>
+    
+    let force (x : Lazy<'a>) : 'a = x.Force()
+    
+    let ifThenElse (if' : Option<'b>) (then' : Lazy<'a>) (else' : Lazy<'a>) : Lazy<'a> =
+        FSharpx.Option.option else' (fun _ -> then') if'
+    
+    let (&&->) (x : Lazy<Option<'a>>) (y : Lazy<Option<'a>>) : Lazy<Option<'a>> =
+        ifThenElse (x.Force()) y x
+    
+    let (<-&&) (x : Lazy<Option<'a>>) (y : Lazy<Option<'a>>) : Lazy<Option<'a>> =
+        ifThenElse (y.Force()) x y
+    
+    let (||->) (x : Lazy<Option<'a>>) (y : Lazy<Option<'a>>) : Lazy<Option<'a>> =
+        ifThenElse (x.Force()) x y
+    
+    let (<-||) (x : Lazy<Option<'a>>) (y : Lazy<Option<'a>>) : Lazy<Option<'a>> =
+        ifThenElse (y.Force()) y x

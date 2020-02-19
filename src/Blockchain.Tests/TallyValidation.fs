@@ -2,16 +2,13 @@ module Tally.Tests.TallyTests
 
 open Blockchain.Tally.Tally
 open Blockchain.Tally.Voting
-open Blockchain.Tally.Nomination
 open Consensus.Types
 open Consensus
-open Consensus
 open Consensus.Tests
-open Consensus.Tests
-open Crypto
 open NUnit.Framework
 open FsCheck
 open FsCheck.NUnit
+open Infrastructure
 
 let someone = PKRecipient Hash.zero
 let cgpContract = ContractRecipient BlockCGPTests.cgpContractId
@@ -406,19 +403,21 @@ let ``weighted median never fails`` (votes : List<byte * uint64>) =
 
 [<Property>]
 let ``isSortedBy validates sorted lists`` (xs : int list) =
-     isSortedBy id (List.sort xs)
+     List.Sorted.isSortedBy id (List.sort xs)
+     |> Option.toBool
 
 [<Property>]
 let ``isSortedBy invalidates unsorted lists`` (xs : int list) =
      xs = List.sort xs
-     || not (isSortedBy id xs)
+     || not (List.Sorted.isSortedBy id xs |> Option.toBool)
 
 [<Property>]
 let ``isUnique validates unique lists`` (xs : int list) =
-     sortedIsUnique_SEE_WARNING (List.distinct <| List.sort xs)
+     List.Sorted.Distinct.isDistinct (xs |> List.Sorted.sort |> List.Sorted.Distinct.distinct).sorted
+     |> Option.toBool
 
 [<Property>]
 let ``isUnique invalidates non-unique lists`` (x : int) (xs : int list) (ys : int list) (zs : int list) =
-     not (sortedIsUnique_SEE_WARNING <| List.sort (xs @ [x] @ ys @ [x] @ zs))
+     not ((xs @ [x] @ ys @ [x] @ zs) |> List.Sorted.sort |> List.Sorted.Distinct.isDistinct |> Option.toBool)
 
 #endif

@@ -1,13 +1,13 @@
 module Blockchain.Tally.Nomination
 
-open System
 open Consensus
 open Types
 open Checked
-open Consensus.Crypto
 open Consensus.Serialization.Serialization
-open Infrastructure.Functional
+open Infrastructure
 open Blockchain.Tally.Tally
+
+type Sorted<'a> = List.Sorted.Sorted<'a>
 
 /// Nomination Environment
 type Env =
@@ -22,33 +22,6 @@ type Env =
 let private (>>=) = FSharpx.Option.(>>=)
 
 let private (|@>) x f = Option.map f x
-
-let rec isSortedBy (f : 'a -> 'key) (ls : 'a list) : bool =
-    match ls with
-    | [] ->
-        true
-    | [_] ->
-        true
-    | x :: y :: xs ->
-        // this is tail recursive assuming the `&&` operator is lazy.
-        f x <= f y && isSortedBy f (y :: xs)
-
-/// WARNING: has a precondition that the input list `ls` is sorted!!!
-/// (we intentionally don't sort it so the responsibility of sorting will be on the user)
-/// TODO: refactor this to enforce precondition by using encapsulation and smart constructors.
-#if DEBUG
-let rec sortedIsUnique_SEE_WARNING : 'a list -> bool =
-#else
-let rec private sortedIsUnique_SEE_WARNING : 'a list -> bool =
-#endif
-    function
-    | [] ->
-        true
-    | (_ :: []) ->
-        true
-    | (x :: y :: xs) ->
-        // this is tail recursive assuming the `&&` operator is lazy.
-        x <> y && sortedIsUnique_SEE_WARNING (y :: xs)
 
 let validatePayoutNominee (env : Env) ((_, spends) as vote : payout) : Option<payout> =
     
@@ -81,18 +54,19 @@ let validatePayoutNominee (env : Env) ((_, spends) as vote : payout) : Option<pa
         let len = List.length spends
         check (1 <= len && len <= 100)
     
-    let checkSorted : Check =
-        check (isSortedBy (fun spend -> spend.asset) spends)
+    let checkSorted : Option<Sorted<Spend>> =
+        (List.Sorted.isSortedBy (fun spend -> spend.asset) spends)
     
-    let checkUniqueness : Check =
-        check (sortedIsUnique_SEE_WARNING spends)
+    let checkUniqueness : Sorted<Spend> -> Check =
+        List.Sorted.Distinct.isDistinct
+        >> ignoreResult
     
     Some ()
     *> checkNonZeros
     *> checkSpendableFunds
     *> checkSize
     *> checkSorted
-    *> checkUniqueness
+    >>= checkUniqueness
     |<- vote
 
 let addVote (env : Env) (tally:Map<payout, uint64>) (vote:payout) amount : Map<payout, uint64> =
