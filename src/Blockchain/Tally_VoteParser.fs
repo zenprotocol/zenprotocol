@@ -89,7 +89,7 @@ let parseBallot (command : string) (encBallot : Prims.string) : Ballot option = 
     match! S.Ballot.deserialize serBallot with
     | Allocation allocation      when command = "Allocation" ->
         return Allocation allocation
-    | Payout (recipient, spends) when command = "Payout"     ->
+    | Payout (recipient, spends) when command = "Payout" || command = "Nomination" ->
         return Payout (recipient, spends)
     | _ ->
         return! None
