@@ -18,6 +18,7 @@ open Api.Helpers
 open FSharp.Data
 open FsBech32
 open Hash
+open Messaging.Services
 open Wallet
 
 [<Literal>]
@@ -768,8 +769,17 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
         |> JsonValue.Number
         |> JsonContent
         |> reply StatusCode.OK
-    | Get("/blockchain/candidates",_) ->
-        Blockchain.getCandidates client
+    | Get("/blockchain/candidates", query) ->
+        let tipInterval =
+            Blockchain.getTip client
+            |> Option.map (fun (_,h)-> h.blockNumber)
+            |> Option.defaultValue 0ul
+            |> CGP.getInterval ((Chain.getChainParameters chain))
+        let interval =
+            Map.tryFind "interval" query
+            |> Option.map (fun x -> uint32 x)
+            |> Option.defaultValue tipInterval
+        Blockchain.getCandidates client interval
         |> List.map (payoutEncoder chain)
         |> List.toArray
         |> JsonValue.Array

@@ -55,7 +55,7 @@ module Blockchain =
         | GetTransaction of Hash
         | CheckTransaction of TransactionExtended
         | GetTotalZP
-        | GetCandidates
+        | GetCandidates of uint32
         | GetBlockReward of uint32
         | GetCGP
         | GetCgpHistory
@@ -161,8 +161,8 @@ module Blockchain =
         GetTotalZP
         |> Request.send<Request, uint64> client serviceName
         
-    let getCandidates client =
-        GetCandidates
+    let getCandidates client interval =
+        GetCandidates interval
         |> Request.send<Request, List<Recipient * Spend list>> client serviceName
 
     let getBlockReward client blockNumber =

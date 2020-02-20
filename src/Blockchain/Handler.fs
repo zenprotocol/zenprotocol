@@ -293,9 +293,9 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
     | GetTotalZP ->
         Chain.getCurrentZPIssuance chain state.tipState.tip.header.blockNumber
         |> requestId.reply
-    | GetCandidates ->
-        let interval = CGP.getInterval chain state.tipState.tip.header.blockNumber
-        Tally.Handler.DA.Candidates.get session chain interval
+    | GetCandidates interval ->
+        Tally.Repository.Candidates.tryGet session session.session interval
+        |> Option.defaultValue []
         |> requestId.reply
     | GetBlockReward blockNumber ->
         blockReward blockNumber state.cgp.allocation
