@@ -41,7 +41,7 @@ let inputEncoder (input:Input) =
 
 let recipientEncoder chain = function
         | PKRecipient pkHash -> Address.encode chain (Address.PK pkHash)
-        | ContractRecipient contractId -> contractId.ToString()
+        | ContractRecipient contractId -> Address.encode chain (Address.Contract contractId)
     
 let lockEncoder chain (lock:Lock) =
     match lock with
