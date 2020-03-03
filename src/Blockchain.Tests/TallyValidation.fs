@@ -2,6 +2,7 @@ module Tally.Tests.TallyTests
 
 open Blockchain.Tally.Tally
 open Blockchain.Tally.Voting
+open Blockchain.Tally.Nomination
 open Consensus.Types
 open Consensus
 open Consensus
@@ -402,4 +403,15 @@ let ``Higher and lower weighted medians`` (votes : List<byte * uint64>) =
 [<Property>]
 let ``weighted median never fails`` (votes : List<byte * uint64>) =
      weightedMedianTest votes |> ignore
+
+[<Property>]
+let ``isUnique validates unique lists`` (xs : int list) =
+     isUnique (List.distinct xs)
+
+[<Property>]
+let ``isUnique invalidates non-unique lists`` (x : int) (xs : int list) (ys : int list) (zs : int list) =
+     not (isUnique (xs @ [x] @ ys @ [x] @ zs))
+
+
+
 #endif

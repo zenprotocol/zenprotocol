@@ -17,6 +17,8 @@ type PK = Crypto.PublicKey
 
 type PKHash = Hash.Hash
 
+type Check = Option<unit>
+
 type CoinbaseRatio =
     | CoinbaseRatio of byte
 
@@ -39,7 +41,7 @@ let option = FSharpx.Option.maybe
 
 let private (|@>) x f = Option.map f x
 
-let check (b : bool) : Option<unit> =
+let check (b : bool) : Check =
     option { if b then return () }
 
 let (|<-) (x : Option<'a>) (y : 'b) : Option<'b> =
@@ -51,7 +53,7 @@ let (|<--) (x : Option<'a>) (y : Lazy<'b>) : Option<'b> =
 let ( *>) : Option<'a> -> Option<'b> -> Option<'b> =
     FSharpx.Option.( *>)
 
-let ignoreResult (x : Option<'a>) : Option<unit> =
+let ignoreResult (x : Option<'a>) : Check =
     x |<- ()
 
 let allocationToCoinbaseRatio (allocation : allocation) : CoinbaseRatio =

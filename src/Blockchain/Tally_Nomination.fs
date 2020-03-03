@@ -1,5 +1,6 @@
 module Blockchain.Tally.Nomination
 
+open System
 open Consensus
 open Types
 open Checked
@@ -7,7 +8,6 @@ open Consensus.Crypto
 open Consensus.Serialization.Serialization
 open Infrastructure.Functional
 open Blockchain.Tally.Tally
-
 
 /// Nomination Environment
 type Env =
@@ -24,6 +24,20 @@ let private (>>=) = FSharpx.Option.(>>=)
 
 let private (|@>) x f = Option.map f x
 
+let isUnique (ls : List<'a>) : bool =
+    let rec onSorted : List<'a> -> bool =
+        function
+        | [] ->
+            true
+        | (_ :: []) ->
+            true
+        | (x :: y :: xs) ->
+            x <> y && onSorted (y :: xs)
+    
+    ls
+    |> List.sort
+    |> onSorted
+
 let validatePayoutNominee (env : Env) ((_, spends) as vote : payout) : Option<payout> =
     
     let subtractSpend (fund : Fund.T) (spend : Spend) : Option<Fund.T> =
@@ -38,33 +52,32 @@ let validatePayoutNominee (env : Env) ((_, spends) as vote : payout) : Option<pa
             return Map.add spend.asset updatedAmount fund
         }
     
-    let checkNonZero (spend : Spend) : Option<unit> = 
+    let checkNonZero (spend : Spend) : Check = 
         check (spend.amount > 0UL)
     
-    let checkSpendableFunds : Option<unit> =
+    let checkSpendableFunds : Check =
         spends
         |> FSharpx.Option.foldM subtractSpend env.lastFund 
         |> ignoreResult
     
-    let checkNonZeros : Option<unit> =
+    let checkNonZeros : Check =
         spends
         |> FSharpx.Option.mapM checkNonZero
         |> ignoreResult
     
-    let checkSize : Option<unit> =
+    let checkSize : Check =
         let len = List.length spends
         check (1 <= len && len <= 100)
+    
+    let checkUniqueness : Check =
+        check (isUnique spends)
     
     Some ()
     *> checkNonZeros
     *> checkSpendableFunds
     *> checkSize
+    *> checkUniqueness
     |<- vote
-
-let aggregateAssets spends =
-    Fund.accumulateSpends Some spends
-    |> Map.toList
-    |> List.map (fun (asset, amount) -> { asset = asset ; amount = amount })
 
 let addVote (env : Env) (tally:Map<payout, uint64>) (vote:payout) amount : Map<payout, uint64> =
     validatePayoutNominee env vote
@@ -82,12 +95,7 @@ let computeCandidates (env : Env) : Candidates =
             )
             |> Some
     
-    // TODO: this is a validation thing, move it to validation
-    // Ensures that no nominees contains multiple spends of the same asset
-    let uniqueNomineesBallots =
-        Map.map (konst <| secondMap aggregateAssets) env.nomineesBallots
-    
-    let nomineesVotes = integrateBallots env.balances uniqueNomineesBallots
+    let nomineesVotes = integrateBallots env.balances env.nomineesBallots
     
     let nomineesTally =
         Map.fold (addVote env) Map.empty nomineesVotes

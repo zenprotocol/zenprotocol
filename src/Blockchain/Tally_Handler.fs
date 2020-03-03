@@ -451,7 +451,7 @@ module Handler =
             if blockNumber = endOfNomination
                 then yield Candidates.update op dataAccess interval chainParams
             if endOfNomination < blockNumber && blockNumber <= endOfInterval
-                then yield PKVote  .update op dataAccess interval chainParams block
+                then yield PKVote    .update op dataAccess interval chainParams block
             if true
                 then yield VoteTip   .update op dataAccess block
         }
