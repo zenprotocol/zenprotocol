@@ -36,7 +36,7 @@ type ChainParameters =
         cgpContractId:ContractId
         votingContractId:ContractId
         upperAllocationBound: byte
-        thresholdFactor: uint64
+        thresholdFactor: uint64 * uint64
         genesisTotal: uint64
     }
 
@@ -61,7 +61,7 @@ let mainParameters =
         cgpContractId= Option.get <| ContractId.fromString "00000000e2e56687e040718fa75210195a2ecbed6d5b2f9d53431b8ce3cba57588191b6a"
         votingContractId= Option.get <| ContractId.fromString "00000000abbf8805a203197e4ad548e4eaa2b16f683c013e31d316f387ecf7adc65b3fb2"
         upperAllocationBound=90uy
-        thresholdFactor=3UL / 100UL
+        thresholdFactor=(3UL, 100UL)
         genesisTotal=20_000_000UL * 100_000_000UL
     }
 
@@ -89,7 +89,7 @@ let testParameters =
         cgpContractId=Option.get <| ContractId.fromString "00000000eac6c58bed912ff310df9f6960e8ed5c28aac83b8a98964224bab1e06c779b93"
         votingContractId= Option.get <| ContractId.fromString "00000000e89738718a802a7d217941882efe8e585e20b20901391bc37af25fac2f22c8ab" 
         upperAllocationBound=90uy
-        thresholdFactor= 3UL / 100UL
+        thresholdFactor=(3UL, 100UL)
         genesisTotal=1UL
     }
 
@@ -106,7 +106,7 @@ let localParameters = {
         genesisTime=1515594186383UL
         networkId=1002ul
         versionExpiry=System.UInt64.MaxValue
-        thresholdFactor= 1UL / 500UL 
+        thresholdFactor=(1UL, 500UL)
 }
 
 let getChainParameters = function

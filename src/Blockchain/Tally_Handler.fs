@@ -77,10 +77,17 @@ module DA =
 
         let get dataAccess (chainParams : ChainParameters) interval =
 
+            let snapshotBlockNumber = CGP.getSnapshotBlock chainParams interval
+
+            let threshold =
+                Chain.getCurrentZPIssuance chainParams snapshotBlockNumber
+                |> (*) (fst chainParams.thresholdFactor)
+                |> (/) (snd chainParams.thresholdFactor)
+
             let env : Tally.Nomination.Env =
                 {
                     cgpContractId       = chainParams.cgpContractId
-                    threshold = chainParams.payoutNominationThreshold
+                    threshold           = threshold
                     lastFund            = Fund.get dataAccess interval
                     nomineesBallots     = PKNominee.get dataAccess interval
                     balances            = PKBalance.get dataAccess interval

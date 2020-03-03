@@ -291,8 +291,7 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
         <@> (fun _ -> ex.txHash)
         |> requestId.reply<Result<Hash.Hash,ValidationError.ValidationError>>
     | GetTotalZP ->
-        [2ul..state.tipState.tip.header.blockNumber]
-        |> List.fold (fun sum blockNumber -> sum + blockReward blockNumber state.cgp.allocation) (20_000_000UL * 100_000_000UL)
+        Chain.getCurrentZPIssuance chain state.tipState.tip.header.blockNumber
         |> requestId.reply
     | GetCandidates ->
         let interval = CGP.getInterval chain state.tipState.tip.header.blockNumber
