@@ -11,7 +11,7 @@ open Consensus.Serialization.Serialization
 open Infrastructure.Functional
 
 [<Literal>]
-let Quorum = 100_000_000_000_000UL
+let Threshold = 100_000_000_000_000UL
 
 type allocation = byte
 

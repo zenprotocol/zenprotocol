@@ -25,9 +25,12 @@ let (|*|) f g (x,y) = option {
 
 let hashBallot (chainParam : ChainParameters) (blockNumber : uint32) (ballotId : Prims.string) : Hash =
     let interval    = CGP.getInterval chainParam blockNumber
+    let isNominee   = CGP.isNomineePhase chainParam blockNumber
+    let phase       = if isNominee then "Contestant" else "Candidate"
     let serBallot   = ballotId |> String |> Data.serialize |> FsBech32.Base16.encode
+    let serPhase    = phase |> ZFStar.fsToFstString |> String |> Data.serialize |> FsBech32.Base16.encode
     let serInterval = interval |> U32    |> Data.serialize |> FsBech32.Base16.encode
-    [serInterval; serBallot]
+    [serInterval; serPhase; serBallot]
     |> String.concat ""
     |> Encoding.Default.GetBytes
     |> Hash.compute

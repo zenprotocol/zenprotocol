@@ -21,7 +21,7 @@ module DA =
         
         let get
             ( dataAccess: DatabaseContext.Session )
-            ( interval  : Interval)
+            ( interval  : Interval )
             : Fund.T =
             Fund.tryGet dataAccess dataAccess.session interval
             |> Option.defaultValue Map.empty
@@ -30,7 +30,7 @@ module DA =
         
         let get 
             ( dataAccess: DatabaseContext.Session )
-            ( interval  : Interval)
+            ( interval  : Interval )
             : PKPayout =
             Nominees.tryGet dataAccess dataAccess.session interval
             |> Option.defaultValue Map.empty
@@ -39,7 +39,7 @@ module DA =
         
         let get 
             ( dataAccess: DatabaseContext.Session )
-            ( interval  : Interval)
+            ( interval  : Interval )
             : PKBalance =
             PKBalance.tryGet dataAccess dataAccess.session interval
             |> Option.defaultValue Map.empty
@@ -48,7 +48,7 @@ module DA =
         
         let get 
             ( dataAccess: DatabaseContext.Session )
-            ( interval  : Interval)
+            ( interval  : Interval )
             : PKAllocation =
             PKAllocation.tryGet dataAccess dataAccess.session interval
             |> Option.defaultValue Map.empty
@@ -57,7 +57,7 @@ module DA =
         
         let get 
             ( dataAccess: DatabaseContext.Session )
-            ( interval  : Interval)
+            ( interval  : Interval )
             : PKPayout =
             PKPayout.tryGet dataAccess dataAccess.session interval
             |> Option.defaultValue Map.empty

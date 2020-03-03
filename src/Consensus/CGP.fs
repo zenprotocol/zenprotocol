@@ -36,6 +36,10 @@ let isPayoutBlock chainParams blockNumber =
 
 let endOfNominationBlock chainParams interval =
     getSnapshotBlock chainParams interval + chainParams.nomination
+    
+let isNomineePhase chainParams blockNumber =
+    let interval = getInterval chainParams blockNumber
+    getSnapshotBlock chainParams interval < blockNumber && blockNumber <= endOfNominationBlock chainParams interval
 
 let getLastIntervalBlock (chainParams : ChainParameters) (interval : uint32) : uint32 =
     chainParams.intervalLength * interval
