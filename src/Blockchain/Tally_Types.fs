@@ -22,7 +22,7 @@ type Payout = Recipient * Spend list
 type PKAllocation= Map<PublicKey,Allocation>
 type PKPayout = Map<PublicKey,Payout>
 
-type Nominees = Payout list 
+type Candidates = Payout list
 
 type NomineesBalance = Map<Payout,uint64>
 

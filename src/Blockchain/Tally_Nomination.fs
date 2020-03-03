@@ -8,6 +8,18 @@ open Consensus.Serialization.Serialization
 open Infrastructure.Functional
 open Blockchain.Tally.Tally
 
+
+/// Nomination Environment
+type Env =
+    {
+        cgpContractId   : ContractId
+        threshold       : uint64
+        lastFund        : Fund.T
+        nomineesBallots : Map<PK, payout>
+        balances        : Map<PKHash, uint64>
+    }
+
+
 let private (>>=) = FSharpx.Option.(>>=)
 
 let private (|@>) x f = Option.map f x
@@ -59,7 +71,7 @@ let addVote (env : Env) (tally:Map<payout, uint64>) (vote:payout) amount : Map<p
     |@> fun votePayout -> accumulate votePayout amount tally
     |> Option.defaultValue tally
 
-let computeNominees (env : Env) : Nominees =
+let computeCandidates (env : Env) : Candidates =
     
     let cgpNominee =
         if Map.isEmpty env.lastFund then
@@ -81,8 +93,8 @@ let computeNominees (env : Env) : Nominees =
         Map.fold (addVote env) Map.empty nomineesVotes
     
     cgpNominee
-    |> Option.map (fun nom -> Map.add nom env.nominationThreshold nomineesTally)
+    |> Option.map (fun nom -> Map.add nom env.threshold nomineesTally)
     |> Option.defaultValue nomineesTally
     |> Map.toList
-    |> List.filter (fun (_ , weight) -> weight >= env.nominationThreshold)
+    |> List.filter (fun (_ , weight) -> weight >= env.threshold)
     |> List.map fst

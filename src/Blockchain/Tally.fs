@@ -26,20 +26,6 @@ type T =
         payout        : Map<payout, uint64>
     }
 
-type Env =
-    {
-        cgpContractId         : ContractId
-        nominationThreshold   : uint64
-        coinbaseCorrectionCap : CoinbaseRatio
-        lowerCoinbaseBound    : CoinbaseRatio
-        lastCoinbaseRatio     : CoinbaseRatio
-        lastFund              : Fund.T
-        nomineesBallots       : Map<PK, payout>
-        balances              : Map<PKHash, uint64>
-        allocationBallots     : Map<PK, allocation>
-        payoutBallots         : Map<PK, payout>
-    }
-
 let empty : T =
     {
         coinbaseRatio = Map.empty

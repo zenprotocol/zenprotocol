@@ -7,6 +7,19 @@ open Checked
 open Infrastructure.Functional
 open Blockchain.Tally.Tally
 
+/// Voting Environment
+type Env =
+    {
+        coinbaseCorrectionCap : CoinbaseRatio
+        lowerCoinbaseBound    : CoinbaseRatio
+        lastCoinbaseRatio     : CoinbaseRatio
+        candidates            : Candidates
+        balances              : Map<PKHash, uint64>
+        allocationBallots     : Map<PK, allocation>
+        payoutBallots         : Map<PK, payout>
+    }
+
+
 let private (>>=) = FSharpx.Option.(>>=)
 
 let private (|@>) x f = Option.map f x
@@ -45,9 +58,7 @@ let validateAllocation env allocation =
 
 let validatePayout (env : Env) (vote : payout) : Option<payout> =
     
-    let nominees = Nomination.computeNominees env
-    
-    if nominees |> List.contains vote then
+    if env.candidates |> List.contains vote then
         Some vote
     else
         None

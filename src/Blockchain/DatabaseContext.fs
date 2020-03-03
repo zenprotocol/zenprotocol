@@ -39,7 +39,7 @@ type T =
         allocationVoters: Collection<Interval, PKAllocation>
         payoutVoters: Collection<Interval, PKPayout>
         nomineesVoters: Collection<Interval,PKPayout>
-        nomineesWinner: Collection<Interval, Nominees>
+        nomineesWinner: Collection<Interval, Candidates>
         winner: Collection<Interval, Winner>
         funds: Collection<Interval, Fund.T>
         voteUtxo: Collection<Interval, VoteUtxo>

@@ -296,8 +296,7 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
         |> requestId.reply
     | GetCandidates ->
         let interval = CGP.getInterval chain state.tipState.tip.header.blockNumber
-        let lastAllocation = Tally.Handler.DA.Winner.getFirstAllocation session interval
-        Tally.Handler.DA.Nominees.get session chain interval lastAllocation
+        Tally.Handler.DA.Candidates.get session chain interval
         |> requestId.reply
     | GetBlockReward blockNumber ->
         blockReward blockNumber state.cgp.allocation

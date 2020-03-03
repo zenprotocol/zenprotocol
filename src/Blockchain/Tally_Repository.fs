@@ -60,7 +60,7 @@ module PKNominee =
 
     let contains (session : Session) = Collection.containsKey session.context.nomineesVoters
 
-module Nominees =
+module Candidates =
     let get (session : Session) = Collection.get session.context.nomineesWinner
 
     let tryGet (session : Session) = Collection.tryGet session.context.nomineesWinner

@@ -17,28 +17,28 @@ type ExtHeader = ExtHeader.T
 
 
 module DA =
-    
+
     module Fund =
-        
+
         let get
             ( dataAccess: DatabaseContext.Session )
             ( interval  : Interval )
             : Fund.T =
             Fund.tryGet dataAccess dataAccess.session interval
             |> Option.defaultValue Map.empty
-    
+
     module PKBalance =
-        
-        let get 
+
+        let get
             ( dataAccess: DatabaseContext.Session )
             ( interval  : Interval )
             : PKBalance =
             PKBalance.tryGet dataAccess dataAccess.session interval
             |> Option.defaultValue Map.empty
-            
+
     module PKNominee =
-        
-        let get 
+
+        let get
             ( dataAccess: DatabaseContext.Session )
             ( interval  : Interval )
             : PKPayout =
@@ -46,8 +46,8 @@ module DA =
             |> Option.defaultValue Map.empty
 
     module PKAllocation =
-        
-        let get 
+
+        let get
             ( dataAccess: DatabaseContext.Session )
             ( interval  : Interval )
             : PKAllocation =
@@ -55,8 +55,8 @@ module DA =
             |> Option.defaultValue Map.empty
 
     module PKPayout =
-        
-        let get 
+
+        let get
             ( dataAccess: DatabaseContext.Session )
             ( interval  : Interval )
             : PKPayout =
@@ -66,101 +66,65 @@ module DA =
         let rec getFirstAllocation dataAccess interval : byte =
             if interval = 1ul then
                 0uy
-            else 
+            else
                match Winner.tryGet dataAccess dataAccess.session interval with
                | Some {allocation = Some al; payout = _ } ->
                    al
                | _ ->
                    getFirstAllocation dataAccess (interval - 1ul)
-    module Nominees =
-        let get dataAccess (chainParams : ChainParameters) interval lastAllocation =
-            
-            let lastFund =
-                Fund.get dataAccess interval
-            
-            let balances =
-                PKBalance.get dataAccess interval
-            
-            let nomineesBallots =
-                PKNominee.get dataAccess interval
-            
-            let allocationBallots =
-                PKAllocation.get dataAccess interval
-            
-            let payoutBallots =
-                PKPayout.get dataAccess interval
-            
-            let env : Tally.Env =
+
+    module Candidates =
+
+        let get dataAccess (chainParams : ChainParameters) interval =
+
+            let env : Tally.Nomination.Env =
                 {
-                    cgpContractId         = chainParams.cgpContractId
-                    nominationThreshold   = chainParams.payoutNominationThreshold
-                    coinbaseCorrectionCap = Tally.allocationToCoinbaseRatio chainParams.allocationCorrectionCap
-                    lowerCoinbaseBound    = Tally.allocationToCoinbaseRatio chainParams.upperAllocationBound
-                    lastCoinbaseRatio     = Tally.allocationToCoinbaseRatio lastAllocation
-                    lastFund              = lastFund
-                    nomineesBallots       = nomineesBallots
-                    balances              = balances
-                    allocationBallots     = allocationBallots
-                    payoutBallots         = payoutBallots
+                    cgpContractId       = chainParams.cgpContractId
+                    threshold = chainParams.payoutNominationThreshold
+                    lastFund            = Fund.get dataAccess interval
+                    nomineesBallots     = PKNominee.get dataAccess interval
+                    balances            = PKBalance.get dataAccess interval
                 }
-                
-            Nomination.computeNominees env
+
+            Nomination.computeCandidates env
 
     module Tally =
-        
+
         let get dataAccess (chainParams : ChainParameters) interval lastAllocation =
-            
-            let lastFund =
-                Fund.get dataAccess interval
-            
-            let balances =
-                PKBalance.get dataAccess interval
-            
-            let nomineesBallots =
-                PKNominee.get dataAccess interval
-            
-            let allocationBallots =
-                PKAllocation.get dataAccess interval
-            
-            let payoutBallots =
-                PKPayout.get dataAccess interval
-            
-            let env : Tally.Env =
+
+            let env : Tally.Voting.Env =
                 {
-                    cgpContractId         = chainParams.cgpContractId
-                    nominationThreshold   = chainParams.payoutNominationThreshold
                     coinbaseCorrectionCap = Tally.allocationToCoinbaseRatio chainParams.allocationCorrectionCap
                     lowerCoinbaseBound    = Tally.allocationToCoinbaseRatio chainParams.upperAllocationBound
                     lastCoinbaseRatio     = Tally.allocationToCoinbaseRatio lastAllocation
-                    lastFund              = lastFund
-                    nomineesBallots       = nomineesBallots
-                    balances              = balances
-                    allocationBallots     = allocationBallots
-                    payoutBallots         = payoutBallots
+                    candidates            = Candidates.get dataAccess chainParams interval
+                    balances              = PKBalance.get dataAccess interval
+                    allocationBallots     = PKAllocation.get dataAccess interval
+                    payoutBallots         = PKPayout.get dataAccess interval
                 }
-            
+
             Voting.createTally env
-            
+
 let getWinner
     ( dataAccess: DatabaseContext.Session )
     ( interval  : Interval)
     : Winner option =
-    Winner.tryGet dataAccess dataAccess.session interval   
+    Winner.tryGet dataAccess dataAccess.session interval
 
 module Handler =
-    
+
     let private updateMap
         ( op     : UpdateOperation   )
-        ( key    : 'key              ) 
+        ( key    : 'key              )
         ( amount : uint64            )
-        ( map    : Map<'key, uint64> ) 
+        ( map    : Map<'key, uint64> )
         : Map<'key, uint64> =
-        
+
         let balance =
             map
             |> Map.tryFind key
             |> Option.defaultValue 0UL
-        
+
         match op with
         | Add ->
             Map.add key (balance + amount)
@@ -172,14 +136,14 @@ module Handler =
             else
                 Map.remove key
         <| map
-        
+
     let votingWitnesses chainParams =
         function
         | ContractWitness {contractId=cid; command=cmd; messageBody=msgBody} when cid = chainParams.votingContractId ->
             Some (cmd, msgBody)
         | _ ->
             None
-            
+
     let private add
         ( map : Map<Crypto.PublicKey,'a> )
         ( pk  : Crypto.PublicKey         )
@@ -188,7 +152,7 @@ module Handler =
         match Map.tryFind pk map with
         | Some _ -> map    // (only the first vote counts)
         | None   -> Map.add pk x map
-    
+
     let private updatePK
         ( op : UpdateOperation           )
         ( x   : 'a                       )
@@ -197,8 +161,8 @@ module Handler =
         : Map<Crypto.PublicKey,'a> =
         match op with
         | Add    -> add map pk x
-        | Remove -> Map.remove pk map 
-    
+        | Remove -> Map.remove pk map
+
     let private set
         ( op : UpdateOperation                    )
         ( map  : Map<Crypto.PublicKey,'a>         )
@@ -209,25 +173,25 @@ module Handler =
         sigs
         |> List.fold (updatePK op x) map
         |> put
-    
-    let getVoteUtxo dataAccess interval : VoteUtxo = 
+
+    let getVoteUtxo dataAccess interval : VoteUtxo =
         VoteUtxoSet.tryGet dataAccess dataAccess.session interval
         |> Option.defaultValue Map.empty
-    
+
     module VoteTip =
         let update op dataAccess block =
-            
+
             lazy
-            
+
             match op with
             | Add ->
                 Block.hash block.header
             | Remove ->
                 block.header.parent
             |> Tally.Repository.VoteTip.put dataAccess dataAccess.session
-    
+
     module PKBalance =
-        
+
         let private spendablePk validMaturity =
             function
             | Unspent {lock=PK pkHash; spend={asset=asset;amount=amount}}
@@ -238,103 +202,108 @@ module Handler =
                     Some (pkHash,amount)
             | _ ->
                     None
-        
+
         let private getSpendablePks validMaturity (utxos: Map<Outpoint,OutputStatus>) : (Hash.Hash * uint64) list =
             utxos
             |> Map.toList
             |> List.map snd
             |> List.choose (spendablePk validMaturity)
-        
+
         let update op dataAccess interval chainParams =
-            
+
             lazy
-                
+
             let validMaturity = CGP.getSnapshotBlock chainParams interval - chainParams.coinbaseMaturity
-            
+
             let updateBalance (pkHash : Hash.Hash, amount : uint64) =
                 PKBalance.tryGet dataAccess dataAccess.session interval
                 |> Option.defaultValue Map.empty
                 |> updateMap op pkHash amount
                 |> PKBalance.put dataAccess dataAccess.session interval
-            
+
             getVoteUtxo dataAccess interval
             |> getSpendablePks validMaturity
             |> List.iter updateBalance
-    
-    module PKBallot =
-        
-        let private setAllocation op dataAccess interval =
-            set op
-                (PKAllocation.tryGet dataAccess dataAccess.session interval
-                 |> Option.defaultValue Map.empty)
-                (PKAllocation.put dataAccess dataAccess.session interval)
-        
-        let private setPayout op dataAccess interval =
-            set op
-                (PKPayout.tryGet dataAccess dataAccess.session interval
-                 |> Option.defaultValue Map.empty)
-                (PKPayout.put dataAccess dataAccess.session interval)
-        
-        let private setBallot op dataAccess interval : Ballot -> Crypto.PublicKey list -> unit =
-            function
-            | Ballot.Allocation allocation ->
-                setAllocation op dataAccess interval allocation
-            | Ballot.Payout (recipient, spends) ->
-                setPayout op dataAccess interval (recipient,spends)
-        
-        let update op dataAccess interval chainParams block =
-            
+
+    module private PKBallot =
+
+        type Setter =
+            UpdateOperation
+             -> DatabaseContext.Session
+             -> Interval
+             -> Ballot
+             -> Crypto.PublicKey list
+             -> unit
+
+        let update (setter : Setter) op dataAccess interval chainParams block =
+
             lazy
-            
+
             let blockNumber = block.header.blockNumber
             block.transactions
             |> List.concatMap (fun ex -> ex.tx.witnesses)
             |> List.choose (votingWitnesses chainParams)
             |> List.choose (uncurry <| VoteParser.parseMessageBody chainParams blockNumber)
-            |> List.iter (uncurry <| setBallot op dataAccess interval)
-    
+            |> List.iter (uncurry <| setter op dataAccess interval)
+
+    module PKVote =
+
+        let private setAllocation op dataAccess interval =
+            set op
+                (PKAllocation.tryGet dataAccess dataAccess.session interval
+                 |> Option.defaultValue Map.empty)
+                (PKAllocation.put dataAccess dataAccess.session interval)
+
+        let private setPayout op dataAccess interval =
+            set op
+                (PKPayout.tryGet dataAccess dataAccess.session interval
+                 |> Option.defaultValue Map.empty)
+                (PKPayout.put dataAccess dataAccess.session interval)
+
+        let private setVote op dataAccess interval : Ballot -> Crypto.PublicKey list -> unit =
+            function
+            | Ballot.Allocation allocation ->
+                setAllocation op dataAccess interval allocation
+            | Ballot.Payout (recipient, spends) ->
+                setPayout op dataAccess interval (recipient,spends)
+
+        let update =
+            PKBallot.update setVote
+
     module PKNominee =
-        
+
         let private setNomine op dataAccess interval =
             set op
                 (PKNominee.tryGet dataAccess dataAccess.session interval
                  |> Option.defaultValue Map.empty)
                 (PKNominee.put dataAccess dataAccess.session interval)
-        
+
         let private setNominees op dataAccess interval : Ballot -> Crypto.PublicKey list -> unit =
             function
             | Ballot.Payout (recipient, spends) ->
                 setNomine op dataAccess interval (recipient,spends)
             | _ ->
                 konst ()
-        
-        let update op dataAccess interval chainParams block =
-            
-            lazy
-            
-            let blockNumber = block.header.blockNumber
-            block.transactions
-            |> List.concatMap (fun ex -> ex.tx.witnesses)
-            |> List.choose (votingWitnesses chainParams)
-            |> List.choose (uncurry <| VoteParser.parseMessageBody chainParams blockNumber)
-            |> List.iter (uncurry <| setNominees op dataAccess interval)
-    
-    module Nominees =
-        
+
+        let update =
+            PKBallot.update setNominees
+
+    module Candidates =
+
         let update op dataAccess interval chainParams =
+
             lazy
-            
+
             match op with
             | Add ->
-                let lastAllocation = DA.Winner.getFirstAllocation dataAccess interval
-                DA.Nominees.get dataAccess chainParams interval lastAllocation
-                |> Nominees.put dataAccess dataAccess.session interval
-            
+                DA.Candidates.get dataAccess chainParams interval
+                |> Candidates.put dataAccess dataAccess.session interval
+
             | Remove ->
-                Nominees.delete dataAccess dataAccess.session interval
-    
+                Candidates.delete dataAccess dataAccess.session interval
+
     module VoteUtxo =
-        
+
         let private addBlock
             (getUTXO : Outpoint -> OutputStatus)
             (block : Block)
@@ -342,21 +311,21 @@ module Handler =
             : Map<Outpoint, OutputStatus> =
                 block.transactions
                 |> List.fold (fun map ex -> handleTransaction getUTXO ex.txHash ex.tx map) map
-        
+
         let private getUTXO dataAccess interval (outpoint : Outpoint) : OutputStatus =
             getVoteUtxo dataAccess interval
             |> Map.tryFind outpoint
             |> Option.defaultValue NoOutput
-        
+
         let private updateBlock =
             function
             | Add    -> addBlock
             | Remove -> undoBlock
-        
+
         let copyToNext op dataAccess interval =
-            
+
             lazy
-            
+
             match op with
             | Add ->
                 VoteUtxoSet.tryGet dataAccess dataAccess.session interval
@@ -364,17 +333,17 @@ module Handler =
                 |> VoteUtxoSet.put dataAccess dataAccess.session (interval + 1ul)
             | Remove ->
                 VoteUtxoSet.delete dataAccess dataAccess.session (interval + 1ul)
-        
+
         let update op dataAccess interval block =
-            
+
             lazy
-            
+
             getVoteUtxo dataAccess interval
             |> updateBlock op (getUTXO dataAccess interval) block
             |> VoteUtxoSet.put dataAccess dataAccess.session interval
-    
+
     module Fund =
-        
+
         let spendableCGP chainParams =
             function
             | Unspent {lock=Contract cid; spend={asset=asset;amount=amount}}
@@ -382,52 +351,52 @@ module Handler =
                     Some (asset, amount)
             | _ ->
                     None
-        
+
         let private getSpendableCGP chainParams (utxos: Map<Outpoint,OutputStatus>) : (Asset * uint64) list =
             utxos
             |> Map.toList
             |> List.map snd
             |> List.choose (spendableCGP chainParams)
-        
+
         let update op dataAccess interval chainParams =
-            
+
             lazy
-            
+
             let updateFund (asset : Asset, amount : uint64) : unit =
                 Fund.tryGet dataAccess dataAccess.session interval
                 |> Option.defaultValue Map.empty
                 |> updateMap op asset amount
                 |> Fund.put dataAccess dataAccess.session interval
-            
+
             getVoteUtxo dataAccess interval
             |> getSpendableCGP chainParams
             |> List.iter updateFund
-    
+
     module Winner =
-        
+
         let update op dataAccess interval chainParams =
-            
+
             lazy
-            
+
             match op with
             | Add ->
                 let lastAllocation = DA.Winner.getFirstAllocation dataAccess interval
                 let tally = DA.Tally.get dataAccess chainParams (interval - 1u) lastAllocation
-                let winner = Voting.getWinner tally 
-                
+                let winner = Voting.getWinner tally
+
                 let withLastAllocation winner =
                     { winner with allocation = Some <| Option.defaultValue lastAllocation winner.allocation }
-                
+
                 winner
                 |> Option.map withLastAllocation
                 |> Option.defaultValue ({allocation= Some lastAllocation; payout= None}:Winner)
                 |> Winner.put dataAccess dataAccess.session interval
-            
+
             | Remove ->
                 {allocation= None; payout= None}
                 |> Winner.put dataAccess dataAccess.session interval
-    
-    
+
+
     let log op chainParams block =
         let operation = match op with | Add -> "adding" |Remove -> "removing"
         let interval = CGP.getInterval chainParams block.header.blockNumber
@@ -437,7 +406,7 @@ module Handler =
         >> setField "blockHash" (Hash.toString (Block.hash block.header))
         >> setField "interval" interval
         |> Log.info;
-    
+
     let private updateBlock op dataAccess chainParams (block : Block) : unit =
         let blockNumber   = block.header.blockNumber
         let interval      = CGP.getInterval          chainParams blockNumber
@@ -445,9 +414,9 @@ module Handler =
         let endOfInterval = CGP.getLastIntervalBlock chainParams interval
         let beginOfInterval = CGP.getLastIntervalBlock chainParams (interval - 1ul) + 1ul
         let endOfNomination = CGP.endOfNominationBlock chainParams interval
-        
+
         let tipHash = Tally.Repository.VoteTip.tryGet dataAccess dataAccess.session |> Option.defaultValue Hash.zero
-        
+
         match op with
         | Add ->
             if tipHash <> block.header.parent then
@@ -457,7 +426,7 @@ module Handler =
             if tipHash <> Block.hash block.header then
                 let tipHeader = BlockRepository.tryGetHeader dataAccess tipHash |> Option.defaultValue (ExtendedBlockHeader.empty)
                 failwithf "trying to remove a block from the tip but the tip is in different chain BlockHeader:\n %A\n tipHeader\n%A\n" block.header tipHeader.header
-        
+
         let updates = seq {
             if blockNumber = beginOfInterval
                 then yield Winner    .update op dataAccess interval chainParams
@@ -473,13 +442,13 @@ module Handler =
             if snapshot < blockNumber && blockNumber <= endOfNomination
                 then yield PKNominee .update op dataAccess interval chainParams block
             if blockNumber = endOfNomination
-                then yield Nominees  .update op dataAccess interval chainParams
+                then yield Candidates.update op dataAccess interval chainParams
             if endOfNomination < blockNumber && blockNumber <= endOfInterval
-                then yield PKBallot  .update op dataAccess interval chainParams block
-            if true 
+                then yield PKVote  .update op dataAccess interval chainParams block
+            if true
                 then yield VoteTip   .update op dataAccess block
         }
-        
+
         match op with
         | Add ->
             updates
@@ -487,13 +456,13 @@ module Handler =
             // When removing - all the updates have to be done in reverse order
             Seq.rev updates
         |> Seq.iter (fun x -> x.Force())
-        
+
         log op chainParams block
-        
-    
+
+
     let addBlock =
         updateBlock Add
-    
+
     let removeBlock =
         updateBlock Remove
 
@@ -527,14 +496,14 @@ let updateTallyBlockFromHeaders op env headers =
 
 let addTallyBlockFromHeaders env headers =
     updateTallyBlockFromHeaders Add env headers
-    
+
 let removeTallyBlockFromHeaders env headers =
     updateTallyBlockFromHeaders Remove env headers
-    
+
 let removeTallyBlocks env forkBlock currentTip =
     Chain.getSubChain env.session forkBlock currentTip
     |> removeTallyBlockFromHeaders env
-    
+
 let addTallyBlocks env forkBlock tip =
     Chain.getSubChain env.session forkBlock tip
     |> addTallyBlockFromHeaders env
