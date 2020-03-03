@@ -294,6 +294,11 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
         [2ul..state.tipState.tip.header.blockNumber]
         |> List.fold (fun sum blockNumber -> sum + blockReward blockNumber state.cgp.allocation) (20_000_000UL * 100_000_000UL)
         |> requestId.reply
+    | GetCandidates ->
+        let interval = CGP.getInterval chain state.tipState.tip.header.blockNumber
+        let lastAllocation = Tally.Handler.DA.Winner.getFirstAllocation session interval
+        Tally.Handler.DA.Nominees.get session chain interval lastAllocation
+        |> requestId.reply
     | GetBlockReward blockNumber ->
         blockReward blockNumber state.cgp.allocation
         |> (+) (blockAllocation blockNumber state.cgp.allocation)

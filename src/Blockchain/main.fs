@@ -118,10 +118,6 @@ let main dataPath chainParams busName wipe =
             Tally.Repository.VoteTip.tryGet session session.session
             |> Option.defaultValue Hash.zero
             
-        if tallyTip <> tip then
-            updateTally dataPath chainParams tip
-        else
-            ()
         
         let tip, acs, ema, contractCache, cgp =
             match BlockRepository.tryGetTip session with
@@ -151,6 +147,13 @@ let main dataPath chainParams busName wipe =
                 EMA.create chainParams,
                 ContractCache.empty,
                 CGP.empty
+        
+        if tip.header.parent = Hash.zero then
+            ()
+        elif tallyTip <> tip.hash then
+            updateTally dataPath chainParams tip.hash
+        else
+            ()
 
         let tipState =
             {

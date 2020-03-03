@@ -220,17 +220,22 @@ let dataEncoder chain data =
 
     JsonValue.Record [| dataName data, dataValue data |]
 
+
+
+let payoutEncoder chain (recipient:Recipient,spend: Spend list) =
+    let res =
+        recipientEncoder chain recipient, spend
+        |> List.map spendEncoder
+        |> List.toArray
+    
+    res 
+    |> (fun (r,s) -> PayoutResultJson.Root(r,s).JsonValue)
+
 let cgpEncoder chain (interval:uint32) (cgp:CGP.T)  =
     let result =
         match cgp.payout with
-        | Some res ->
-            res
-            |> (fun (recipient:Recipient, spend: Spend list) ->
-                (recipientEncoder chain recipient, spend
-                |> List.map (fun spend ->
-                    SpendJson.Root(spend.asset.AsString, int64 spend.amount).JsonValue)
-                |> List.toArray) )
-            |> (fun (r,s) -> PayoutResultJson.Root(r,s).JsonValue)
+        | Some payout ->
+            payoutEncoder chain payout
         | _ -> emptyRecord
     JsonValue.Record
         [|

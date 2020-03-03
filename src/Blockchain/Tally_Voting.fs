@@ -1,5 +1,6 @@
 module Blockchain.Tally.Voting
 
+open Blockchain.Tally
 open Consensus
 open Types
 open Checked
@@ -42,12 +43,15 @@ let validateAllocation env allocation =
     >>= validateCoinbaseRatio env
     |@> coinbaseRatioToAllocation
 
-// Iteratively remove the payout spends from the fund and check that it wasn't depleted
-let validatePayout (env : Env) ((_, spends) as vote : payout) : Option<payout> =
+let validatePayout (env : Env) (vote : payout) : Option<payout> =
     
-    // TODO: validate payout with nominees
+    let nominees = Nomination.computeNominees env
     
-    failwith "TODO: implement this"  
+    if nominees |> List.contains vote then
+        Some vote
+    else
+        None
+    
 
 let validateVote (env : Env) (vote : Ballot) : Option<Ballot> =
     match vote with

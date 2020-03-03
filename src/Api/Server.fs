@@ -768,6 +768,13 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
         |> JsonValue.Number
         |> JsonContent
         |> reply StatusCode.OK
+    | Get("/blockchain/candidates",_) ->
+        Blockchain.getCandidates client
+        |> List.map (payoutEncoder chain)
+        |> List.toArray
+        |> JsonValue.Array
+        |> JsonContent
+        |> reply StatusCode.OK
     | Post("/addressdb/contract/history", Some json) ->
         parseGetContractHistoryJson json
         >>= AddressDB.getContractHistory client

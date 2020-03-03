@@ -26,9 +26,9 @@ let (|*|) f g (x,y) = option {
 let hashBallot (chainParam : ChainParameters) (blockNumber : uint32) (ballotId : Prims.string) : Hash =
     let interval    = CGP.getInterval chainParam blockNumber
     let isNominee   = CGP.isNomineePhase chainParam blockNumber
-    let phase       = if isNominee then "Contestant" else "Candidate"
+    let phase       = begin if isNominee then "Nomination" else "Vote" end |> ZFStar.fsToFstString
     let serBallot   = ballotId |> String |> Data.serialize |> FsBech32.Base16.encode
-    let serPhase    = phase |> ZFStar.fsToFstString |> String |> Data.serialize |> FsBech32.Base16.encode
+    let serPhase    = phase    |> String |> Data.serialize |> FsBech32.Base16.encode
     let serInterval = interval |> U32    |> Data.serialize |> FsBech32.Base16.encode
     [serInterval; serPhase; serBallot]
     |> String.concat ""
@@ -46,7 +46,7 @@ let getBallot (command : string) (dict : Map<Prims.string, data>) : Prims.string
     |> Map.tryFind (ZFStar.fsToFstString command)
     >>= tryString
 
-let getSignatures (dict : Map<Prims.string, data>) : Map<Prims.string,data> option = 
+let getSignatures (dict : Map<Prims.string, data>) : Map<Prims.string,data> option =
     dict
     |> Map.tryFind (ZFStar.fsToFstString "Signature")
     >>= tryDict
@@ -79,13 +79,13 @@ let parseValidSignatures (message : Hash) (sigs : Map<Prims.string,data>) : Map<
     |> Map.ofSeq
 
 let parseBallot (command : string) (encBallot : Prims.string) : Ballot option = option {
-        
+
     let serBallot =
         encBallot
         |> ZFStar.fstToFsString
         |> FsBech32.Base16.decode
         |> Option.defaultValue ""B
-    
+
     match! S.Ballot.deserialize serBallot with
     | Allocation allocation      when command = "Allocation" ->
         return Allocation allocation

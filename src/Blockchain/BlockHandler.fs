@@ -7,6 +7,7 @@ open Types
 open Infrastructure
 open Blockchain.EffectsWriter
 open Blockchain.Tally.Handler
+open Blockchain.Tally.Repository
 open Messaging
 open Events
 open State

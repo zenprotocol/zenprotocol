@@ -238,7 +238,7 @@ let ``tally correctly find winner and change state`` () =
     let ballot = Allocation 5uy
      
     let cgps : IntervalCGPMap = Map.add 2ul {allocation = 5uy; payout= None} Map.empty
-    let txs : BlockNumberEXMap = Map.add 91ul [(createVoteTransaction session rootAccount 91ul timestamp ballot |> Transaction.toExtended)] Map.empty
+    let txs : BlockNumberEXMap = Map.add 96ul [(createVoteTransaction session rootAccount 96ul timestamp ballot |> Transaction.toExtended)] Map.empty
     let mainChain, _ = createChainFromGenesisWithSession 120 0 cgps txs
     
 
@@ -255,14 +255,14 @@ let ``2 chain, tally correctly find winner from the stronger chain and change st
     let ballot = Allocation 5uy
      
     let cgps : IntervalCGPMap = Map.add 2ul {allocation = 5uy; payout= None} Map.empty
-    let txs : BlockNumberEXMap = Map.add 91ul [(createVoteTransaction session rootAccount 91ul timestamp ballot |> Transaction.toExtended)] Map.empty
-    let mainChain, _ = createChainFromGenesisWithSession 90 0 cgps txs
+    let txs : BlockNumberEXMap = Map.add 97ul [(createVoteTransaction session rootAccount 97ul timestamp ballot |> Transaction.toExtended)] Map.empty
+    let mainChain, _ = createChainFromGenesisWithSession 95 0 cgps txs
 
     let ballot = Allocation 4uy
     
-    let forkedBlock = mainChain.[89]
+    let forkedBlock = mainChain.[95]
     let cgps : IntervalCGPMap = Map.add 2ul {allocation = 4uy; payout= None} Map.empty
-    let txs : BlockNumberEXMap = Map.add 91ul [(createVoteTransaction session rootAccount 91ul timestamp ballot |> Transaction.toExtended)] Map.empty
+    let txs : BlockNumberEXMap = Map.add 97ul [(createVoteTransaction session rootAccount 97ul timestamp ballot |> Transaction.toExtended)] Map.empty
     let ema = EMA.add chain forkedBlock.header.timestamp ema
     let strongerChain, _ = createChainWithSession 20 1 forkedBlock ema rootAccount cgps txs
     

@@ -36,7 +36,7 @@ let isPayoutBlock chainParams blockNumber =
 
 let endOfNominationBlock chainParams interval =
     getSnapshotBlock chainParams interval + chainParams.nomination
-    
+
 let isNomineePhase chainParams blockNumber =
     let interval = getInterval chainParams blockNumber
     getSnapshotBlock chainParams interval < blockNumber && blockNumber <= endOfNominationBlock chainParams interval
@@ -151,40 +151,40 @@ module Contract =
         |> ZData.Dict
         |> ZData.Collection
         |> Some
-        
+
 module Connection =
     let private result = Result.ResultBuilder<string>()
-    
+
     let internalizeRecipient
         ( (recip, spends) : Recipient * List<Spend> )
         : List<Output> =
-        
+
         spends
         |> List.map ( fun spend -> { lock = recipientToLock recip; spend = spend } )
-    
+
     let checkMessageBody
         ( payout  : Recipient * List<Spend>     )
         ( msgBody : Option<Zen.Types.Data.data> )
         : Result<unit, string> = result {
-        
+
         let! outputs =
             msgBody
             |> Contract.extractPayoutOutputs
             |> Result.ofOption "Couldn't parse message body"
-        
+
         let winner =
             internalizeRecipient payout
-        
+
         if List.sort outputs = List.sort winner
             then return ()
             else return! Error "Contract outputs are not the same as the payout winner"
         }
-    
+
     let extractPayoutWitnesses
         ( chainParams : ChainParameters     )
         ( ex          : TransactionExtended )
         : List<ContractWitness> =
-        
+
         ex.tx.witnesses
         |> List.choose
                begin function
@@ -197,7 +197,7 @@ module Connection =
         let payoutWitnesses : List<ContractWitness> =
                 transactions
                 |> List.concatMap (extractPayoutWitnesses chainParams)
-    
+
         match payoutWitnesses with
         | _ :: _ :: _ ->
             Error "Multiple payout Txs"

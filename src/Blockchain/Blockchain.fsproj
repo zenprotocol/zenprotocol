@@ -45,8 +45,8 @@
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Tally_Types.fs" />
     <Compile Include="Tally.fs" />
-    <Compile Include="Tally_Voting.fs" />
     <Compile Include="Tally_Nomination.fs" />
+    <Compile Include="Tally_Voting.fs" />
     <Compile Include="Tally_VoteParser.fs" />
     <Compile Include="BlockState.fs" />
     <Compile Include="ExtendedBlockHeader.fs" />

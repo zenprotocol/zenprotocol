@@ -1,5 +1,6 @@
 module Blockchain.Tally.Handler
 open Blockchain
+open Blockchain.Tally.Repository
 open Consensus
 open Chain
 open Infrastructure
@@ -61,6 +62,49 @@ module DA =
             : PKPayout =
             PKPayout.tryGet dataAccess dataAccess.session interval
             |> Option.defaultValue Map.empty
+    module Winner =
+        let rec getFirstAllocation dataAccess interval : byte =
+            if interval = 1ul then
+                0uy
+            else 
+               match Winner.tryGet dataAccess dataAccess.session interval with
+               | Some {allocation = Some al; payout = _ } ->
+                   al
+               | _ ->
+                   getFirstAllocation dataAccess (interval - 1ul)
+    module Nominees =
+        let get dataAccess (chainParams : ChainParameters) interval lastAllocation =
+            
+            let lastFund =
+                Fund.get dataAccess interval
+            
+            let balances =
+                PKBalance.get dataAccess interval
+            
+            let nomineesBallots =
+                PKNominee.get dataAccess interval
+            
+            let allocationBallots =
+                PKAllocation.get dataAccess interval
+            
+            let payoutBallots =
+                PKPayout.get dataAccess interval
+            
+            let env : Tally.Env =
+                {
+                    cgpContractId         = chainParams.cgpContractId
+                    nominationThreshold   = chainParams.payoutNominationThreshold
+                    coinbaseCorrectionCap = Tally.allocationToCoinbaseRatio chainParams.allocationCorrectionCap
+                    lowerCoinbaseBound    = Tally.allocationToCoinbaseRatio chainParams.upperAllocationBound
+                    lastCoinbaseRatio     = Tally.allocationToCoinbaseRatio lastAllocation
+                    lastFund              = lastFund
+                    nomineesBallots       = nomineesBallots
+                    balances              = balances
+                    allocationBallots     = allocationBallots
+                    payoutBallots         = payoutBallots
+                }
+                
+            Nomination.computeNominees env
 
     module Tally =
         
@@ -205,7 +249,6 @@ module Handler =
             
             lazy
                 
-            //I don't believe we need to consider the maturity here
             let validMaturity = CGP.getSnapshotBlock chainParams interval - chainParams.coinbaseMaturity
             
             let updateBalance (pkHash : Hash.Hash, amount : uint64) =
@@ -278,11 +321,17 @@ module Handler =
     
     module Nominees =
         
-        let update op dataAccess interval chainParams block =
-            
+        let update op dataAccess interval chainParams =
             lazy
-                
-            ()
+            
+            match op with
+            | Add ->
+                let lastAllocation = DA.Winner.getFirstAllocation dataAccess interval
+                DA.Nominees.get dataAccess chainParams interval lastAllocation
+                |> Nominees.put dataAccess dataAccess.session interval
+            
+            | Remove ->
+                Nominees.delete dataAccess dataAccess.session interval
     
     module VoteUtxo =
         
@@ -356,23 +405,13 @@ module Handler =
     
     module Winner =
         
-        let rec getFirstAllocation dataAccess interval : byte =
-            if interval = 1ul then
-                0uy
-            else 
-               match Winner.tryGet dataAccess dataAccess.session interval with
-               | Some {allocation = Some al; payout = _ } ->
-                   al
-               | _ ->
-                   getFirstAllocation dataAccess (interval - 1ul)
-        
         let update op dataAccess interval chainParams =
             
             lazy
             
             match op with
             | Add ->
-                let lastAllocation = getFirstAllocation dataAccess interval
+                let lastAllocation = DA.Winner.getFirstAllocation dataAccess interval
                 let tally = DA.Tally.get dataAccess chainParams (interval - 1u) lastAllocation
                 let winner = Voting.getWinner tally 
                 
@@ -433,6 +472,8 @@ module Handler =
                      yield Fund      .update op dataAccess interval chainParams
             if snapshot < blockNumber && blockNumber <= endOfNomination
                 then yield PKNominee .update op dataAccess interval chainParams block
+            if blockNumber = endOfNomination
+                then yield Nominees  .update op dataAccess interval chainParams
             if endOfNomination < blockNumber && blockNumber <= endOfInterval
                 then yield PKBallot  .update op dataAccess interval chainParams block
             if true 

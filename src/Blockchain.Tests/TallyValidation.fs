@@ -4,12 +4,16 @@ open Blockchain.Tally.Tally
 open Blockchain.Tally.Voting
 open Consensus.Types
 open Consensus
+open Consensus
+open Consensus.Tests
+open Consensus.Tests
 open Crypto
 open NUnit.Framework
 open FsCheck
 open FsCheck.NUnit
 
 let someone = PKRecipient Hash.zero
+let cgpContract = ContractRecipient BlockCGPTests.cgpContractId
 let someoneElse = ContractRecipient (ContractId (0ul, Hash.zero))
 
 let asset0 = Asset.defaultOf (ContractId (1u, Hash.zero))
@@ -25,6 +29,8 @@ let ``should be`` (expected : 'a) (actual : 'a) : unit =
 let ``validateCoibaseRatio coinbase correction cap`` () =
      
      let env = {
+          cgpContractId         = BlockCGPTests.cgpContractId
+          nominationThreshold   = 0UL
           coinbaseCorrectionCap = CoinbaseRatio 90uy
           lowerCoinbaseBound    = CoinbaseRatio 10uy
           lastCoinbaseRatio     = CoinbaseRatio 20uy
@@ -75,6 +81,8 @@ let ``validateCoibaseRatio coinbase correction cap`` () =
 let ``validateCoibaseRatio lower coinbase bound`` () =
      
      let env = {
+          cgpContractId         = BlockCGPTests.cgpContractId
+          nominationThreshold   = 0UL
           coinbaseCorrectionCap = CoinbaseRatio 80uy
           lowerCoinbaseBound    = CoinbaseRatio 20uy
           lastCoinbaseRatio     = CoinbaseRatio 22uy
@@ -102,6 +110,8 @@ let ``validateCoibaseRatio lower coinbase bound`` () =
      |> ``should be`` None
      
      let env = {
+          cgpContractId         = BlockCGPTests.cgpContractId
+          nominationThreshold   = 0UL
           coinbaseCorrectionCap = CoinbaseRatio 20uy
           lowerCoinbaseBound    = CoinbaseRatio 5uy
           lastCoinbaseRatio     = CoinbaseRatio 8uy
@@ -136,6 +146,8 @@ let ``validateCoibaseRatio lower coinbase bound`` () =
 let ``validateCoibaseRatio upper coinbase bound`` () =
      
      let env = {
+          cgpContractId         = BlockCGPTests.cgpContractId
+          nominationThreshold   = 0UL
           coinbaseCorrectionCap = CoinbaseRatio 80uy
           lowerCoinbaseBound    = CoinbaseRatio 20uy
           lastCoinbaseRatio     = CoinbaseRatio 98uy
@@ -159,10 +171,12 @@ let ``validateCoibaseRatio upper coinbase bound`` () =
      |> ``should be`` None
      
 
-[<Test>]
+[<Test>] //;IgnoreAttribute("add Nominees")>]
 let ``validatePayout tests`` () =
      
      let env = {
+          cgpContractId         = BlockCGPTests.cgpContractId
+          nominationThreshold   = 0UL
           coinbaseCorrectionCap = CoinbaseRatio 90uy
           lowerCoinbaseBound    = CoinbaseRatio 10uy
           lastCoinbaseRatio     = CoinbaseRatio 20uy
@@ -185,9 +199,15 @@ let ``validatePayout tests`` () =
      validatePayout env vote
      |> ``should be`` None
      
-     let env = { env with lastFund = Map.empty |> Map.add Asset.Zen 1UL }
+     let genPk = PublicKey.fromString "02bc15ee2d0073ec3f9d0f9a61f63027e9d5b6202faed8792836c42cbdb3cd4423" |> Option.get
+     let genPkHash = genPk |> PublicKey.hash
+     let env = { env with
+                    lastFund = Map.empty |> Map.add Asset.Zen 1UL
+                    nomineesBallots = Map.add genPk (someone, [{asset=Asset.Zen; amount=1UL }]) Map.empty
+                    balances        = Map.add genPkHash 10000UL Map.empty
+                  }
      
-     let vote = (someone, [{asset=Asset.Zen; amount=1UL}])
+     let vote = (cgpContract, [{asset=Asset.Zen; amount=1UL}])
      validatePayout env vote
      |> ``should be`` (Some vote)
      
@@ -201,17 +221,22 @@ let ``validatePayout tests`` () =
      validatePayout env vote
      |> ``should be`` None
      
-     let env = { env with lastFund =
+     let env = { env with
+                         lastFund =
                               Map.empty
                               |> Map.add Asset.Zen 2UL
                               |> Map.add asset0 5UL
+                         nomineesBallots =
+                              Map.empty
+                              |> Map.add genPk (someone, [{asset=Asset.Zen; amount=2UL}])
+                         balances        = Map.add genPkHash 10000UL Map.empty
                               }
      
-     let vote = (someone, [{asset=Asset.Zen; amount=1UL}])
+     let vote = (cgpContract, [{asset=Asset.Zen; amount=1UL}])
      validatePayout env vote
      |> ``should be`` (Some vote)
      
-     let vote = (someone, [{asset=Asset.Zen; amount=1UL}; {asset=Asset.Zen; amount=1UL}])
+     let vote = (someone, [{asset=Asset.Zen; amount=2UL}])
      validatePayout env vote
      |> ``should be`` (Some vote)
      
@@ -219,7 +244,18 @@ let ``validatePayout tests`` () =
      validatePayout env vote
      |> ``should be`` None
      
-     let vote = (someone, [{asset=Asset.Zen; amount=1UL}; {asset=asset0; amount=5UL}])
+     let env = { env with
+                    lastFund =
+                         Map.empty
+                         |> Map.add Asset.Zen 2UL
+                         |> Map.add asset0 5UL
+                    nomineesBallots =
+                         Map.empty
+                         |> Map.add genPk (someoneElse, [{asset=Asset.Zen; amount=1UL}; {asset=asset0; amount=5UL}])
+                    balances        = Map.add genPkHash 10000UL Map.empty
+                         }
+     
+     let vote = (someoneElse, [{asset=Asset.Zen; amount=1UL}; {asset=asset0; amount=5UL}])
      validatePayout env vote
      |> ``should be`` (Some vote)
      
@@ -303,12 +339,15 @@ let ``validate Tally`` () =
      let assets = genAsset 100ul
      
      let env = {
+          cgpContractId         = BlockCGPTests.cgpContractId
+          nominationThreshold   = 0UL
           coinbaseCorrectionCap = CoinbaseRatio 90uy
           lowerCoinbaseBound    = CoinbaseRatio 10uy
           lastCoinbaseRatio     = CoinbaseRatio 100uy
           lastFund              =
                List.fold (fun map n -> Map.add assets 500UL map) Map.empty [1..100]
-          nomineesBallots       = Map.empty
+          nomineesBallots       =
+               Map.add (genPk) (PKRecipient (genPk |> PublicKey.hash), [1] |> List.map (fun n -> {asset=assets; amount=1UL *(uint64 n)})) Map.empty
           balances              = Map.add (genPkHash) 50UL Map.empty
           allocationBallots     = Map.add (genPk ) 1uy Map.empty
           payoutBallots         =
