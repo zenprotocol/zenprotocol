@@ -2,119 +2,176 @@
 
 This proposed protocol upgrade would seek to create a '**Common Goods Pool**' (or '**CGP**'), which would hold assets, and distribute its funds according to an on-chain vote open to ZP holders.
 
-Users will be able to vote on the proportion of the coinbase outputs locked to the CGP contract.
+The CGP contract is a custodian contract which can unlock ('**pay out**') some of its available assets to a specified recipient - a PK address or a contract.
+
+For each block - some portion of the coinbase transaction (called "**allocation**")
+will be locked to the CGP contract instead of the miner.
+
+Since the CGP is a contract, users would also be able to **donate** any
+amount of any asset they own to the CGP, allowing the CGP to hold tokens
+of any kind of Zen Protocol asset.
+
+Users will be able to vote on the portion of the coinbase outputs locked to the CGP contract ("**allocation**" vote),
+and on the recipient and spends (assets and amounts) of each payout ("**payout**" vote).
+
+Voting for allocation could be done anytime during the voting phase, however - voting for payout is split into 2 phases - nomination phase and voting phase.
+
+1. The **Nomination Phase** - in which payout contestants are trying to become valid payout **nominees**.
+
+2. The **Voting Phase** - in which valid payout nominees are trying to get the payout.
 
 ### Interval blocks
-    VoteInterval        = from (10,000 * N + 9,001) to (10,000 * N + 10,000)
-    TallyActorExecution = 10,000 * N + 10,050
-    AllocationInterval  = from (10,000 * N + 10,101) to (10,000 * N + 20,100)
 
+  * **Blockchain Interval:**
 
-# Voting
+      From `10,000 * (N-1) + 1` to `10,000 * N` (including boundaries)
 
-### Voting Intervals
+      The whole process takes places in intervals of `10,000` blocks
+      starting from the genesis.
 
-Vote Intervals occur every 10,000 blocks.
+  * **Voting Interval:**
 
-In order to vote you must have your ZP in your wallet by the vote snapshot, after which users are provided with a time frame of 1,000 blocks to cast a vote.
+      From `10,000 * (N-1) + 9,001` to `10,000 * N` (including boundaries)
 
-    VoteSnapshot      = 10,000 * N + 9,000
-    VoteIntervalStart = 10,000 * N + 9,001
-    VoteIntervalEnd   = 10,000 * N + 10,000
-    (where N is the interval number)
+      The actual voting takes place here.
 
-The weight of your vote will be determined by the amount of available ZP you have by the time of the snapshot.
+      Split into 2 **phases**:
 
-### Casting a Ballot
+      1. **Nomination Phase:**
 
-Users cast a ballot by sending meta data (using the contract message body) to the Voting contract.
+        From `10,000 * (N-1) + 9,001` to `10,000 * (N-1) + 9,500` (including boundaries)
 
-The Tally Actor will count the votes, and determine the winner.
+        Nominating contestants for the payout
+
+      2. **Voting Phase:**
+
+        From `10,000 * (N-1) + 9,501` to `10,000 * N` (including boundaries)
+
+        Voting on which nominee gets the payout
+
+  * **Snapshot Block:**
+
+      `10,000 * (N-1) + 9,000`
+
+      All the votes are weighted and validated by using the state of the UTXOs set at this block.
+
+  * **Payout Block:**
+
+      `10,000 * N + 100`
+
+      The payout and allocation change takes place at this block.
+
+## Payout
+
+The **CGP Contract** execution will return a valid transaction only if the following conditions hold:
+
+  1. There are sufficient funds for the CGP contract to cover all the outputs of the payout transaction.
+
+  2. The payout transaction contains at least 1 output and no more than 100 outputs.
+
+## Allocation
+
+With each mined block, in the coinbase transaction, a percentage of the reward of that block will be sent by the miner to the CGP contract.
+
+This percentage is called “**The Coinbase Allocation**”.
+
+## Voting
+
+Users cast a ballot by sending the voting data (using the contract message body) to the Voting contract.
+
+The Tally will count the votes, and determine the winner.
 
 Users may vote for 2 independent items:
 
-    • 'CgpAllocation': Users vote on the % of the block reward to be gifted to the CGP each block.
-    (Nodes will not build on top of a block that does not contain an coinbase transaction with a sufficient AllocationOutput)
+* `Allocation`: Users vote on the % of the block reward to be allocated to the CGP each block.
+(Nodes will not build on top of a block that does not contain a coinbase transaction with sufficient allocation output)
 
-    • 'PayoutTx': Each voting interval people can vote on the recipient and the list of assets & amounts the recipient will receive.
+* `Payout`: Each voting interval users can vote on the recipient and the list of assets & amounts the recipient will receive
 
-### Tallying
+### Tally Calculation
 
-At the end of the voting interval an external actor will calculate the vote (this provides for proper modulation and implements best - such as soft fork - practices).
+At the end of the voting interval the tally will calculate the votes.
 
-    TallyActorExecution = 10,000 * N + 10,050
+The Tally will only count the 1st vote for each PK,
+and only when it is executed within the voting interval.
+The vote also has to have a valid ballot to count.
 
-The Tally Actor will consider a vote as valid if it:
+### Allocation Ballot Validation
 
-    1. Does not attempt to vote with the same ZP more than once per interval for each item.
+An allocation ballot is considered as valid as long as the following conditions hold:
 
-    2. That the %Δ of the CgpAllocation between intervals is => 15%
+1. It doesn’t exceed the upper allocation bound (`90%`).
 
-    3. That the CgpAllocation % is no larger than 90%.
+2. It is no bigger and no smaller than the allocation correction cap (`15%`) relative (proportional) to the allocation of the last block.
 
-    4. That the PayoutTx votes to pay out assets which are UTXOs of the CgpContract at the snapshot block.
+### Payout Ballot Validation
+
+Voting on payout is done in 2 phases, each with its own validity rules:
+
+1. **Nomination Phase:**
+
+    A payout ballot will become a valid nominee if the following conditions hold:
+
+    a. At the snapshot the CGP contract has enough funds to cover it
+
+    b. The spend list length is between 1 and 100 elements
+
+    c. The spend list must be sorted in lexicographical order (over the asset ids) and the assets must to be unique
+
+    d. The aggregated vote weight of the contestant is at least 3% of the total issued ZP at the snapshot block
+
+2. **Voting Phase:**
+
+    During the voting phase payout votes can only be made for a valid nominee.
+
+    There is a special nominee which is always valid as long as there are sufficient funds in the CGP regardless of the results of the nomination, which is a payout of 1 kalapa to the CGP itself - this is the **default** vote which a user can vote on to effectively prevent a payout.
+
+## Block Validation
+
+The following validation rule has been added:
+
+* The **coinbase transaction** may now contain an output with a **contract lock**, along with the usual **coinbase** output.
+
+* To be sure that the CGP contract can always be executed we increase the upper limit of the block weight.
 
 ### Block Rewards
 
-Our previous implementation invalidates a coinbase transaction if it locks an output to anything besides the "CoinbaseLocktype"
+The previous implementation invalidates a coinbase transaction if it locks an output to anything besides the Coinbase lock.
+
 We relax this restriction and consider a coinbase transaction valid if its outputs are locked to either a Coinbase lock or a Contract lock.
-Whereas currently there is a fixed  paid entirely to the miner who mines a block (using a Coinbase lock), this proposal would allow users to accept a block as valid only if a sufficient amount
-of ZP are locked to the CgpContract.
 
-It will be possible to vote during a voting interval for a particular distribution of the blockReward between the miner and the CGP.
+Whereas currently there is a fixed amount paid entirely to the miner who mines a block (using a Coinbase lock), this proposal would allow users to accept a block as valid only if the correct amount of ZP is locked to the CGP contract.
 
-The distribution of the blockReward between the miner and CGP in a particular block shall be determined by the the vote in the previous voting interval.
+It will be possible to vote during a voting interval for a particular distribution of the block reward between the miner and the CGP.
 
-The allocation winner resulting from votes in a particular voting interval shall be considered to be the weighted median of votes for particular distributions in that voting interval.
+The distribution of the block reward between the miner and CGP in a particular block will be determined by the vote in the previous voting interval.
 
-There shall be a limit as to the largest possible percentage change in blockReward distribution resulting from a vote in a single voting interval.
+The allocation winner resulting from votes in a particular voting interval will be the weighted median of votes for the allocation in that voting interval.
 
-This proposal sets the bounds to the largest possible percentage change in blockReward distribution (Δ to miner's income) resulting from a vote in a single voting interval at `15%`.
+There will be a limit as to the largest possible percentage change in block reward distribution resulting from a vote in a single voting interval.
 
-The winning allocation % comes into effect 100 blocks after the voting interval finishes.
+This proposal sets the bounds to the largest possible percentage change in the block reward distribution (% to miner's income) resulting from a vote in a single voting interval at `15%`.
 
-    AllocationIntervalStart = 10,000 * N + 10,101
-    AllocationIntervalEnd   = 10,000 * N + 20,100
+The winning allocation % comes into effect 100 blocks (the size of the coinbase maturity) after the voting interval finishes.
 
-## Payout Transactions
-Payout Transactions occur at the beginning of an allocation interval.
+## Connection
 
-PayoutBlock = 10,000 * N + 10,101
+When extending the local blockchain we check:
 
-### Example
+  1. The correct distribution of the block reward + fees, according to the allocations declared by the allocation tally winner.
 
-Suppose the vote at the end of the voting interval is as follows:
+  2. The contract lock output is locked to the CGP contract, and the amount matches the payout tally winner.
 
-| CGP Block Reward Allocation (%) | Total number of votes | Cumulative Total |
-|:-------------------------------:|:---------------------:|:----------------:|
-| 0                               | 1800                  | 1800
-| 10                              | 1560                  | 3360
-| 20                              | 1353                  | 4713
-| 30                              | 1173                  | 5886
-| 40                              | 1016                  | 6902
-| 50                              | 881                   | 7783
-| 60                              | 764                   | 8547
-| 70                              | 662                   | 9209
-| 80                              | 574                   | 9783
-| 90                              | 217                   | 10000
+The CGP contract must be executed one block before and added to the payout block.
 
-Here the weighted median would be the midpoint of the reward vs cumulative total votes, which would be `30%`. If the distribution of block rewards at the start of the voting interval was set at `0%` allocated to the CGP, and `100%` allocated to miners, then the weighted median presents a change greater than `15%`, and so the outcome distribution would be `15%` of the block reward going to the CGP, and `85%` going to the miner during the next voting interval.
+For the payout block - the node checks that the following conditions hold:
 
-## CGP Payouts
+  1. If there is a payout winner for the tally of the previous interval - there must also be a payout in the payout block after that interval.
 
-It will be possible to vote during a voting interval for a specific payout of funds controlled by the CgpContract to a public key hash or contract.
-The CgpContract will pay out at the start of an allocation interval, and the amount and recipient for this payout of its funds shall be determined by the vote in the previous voting interval.
-As there is no objectively superior voting scheme for this case (consider approval voting, alternative voting, etc.) the scheme used to determine the payout from votes in the previous voting interval shall be 'winner takes all', as in the proposed payout with the greatest amount of votes in the previous voting interval will be the payout that is made.
-### Example
+  2. There is at most one payout transaction per payout block.
 
-Suppose the vote at the end of the a voting interval is as follows:
+  3. The payout transaction matches the payout winner of the tally.
 
-| Payout Recipient | Payout List    | Total number of votes |
-|:----------------:|:--------------:|:---------------------:|
-| PKHash Alice     | 4000 ZP        | 2700
-| PKHash Alice     | 9000 Asset1    | 2800
-| PKHash Bob       | 8000 ZP        | 1500
-| ContractID C     | 2000 ZP, Asset1| 3000
+## Links
 
-Here the proposal with the greatest total number of votes is that `ContractID C` would receive `2000ZP and 10 USDT`, and so the CGP will make this payout at the start of the next voting interval.
-
+Try the [Release Candidate](https://blockchaindevelopmentltd.com/proposal)
