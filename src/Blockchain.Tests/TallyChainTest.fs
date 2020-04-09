@@ -23,9 +23,11 @@ open Api.Types
 open System
 open Blockchain.Tally
 open Blockchain.Tests
+open Consensus
 open Consensus.Tests
 open Consensus.Tests
 open Consensus.Tests
+open Consensus.Types
 open TestsInfrastructure.Constraints
 open Messaging.Services
 open Helper
@@ -86,10 +88,10 @@ let state = {
     cgp = {allocation = 0uy; payout= None}
 }
 
-let addBlock (env:Environment.Env) block =
-    Tally.Handler.addBlock env.session env.chainParams block
-let removeBlock (env:Environment.Env) block =
-     Tally.Handler.removeBlock env.session env.chainParams block
+let addBlock (env:Environment.Env) utxoSet block =
+    Tally.Handler.addBlock env.session env.chainParams utxoSet block
+let removeBlock (env:Environment.Env) utxoSet block =
+     Tally.Handler.removeBlock env.session env.chainParams utxoSet block
 
 let private sign message path : Result<Crypto.Signature,string> =
     result {
@@ -297,18 +299,11 @@ let ``Tally modules are reverted to its previous state `` () =
         List.head (blocks|>List.rev), blocks |> List.take 89
 
     for block in mainChain do
-        addBlock env block
+        addBlock env utxoSet block
         Tally.Repository.VoteTip.put session session.session (Block.hash block.header)
 
     let pkBalanceBefore =
         Tally.Repository.PKBalance.tryGet session session.session 1ul
-        |> Option.map Map.toList
-        |> Option.map List.sort
-        |> Option.defaultValue []
-    
-    let utxosBefore =
-        Tally.Repository.VoteUtxoSet.tryGet session session.session 1ul
-        |> Option.map (Map.filter (fun _ -> function | UtxoSet.NoOutput -> false | _ -> true))
         |> Option.map Map.toList
         |> Option.map List.sort
         |> Option.defaultValue []
@@ -319,22 +314,15 @@ let ``Tally modules are reverted to its previous state `` () =
         |> Option.map List.sort
         |> Option.defaultValue []
     
-    addBlock env snapshot
+    addBlock env utxoSet snapshot
     Tally.Repository.VoteTip.put session session.session (Block.hash snapshot.header)
-    removeBlock env snapshot
+    removeBlock env utxoSet snapshot
     
     let pkBalanceAfter =
         Tally.Repository.PKBalance.tryGet session session.session 1ul
         |> Option.map Map.toList
         |> Option.map List.sort
         |> Option.defaultValue [] 
-    
-    let utxosAfter =
-        Tally.Repository.VoteUtxoSet.tryGet session session.session 1ul
-        |> Option.map (Map.filter (fun _ -> function | UtxoSet.NoOutput -> false | _ -> true))
-        |> Option.map Map.toList
-        |> Option.map List.sort
-        |> Option.defaultValue []
     
     let fundAfter =
         Tally.Repository.Fund.tryGet session session.session 1ul
@@ -345,18 +333,19 @@ let ``Tally modules are reverted to its previous state `` () =
 
     
     pkBalanceBefore |> should equal pkBalanceAfter
-    utxosBefore |> should equal utxosAfter
     fundBefore |> should equal fundAfter
 
 [<Test>]
 let ``Tally modules in the voting interval are reverted to its previous state `` () =
     use databaseContext = DatabaseContext.createEmpty (tempDir())
     use session = DatabaseContext.createSession databaseContext
+
     let ballot = (Allocation 5uy)
-     
+    let tx = createVoteTransaction session rootAccount 91ul timestamp ballot
     let cgps : IntervalCGPMap = Map.add 1ul {allocation = 5uy; payout= None} Map.empty
-    let txs : BlockNumberEXMap = Map.add 91ul [(createVoteTransaction session rootAccount 91ul timestamp ballot |> Transaction.toExtended)] Map.empty
+    let txs : BlockNumberEXMap = Map.add 91ul [tx|> Transaction.toExtended] Map.empty
     let mainChainBlocks, _ = createChainFromGenesisWithSession 101 0 cgps txs
+    
     let env : Environment.Env =
         {
             chainParams   = chain
@@ -370,8 +359,9 @@ let ``Tally modules in the voting interval are reverted to its previous state ``
         let blocks = mainChainBlocks |> List.take 100
         List.head (blocks|>List.rev), blocks |> List.take 99
         
-    for block in mainChain do
-        addBlock env block
+    let utxoSet =
+        validateChain session mainChain state
+        |> fun (_,s) -> s.memoryState.utxoSet
 
     let pkBalanceBefore =
         Tally.Repository.PKBalance.tryGet session session.session 1ul
@@ -379,12 +369,6 @@ let ``Tally modules in the voting interval are reverted to its previous state ``
         |> Option.map List.sort
         |> Option.defaultValue []
     
-    let utxosBefore =
-        Tally.Repository.VoteUtxoSet.tryGet session session.session 1ul
-        |> Option.map (Map.filter (fun _ -> function | UtxoSet.NoOutput -> false | _ -> true))
-        |> Option.map Map.toList
-        |> Option.map List.sort
-        |> Option.defaultValue []
     
     let fundBefore =
         Tally.Repository.Fund.tryGet session session.session 1ul
@@ -404,9 +388,9 @@ let ``Tally modules in the voting interval are reverted to its previous state ``
         |> Option.map List.sort
         |> Option.defaultValue []
     
-    addBlock env endOfInterval
+    addBlock env utxoSet endOfInterval
 
-    removeBlock env endOfInterval
+    removeBlock env utxoSet endOfInterval
     
     let pkBalanceAfter =
         Tally.Repository.PKBalance.tryGet session session.session 1ul
@@ -414,12 +398,6 @@ let ``Tally modules in the voting interval are reverted to its previous state ``
         |> Option.map List.sort
         |> Option.defaultValue [] 
     
-    let utxosAfter =
-        Tally.Repository.VoteUtxoSet.tryGet session session.session 1ul
-        |> Option.map (Map.filter (fun _ -> function | UtxoSet.NoOutput -> false | _ -> true))
-        |> Option.map Map.toList
-        |> Option.map List.sort
-        |> Option.defaultValue []
     
     let fundAfter =
         Tally.Repository.Fund.tryGet session session.session 1ul
@@ -441,7 +419,6 @@ let ``Tally modules in the voting interval are reverted to its previous state ``
     
         
     pkBalanceBefore |> should equal pkBalanceAfter
-    utxosBefore |> should equal utxosAfter
     fundBefore |> should equal fundAfter
     pkAllocBefore |> should equal pkAllocAfter
     pkPayoutBefore |> should equal pkPayoutAfter

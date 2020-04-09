@@ -356,22 +356,6 @@ module PKPayout =
     let serialize = Serialization.serialize size write
     let deserialize = Serialization.deserialize read
     
-module VoteUtxo =
-    
-    let size voteUtxo =
-        Map.size (fun (outpoint, outputStatus) -> 
-            Outpoint.size outpoint + 
-            OutputStatus.size outputStatus) voteUtxo
-    let write (stream:Stream) = fun (voteUtxo:VoteUtxo) ->
-        Map.write (fun stream (outpoint, outputStatus)->
-                Outpoint.write stream outpoint
-                OutputStatus.write stream outputStatus) stream voteUtxo
-    let read (stream:Stream) =
-        Map.read (fun stream -> Outpoint.read stream, OutputStatus.read stream) stream
-        
-    let serialize = Serialization.serialize size write
-    let deserialize = Serialization.deserialize read
-
 module Winner =
     //TOOD: make allocation a byte instead of an option<Byte> (not urgent)
     let size = fun ({ allocation = allocation; payout = payout } : Types.Winner) ->

@@ -348,7 +348,7 @@ let private handleGenesisBlock
             let extendedHeader =
                 ExtHeader.createGenesis blockHash block
 
-            Tally.Handler.addBlock env.session env.chainParams block
+            Tally.Handler.addBlock env.session env.chainParams connState.utxoSet block
 
             BlockRepository.saveHeader env.session extendedHeader
 
@@ -471,7 +471,7 @@ let private handleMainChain
                     memoryState =
                         { state.memoryState with contractCache = connState.contractCache }
                 }
-            Tally.Handler.addBlock env.session env.chainParams block
+            Tally.Handler.addBlock env.session env.chainParams connState.utxoSet block
 
             let extendedHeader =
                 ExtHeader.createMain parent blockHash block
@@ -577,11 +577,8 @@ let private handleForkChain
                 let tip =
                     ExtHeader.markAsMain origState.header
 
-                removeTallyBlocks env forkBlock currentTip
-                
-                Chain.updateTip env.session origState.connection forkState.header
-                
-                addTallyBlocks env forkBlock tip
+                removeTallyBlocks env state.memoryState.utxoSet forkBlock currentTip
+                addTallyBlocks env forkState.utxoSet forkBlock tip
 
                 Chain.updateTip env.session origState.connection tip
 

@@ -42,7 +42,6 @@ type T =
         nomineesWinner: Collection<Interval, Candidates>
         winner: Collection<Interval, Winner>
         funds: Collection<Interval, Fund.T>
-        voteUtxo: Collection<Interval, VoteUtxo>
         voteTip: SingleValue<Hash.Hash>
     }
     interface System.IDisposable with
@@ -200,10 +199,6 @@ let create dataPath =
         Collection.create session "funds" VarInt.serialize
             Fund.serialize
             Fund.deserialize
-    let voteUtxo =
-        Collection.create session "voteUtxo" VarInt.serialize
-            VoteUtxo.serialize
-            VoteUtxo.deserialize
 
     let voteTip =
         SingleValue.create databaseContext "voteTip" Hash.bytes
@@ -233,7 +228,6 @@ let create dataPath =
             nomineesWinner = nomineesWinner
             winner = winner
             funds = funds
-            voteUtxo = voteUtxo
             voteTip = voteTip
         }
 

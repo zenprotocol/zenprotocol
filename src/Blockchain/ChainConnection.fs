@@ -92,8 +92,12 @@ let private connectTip
                 origState
                 
             | Ok (block, connState) ->
-                
-    
+                match op with
+                | Main -> 
+                    Tally.Handler.addBlock env.session env.chainParams connState.utxoSet block
+                | Fork ->
+                    ()
+
                 BlockRepository.saveBlockState env.session tip.hash
                     {
                         ema =
@@ -123,19 +127,7 @@ let rec private connectTips
     : OriginState
     =
     let mutable state = origState
-    match op with
-    | Main ->
-        for tip in tips do
-            let block =
-                BlockRepository.getFullBlock env.session tip
-            Handler.addBlock env.session env .chainParams block
-            state <- connectTip env op state tip
-        for tip in List.rev tips do
-            let block =
-                BlockRepository.getFullBlock env.session tip
-            Handler.removeBlock env.session env.chainParams block
-    | Fork ->
-        for tip in tips do
+    for tip in tips do
             state <- connectTip env op state tip
     state
 
@@ -178,7 +170,7 @@ let connectLongestChain
             if ExtHeader.chainWork state.header > ExtHeader.chainWork bestState.header then
                 state
             else
-                bestState
+                { state with header = bestState.header }
         else
             bestState
     
@@ -186,12 +178,6 @@ let connectLongestChain
         List.fold connect origState chains
     
     if ExtHeader.chainWork bestState.header > minChainWork then
-        match op with
-        | Main ->
-            getHeaders env origState.header bestState.header
-            |> Tally.Handler.addTallyBlockFromHeaders env
-        | Fork ->
-            ()
         Some bestState
     else
         None
