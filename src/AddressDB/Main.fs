@@ -66,6 +66,10 @@ let requestHandler chain (requestId:RequestId) request dataAccess session view =
         decodeAddresses addresses
         <@> Repository.getOutputs dataAccess session view mode
         |> reply<List<PointedOutput>> requestId
+    | GetTransactionCount (addresses, blockNumber) ->
+        decodeAddresses addresses
+        <@> Repository.getTransactionCount dataAccess session view blockNumber
+        |> reply<int> requestId
     | GetTransactions (addresses, skip, take) ->
         decodeAddresses addresses
         <@> Repository.getHistory dataAccess session view skip take
