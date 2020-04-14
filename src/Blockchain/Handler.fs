@@ -5,7 +5,6 @@ open Result
 open Writer
 open ServiceBus.Agent
 open Messaging.Services
-open Messaging.Events
 open Consensus
 open Blockchain
 open EffectsWriter
@@ -13,8 +12,8 @@ open Consensus.Types
 open State
 open DatabaseContext
 open Logary.Message
-open Infrastructure.Result
 open Chain
+open Environment
 
 let getUnionCaseName (x:'a) =
     match Microsoft.FSharp.Reflection.FSharpValue.GetUnionFields(x, typeof<'a>) with
@@ -41,13 +40,16 @@ let handleCommand chainParams command session timestamp (state:State) =
 
     let contractPath = session.context.contractPath
 
+    let env : Env =
+        {
+            chainParams   = chainParams
+            contractsPath = contractPath
+            timestamp     = timestamp
+            session       = session
+        }
+
     let result =
         match command with
-        | SetCGP winner ->
-            effectsWriter {
-                let cgp = CGP.update winner state.cgp
-                return {state with cgp = cgp}
-            }
         | ValidateTransaction ex ->
             effectsWriter {
                 let! memoryState =
@@ -84,13 +86,13 @@ let handleCommand chainParams command session timestamp (state:State) =
                 return state
             }
         | ValidateBlock (peerId,block) ->
-            BlockHandler.validateBlock chainParams contractPath session timestamp (Some peerId) block false state
+            BlockHandler.validateBlock env (Some peerId) block state
         | ValidateMinedBlock block ->
-            BlockHandler.validateBlock chainParams contractPath session timestamp None block true state
+            BlockHandler.validateBlock env None block state
         | HandleTip (peerId,header) ->
-            BlockHandler.handleTip chainParams session timestamp peerId header state
+            BlockHandler.handleTip env peerId header state
         | ValidateNewBlockHeader (peerId, header) ->
-            BlockHandler.handleNewBlockHeader chainParams session timestamp peerId header state
+            BlockHandler.validateNewBlockHeader env peerId header state
         | RequestTip peerId ->
             effectsWriter {
                 if state.tipState.tip <> ExtendedBlockHeader.empty then
@@ -133,6 +135,15 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
         TransactionHandler.executeContract session txSkeleton timestamp contractId command sender messageBody state false
         |> requestId.reply<Result<Transaction, string>>
     | GetBlockTemplate pkHash ->
+        let state =
+            let nextBlockNumber = state.tipState.tip.header.blockNumber + 1ul
+            if CGP.isPayoutBlock chain nextBlockNumber then
+                let interval = CGP.getInterval chain nextBlockNumber
+                let winner   = Tally.Handler.getWinner session interval
+                let cgp = CGP.update winner state.cgp
+                {state with cgp = cgp}
+            else
+                state
         BlockTemplateBuilder.makeTransactionList chain session state timestamp
         <@> fun (memState, validatedTransactions) ->
             Block.createTemplate chain state.tipState.tip.header timestamp state.tipState.ema memState.activeContractSet state.cgp validatedTransactions pkHash
@@ -280,15 +291,24 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
         <@> (fun _ -> ex.txHash)
         |> requestId.reply<Result<Hash.Hash,ValidationError.ValidationError>>
     | GetTotalZP ->
-        [2ul..state.tipState.tip.header.blockNumber]
-        |> List.fold (fun sum blockNumber -> sum + blockReward blockNumber state.cgp.allocation) (20_000_000UL * 100_000_000UL)
+        Chain.getCurrentZPIssuance chain state.tipState.tip.header.blockNumber
+        |> requestId.reply
+    | GetCandidates interval ->
+        Tally.Repository.Candidates.tryGet session session.session interval
+        |> Option.defaultValue []
         |> requestId.reply
     | GetBlockReward blockNumber ->
         blockReward blockNumber state.cgp.allocation
         |> (+) (blockAllocation blockNumber state.cgp.allocation)
         |> requestId.reply
     | GetCGP ->
-        state.cgp
+        let blockNumber = state.tipState.tip.header.blockNumber + 1ul
+        if CGP.isPayoutBlock chain blockNumber then
+            let interval = CGP.getInterval chain blockNumber
+            let winner   = Tally.Handler.getWinner session interval
+            CGP.update winner state.cgp
+        else
+            state.cgp
         |> requestId.reply<CGP.T>
     | GetCgpHistory ->
         let currentInterval = state.tipState.tip.header.blockNumber / chain.intervalLength
@@ -318,7 +338,7 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
         |> List.mapi (fun i cgp -> (uint32 i,cgp))
         |> requestId.reply<(uint32 * CGP.T) list>
     |> ignore
-           
+
     logEndAction timestamp "request" request
 
     ret state

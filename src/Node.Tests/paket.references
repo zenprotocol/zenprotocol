@@ -8,6 +8,7 @@ zen_z3_osx
 FSharp.Compiler.Tools
 ZFStar
 NUnit
+NBitcoin
 FsUnit
 System.Reflection.Metadata
 FSharp.Data

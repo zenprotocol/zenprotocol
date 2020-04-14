@@ -10,7 +10,7 @@ open Logary.Message
 
 let treshhold = 500ul
 
-let LastTickTimeout = 3UL * Second 
+let LastTickTimeout = 3UL * Second
 
 let NoResponseTimeout = 10UL * Second
 
@@ -72,7 +72,7 @@ let processHeaders chain session timestamp peerId (headers:BlockHeader list) ibd
         |> Log.info
 
         // check if any of the block is invalid, if so we quit the IBD process and ask for tips
-        let allValid = List.forall (Block.validateHeader chain >> Result.isOk) headers
+        let allValid = List.forall (BlockValidation.Header.validate chain >> Result.isOk) headers
 
         if not allValid then
             eventX "Process headers failed, not all headers are valid. Disconnect node and sending request again"

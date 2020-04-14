@@ -1,18 +1,135 @@
 module Blockchain.BlockTemplateBuilder
 
 open Consensus
+open ValidationError
+open Chain
+open Types
+open TransactionValidation
 
 open Infrastructure
-open ValidationError
 open Result
-open Consensus.TransactionValidation
+
 open Blockchain.State
-open Consensus
 
-let getUTXO = UtxoSetRepository.get
-let getContractState = ContractStateRepository.get
+open Logary.Message
 
-let result = new Result.ResultBuilder<string>()
+module ZData = Zen.Types.Data
+
+let result = Result.ResultBuilder<string>()
+
+
+module private CGP =
+    
+    open FSharpx.Reader
+    
+    let reader = FSharpx.Reader.reader
+    
+    let (<@|) = map
+    
+    let (|@>) x f = map f x
+    
+    type Env =
+        {
+            chain : ChainParameters
+            cgp   : CGP.T
+        }
+        static member getCGP =
+            ask |@> fun env -> env.cgp 
+        static member getChain =
+            ask |@> fun env -> env.chain
+        static member getEnv =
+            ask
+    
+    type E<'a> = Reader<Env, 'a>
+    
+    let hasValidData
+        ( msgBody : Option<Zen.Types.Data.data> )
+        : E< bool > = reader {
+            let! cgp = Env.getCGP
+            
+            let outputs =
+                msgBody
+                |> CGP.Contract.extractPayoutOutputs
+                |> Option.defaultValue []
+            
+            let winner =
+                cgp.payout
+                |> Option.map CGP.Connection.internalizeRecipient
+                |> Option.defaultValue []
+            
+            return List.sort outputs = List.sort winner
+        }
+    
+    let filterValidCgpTxs
+        ( xs : List<TransactionExtended * 'a> )
+        : E< List<TransactionExtended * 'a> > = reader {
+            let! env   = Env.getEnv
+            let! chain = Env.getChain
+            
+            let extractValidCGPWitnesses ex =
+                ex
+                |> CGP.Connection.extractPayoutWitnesses chain
+                |> List.filter (fun cw -> hasValidData cw.messageBody env)
+            
+            let isValidCgp =
+                fst
+                >> extractValidCGPWitnesses
+                >> List.isSingleton
+            
+            return List.choose (Option.validateWith isValidCgp) xs
+        }
+    
+    let removeAllCgpTxs
+        ( txs : List<TransactionExtended * 'a> )
+        : E< List<TransactionExtended * 'a> > = reader {
+            let! chain = Env.getChain
+            
+            let isNonCGP =
+                 fst
+                 >> CGP.Connection.extractPayoutWitnesses chain
+                 >> List.isEmpty
+            
+            return List.choose (Option.validateWith isNonCGP) txs
+        }
+    
+    let filterCGPExecutions
+        ( txs : List<TransactionExtended * 'a> )
+        : E< List<TransactionExtended * 'a> > = reader {
+            let! chain = Env.getChain
+            let! cgp   = Env.getCGP
+            
+            let payoutWitnesses =
+                txs
+                |> List.concatMap (fst >> CGP.Connection.extractPayoutWitnesses chain)
+            
+            // Either return the 1st valid CGP tx, or remove all the cgp txs
+            // (sorry for the convoluted implementation, it's more efficient this way)
+            let uniqueCgp = reader {
+                match! List.tryHead <@| filterValidCgpTxs txs with
+                | None ->
+                    eventX "No valid cgp transaction found, execute the contract correctly"
+                    |> Log.error
+                    return! Error <@| removeAllCgpTxs txs
+                | Some tx ->
+                    return Ok tx
+            }
+            
+            match cgp.payout with
+            | None ->
+                // we can safely remove the cgp txs as if there are none it will return an empty list
+                return! removeAllCgpTxs txs
+            | Some _ ->
+                match payoutWitnesses with
+                | [] ->
+                    eventX "You should create your own contract execution"
+                    |> Log.error
+                    return txs
+                | [_] ->
+                    return! uniqueCgp |@> Result.fromOk (fun _ -> txs)
+                | _ :: _ :: _ ->
+                    let! noCgpTxs = removeAllCgpTxs txs
+                    return! uniqueCgp |@> Result.fromOk (fun tx -> tx :: noCgpTxs)
+        }
 
 // We pre-compute the weights of all transactions in the mempool.
 // It may be better to compute the weights when transactions are inserted, but
@@ -22,7 +139,7 @@ let result = new Result.ResultBuilder<string>()
 let weights session state =
     MemPool.toList state.memoryState.mempool
     |> Result.traverseResultM (fun ex -> 
-        UtxoSet.tryGetOutputs (getUTXO session) state.memoryState.utxoSet ex.tx.inputs
+        UtxoSet.tryGetOutputs (UtxoSetRepository.get session) state.memoryState.utxoSet ex.tx.inputs
         |> Result.ofOption "could not get outputs"
         <@> TxSkeleton.fromTransaction ex.tx
         >>= Weight.transactionWeight ex.tx
@@ -31,14 +148,14 @@ let weights session state =
 let selectOrderedTransactions (chain:Chain.ChainParameters) (session:DatabaseContext.Session) blockNumber timestamp acs contractCache transactions =
     let contractPath = session.context.contractPath
     let maxWeight = chain.maxBlockWeight
-    let getUTXO = getUTXO session
+    let getUTXO = UtxoSetRepository.get session
     let blockNumber = blockNumber + 1ul
 
     let tryAddTransaction (state, added, notAdded, altered, weight) (ex,wt) =
         let newWeight = weight+wt
         if newWeight > maxWeight then (state, added, notAdded, false, weight) else
         validateInContext chain getUTXO contractPath blockNumber timestamp
-            state.activeContractSet state.contractCache state.utxoSet (getContractState session) ContractStates.asDatabase ex
+            state.activeContractSet state.contractCache state.utxoSet (ContractStateRepository.get session) ContractStates.asDatabase ex
         |> function
             | Error (Orphan | ContractNotActive) ->
                 (state, added, (ex,wt)::notAdded, altered, weight)
@@ -74,7 +191,12 @@ let selectOrderedTransactions (chain:Chain.ChainParameters) (session:DatabaseCon
 
 
 let makeTransactionList chain (session:DatabaseContext.Session) (state:State) timestamp = result {
-    let! txs = weights session state 
-    let txs = List.sortBy (fun (_,wt) -> wt) txs
+    let! txs = weights session state
+    let txs =
+        if CGP.isPayoutBlock chain (state.tipState.tip.header.blockNumber + 1ul) then
+            CGP.filterCGPExecutions txs { chain=chain ; cgp=state.cgp }
+        else
+            txs
+        |> List.sortBy (fun (_,wt) -> wt)
     return selectOrderedTransactions chain session state.tipState.tip.header.blockNumber timestamp state.tipState.activeContractSet state.memoryState.contractCache txs
 }

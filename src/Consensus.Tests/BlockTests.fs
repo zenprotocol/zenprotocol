@@ -22,6 +22,19 @@ let difficulty = 0x20fffffful
 
 let chain = getChainParameters Chain.Local
 
+    
+    
+[<Property>]
+let ``should compute same number`` (period : uint32) (bn:uint32) =
+    let blockNumber = 800_000ul * period + bn
+    
+    
+    let oldImplementation chainParams (blockNumber:uint32) =
+        [2ul..blockNumber]
+        |> List.fold (fun sum blockNumber -> sum + blockTotalReward blockNumber) chainParams.genesisTotal
+    
+    Chain.getCurrentZPIssuance chain blockNumber = oldImplementation chain blockNumber
+
 let contractsPath = System.IO.Path.Combine
                         [| System.IO.Path.GetTempPath(); System.IO.Path.GetRandomFileName() |]
 
@@ -62,7 +75,7 @@ let ``block with empty transactions failed validation``(header) =
                   witnessMerkleRoot=Hash.zero;
                   activeContractSetMerkleRoot=Hash.zero; }
 
-    Block.validate chain block = Error "transactions is empty"
+    BlockValidation.validate block chain = Error "transactions is empty"
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``block with invalid header failed validation``(header:BlockHeader) (NonEmptyTransactions transactions) =
@@ -76,7 +89,7 @@ let ``block with invalid header failed validation``(header:BlockHeader) (NonEmpt
                   witnessMerkleRoot=Hash.zero;
                   activeContractSetMerkleRoot=Hash.zero; }
 
-    Block.validate chain block = Error "proof of work failed"
+    BlockValidation.validate block chain = Error "proof of work failed"
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``block with one invalid transaction fail validation``(header) (NonEmptyTransactions transactions) (NonNegativeInt index) =
@@ -101,7 +114,7 @@ let ``block with one invalid transaction fail validation``(header) (NonEmptyTran
 
     let expected = Error (sprintf "transaction %A failed validation due to General \"structurally invalid input(s)\"" invalidTx.txHash)
 
-    Block.validate chain block = expected
+    BlockValidation.validate block chain = expected
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``block with valid transactions pass validation``(header:BlockHeader) (NonEmptyTransactions transactions) =
@@ -128,7 +141,7 @@ let ``block with valid transactions pass validation``(header:BlockHeader) (NonEm
                   witnessMerkleRoot=witnessMerkleRoot;
                   activeContractSetMerkleRoot=Hash.zero }
 
-    Block.validate chain block = Ok block
+    BlockValidation.validate block chain = Ok block
 
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``connecting block failed when block number is not successive``(parent:BlockHeader) (block:Block) =
@@ -137,10 +150,29 @@ let ``connecting block failed when block number is not successive``(parent:Block
     let utxoSet = UtxoSet.asDatabase
     let cgp = CGP.empty
     let ema = EMA.create chain
+    
+    let state : BlockConnection.State = {
+        utxoSet        = utxoSet
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chain
+        timestamp        = 1UL
+        getUTXO          = getUTXO
+        getContractState = getContractState
+        contractsPath    = contractsPath
+        parent           = parent
+        block            = block
+    }
 
     parent.blockNumber + 1ul <> block.header.blockNumber
     ==>
-    (match Block.connect chain getUTXO contractsPath parent 1UL utxoSet cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block with
+    (match BlockConnection.connect state env with
     | Ok _ -> Ok ()
     | Error error -> Error error
     = Error "blockNumber mismatch")
@@ -172,7 +204,26 @@ let ``connecting block should fail when commitments are wrong``(parent:BlockHead
                   witnessMerkleRoot=Hash.zero;
                   activeContractSetMerkleRoot=Hash.zero; }
 
-    match Block.connect chain getUTXO contractsPath parent (timestamp + 1UL) utxoSet cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block with
+    let state : BlockConnection.State = {
+        utxoSet        = utxoSet
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chain
+        timestamp        = timestamp + 1UL
+        getUTXO          = getUTXO
+        getContractState = getContractState
+        contractsPath    = contractsPath
+        parent           = parent
+        block            = block
+    }
+    
+    match BlockConnection.connect state env with
     | Ok _ -> Ok ()
     | Error error -> Error error
     = Error "commitments mismatch"
@@ -186,7 +237,26 @@ let ``connecting block should fail when transaction inputs are invalid``(parent:
 
     let block = Block.createTemplate chain parent timestamp ema acs cgp transactions Hash.zero
 
-    match Block.connect chain getUTXO contractsPath parent (timestamp + 1UL) utxoSet cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block with
+    let state : BlockConnection.State = {
+        utxoSet        = utxoSet
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chain
+        timestamp        = timestamp + 1UL
+        getUTXO          = getUTXO
+        getContractState = getContractState
+        contractsPath    = contractsPath
+        parent           = parent
+        block            = block
+    }
+    
+    match BlockConnection.connect state env with
     | Error _ ->
         true
     | _ -> false
@@ -212,8 +282,27 @@ let ``block timestamp too early``() =
 
     // createTemplate auto-correct to early timestamps, so we have to override the timestamp
     let block = {block with header = {block.header with timestamp = timestamp}}
-
-    Block.connect chain getUTXO contractsPath parent timestamp utxoSet cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block
+    
+    let state : BlockConnection.State = {
+        utxoSet        = utxoSet
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chain
+        timestamp        = timestamp
+        getUTXO          = getUTXO
+        getContractState = getContractState
+        contractsPath    = contractsPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> expectError "block's timestamp is too early"
 
 [<Test>]
@@ -235,7 +324,26 @@ let ``block timestamp in the future``() =
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate chain parent (timestamp + Block.MaxTimeInFuture + 1UL) ema acs cgp [Transaction.toExtended tx] Hash.zero
 
-    Block.connect chain getUTXO contractsPath parent timestamp utxoSet cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = utxoSet
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chain
+        timestamp        = timestamp
+        getUTXO          = getUTXO
+        getContractState = getContractState
+        contractsPath    = contractsPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> expectError "block timestamp too far in the future"
 
 [<Test>]
@@ -255,7 +363,26 @@ let ``block with mismatch commitments fail connecting``() =
     let block = Block.createTemplate chain parent (timestamp + 1UL) ema acs cgp [Transaction.toExtended tx] Hash.zero
     let block = {block with commitments=[Hash.zero]}
 
-    Block.connect chain getUTXO contractsPath parent timestamp utxoSet cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = utxoSet
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chain
+        timestamp        = timestamp
+        getUTXO          = getUTXO
+        getContractState = getContractState
+        contractsPath    = contractsPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> expectError "commitments mismatch"
 
 [<Test>]
@@ -274,7 +401,26 @@ let ``can connect valid block``() =
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate chain parent (timestamp+1UL) ema acs cgp [Transaction.toExtended tx] Hash.zero
 
-    Block.connect chain getUTXO contractsPath parent timestamp utxoSet cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = utxoSet
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chain
+        timestamp        = timestamp
+        getUTXO          = getUTXO
+        getContractState = getContractState
+        contractsPath    = contractsPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> should be ok
 
 [<Test>]
@@ -290,7 +436,26 @@ let ``can connect block with coinbase only``() =
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate chain parent (timestamp+1UL) ema acs cgp [] Hash.zero
 
-    Block.connect chain getUTXO contractsPath parent timestamp utxoSet cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = utxoSet
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chain
+        timestamp        = timestamp
+        getUTXO          = getUTXO
+        getContractState = getContractState
+        contractsPath    = contractsPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> should be ok
 
 [<Test>]
@@ -318,7 +483,26 @@ let ``can connect block with a contract``() =
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate chain  parent (timestamp+1UL) ema acs cgp [Transaction.toExtended tx] Hash.zero
 
-    Block.connect chain getUTXO contractsPath parent timestamp utxoSet cgp ActiveContractSet.empty ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = utxoSet
+        acs            = ActiveContractSet.empty
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chain
+        timestamp        = timestamp
+        getUTXO          = getUTXO
+        getContractState = getContractState
+        contractsPath    = contractsPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> should be ok
 
 [<Test>]
@@ -351,7 +535,26 @@ let ``block with invalid contract failed connecting``() =
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate chain parent (timestamp+1UL) ema acs cgp [Transaction.toExtended tx] Hash.zero
 
-    Block.connect chain getUTXO contractsPath parent timestamp utxoSet cgp (ActiveContractSet.empty) ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = utxoSet
+        acs            = ActiveContractSet.empty
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chain
+        timestamp        = timestamp
+        getUTXO          = getUTXO
+        getContractState = getContractState
+        contractsPath    = contractsPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> expectError "transactions failed inputs validation due to BadContract"
 
 [<Test>]
@@ -402,7 +605,7 @@ let ``block with coinbase lock within a regular transaction should fail``() =
 
     let expected : Result<Block,string> = Error (sprintf "transaction %A failed validation due to General \"coinbase lock is not allowed within an ordinary transaction\"" <| Transaction.hash tx)
 
-    (Block.validate chain block, expected)
+    (BlockValidation.validate block chain, expected)
     |> shouldEqual
 
 [<Test>]
@@ -453,7 +656,26 @@ let ``block with wrong coinbase reward``() =
                   witnessMerkleRoot=witnessMerkleRoot;
                   activeContractSetMerkleRoot=acsMerkleRoot }
 
-    Block.connect chain getUTXO contractsPath parent timestamp UtxoSet.asDatabase CGP.empty ActiveContractSet.empty ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = UtxoSet.asDatabase
+        acs            = ActiveContractSet.empty
+        cgp            = CGP.empty
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chain
+        timestamp        = timestamp
+        getUTXO          = getUTXO
+        getContractState = getContractState
+        contractsPath    = contractsPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> expectError "block reward is incorrect"
 
 [<Test>]
@@ -502,7 +724,7 @@ let ``coinbase lock have wrong blockNumber``() =
     // let expected : Result<Block,string> =
     //     Error  "Block failed coinbase validation due to General \"within coinbase transaction all outputs must use coinbase or contract lock\""
 
-    Block.validate chain block
+    BlockValidation.validate block chain
     |> expectGenericError
 
 [<Test>]
@@ -551,7 +773,7 @@ let ``block without coinbase``() =
     //let expected : Result<Block,string> =
     //    Error  "Block failed coinbase validation due to General \"within coinbase transaction all outputs must use coinbase or contract lock\""
 
-    Block.validate chain block
+    BlockValidation.validate block chain
     |> expectGenericError
 
 [<Test>]
@@ -607,7 +829,26 @@ let ``block with coinbase with multiple asset as reward should fail``() =
                   activeContractSetMerkleRoot=acsMerkleRoot; }
     
 
-    Block.connect chain getUTXO contractsPath parent timestamp UtxoSet.asDatabase CGP.empty ActiveContractSet.empty ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = UtxoSet.asDatabase
+        acs            = ActiveContractSet.empty
+        cgp            = CGP.empty
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chain
+        timestamp        = timestamp
+        getUTXO          = getUTXO
+        getContractState = getContractState
+        contractsPath    = contractsPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> expectError "block reward is incorrect"
 
 [<Test>]
@@ -663,7 +904,26 @@ let ``coinbase reward split over multiple outputs``() =
                   activeContractSetMerkleRoot=acsMerkleRoot; }
      
 
-    Block.connect chain getUTXO contractsPath parent timestamp UtxoSet.asDatabase CGP.empty ActiveContractSet.empty ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = UtxoSet.asDatabase
+        acs            = ActiveContractSet.empty
+        cgp            = CGP.empty
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chain
+        timestamp        = timestamp
+        getUTXO          = getUTXO
+        getContractState = getContractState
+        contractsPath    = contractsPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> should be ok
 
 [<Test>]
@@ -698,7 +958,26 @@ let ``block spending mature transaction is valid``() =
     let parent = {version=0ul; parent=Hash.zero; blockNumber=100ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate chain parent (timestamp+1UL) ema acs cgp [Transaction.toExtended tx] Hash.zero
 
-    Block.connect chain getUTXO contractsPath parent timestamp utxoSet cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = utxoSet
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chain
+        timestamp        = timestamp
+        getUTXO          = getUTXO
+        getContractState = getContractState
+        contractsPath    = contractsPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |>  should be ok
 
 [<Test>]
@@ -732,7 +1011,26 @@ let ``block spending unmature transaction is invalid``() =
     let parent = {version=0ul; parent=Hash.zero; blockNumber=Chain.testParameters.coinbaseMaturity - 1ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate chain parent (timestamp+1UL) ema acs cgp [Transaction.toExtended tx] Hash.zero
 
-    Block.connect chain getUTXO contractsPath parent timestamp utxoSet cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = utxoSet
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chain
+        timestamp        = timestamp
+        getUTXO          = getUTXO
+        getContractState = getContractState
+        contractsPath    = contractsPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> expectError "transactions failed inputs validation due to General \"Coinbase not mature enough\""
 
 [<Test>]
@@ -754,7 +1052,26 @@ let ``contract get removed when expiring arrive``() =
     let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
     let block = Block.createTemplate chain parent (timestamp+1UL) ema acs cgp [] Hash.zero
 
-    Block.connect chain getUTXO contractsPath parent timestamp utxoSet cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = utxoSet
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chain
+        timestamp        = timestamp
+        getUTXO          = getUTXO
+        getContractState = getContractState
+        contractsPath    = contractsPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> should be ok
 
 //TODO: transaction validation was fixed and now needs a valid transaction - need to redo the test
@@ -818,7 +1135,7 @@ let ``contract get removed when expiring arrive``() =
 //    let parent = {version=0ul; parent=Hash.zero; blockNumber=0ul;commitments=Hash.zero; timestamp=timestamp;difficulty=0ul;nonce=0UL,0UL}
 //    let block = Block.createTemplate chain parent (timestamp+1UL) ema acs [tx1;tx2] Hash.zero
 //
-//    let res = Block.connect chain getUTXO contractsPath parent timestamp utxoSet acs ContractCache.empty ema getContractState ContractStates.asDatabase block
+//    let res = BlockConnection.connect chain getUTXO contractsPath parent timestamp utxoSet acs ContractCache.empty ema getContractState ContractStates.asDatabase block
 //    res |> should not' (be ok)
 //    let errStr =
 //        match res with | Error err -> err | _ -> assert false; ""

@@ -15,9 +15,11 @@ open Zen.Crypto
 open Consensus.Crypto
 open Logary.Message
 open Api.Helpers
+open Consensus.Chain
 open FSharp.Data
 open FsBech32
 open Hash
+open Messaging.Services
 open Wallet
 
 [<Literal>]
@@ -125,7 +127,7 @@ let publishTransaction client reply ex =
             |> TextContent
             |> reply StatusCode.BadRequest
 
-let handleRequest chain client (request,reply) (templateCache : BlockTemplateCache) =
+let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTemplateCache) =
     let replyError error =
         reply StatusCode.BadRequest (TextContent error)
 
@@ -154,7 +156,7 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
 
     let validateBlock block =
         Blockchain.validateMinedBlock client block
-        match Block.validate (Chain.getChainParameters chain) block with
+        match BlockValidation.validate block (Chain.getChainParameters chain) with
         | Ok _ ->
             Block.hash block.header
             |> Hash.toString
@@ -479,6 +481,30 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
     | Get ("/blockchain/cgp/history", _) ->
         let cgp = Blockchain.getCgpHistory client
         reply StatusCode.OK (JsonContent <| (cgpHistoryEncoder chain cgp))
+    | Get ("/blockchain/contract/cgp", _) ->
+        let cgp = Blockchain.getCgp client
+        let msgBody =
+            Option.map CGP.internalizeRecipient cgp.payout
+            |> Option.bind Consensus.CGP.Contract.createPayoutMsgBody
+        let raw =
+            msgBody
+            |> Option.map (dataEncoder chain)
+            |> Option.defaultValue JsonValue.Null
+        let encoded =
+            msgBody
+            |> Option.map Data.serialize
+            |> Option.map Base16.encode
+            |> Option.defaultValue ""
+            |> JsonValue.String
+        JsonValue.Record
+            [|
+                ("raw", raw)
+                ("encoded", encoded)
+                ("cgpContract", (Chain.getChainParameters chain).cgpContractId.ToString() |> JsonValue.String)
+            |]
+        |> JsonContent
+        |> reply StatusCode.OK
+
     | Post ("/blockchain/publishblock", Some body) ->
         match parsePublishBlockJson body with
         | Error error ->
@@ -766,6 +792,22 @@ let handleRequest chain client (request,reply) (templateCache : BlockTemplateCac
         Blockchain.getTotalZP client
         |> decimal
         |> JsonValue.Number
+        |> JsonContent
+        |> reply StatusCode.OK
+    | Get("/blockchain/candidates", query) ->
+        let tipInterval =
+            Blockchain.getTip client
+            |> Option.map (fun (_,h)-> h.blockNumber)
+            |> Option.defaultValue 0ul
+            |> CGP.getInterval ((Chain.getChainParameters chain))
+        let interval =
+            Map.tryFind "interval" query
+            |> Option.map (fun x -> uint32 x)
+            |> Option.defaultValue tipInterval
+        Blockchain.getCandidates client interval
+        |> List.map (payoutEncoder chain)
+        |> List.toArray
+        |> JsonValue.Array
         |> JsonContent
         |> reply StatusCode.OK
     | Post("/addressdb/contract/history", Some json) ->

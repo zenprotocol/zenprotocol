@@ -26,7 +26,6 @@ module Blockchain =
     }
 
     type Command =
-        | SetCGP of Option<Winner>
         | ValidateTransaction of Types.TransactionExtended
         | RequestMemPool of peerId:byte[]
         | RequestTransactions of peerId:byte[] * txHashes:Hash list
@@ -56,15 +55,13 @@ module Blockchain =
         | GetTransaction of Hash
         | CheckTransaction of TransactionExtended
         | GetTotalZP
+        | GetCandidates of uint32
         | GetBlockReward of uint32
         | GetCGP
         | GetCgpHistory
 
     type Response = unit
     
-    let setCGP client winner =
-        Command.send client serviceName (SetCGP winner)
-
     let validateTransaction client tx =
         Command.send client serviceName (ValidateTransaction tx)
 
@@ -163,6 +160,10 @@ module Blockchain =
     let getTotalZP client =
         GetTotalZP
         |> Request.send<Request, uint64> client serviceName
+        
+    let getCandidates client interval =
+        GetCandidates interval
+        |> Request.send<Request, List<Recipient * Spend list>> client serviceName
 
     let getBlockReward client blockNumber =
         GetBlockReward blockNumber

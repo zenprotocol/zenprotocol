@@ -5,9 +5,7 @@ open Blockchain.EffectsWriter
 open Messaging.Events
 open Infrastructure
 open Consensus
-open Consensus.Transaction
 open Consensus.ValidationError
-open Consensus.TransactionValidation
 open Consensus.Types
 open State
 open Logary.Message
@@ -171,7 +169,7 @@ let executeContract session txSkeleton timestamp contractId command sender messa
 
             let contractContext : ContractContext =
                 {
-                    blockNumber = state.tipState.tip.header.blockNumber
+                    blockNumber = state.tipState.tip.header.blockNumber + 1ul
                     timestamp = timestamp
                 }
 

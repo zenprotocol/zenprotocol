@@ -1,6 +1,5 @@
 module Consensus.Tests.BlockCGPTests
 
-#if DEBUG
 
 open Consensus
 open Consensus
@@ -11,6 +10,7 @@ open TestsInfrastructure.Nunit
 open Consensus.Tests.CGPContractCode
 
 module CryptoPublicKey = Crypto.PublicKey
+module ZData = Zen.Types.Data
 
 let timestamp = 1515594186383UL + 1UL
 let difficulty = 0x20fffffful
@@ -25,6 +25,33 @@ let context0 = { blockNumber=1u; timestamp = 1UL }
 
 let contractPath =
     NUnit.Framework.TestContext.CurrentContext.TestDirectory
+
+let changeMessageBody messageBody =
+    ZFStar.fsToFstList []
+    |> ZData.List
+    |> ZData.Collection
+    |> Some
+        
+    
+
+let env block : BlockConnection.Env = {
+    chainParams      = chainParams
+    timestamp        = timestamp
+    getUTXO          = (fun _ -> failwith "shouldn't be used")
+    getContractState = (fun _ -> failwith "shouldn't be used")
+    contractsPath    = contractPath
+    parent           = block.header
+    block            = block
+}
+
+let state cgp ema : BlockConnection.State = {
+    utxoSet        = Map.empty
+    acs            = ActiveContractSet.empty
+    cgp            = cgp
+    ema            = ema
+    contractCache  = Map.empty
+    contractStates = Map.empty
+}
 
 let shouldFailWith expectedMsg =
     function
@@ -114,11 +141,11 @@ let executeCgpContract (txSkeleton : TxSkeleton.T) context messageBody wallet =
         
         let inputs =
             txSkel.pInputs
-            |> List.map (function TxSkeleton.PointedOutput (pt,op) -> Outpoint pt | TxSkeleton.Mint s -> Mint s)
+            |> List.map (function TxSkeleton.PointedOutput (pt,_) -> Outpoint pt | TxSkeleton.Mint s -> Mint s)
         
         let utxosInputs =
             txSkel.pInputs
-            |> List.choose ((function TxSkeleton.PointedOutput (pt,op) -> Some (pt,op) | TxSkeleton.Mint s -> None))
+            |> List.choose ((function TxSkeleton.PointedOutput (pt,op) -> Some (pt,op) | _ -> None))
             |> List.fold (fun m (pt,op) -> Map.add pt (UtxoSet.Unspent op) m) Map.empty
         
         let utxos =
@@ -220,7 +247,7 @@ let cgp1 : CGP.T =
         allocation = 32uy
         payout     = Some (ContractRecipient cgpContractId, [ {asset=Asset.Zen; amount=123UL} ])
     }
-
+#if DEBUG
 [<Test>]
 let ``valid payout`` () =
     let context = { context0 with blockNumber = 10u * chainParams.intervalLength + chainParams.coinbaseMaturity }
@@ -261,11 +288,62 @@ let ``valid payout`` () =
         }
     
     let test3 =
-        Block.checkPayoutTx chainParams cgp (block,ema)
+        BlockConnection.PayoutTx.check (state cgp ema) (env block)
     
-    test1 *> test2 *> test3
+    test1 *> test2  *> test3
     |> function
     | Ok _ -> ()
+    | Error msg -> failwithf "Error: %s" msg
+    
+[<Test>]    
+let ``valid payout, 2 asset Zen`` () =
+    //TODO: Fix Zulib Issue and change this test appropriatly
+    let context = { context0 with blockNumber = 10u * chainParams.intervalLength + chainParams.coinbaseMaturity }
+    
+    let res = executeCgpContractInContext [ {lock=PK Hash.zero ; spend = { asset=Asset.defaultOf cgpContractId; amount=20UL }}; {lock=PK Hash.zero ; spend = { asset=Asset.defaultOf cgpContractId; amount=20UL }  } ] context
+    
+    let test1 =
+        res >>= fun (ex, _, _) -> TransactionValidation.checkStructure ex.tx |@!> sprintf "%A"
+    let test1 =
+        res >>= fun (ex, _, _) -> TransactionValidation.validateBasic ex.tx |@!> sprintf "%A"
+    
+    let test2 =
+        res >>= fun (_, txSkel, _) -> TransactionValidation.checkAmounts txSkel |@!> sprintf "%A"
+    
+    let ex = match res with | Ok (ex, _, _) -> ex | Error msg -> failwithf "Error: %s" msg
+    
+    let block =
+        {
+            header =
+                {
+                    version     = Version0
+                    parent      = Hash.zero
+                    blockNumber = context.blockNumber
+                    difficulty  = difficulty
+                    commitments = Hash.zero
+                    timestamp   = context.timestamp
+                    nonce       = (0UL, 0UL)
+                }
+            txMerkleRoot                = Hash.zero
+            witnessMerkleRoot           = Hash.zero
+            activeContractSetMerkleRoot = Hash.zero
+            commitments                 = []
+            transactions                = [ex]
+        }
+    
+    let cgp : CGP.T =
+        {
+            allocation = 12uy
+            payout     = Some (PKRecipient Hash.zero, [ { asset=Asset.defaultOf cgpContractId; amount=20UL }; { asset=Asset.defaultOf cgpContractId; amount=20UL }  ])
+        }
+    
+    let test3 =
+        BlockConnection.PayoutTx.check (state cgp ema) (env block)
+    
+    test1 *> test2  *> test3
+    |> function
+    | Ok _ -> failwithf "There should have been an error, but there wasn't one"
+    | Error msg when msg = "General \"inputs duplicated\"" -> ()
     | Error msg -> failwithf "Error: %s" msg
 
 [<Test>]
@@ -308,9 +386,9 @@ let ``multiple payout Txs`` () =
         }
     
     let test3 =
-        Block.checkPayoutTx chainParams cgp (block,ema)
+        BlockConnection.PayoutTx.check (state cgp ema) (env block)
     
-    test1 *> test2 *> test3
+    test1 *> test2  *> test3
     |> function
     | Ok _ -> failwithf "There should have been an error, but there wasn't one"
     | Error msg when msg = "Multiple payout Txs" -> ()
@@ -356,9 +434,9 @@ let ``different winner asset`` () =
         }
     
     let test3 =
-        Block.checkPayoutTx chainParams cgp (block,ema)
+        BlockConnection.PayoutTx.check (state cgp ema) (env block)
     
-    test1 *> test2 *> test3
+    test1 *> test2  *> test3
     |> function
     | Ok _ -> failwithf "There should have been an error, but there wasn't one"
     | Error msg when msg = "Contract outputs are not the same as the payout winner" -> ()
@@ -404,9 +482,9 @@ let ``different winner amount`` () =
         }
     
     let test3 =
-        Block.checkPayoutTx chainParams cgp (block,ema)
+        BlockConnection.PayoutTx.check (state cgp ema) (env block)
     
-    test1 *> test2 *> test3
+    test1 *> test2  *> test3
     |> function
     | Ok _ -> failwithf "There should have been an error, but there wasn't one"
     | Error msg when msg = "Contract outputs are not the same as the payout winner" -> ()
@@ -452,9 +530,9 @@ let ``different winner recipient`` () =
         }
     
     let test3 =
-        Block.checkPayoutTx chainParams cgp (block,ema)
+        BlockConnection.PayoutTx.check (state cgp ema) (env block)
     
-    test1 *> test2 *> test3
+    test1 *> test2  *> test3
     |> function
     | Ok _ -> failwithf "There should have been an error, but there wasn't one"
     | Error msg when msg = "Contract outputs are not the same as the payout winner" -> ()
@@ -500,9 +578,9 @@ let ``different winner - extra spends`` () =
         }
     
     let test3 =
-        Block.checkPayoutTx chainParams cgp (block,ema)
+        BlockConnection.PayoutTx.check (state cgp ema) (env block)
     
-    test1 *> test2 *> test3
+    test1 *> test2  *> test3
     |> function
     | Ok _ -> failwithf "There should have been an error, but there wasn't one"
     | Error msg when msg = "Contract outputs are not the same as the payout winner" -> ()
@@ -548,9 +626,9 @@ let ``same winner - different order`` () =
         }
     
     let test3 =
-        Block.checkPayoutTx chainParams cgp (block,ema)
+        BlockConnection.PayoutTx.check (state cgp ema) (env block)
     
-    test1 *> test2 *> test3
+    test1 *> test2  *> test3
     |> function
     | Ok _ -> ()
     | Error msg -> failwithf "Error: %s" msg
@@ -595,9 +673,9 @@ let ``different winner - distributed spends`` () =
         }
     
     let test3 =
-        Block.checkPayoutTx chainParams cgp (block,ema)
+        BlockConnection.PayoutTx.check (state cgp ema) (env block)
     
-    test1 *> test2 *> test3
+    test1 *> test2  *> test3
     |> function
     | Ok _ -> failwithf "There should have been an error, but there wasn't one"
     | Error msg when msg = "Contract outputs are not the same as the payout winner" -> ()
@@ -661,14 +739,14 @@ let ``no payout when there should be`` () =
         }
     
     let test3 =
-        Block.checkPayoutTx chainParams cgp (block,ema)
+        BlockConnection.PayoutTx.check (state cgp ema) (env block)
     
     test1 *> test2 *> test3
     |> function
     | Ok _ -> failwithf "There should have been an error, but there wasn't one"
     | Error msg when msg = "No payout Tx" -> ()
     | Error msg -> failwithf "Wrong error: %A" msg
-
+#endif
 [<Test>]
 let ``valid connect`` ()  =
     let context = { context0 with blockNumber = 10u * chainParams.intervalLength + chainParams.coinbaseMaturity }
@@ -725,10 +803,119 @@ let ``valid connect`` ()  =
             transactions                = [coinbaseTx; ex]
         }
     
-    Block.connect chainParams (generateGetUTXO utxos) contractPath parent 1UL utxos cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = utxos
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chainParams
+        timestamp        = 1UL
+        getUTXO          = generateGetUTXO utxos
+        getContractState = getContractState
+        contractsPath    = contractPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> function
     | Ok _ -> ()
     | Error msg -> failwithf "Error: %s" msg
+
+
+[<Test>]
+let ``connect with invalid coinbase - CGP output 1st (instead of coinbase)`` ()  =
+    let context = { context0 with blockNumber = 10u * chainParams.intervalLength + chainParams.coinbaseMaturity }
+    
+    let res = executeCgpContractInContext [ {lock=PK Hash.zero ; spend = { asset=Asset.defaultOf cgpContractId; amount=20UL } } ] context
+    
+    let ex, utxos = match res with | Ok (ex, _, utxos) -> ex, utxos | Error msg -> failwithf "Error: %s" msg
+    
+    let cgp : CGP.T =
+        {
+            allocation = 12uy
+            payout     = Some (PKRecipient Hash.zero, [ { asset=Asset.defaultOf cgpContractId; amount=20UL } ])
+        }
+    
+    let acs =
+        ActiveContractSet.empty
+        |> ActiveContractSet.add cgpContractId (compiledCgpContract.Force() |> function | Ok x -> x | _ -> failwith "no")
+    
+    let getContractState _ = None
+    
+    let parent =
+        {
+            version     = Version0
+            parent      = Hash.zero
+            blockNumber = context.blockNumber - 1ul
+            difficulty  = difficulty
+            commitments = Hash.zero
+            timestamp   = context.timestamp
+            nonce       = (0UL, 0UL)
+        }
+    
+    let validCoinbaseTx = Block.getBlockCoinbase chainParams acs context.blockNumber [ex] Hash.zero (cgp:CGP.T)
+    
+    let coinbaseOutputs =
+         [ {lock = Contract cgpContractId; spend = {asset = Asset.Zen; amount = 600000000UL;};}
+         ; {lock = Coinbase (context.blockNumber ,Hash.zero); spend = {asset = Asset.Zen; amount = 4400009026UL;};}
+         ]
+    
+    let coinbaseTx =
+        { validCoinbaseTx with tx = { validCoinbaseTx.tx with outputs = coinbaseOutputs } }
+    
+    let commitments =
+            Block.createCommitments Hash.zero Hash.zero (ActiveContractSet.root acs) []
+            |> MerkleTree.computeRoot
+    
+    let block =
+        {
+            header =
+                {
+                    version     = Version0
+                    parent      = Hash.zero
+                    blockNumber = context.blockNumber
+                    difficulty  = difficulty
+                    commitments = commitments
+                    timestamp   = context.timestamp
+                    nonce       = (0UL, 0UL)
+                }
+            txMerkleRoot                = Hash.zero
+            witnessMerkleRoot           = Hash.zero
+            activeContractSetMerkleRoot = ActiveContractSet.root acs
+            commitments                 = []
+            transactions                = [coinbaseTx; ex]
+        }
+    
+    let state : BlockConnection.State = {
+        utxoSet        = utxos
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chainParams
+        timestamp        = 1UL
+        getUTXO          = generateGetUTXO utxos
+        getContractState = getContractState
+        contractsPath    = contractPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
+    |> function
+    | Ok _ -> ()
+    | Error msg -> failwithf "Error: %s" msg
+
 
 [<Test>]
 let ``connect with invalid coinbase - CGP overflow`` ()  =
@@ -794,7 +981,115 @@ let ``connect with invalid coinbase - CGP overflow`` ()  =
             transactions                = [coinbaseTx; ex]
         }
     
-    Block.connect chainParams (generateGetUTXO utxos) contractPath parent 1UL utxos cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = utxos
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chainParams
+        timestamp        = 1UL
+        getUTXO          = generateGetUTXO utxos
+        getContractState = getContractState
+        contractsPath    = contractPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
+    |> function
+    | Ok _ -> failwithf "There should have been an error, but there wasn't one"
+    | Error msg when msg = "block reward is incorrect" -> ()
+    | Error msg -> failwithf "Wrong error: %A" msg
+
+[<Test>]
+let ``connect with invalid coinbase - CGP underflow`` ()  =
+    let context = { context0 with blockNumber = 10u * chainParams.intervalLength + chainParams.coinbaseMaturity }
+    
+    let res = executeCgpContractInContext [ {lock=PK Hash.zero ; spend = { asset=Asset.defaultOf cgpContractId; amount=20UL } } ] context
+    
+    let ex, utxos = match res with | Ok (ex, _, utxos) -> ex, utxos | Error msg -> failwithf "Error: %s" msg
+    
+    let cgp : CGP.T =
+        {
+            allocation = 12uy
+            payout     = Some (PKRecipient Hash.zero, [ { asset=Asset.defaultOf cgpContractId; amount=20UL } ])
+        }
+    
+    let acs =
+        ActiveContractSet.empty
+        |> ActiveContractSet.add cgpContractId (compiledCgpContract.Force() |> function | Ok x -> x | _ -> failwith "no")
+    
+    let getContractState _ = None
+    
+    let parent =
+        {
+            version     = Version0
+            parent      = Hash.zero
+            blockNumber = context.blockNumber - 1ul
+            difficulty  = difficulty
+            commitments = Hash.zero
+            timestamp   = context.timestamp
+            nonce       = (0UL, 0UL)
+        }
+    
+    let validCoinbaseTx = Block.getBlockCoinbase chainParams acs context.blockNumber [ex] Hash.zero (cgp:CGP.T)
+    
+    let coinbaseOutputs =
+         [ {lock = Coinbase (context.blockNumber ,Hash.zero); spend = {asset = Asset.Zen; amount = 4400009026UL;};}
+         ; {lock = Contract cgpContractId; spend = {asset = Asset.Zen; amount = 600000000UL - 1UL;};}
+         ]
+    
+    let coinbaseTx =
+        { validCoinbaseTx with tx = { validCoinbaseTx.tx with outputs = coinbaseOutputs } }
+    
+    let commitments =
+            Block.createCommitments Hash.zero Hash.zero (ActiveContractSet.root acs) []
+            |> MerkleTree.computeRoot
+    
+    let block =
+        {
+            header =
+                {
+                    version     = Version0
+                    parent      = Hash.zero
+                    blockNumber = context.blockNumber
+                    difficulty  = difficulty
+                    commitments = commitments
+                    timestamp   = context.timestamp
+                    nonce       = (0UL, 0UL)
+                }
+            txMerkleRoot                = Hash.zero
+            witnessMerkleRoot           = Hash.zero
+            activeContractSetMerkleRoot = ActiveContractSet.root acs
+            commitments                 = []
+            transactions                = [coinbaseTx; ex]
+        }
+    
+    let state : BlockConnection.State = {
+        utxoSet        = utxos
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chainParams
+        timestamp        = 1UL
+        getUTXO          = generateGetUTXO utxos
+        getContractState = getContractState
+        contractsPath    = contractPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> function
     | Ok _ -> failwithf "There should have been an error, but there wasn't one"
     | Error msg when msg = "block reward is incorrect" -> ()
@@ -864,7 +1159,26 @@ let ``connect with invalid coinbase - miner overflow`` ()  =
             transactions                = [coinbaseTx; ex]
         }
     
-    Block.connect chainParams (generateGetUTXO utxos) contractPath parent 1UL utxos cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = utxos
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chainParams
+        timestamp        = 1UL
+        getUTXO          = generateGetUTXO utxos
+        getContractState = getContractState
+        contractsPath    = contractPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> function
     | Ok _ -> failwithf "There should have been an error, but there wasn't one"
     | Error msg when msg = "block reward is incorrect" -> ()
@@ -934,7 +1248,26 @@ let ``connect with invalid coinbase - cgp gets too much`` ()  =
             transactions                = [coinbaseTx; ex]
         }
     
-    Block.connect chainParams (generateGetUTXO utxos) contractPath parent 1UL utxos cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = utxos
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chainParams
+        timestamp        = 1UL
+        getUTXO          = generateGetUTXO utxos
+        getContractState = getContractState
+        contractsPath    = contractPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> function
     | Ok _ -> failwithf "There should have been an error, but there wasn't one"
     | Error msg when msg = "reward is not divided correctly" -> ()
@@ -1004,7 +1337,26 @@ let ``connect with invalid coinbase - miner gets too much`` ()  =
             transactions                = [coinbaseTx; ex]
         }
     
-    Block.connect chainParams (generateGetUTXO utxos) contractPath parent 1UL utxos cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = utxos
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chainParams
+        timestamp        = 1UL
+        getUTXO          = generateGetUTXO utxos
+        getContractState = getContractState
+        contractsPath    = contractPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> function
     | Ok _ -> failwithf "There should have been an error, but there wasn't one"
     | Error msg when msg = "reward is not divided correctly" -> ()
@@ -1074,7 +1426,26 @@ let ``coinbase creation - non-ZP asset`` () =
             transactions                = [coinbaseTx; ex]
         }
     
-    Block.connect chainParams (generateGetUTXO utxos) contractPath parent 1UL utxos cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = utxos
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chainParams
+        timestamp        = 1UL
+        getUTXO          = generateGetUTXO utxos
+        getContractState = getContractState
+        contractsPath    = contractPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> function
     | Ok _ -> failwithf "There should have been an error, but there wasn't one"
     | Error msg when msg = "block reward is incorrect" -> ()
@@ -1144,7 +1515,26 @@ let ``coinbase creation - non-CGP contract`` () =
             transactions                = [coinbaseTx; ex]
         }
     
-    Block.connect chainParams (generateGetUTXO utxos) contractPath parent 1UL utxos cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = utxos
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chainParams
+        timestamp        = 1UL
+        getUTXO          = generateGetUTXO utxos
+        getContractState = getContractState
+        contractsPath    = contractPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> function
     | Ok _ -> failwithf "There should have been an error, but there wasn't one"
     | Error msg when msg = "reward to cgp contract in invalid" -> ()
@@ -1201,7 +1591,7 @@ let ``implementation execution of the CGP contract`` () =
         
         let msgBody = CGP.Contract.createPayoutMsgBody outputs
         
-        let executeContract (contractId:ContractId) command sender (messageBody: Zen.Types.Data.data option) (txSkel : TxSkeleton.T) =
+        let executeContract _ _ _ (messageBody: Zen.Types.Data.data option) (txSkel : TxSkeleton.T) =
             let context = { context0 with blockNumber = 10u * chainParams.intervalLength + chainParams.coinbaseMaturity }
             let wallet = createWalletExact outputs
             
@@ -1221,7 +1611,458 @@ let ``implementation execution of the CGP contract`` () =
     | Ok _ -> ()
     | Error msg -> failwith msg
     
-    ()
+
+[<Test>]
+let ``outputs with 0 amount`` () =
+    let context = { context0 with blockNumber = 10u * chainParams.intervalLength + chainParams.coinbaseMaturity }
+    
+    let acs =
+        ActiveContractSet.empty
+        |> ActiveContractSet.add cgpContractId (compiledCgpContract.Force() |> function | Ok x -> x | _ -> failwith "no")
+    
+    let mnemonicPhrase =
+        NBitcoin.Mnemonic( NBitcoin.Wordlist.English, NBitcoin.WordCount.TwentyFour ).Words
+        |> Array.toSeq
+    
+    let result = Infrastructure.Result.ResultBuilder<string>()
+        
+    result {
+        let! (account,_) = TestWallet.import mnemonicPhrase "1234" Hash.zero 1ul
+        
+        let validCoinbaseTx = Block.getBlockCoinbase chainParams acs context.blockNumber [] Hash.zero CGP.empty
+
+        let coinbaseOutputs =
+             [ { lock = Coinbase (context.blockNumber - 501u, account.publicKey |> CryptoPublicKey.hash); spend = {asset = Asset.Zen; amount = 4400009026UL;}; }
+             ; { lock = Contract cgpContractId; spend = { asset = Asset.Zen; amount = 600000000UL;}; }
+             ; { lock = Contract cgpContractId; spend = { asset = Asset.defaultOf cgpContractId; amount=20UL } }
+             ; { lock = Contract cgpContractId; spend = { asset = Asset.defaultOf chainParams.votingContractId ; amount=123UL } }
+             ]
+        
+        let coinbaseTx =
+            { validCoinbaseTx with tx = { validCoinbaseTx.tx with outputs = coinbaseOutputs } }
+        
+        let uns = UtxoSet.Unspent
+        
+        let utxos =
+            Map.empty
+            |> Map.add {txHash=Transaction.hash coinbaseTx.tx; index=0u} (uns { lock = Coinbase (context.blockNumber - 501u, account.publicKey |> CryptoPublicKey.hash); spend = {asset = Asset.Zen; amount = 4400009026UL;}; })
+            |> Map.add {txHash=Transaction.hash coinbaseTx.tx; index=1u} (uns { lock = Contract cgpContractId; spend = { asset = Asset.Zen; amount = 600000000UL;}; })
+            |> Map.add {txHash=Hash.zero; index=0u} (uns { lock=Contract cgpContractId; spend = { asset=Asset.defaultOf cgpContractId; amount=20UL } })
+            |> Map.add {txHash=Hash.zero; index=1u} (uns { lock=Contract cgpContractId; spend = { asset=Asset.defaultOf chainParams.votingContractId ; amount=123UL } })
+        
+        let account =
+            account
+            |> TestWallet.addTransaction (Transaction.hash coinbaseTx.tx) coinbaseTx.tx
+        
+        let! extendedKey = Wallet.ExtendedKey.fromMnemonicPhrase (String.concat " " mnemonicPhrase)
+        
+        let outputs =
+            []
+        
+        let msgBody = CGP.Contract.createPayoutMsgBody outputs
+        
+        let executeContract _ _ _ (messageBody: Zen.Types.Data.data option) (txSkel : TxSkeleton.T) =
+            let context = { context0 with blockNumber = 10u * chainParams.intervalLength + chainParams.coinbaseMaturity }
+            let wallet = createWalletExact outputs
+            
+            let res = executeCgpContract txSkel context messageBody wallet
+            res
+            |> Result.map (fun (ex,_,_) -> ex.tx) 
+        
+        let! tx = TestWallet.createExecuteContractTransaction chainParams executeContract cgpContractId "Payout" msgBody false None Map.empty (account, extendedKey)
+        
+        return tx, utxos
+    }
+    |> Result.bind
+           (fun (tx, utxos) ->
+        TransactionValidation.validateInContext chainParams (generateGetUTXO utxos) contractPath (context.blockNumber) timestamp acs Map.empty utxos (fun _ -> None) Map.empty (Transaction.toExtended tx)
+        |> Result.mapError (sprintf "%A"))
+    |> function
+    | Ok _ -> failwithf "There should have been an error, but there wasn't one"
+    | Error msg when msg = "Outputs list size is out of bounds" -> ()
+    | Error msg -> failwithf "Wrong error: %A" msg
+
+
+[<Test>]
+let ``No message body (None)`` () =
+    let context = { context0 with blockNumber = 10u * chainParams.intervalLength + chainParams.coinbaseMaturity }
+    
+    let acs =
+        ActiveContractSet.empty
+        |> ActiveContractSet.add cgpContractId (compiledCgpContract.Force() |> function | Ok x -> x | _ -> failwith "no")
+    
+    let mnemonicPhrase =
+        NBitcoin.Mnemonic( NBitcoin.Wordlist.English, NBitcoin.WordCount.TwentyFour ).Words
+        |> Array.toSeq
+    
+    let result = Infrastructure.Result.ResultBuilder<string>()
+        
+    result {
+        let! (account,_) = TestWallet.import mnemonicPhrase "1234" Hash.zero 1ul
+        
+        let validCoinbaseTx = Block.getBlockCoinbase chainParams acs context.blockNumber [] Hash.zero CGP.empty
+
+        let coinbaseOutputs =
+             [ { lock = Coinbase (context.blockNumber - 501u, account.publicKey |> CryptoPublicKey.hash); spend = {asset = Asset.Zen; amount = 4400009026UL;}; }
+             ; { lock = Contract cgpContractId; spend = { asset = Asset.Zen; amount = 600000000UL;}; }
+             ; { lock = Contract cgpContractId; spend = { asset = Asset.defaultOf cgpContractId; amount=20UL } }
+             ; { lock = Contract cgpContractId; spend = { asset = Asset.defaultOf chainParams.votingContractId ; amount=123UL } }
+             ]
+        
+        let coinbaseTx =
+            { validCoinbaseTx with tx = { validCoinbaseTx.tx with outputs = coinbaseOutputs } }
+        
+        let uns = UtxoSet.Unspent
+        
+        let utxos =
+            Map.empty
+            |> Map.add {txHash=Transaction.hash coinbaseTx.tx; index=0u} (uns { lock = Coinbase (context.blockNumber - 501u, account.publicKey |> CryptoPublicKey.hash); spend = {asset = Asset.Zen; amount = 4400009026UL;}; })
+            |> Map.add {txHash=Transaction.hash coinbaseTx.tx; index=1u} (uns { lock = Contract cgpContractId; spend = { asset = Asset.Zen; amount = 600000000UL;}; })
+            |> Map.add {txHash=Hash.zero; index=0u} (uns { lock=Contract cgpContractId; spend = { asset=Asset.defaultOf cgpContractId; amount=20UL } })
+            |> Map.add {txHash=Hash.zero; index=1u} (uns { lock=Contract cgpContractId; spend = { asset=Asset.defaultOf chainParams.votingContractId ; amount=123UL } })
+        
+        let account =
+            account
+            |> TestWallet.addTransaction (Transaction.hash coinbaseTx.tx) coinbaseTx.tx
+        
+        let! extendedKey = Wallet.ExtendedKey.fromMnemonicPhrase (String.concat " " mnemonicPhrase)
+        
+        let outputs =
+            [ { lock = account.publicKey |> CryptoPublicKey.hash |> PK ; spend = { asset=Asset.defaultOf cgpContractId; amount=20UL } }
+            ; { lock = account.publicKey |> CryptoPublicKey.hash |> PK ; spend = { asset=Asset.defaultOf chainParams.votingContractId ; amount=123UL } }
+            ]
+        
+        let msgBody = None
+        
+        let executeContract _ _ _ (messageBody: Zen.Types.Data.data option) (txSkel : TxSkeleton.T) =
+            let context = { context0 with blockNumber = 10u * chainParams.intervalLength + chainParams.coinbaseMaturity }
+            let wallet = createWalletExact outputs
+            
+            let res = executeCgpContract txSkel context messageBody wallet
+            res
+            |> Result.map (fun (ex,_,_) -> ex.tx) 
+        
+        let! tx = TestWallet.createExecuteContractTransaction chainParams executeContract cgpContractId "Payout" msgBody false None Map.empty (account, extendedKey)
+        
+        return tx, utxos
+    }
+    |> Result.bind
+           (fun (tx, utxos) ->
+        TransactionValidation.validateInContext chainParams (generateGetUTXO utxos) contractPath (context.blockNumber) timestamp acs Map.empty utxos (fun _ -> None) Map.empty (Transaction.toExtended tx)
+        |> Result.mapError (sprintf "%A"))
+    |> function
+    | Ok _ -> failwithf "There should have been an error, but there wasn't one"
+    | Error msg when msg = "Data parsing failed - the message body is empty" -> ()
+    | Error msg -> failwithf "Wrong error: %A" msg
+    
+[<Test>]
+let ``No dictionary in message body`` () =
+    let context = { context0 with blockNumber = 10u * chainParams.intervalLength + chainParams.coinbaseMaturity }
+    
+    let acs =
+        ActiveContractSet.empty
+        |> ActiveContractSet.add cgpContractId (compiledCgpContract.Force() |> function | Ok x -> x | _ -> failwith "no")
+    
+    let mnemonicPhrase =
+        NBitcoin.Mnemonic( NBitcoin.Wordlist.English, NBitcoin.WordCount.TwentyFour ).Words
+        |> Array.toSeq
+    
+    let result = Infrastructure.Result.ResultBuilder<string>()
+        
+    result {
+        let! (account,_) = TestWallet.import mnemonicPhrase "1234" Hash.zero 1ul
+        
+        let validCoinbaseTx = Block.getBlockCoinbase chainParams acs context.blockNumber [] Hash.zero CGP.empty
+
+        let coinbaseOutputs =
+             [ { lock = Coinbase (context.blockNumber - 501u, account.publicKey |> CryptoPublicKey.hash); spend = {asset = Asset.Zen; amount = 4400009026UL;}; }
+             ; { lock = Contract cgpContractId; spend = { asset = Asset.Zen; amount = 600000000UL;}; }
+             ; { lock = Contract cgpContractId; spend = { asset = Asset.defaultOf cgpContractId; amount=20UL } }
+             ; { lock = Contract cgpContractId; spend = { asset = Asset.defaultOf chainParams.votingContractId ; amount=123UL } }
+             ]
+        
+        let coinbaseTx =
+            { validCoinbaseTx with tx = { validCoinbaseTx.tx with outputs = coinbaseOutputs } }
+        
+        let uns = UtxoSet.Unspent
+        
+        let utxos =
+            Map.empty
+            |> Map.add {txHash=Transaction.hash coinbaseTx.tx; index=0u} (uns { lock = Coinbase (context.blockNumber - 501u, account.publicKey |> CryptoPublicKey.hash); spend = {asset = Asset.Zen; amount = 4400009026UL;}; })
+            |> Map.add {txHash=Transaction.hash coinbaseTx.tx; index=1u} (uns { lock = Contract cgpContractId; spend = { asset = Asset.Zen; amount = 600000000UL;}; })
+            |> Map.add {txHash=Hash.zero; index=0u} (uns { lock=Contract cgpContractId; spend = { asset=Asset.defaultOf cgpContractId; amount=20UL } })
+            |> Map.add {txHash=Hash.zero; index=1u} (uns { lock=Contract cgpContractId; spend = { asset=Asset.defaultOf chainParams.votingContractId ; amount=123UL } })
+        
+        let account =
+            account
+            |> TestWallet.addTransaction (Transaction.hash coinbaseTx.tx) coinbaseTx.tx
+        
+        let! extendedKey = Wallet.ExtendedKey.fromMnemonicPhrase (String.concat " " mnemonicPhrase)
+        
+        let outputs =
+            [ { lock = account.publicKey |> CryptoPublicKey.hash |> PK ; spend = { asset=Asset.defaultOf cgpContractId; amount=20UL } }
+            ; { lock = account.publicKey |> CryptoPublicKey.hash |> PK ; spend = { asset=Asset.defaultOf chainParams.votingContractId ; amount=123UL } }
+            ]
+        
+        let msgBody =
+            []
+            |> ZFStar.fsToFstList
+            |> ZData.List
+            |> ZData.Collection
+            |> Some
+        
+        let executeContract _ _ _ (messageBody: Zen.Types.Data.data option) (txSkel : TxSkeleton.T) =
+            let context = { context0 with blockNumber = 10u * chainParams.intervalLength + chainParams.coinbaseMaturity }
+            let wallet = createWalletExact outputs
+            
+            let res = executeCgpContract txSkel context messageBody wallet
+            res
+            |> Result.map (fun (ex,_,_) -> ex.tx) 
+        
+        let! tx = TestWallet.createExecuteContractTransaction chainParams executeContract cgpContractId "Payout" msgBody false None Map.empty (account, extendedKey)
+        
+        return tx, utxos
+    }
+    |> Result.bind
+           (fun (tx, utxos) ->
+        TransactionValidation.validateInContext chainParams (generateGetUTXO utxos) contractPath (context.blockNumber) timestamp acs Map.empty utxos (fun _ -> None) Map.empty (Transaction.toExtended tx)
+        |> Result.mapError (sprintf "%A"))
+    |> function
+    | Ok _ -> failwithf "There should have been an error, but there wasn't one"
+    | Error msg when msg = "Data parsing failed - the message body isn't a dictionary" -> ()
+    | Error msg -> failwithf "Wrong error: %A" msg
+    
+[<Test>]
+let ``No "Outputs" field in message body`` () =
+    let context = { context0 with blockNumber = 10u * chainParams.intervalLength + chainParams.coinbaseMaturity }
+    
+    let acs =
+        ActiveContractSet.empty
+        |> ActiveContractSet.add cgpContractId (compiledCgpContract.Force() |> function | Ok x -> x | _ -> failwith "no")
+    
+    let mnemonicPhrase =
+        NBitcoin.Mnemonic( NBitcoin.Wordlist.English, NBitcoin.WordCount.TwentyFour ).Words
+        |> Array.toSeq
+    
+    let result = Infrastructure.Result.ResultBuilder<string>()
+        
+    result {
+        let! (account,_) = TestWallet.import mnemonicPhrase "1234" Hash.zero 1ul
+        
+        let validCoinbaseTx = Block.getBlockCoinbase chainParams acs context.blockNumber [] Hash.zero CGP.empty
+
+        let coinbaseOutputs =
+             [ { lock = Coinbase (context.blockNumber - 501u, account.publicKey |> CryptoPublicKey.hash); spend = {asset = Asset.Zen; amount = 4400009026UL;}; }
+             ; { lock = Contract cgpContractId; spend = { asset = Asset.Zen; amount = 600000000UL;}; }
+             ; { lock = Contract cgpContractId; spend = { asset = Asset.defaultOf cgpContractId; amount=20UL } }
+             ; { lock = Contract cgpContractId; spend = { asset = Asset.defaultOf chainParams.votingContractId ; amount=123UL } }
+             ]
+        
+        let coinbaseTx =
+            { validCoinbaseTx with tx = { validCoinbaseTx.tx with outputs = coinbaseOutputs } }
+        
+        let uns = UtxoSet.Unspent
+        
+        let utxos =
+            Map.empty
+            |> Map.add {txHash=Transaction.hash coinbaseTx.tx; index=0u} (uns { lock = Coinbase (context.blockNumber - 501u, account.publicKey |> CryptoPublicKey.hash); spend = {asset = Asset.Zen; amount = 4400009026UL;}; })
+            |> Map.add {txHash=Transaction.hash coinbaseTx.tx; index=1u} (uns { lock = Contract cgpContractId; spend = { asset = Asset.Zen; amount = 600000000UL;}; })
+            |> Map.add {txHash=Hash.zero; index=0u} (uns { lock=Contract cgpContractId; spend = { asset=Asset.defaultOf cgpContractId; amount=20UL } })
+            |> Map.add {txHash=Hash.zero; index=1u} (uns { lock=Contract cgpContractId; spend = { asset=Asset.defaultOf chainParams.votingContractId ; amount=123UL } })
+        
+        let account =
+            account
+            |> TestWallet.addTransaction (Transaction.hash coinbaseTx.tx) coinbaseTx.tx
+        
+        let! extendedKey = Wallet.ExtendedKey.fromMnemonicPhrase (String.concat " " mnemonicPhrase)
+        
+        let outputs =
+            [ { lock = account.publicKey |> CryptoPublicKey.hash |> PK ; spend = { asset=Asset.defaultOf cgpContractId; amount=20UL } }
+            ; { lock = account.publicKey |> CryptoPublicKey.hash |> PK ; spend = { asset=Asset.defaultOf chainParams.votingContractId ; amount=123UL } }
+            ]
+        
+        let msgBody =
+            Map.empty
+            |> Map.add "NOTOutput"B (CGP.Contract.createPayout outputs)
+            |> fun m -> (m, 1u)
+            |> ZData.Dict
+            |> ZData.Collection
+            |> Some
+        
+        let executeContract _ _ _ (messageBody: Zen.Types.Data.data option) (txSkel : TxSkeleton.T) =
+            let context = { context0 with blockNumber = 10u * chainParams.intervalLength + chainParams.coinbaseMaturity }
+            let wallet = createWalletExact outputs
+            
+            let res = executeCgpContract txSkel context messageBody wallet
+            res
+            |> Result.map (fun (ex,_,_) -> ex.tx) 
+        
+        let! tx = TestWallet.createExecuteContractTransaction chainParams executeContract cgpContractId "Payout" msgBody false None Map.empty (account, extendedKey)
+        
+        return tx, utxos
+    }
+    |> Result.bind
+           (fun (tx, utxos) ->
+        TransactionValidation.validateInContext chainParams (generateGetUTXO utxos) contractPath (context.blockNumber) timestamp acs Map.empty utxos (fun _ -> None) Map.empty (Transaction.toExtended tx)
+        |> Result.mapError (sprintf "%A"))
+    |> function
+    | Ok _ -> failwithf "There should have been an error, but there wasn't one"
+    | Error msg when msg = "Couldn't parse Outputs" -> ()
+    | Error msg -> failwithf "Wrong error: %A" msg
+    
+    
+[<Test>]
+let ``Extra stuff in TX`` () =
+    let context = { context0 with blockNumber = 10u * chainParams.intervalLength + chainParams.coinbaseMaturity }
+    
+    let acs =
+        ActiveContractSet.empty
+        |> ActiveContractSet.add cgpContractId (compiledCgpContract.Force() |> function | Ok x -> x | _ -> failwith "no")
+    
+    let mnemonicPhrase =
+        NBitcoin.Mnemonic( NBitcoin.Wordlist.English, NBitcoin.WordCount.TwentyFour ).Words
+        |> Array.toSeq
+    
+    let result = Infrastructure.Result.ResultBuilder<string>()
+        
+    result {
+        let! (account,_) = TestWallet.import mnemonicPhrase "1234" Hash.zero 1ul
+        
+        let validCoinbaseTx = Block.getBlockCoinbase chainParams acs context.blockNumber [] Hash.zero CGP.empty
+
+        let coinbaseOutputs =
+             [ { lock = Coinbase (context.blockNumber - 501u, account.publicKey |> CryptoPublicKey.hash); spend = {asset = Asset.Zen; amount = 4400009026UL;}; }
+             ; { lock = Contract cgpContractId; spend = { asset = Asset.Zen; amount = 600000000UL;}; }
+             ; { lock = Contract cgpContractId; spend = { asset = Asset.defaultOf cgpContractId; amount=20UL } }
+             ; { lock = Contract cgpContractId; spend = { asset = Asset.defaultOf chainParams.votingContractId ; amount=123UL } }
+             ]
+        
+        let coinbaseTx =
+            { validCoinbaseTx with tx = { validCoinbaseTx.tx with outputs = coinbaseOutputs } }
+        
+        let uns = UtxoSet.Unspent
+        
+        let utxos =
+            Map.empty
+            |> Map.add {txHash=Transaction.hash coinbaseTx.tx; index=0u} (uns { lock = Coinbase (context.blockNumber - 501u, account.publicKey |> CryptoPublicKey.hash); spend = {asset = Asset.Zen; amount = 4400009026UL;}; })
+            |> Map.add {txHash=Transaction.hash coinbaseTx.tx; index=1u} (uns { lock = Contract cgpContractId; spend = { asset = Asset.Zen; amount = 600000000UL;}; })
+            |> Map.add {txHash=Hash.zero; index=0u} (uns { lock=Contract cgpContractId; spend = { asset=Asset.defaultOf cgpContractId; amount=20UL } })
+            |> Map.add {txHash=Hash.zero; index=1u} (uns { lock=Contract cgpContractId; spend = { asset=Asset.defaultOf chainParams.votingContractId ; amount=123UL } })
+        
+        let account =
+            account
+            |> TestWallet.addTransaction (Transaction.hash coinbaseTx.tx) coinbaseTx.tx
+        
+        let! extendedKey = Wallet.ExtendedKey.fromMnemonicPhrase (String.concat " " mnemonicPhrase)
+        
+        let outputs =
+            [ { lock = account.publicKey |> CryptoPublicKey.hash |> PK ; spend = { asset=Asset.defaultOf cgpContractId; amount=20UL } }
+            ; { lock = account.publicKey |> CryptoPublicKey.hash |> PK ; spend = { asset=Asset.defaultOf chainParams.votingContractId ; amount=123UL } }
+            ]
+        
+        let msgBody = CGP.Contract.createPayoutMsgBody outputs
+        
+        let executeContract _ _ _ (messageBody: Zen.Types.Data.data option) (txSkel : TxSkeleton.T) =
+            let context = { context0 with blockNumber = 10u * chainParams.intervalLength + chainParams.coinbaseMaturity }
+            let wallet = createWalletExact outputs
+            
+            let res = executeCgpContract txSkel context messageBody wallet
+            res
+            |> Result.map (fun (ex,_,_) -> ex.tx) 
+        
+        let! tx = TestWallet.createExecuteContractTransaction chainParams executeContract cgpContractId "Payout" msgBody false None Map.empty (account, extendedKey)
+        
+        let tx = {tx with witnesses = List.append tx.witnesses [PKWitness (TxHash, Crypto.PublicKey [||],Crypto.Signature [||])] }
+        
+        return tx, utxos
+    }
+    |> Result.bind
+           (fun (tx, utxos) ->
+        TransactionValidation.validateInContext chainParams (generateGetUTXO utxos) contractPath (context.blockNumber) timestamp acs Map.empty utxos (fun _ -> None) Map.empty (Transaction.toExtended tx)
+        |> Result.mapError (sprintf "%A"))
+    |> function
+    | Ok _ -> failwithf "There should have been an error, but there wasn't one"
+    | Error msg when msg = "General \"expecting a contract 0 witness\"" -> ()
+    | Error msg -> failwithf "Wrong error: %A" msg
+    
+    
+[<Test>]
+let ``ContractWitness get updated before publishing`` () =
+    let context = { context0 with blockNumber = 10u * chainParams.intervalLength + chainParams.coinbaseMaturity }
+    
+    let acs =
+        ActiveContractSet.empty
+        |> ActiveContractSet.add cgpContractId (compiledCgpContract.Force() |> function | Ok x -> x | _ -> failwith "no")
+    
+    let mnemonicPhrase =
+        NBitcoin.Mnemonic( NBitcoin.Wordlist.English, NBitcoin.WordCount.TwentyFour ).Words
+        |> Array.toSeq
+    
+    let result = Infrastructure.Result.ResultBuilder<string>()
+        
+    result {
+        let! (account,_) = TestWallet.import mnemonicPhrase "1234" Hash.zero 1ul
+        
+        let validCoinbaseTx = Block.getBlockCoinbase chainParams acs context.blockNumber [] Hash.zero CGP.empty
+
+        let coinbaseOutputs =
+             [ { lock = Coinbase (context.blockNumber - 501u, account.publicKey |> CryptoPublicKey.hash); spend = {asset = Asset.Zen; amount = 4400009026UL;}; }
+             ; { lock = Contract cgpContractId; spend = { asset = Asset.Zen; amount = 600000000UL;}; }
+             ; { lock = Contract cgpContractId; spend = { asset = Asset.defaultOf cgpContractId; amount=20UL } }
+             ; { lock = Contract cgpContractId; spend = { asset = Asset.defaultOf chainParams.votingContractId ; amount=123UL } }
+             ]
+        
+        let coinbaseTx =
+            { validCoinbaseTx with tx = { validCoinbaseTx.tx with outputs = coinbaseOutputs } }
+        
+        let uns = UtxoSet.Unspent
+        
+        let utxos =
+            Map.empty
+            |> Map.add {txHash=Transaction.hash coinbaseTx.tx; index=0u} (uns { lock = Coinbase (context.blockNumber - 501u, account.publicKey |> CryptoPublicKey.hash); spend = {asset = Asset.Zen; amount = 4400009026UL;}; })
+            |> Map.add {txHash=Transaction.hash coinbaseTx.tx; index=1u} (uns { lock = Contract cgpContractId; spend = { asset = Asset.Zen; amount = 600000000UL;}; })
+            |> Map.add {txHash=Hash.zero; index=0u} (uns { lock=Contract cgpContractId; spend = { asset=Asset.defaultOf cgpContractId; amount=20UL } })
+            |> Map.add {txHash=Hash.zero; index=1u} (uns { lock=Contract cgpContractId; spend = { asset=Asset.defaultOf chainParams.votingContractId ; amount=123UL } })
+        
+        let account =
+            account
+            |> TestWallet.addTransaction (Transaction.hash coinbaseTx.tx) coinbaseTx.tx
+        
+        let! extendedKey = Wallet.ExtendedKey.fromMnemonicPhrase (String.concat " " mnemonicPhrase)
+        
+        let outputs =
+            [ { lock = account.publicKey |> CryptoPublicKey.hash |> PK ; spend = { asset=Asset.defaultOf cgpContractId; amount=20UL } }
+            ; { lock = account.publicKey |> CryptoPublicKey.hash |> PK ; spend = { asset=Asset.defaultOf chainParams.votingContractId ; amount=123UL } }
+            ]
+        
+        let msgBody = CGP.Contract.createPayoutMsgBody outputs
+        
+        let executeContract _ _ _ (messageBody: Zen.Types.Data.data option) (txSkel : TxSkeleton.T) =
+            let context = { context0 with blockNumber = 10u * chainParams.intervalLength + chainParams.coinbaseMaturity }
+            let wallet = createWalletExact outputs
+            
+            let res = executeCgpContract txSkel context messageBody wallet
+            res
+            |> Result.map (fun (ex,_,_) -> ex.tx) 
+        
+        let! tx = TestWallet.createExecuteContractTransaction chainParams executeContract cgpContractId "Payout" msgBody false None Map.empty (account, extendedKey)
+        
+        let lastWitness =
+            tx.witnesses
+            |> List.map (fun x -> match x with | ContractWitness cw -> (ContractWitness {cw with messageBody = changeMessageBody cw.messageBody}) : Witness | _ -> x )
+            
+        let tx = {tx with witnesses = List.append tx.witnesses lastWitness }
+        
+        return tx, utxos
+    }
+    |> Result.bind
+           (fun (tx, utxos) ->
+        TransactionValidation.validateInContext chainParams (generateGetUTXO utxos) contractPath (context.blockNumber) timestamp acs Map.empty utxos (fun _ -> None) Map.empty (Transaction.toExtended tx)
+        |> Result.mapError (sprintf "%A"))
+    |> function
+    | Ok _ -> ()
+    | Error msg when msg = "General \"expecting a contract 0 witness\"" -> ()
+    | Error msg -> failwithf "Error: %s" msg
 
 [<Test>]
 let ``no unreported payout vulnerability`` () =
@@ -1247,7 +2088,7 @@ let ``no unreported payout vulnerability`` () =
     
     let res = executeCgpContract txSkel context messageBody wallet
     
-    let ex, txSkel, utxos = match res with | Ok (ex, txSkel, utxos) -> ex, txSkel, utxos | Error msg -> failwithf "Error: %s" msg
+    let ex, _, utxos = match res with | Ok (ex, txSkel, utxos) -> ex, txSkel, utxos | Error msg -> failwithf "Error: %s" msg
     
     let cgp : CGP.T =
         {
@@ -1297,10 +2138,30 @@ let ``no unreported payout vulnerability`` () =
             transactions                = [coinbaseTx; ex]
         }
     
-    Block.connect chainParams (generateGetUTXO utxos) contractPath parent 1UL utxos cgp acs ContractCache.empty ema getContractState ContractStates.asDatabase block
+    let state : BlockConnection.State = {
+        utxoSet        = utxos
+        acs            = acs
+        cgp            = cgp
+        ema            = ema
+        contractCache  = ContractCache.empty
+        contractStates = ContractStates.asDatabase
+    }
+    
+    let env : BlockConnection.Env = {
+        chainParams      = chainParams
+        timestamp        = 1UL
+        getUTXO          = generateGetUTXO utxos
+        getContractState = getContractState
+        contractsPath    = contractPath
+        parent           = parent
+        block            = block
+    }
+    
+    BlockConnection.connect state env
     |> function
     | Ok _ -> failwithf "There should have been an error, but there wasn't one"
     | Error msg when msg = "transactions failed inputs validation due to General \"invalid amounts\"" -> ()
     | Error msg -> failwithf "Wrong error: %A" msg
 
-#endif
+
+

@@ -81,6 +81,13 @@ let get (MultiCollection collection) session key =
         getNext [] |> List.rev
     else
         []
+        
+/// trivial implementation
+let tryGet collection session key =
+    match get collection session key with
+    | [] -> None
+    | x -> Some x
+
 
 let truncate (MultiCollection collection) session =
     mdb_drop(session.tx, collection.database,0)

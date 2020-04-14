@@ -46,11 +46,13 @@
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="BigEndianBitConverter.fs" />
     <Compile Include="Functional.fs" />
+    <Compile Include="ReaderResult.fs" />
     <Compile Include="Ref.fs" />
     <Compile Include="Result.fs" />
     <Compile Include="BigInteger.fs" />
     <Compile Include="Security.fs" />
     <Compile Include="Endpoint.fs" />
+    <Compile Include="Option.fs" />
     <Compile Include="List.fs" />
     <Compile Include="Log.fs" />
     <Compile Include="ServiceBusMessage.fs" />
@@ -69,7 +71,7 @@
     <Compile Include="Exception.fs" />
     <Compile Include="Platform.fs" />
     <Compile Include="ZFStar.fs" />
-    <Compile Include="Option.fs" />
+    <Compile Include="Map.fs" />
   </ItemGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>

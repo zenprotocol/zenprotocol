@@ -1,10 +1,8 @@
 module Blockchain.ExtendedBlockHeader
 
-open Blockchain
 open Consensus
 open Consensus.Block
 open Consensus.Types
-open Infrastructure
 
 // TODO: serialize and deserialize for persistence
 

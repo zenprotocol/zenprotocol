@@ -85,8 +85,9 @@ let publishTx dataAccess session client view publish tx =
     match tx with
     | Ok tx ->
         if publish then
-            let ex = Transaction.toExtended tx
-
+            //hack as the F# wallet will be deprecated
+            let ex = Transaction.toExtended tx |> Serialization.TransactionExtended.serialize |> Serialization.TransactionExtended.deserialize |> Option.get
+            
             let view = View.addMempoolTransaction dataAccess session ex.txHash tx view
             Blockchain.validateTransaction client ex
 

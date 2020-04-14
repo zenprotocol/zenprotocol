@@ -42,6 +42,8 @@ type T = {
     tip: Hash
     blockNumber: uint32
     publicKey: PublicKey
+    publicKeyChange: PublicKey
+    cgp: CGP.T
 }
 
 let private zenCoinType = ExtendedKey.Hardened 258
@@ -49,11 +51,16 @@ let private purpose = ExtendedKey.Hardened 44
 
 let deriveZenKey = ExtendedKey.derivePath "m/44'/258'/0'/0/0"
 
+let deriveChangeZenKey = ExtendedKey.derivePath "m/44'/258'/0'/1/0"
+
 let private create mnemonicPhrase password tipHash tipBlockNumber = result {
     let! extendedPrivateKey = ExtendedKey.fromMnemonicPhrase mnemonicPhrase
 
     let! zenPrivateKey = deriveZenKey extendedPrivateKey
     let! publicKey =ExtendedKey.getPublicKey zenPrivateKey
+
+    let! zenChangePrivateKey = deriveChangeZenKey extendedPrivateKey
+    let! publicKeyChange =ExtendedKey.getPublicKey zenChangePrivateKey
 
     let secured = Secured.create password mnemonicPhrase
 
@@ -64,6 +71,8 @@ let private create mnemonicPhrase password tipHash tipBlockNumber = result {
         tip = tipHash
         blockNumber = tipBlockNumber
         publicKey = publicKey
+        publicKeyChange = publicKeyChange
+        cgp = CGP.empty
     }, secured
 }
 
@@ -73,7 +82,7 @@ let import mnemonicPhrase =
     create mnemonicPhrase
 
 let private isKeyMatch account address =
-    PublicKey.hash account.publicKey = address
+    PublicKey.hash account.publicKey = address || PublicKey.hash account.publicKeyChange = address
 
 // update the outputs with transaction
 let private handleTransaction txHash (tx:Transaction) account outputs txDeltas blockNumber =
@@ -82,7 +91,7 @@ let private handleTransaction txHash (tx:Transaction) account outputs txDeltas b
             Map.add { txHash = txHash; index = index } (Unspent output) outputs,
             List.add (Unspent output.spend) deltas)
         match output.lock with
-        | Coinbase (_,pkHash) when isKeyMatch account pkHash -> add
+        | Coinbase (_,pkHash) when isKeyMatch account pkHash  -> add
         | PK pkHash when isKeyMatch account pkHash -> add
         | _ -> (outputs, deltas)
 
@@ -162,7 +171,7 @@ let getBalance account =
         | Some amount -> Map.add output.spend.asset (amount+output.spend.amount) balance
         | None -> Map.add output.spend.asset output.spend.amount balance) Map.empty unspent
 
-let private collectInputs chainParams account amount asset secretKey =
+let private collectInputs chainParams account amount asset secretKey secretChangeKey =
     let unspent, _ = getUnspentOutputs account
 
     let collectInputs ((inputs, keys), collectedAmount) outpoint output =
@@ -172,8 +181,16 @@ let private collectInputs chainParams account amount asset secretKey =
             | _ -> true
 
         if isMature && amount > collectedAmount && asset = output.spend.asset then
-            let keyPair = secretKey, account.publicKey
-            (((outpoint,output) :: inputs, keyPair :: keys), output.spend.amount + collectedAmount)
+            match output.lock with
+            | Coinbase (_,hash)
+            | PK hash when hash = PublicKey.hash account.publicKey ->
+                let keyPair = secretKey, account.publicKey
+                (((outpoint,output) :: inputs, keyPair :: keys), output.spend.amount + collectedAmount)
+            | Coinbase (_,hash)
+            | PK hash when hash = PublicKey.hash account.publicKeyChange ->
+                let keyPair = secretChangeKey, account.publicKeyChange
+                (((outpoint,output) :: inputs, keyPair :: keys), output.spend.amount + collectedAmount)
+            | _ -> failwith "No other spendable output found"
         else
             ((inputs, keys), collectedAmount)
 
@@ -193,7 +210,7 @@ let private addChange inputAmount asset account outputs =
         let changeOutput =
             {
                 spend = { amount=(inputAmount-outputAmount);asset=asset};
-                lock = PK (PublicKey.hash account.publicKey)
+                lock = PK (PublicKey.hash account.publicKeyChange)
             }
 
         List.add changeOutput outputs
@@ -203,8 +220,10 @@ let private addChange inputAmount asset account outputs =
 let createTransactionFromLock chainParams lk spend (account, extendedKey) = result {
     let! zenKey = deriveZenKey extendedKey
     let! secretKey = ExtendedKey.getPrivateKey zenKey
+    let! zenChaingeKey = deriveChangeZenKey extendedKey
+    let! secretChangeKey = ExtendedKey.getPrivateKey zenChaingeKey
 
-    let! (inputs, keys, inputAmount) = collectInputs chainParams account spend.amount spend.asset secretKey
+    let! (inputs, keys, inputAmount) = collectInputs chainParams account spend.amount spend.asset secretKey secretChangeKey
     let inputPoints = List.map (fst >> Outpoint) inputs
     let outputs = addChange inputAmount spend.asset account [{ spend = spend; lock = lk }]
     return
@@ -246,8 +265,10 @@ let createActivationTransactionFromContract chainParams (contractId, ({queries=q
 
         let! zenKey = deriveZenKey extendedKey
         let! secretKey = ExtendedKey.getPrivateKey zenKey
+        let! zenChaingeKey = deriveChangeZenKey extendedKey
+        let! secretChangeKey = ExtendedKey.getPrivateKey zenChaingeKey
 
-        let! (inputs,keys,inputAmount) = collectInputs chainParams account (activationSacrifice + activationFee) Asset.Zen secretKey
+        let! (inputs,keys,inputAmount) = collectInputs chainParams account (activationSacrifice + activationFee) Asset.Zen secretKey secretChangeKey
         let inputPoints = List.map (fst >> Outpoint) inputs
 
         let outputs =
@@ -324,6 +345,8 @@ let createExecuteContractTransaction chainParams executeContract (contractId:Con
 
     let! zenKey = deriveZenKey extendedKey
     let! secretKey = ExtendedKey.getPrivateKey zenKey
+    let! zenChaingeKey = deriveChangeZenKey extendedKey
+    let! secretChangeKey = ExtendedKey.getPrivateKey zenChaingeKey
     let pkHash = PublicKey.hash account.publicKey
 
     if Map.isEmpty spends then
@@ -332,7 +355,7 @@ let createExecuteContractTransaction chainParams executeContract (contractId:Con
         let tempFeeAmount = 1UL
 
         let! inputs, keys', collectedAmount =
-            collectInputs chainParams account tempFeeAmount Zen secretKey
+            collectInputs chainParams account tempFeeAmount Zen secretKey secretChangeKey
         let inputs = List.map TxSkeleton.Input.PointedOutput inputs
 
         txSkeleton <-
@@ -346,7 +369,7 @@ let createExecuteContractTransaction chainParams executeContract (contractId:Con
     else
         for (asset, amount) in Map.toSeq spends do
             let! inputs, keys', collectedAmount =
-                collectInputs chainParams account amount asset secretKey
+                collectInputs chainParams account amount asset secretKey secretChangeKey
             let inputs = List.map TxSkeleton.Input.PointedOutput inputs
 
             txSkeleton <-

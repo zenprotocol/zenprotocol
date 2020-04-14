@@ -41,7 +41,7 @@ let inputEncoder (input:Input) =
 
 let recipientEncoder chain = function
         | PKRecipient pkHash -> Address.encode chain (Address.PK pkHash)
-        | ContractRecipient contractId -> contractId.ToString()
+        | ContractRecipient contractId -> Address.encode chain (Address.Contract contractId)
     
 let lockEncoder chain (lock:Lock) =
     match lock with
@@ -220,22 +220,28 @@ let dataEncoder chain data =
 
     JsonValue.Record [| dataName data, dataValue data |]
 
+
+
+let payoutEncoder chain (recipient:Recipient,spend: Spend list) =
+    let res =
+        recipientEncoder chain recipient, spend
+        |> List.map spendEncoder
+        |> List.toArray
+    
+    res 
+    |> (fun (r,s) -> PayoutResultJson.Root(r,s).JsonValue)
+
 let cgpEncoder chain (interval:uint32) (cgp:CGP.T)  =
     let result =
         match cgp.payout with
-        | Some res ->
-            res
-            |> (fun (recipient:Recipient, spend: Spend list) ->
-                spend
-                |> List.map (fun spend ->
-                    PayoutResultJson.Root(recipientEncoder chain recipient, int64 spend.amount, spend.asset.AsString)))
-            |> fun j ->  List.map (fun (x:PayoutResultJson.Root) -> x.JsonValue) j
-        | _ -> [emptyRecord]
+        | Some payout ->
+            payoutEncoder chain payout
+        | _ -> emptyRecord
     JsonValue.Record
         [|
             ("interval", JsonValue.Number ((decimal)interval))
             ("allocation", JsonValue.Number (decimal cgp.allocation))
-            ("payout", result|> List.toArray |> JsonValue.Array)
+            ("payout", result)
         |]
     |> omitNullFields
 
