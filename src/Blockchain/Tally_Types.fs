@@ -25,5 +25,3 @@ type PKPayout = Map<PublicKey,Payout>
 type Candidates = Payout list
 
 type NomineesBalance = Map<Payout,uint64>
-
-type VoteUtxo = Map<Outpoint,OutputStatus>

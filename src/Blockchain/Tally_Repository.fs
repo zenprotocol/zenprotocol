@@ -27,17 +27,6 @@ module PKAllocation =
 
     let contains (session : Session) = Collection.containsKey session.context.allocationVoters
 
-module VoteUtxoSet =
-    let get (session : Session) = Collection.get session.context.voteUtxo
-
-    let tryGet (session : Session) = Collection.tryGet session.context.voteUtxo
-    let put (session : Session) = Collection.put session.context.voteUtxo
-
-    let delete (session : Session) = Collection.delete session.context.voteUtxo
-    let truncate (session : Session) = Collection.truncate session.context.voteUtxo
-
-    let contains (session : Session) = Collection.containsKey session.context.voteUtxo
-
 module PKPayout =
     let get (session : Session) = Collection.get session.context.payoutVoters
 

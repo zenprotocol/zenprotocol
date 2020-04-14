@@ -1,8 +1,11 @@
 module Blockchain.Tally.Handler
 open Blockchain
+open Blockchain
+open Blockchain.Tally
 open Blockchain.Tally.Repository
 open Consensus
 open Chain
+open Consensus
 open Infrastructure
 open Logary.Message
 open Types
@@ -194,9 +197,8 @@ module Handler =
         | NoOutput ->
             failwith "Output doesn't exist"
 
-    let getVoteUtxo dataAccess interval : VoteUtxo =
-        VoteUtxoSet.tryGet dataAccess dataAccess.session interval
-        |> Option.defaultValue Map.empty
+    let getUTXO session =
+        UtxoSetRepository.get session
 
     module VoteTip =
         let update op dataAccess block =
@@ -210,73 +212,33 @@ module Handler =
                 block.header.parent
             |> Tally.Repository.VoteTip.put dataAccess dataAccess.session
 
-    module VoteUtxo =
-
-        let private addBlock
-            (getUTXO : Outpoint -> OutputStatus)
-            (block : Block)
-            (map : Map<Outpoint, OutputStatus>)
-            : Map<Outpoint, OutputStatus> =
-                block.transactions
-                |> List.fold (fun map ex -> handleTransaction getUTXO ex.txHash ex.tx map) map
-
-        let getUTXO dataAccess interval (outpoint : Outpoint) : OutputStatus =
-            getVoteUtxo dataAccess interval
-            |> Map.tryFind outpoint
-            |> Option.defaultValue NoOutput
-
-        let private updateBlock =
-            function
-            | Add    -> addBlock
-            | Remove -> undoBlock
-
-        let copyToNext op dataAccess interval =
-
-            lazy
-
-            match op with
-            | Add ->
-                VoteUtxoSet.tryGet dataAccess dataAccess.session interval
-                |> Option.defaultValue Map.empty
-                |> VoteUtxoSet.put dataAccess dataAccess.session (interval + 1ul)
-            | Remove ->
-                VoteUtxoSet.delete dataAccess dataAccess.session (interval + 1ul)
-
-        let update op dataAccess interval block =
-
-            lazy
-
-            getVoteUtxo dataAccess interval
-            |> updateBlock op (getUTXO dataAccess interval) block
-            |> VoteUtxoSet.put dataAccess dataAccess.session interval
-
     module PKBalance =
 
-        let handleOutput op validMaturity (map : PKBalance) (outp : Output) : PKBalance =
+        let handleOutput op (map : PKBalance) (outp : Output) : PKBalance =
             match outp.lock with
             | PK pkHash when outp.spend.asset = Asset.Zen ->
                 map
                 |> updateMap op pkHash outp.spend.amount
-            | Coinbase (blockNumber,pkHash) when outp.spend.asset = Asset.Zen && validMaturity >= blockNumber ->
+            | Coinbase (blockNumber,pkHash) when outp.spend.asset = Asset.Zen ->
                 map
                 |> updateMap op pkHash outp.spend.amount
             | _ ->
                 map
 
-        let handleInput op dataAccess interval chainParams validMaturity (set: UtxoSet.T) (map : PKBalance) (inp : Input) : PKBalance =
+        let handleInput op dataAccess (utxoSet: UtxoSet.T) (map : PKBalance) (inp : Input) : PKBalance =
             match inp with
             | Outpoint (outpoint) ->
-               handleOutput (invert op) validMaturity map (getOutput (VoteUtxo.getUTXO dataAccess interval) set outpoint)
+               handleOutput (invert op) map (getOutput (getUTXO dataAccess) utxoSet outpoint)
             | _ ->
                 map
 
-        let handleTx op dataAccess interval chainParams validMaturity set fund tx =
+        let handleTx op dataAccess utxoSet fund tx =
             let fundAfterInputs =
                 tx.inputs
-                |> List.fold (handleInput op dataAccess interval chainParams validMaturity set) fund
+                |> List.fold (handleInput op dataAccess utxoSet) fund
 
             tx.outputs
-            |> List.fold (handleOutput op validMaturity) fundAfterInputs
+            |> List.fold (handleOutput op) fundAfterInputs
 
         let copyToNext op dataAccess interval =
 
@@ -290,11 +252,9 @@ module Handler =
             | Remove ->
                 PKBalance.delete dataAccess dataAccess.session (interval + 1ul)
 
-        let update op dataAccess interval chainParams block =
+        let update op dataAccess interval utxoSet block =
 
             lazy
-
-            let validMaturity = CGP.getSnapshotBlock chainParams interval - chainParams.coinbaseMaturity
 
             let txs =
                 match op with
@@ -306,10 +266,7 @@ module Handler =
                 |> Option.defaultValue Map.empty
 
             for ex in txs do
-                let utxoSet =
-                    VoteUtxoSet.tryGet dataAccess dataAccess.session interval
-                    |> Option.defaultValue Map.empty
-                pkbal <- handleTx op dataAccess interval chainParams validMaturity utxoSet pkbal ex.tx
+                pkbal <- handleTx op dataAccess utxoSet pkbal ex.tx
 
             PKBalance.put dataAccess dataAccess.session interval pkbal
 
@@ -400,17 +357,17 @@ module Handler =
             | _ ->
                 fund
 
-        let handleInput op dataAccess interval chainParams (set: UtxoSet.T) (fund : Map<Asset,uint64>) (inp : Input) : Map<Asset,uint64> =
+        let handleInput op dataAccess chainParams (utxoSet: UtxoSet.T) (fund : Map<Asset,uint64>) (inp : Input) : Map<Asset,uint64> =
             match inp with
             | Outpoint (outpoint) ->
-               handleOutput (invert op) chainParams fund  (getOutput (VoteUtxo.getUTXO dataAccess interval) set outpoint)
+               handleOutput (invert op) chainParams fund  (getOutput (getUTXO dataAccess) utxoSet outpoint)
             | _ ->
                 fund
 
-        let handleTx op dataAccess interval chainParams set fund tx =
+        let handleTx op dataAccess chainParams utxoSet fund tx =
             let fundAfterInputs =
                 tx.inputs
-                |> List.fold (handleInput op dataAccess interval chainParams set) fund
+                |> List.fold (handleInput op dataAccess chainParams utxoSet) fund
 
             tx.outputs
             |> List.fold (handleOutput op chainParams) fundAfterInputs
@@ -427,13 +384,9 @@ module Handler =
             | Remove ->
                 Fund.delete dataAccess dataAccess.session (interval + 1ul)
 
-        let update op dataAccess interval chainParams block =
+        let update op dataAccess interval chainParams utxoSet block =
 
             lazy
-
-            let utxoSet =
-                VoteUtxoSet.tryGet dataAccess dataAccess.session interval
-                |> Option.defaultValue Map.empty
 
             let txs =
                 match op with
@@ -445,7 +398,7 @@ module Handler =
                 |> Option.defaultValue Map.empty
 
             for ex in txs do
-                fund <- handleTx op dataAccess interval chainParams utxoSet fund ex.tx
+                fund <- handleTx op dataAccess chainParams utxoSet fund ex.tx
 
             Fund.put dataAccess dataAccess.session interval fund
 
@@ -484,7 +437,7 @@ module Handler =
         >> setField "interval" interval
         |> Log.info;
 
-    let private updateBlock op dataAccess chainParams (block : Block) : unit =
+    let private updateBlock op dataAccess chainParams (utxoSet : UtxoSet.T) (block : Block) : unit =
         let blockNumber   = block.header.blockNumber
         let interval      = CGP.getInterval          chainParams blockNumber
         let snapshot      = CGP.getSnapshotBlock     chainParams interval
@@ -508,17 +461,14 @@ module Handler =
             if blockNumber = beginOfInterval
                 then yield Winner     .update op dataAccess interval chainParams
             if blockNumber <= snapshot
-                then yield VoteUtxo   .update op dataAccess interval block
-                     yield PKBalance  .update op dataAccess interval chainParams block
-                     yield Fund       .update op dataAccess interval chainParams block
+                then yield PKBalance  .update op dataAccess interval utxoSet block
+                     yield Fund       .update op dataAccess interval chainParams utxoSet block
             if blockNumber = snapshot + 1u
-                then yield VoteUtxo   .copyToNext op dataAccess interval
-                     yield PKBalance  .copyToNext op dataAccess interval
+                then yield PKBalance  .copyToNext op dataAccess interval
                      yield Fund       .copyToNext op dataAccess interval
             if blockNumber > snapshot
-                then yield VoteUtxo   .update op dataAccess (interval + 1u) block
-                     yield PKBalance  .update op dataAccess (interval + 1u) chainParams block
-                     yield Fund       .update op dataAccess (interval + 1u) chainParams block
+                then yield PKBalance  .update op dataAccess (interval + 1u) utxoSet block
+                     yield Fund       .update op dataAccess (interval + 1u) chainParams utxoSet block
             if snapshot < blockNumber && blockNumber <= endOfNomination
                 then yield PKNominee .update op dataAccess interval chainParams block
             if blockNumber = endOfNomination
@@ -546,41 +496,57 @@ module Handler =
     let removeBlock =
         updateBlock Remove
 
-let addBlock dataAccess chainParams block =
-    Handler.addBlock dataAccess chainParams block
+let addBlock dataAccess chainParams utxoSet block =
+    Handler.addBlock dataAccess chainParams utxoSet block
 
-let removeBlock dataAccess chainParams block =
-    Handler.removeBlock dataAccess chainParams block
+let removeBlock dataAccess chainParams utxoSet block =
+    Handler.removeBlock dataAccess chainParams utxoSet block
 
-let updateTallyBlockFromHeaders op env headers =
+let updateTallyBlockFromHeaders op env utxoSet headers =
     let headers =
         match op with
         | Add ->
             headers
         | Remove ->
             headers |> List.rev
+
+    let updateUtxo session block utxoSet =
+        let mutable utxoSet = utxoSet
+        match op with
+        | Add ->
+            for ex in block.transactions do
+                utxoSet <- handleTransaction (Handler.getUTXO session) ex.txHash ex.tx utxoSet
+        | Remove ->
+            utxoSet <- undoBlock (Handler.getUTXO session) block utxoSet
+
+        utxoSet
+
+    let mutable utxoSet = utxoSet
+
     for header in headers do
 
             let block =
                 BlockRepository.getFullBlock env.session header
             match op with
             | Add ->
-                addBlock env.session env.chainParams block
+                addBlock env.session env.chainParams utxoSet block
+                utxoSet <- updateUtxo env.session block utxoSet
 
             | Remove ->
-                removeBlock env.session env.chainParams block
+                utxoSet <- updateUtxo env.session block utxoSet
+                removeBlock env.session env.chainParams utxoSet block
 
 
-let addTallyBlockFromHeaders env headers =
-    updateTallyBlockFromHeaders Add env headers
+let addTallyBlockFromHeaders env utxoSet headers =
+    updateTallyBlockFromHeaders Add env utxoSet headers
 
-let removeTallyBlockFromHeaders env headers =
-    updateTallyBlockFromHeaders Remove env headers
+let removeTallyBlockFromHeaders env utxoSet headers =
+    updateTallyBlockFromHeaders Remove env utxoSet headers
 
-let removeTallyBlocks env forkBlock currentTip =
+let removeTallyBlocks env utxoSet forkBlock currentTip =
     Chain.getSubChain env.session forkBlock currentTip
-    |> removeTallyBlockFromHeaders env
+    |> removeTallyBlockFromHeaders env utxoSet
 
-let addTallyBlocks env forkBlock tip =
+let addTallyBlocks env utxoSet forkBlock tip =
     Chain.getSubChain env.session forkBlock tip
-    |> addTallyBlockFromHeaders env
+    |> addTallyBlockFromHeaders env utxoSet
