@@ -422,6 +422,13 @@ let parseGetOutputsJson chain json =
                 Error "unrecognized mode"
     with _ as ex ->
         Error ("Json invalid: " + ex.Message)
+let parseTransactionCountJson chain json =
+    try
+        let json = GetTransactionCountJson.Parse json
+
+        checkAddresses chain json.Addresses
+    with _ as ex ->
+        Error ("Json invalid: " + ex.Message)
 
 let parseGetContractHistoryJson json =
     try
