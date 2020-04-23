@@ -83,9 +83,9 @@ module DA =
             let snapshotBlockNumber = CGP.getSnapshotBlock chainParams interval
 
             let threshold =
-                Chain.getCurrentZPIssuance chainParams snapshotBlockNumber
-                |> (*) (fst chainParams.thresholdFactor)
-                |> (/) (snd chainParams.thresholdFactor)
+                let numerator =
+                    (Chain.getCurrentZPIssuance chainParams snapshotBlockNumber * fst chainParams.thresholdFactor)
+                numerator / (snd chainParams.thresholdFactor)
 
             let env : Tally.Nomination.Env =
                 {
