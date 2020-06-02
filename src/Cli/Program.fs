@@ -107,6 +107,9 @@ type Arguments =
     interface IArgParserTemplate with
         member arg.Usage =
             match arg with
+#if DEBUG
+            | Local _ -> "use local"
+#endif
             | Port _ -> "port of zen-node API"
             | Test _ -> "use testnet port"
             | Balance _ -> "get wallet balance"
@@ -169,7 +172,7 @@ let main argv =
         | Port p -> getUri <- getUri' (string p)
         | Test -> getUri <- getUri' "31567"
 #if DEBUG
-        | Local idx -> getUri <- getUri' (port (int idx))
+        | Local idx -> getUri <- getURL (int idx)
 #endif
         | _ -> ()
         ) (results.GetAllResults())
