@@ -98,37 +98,40 @@ module Server =
 
         let async () =
             while not source.IsCancellationRequested do
-                let context = listener.GetContext()
+                try 
+                    let context = listener.GetContext()
 
-                let path = removePostfixSlash context.Request.Url.AbsolutePath
+                    let path = removePostfixSlash context.Request.Url.AbsolutePath
 
-                let reply = writeResponse context.Response
+                    let reply = writeResponse context.Response
 
-                match context.Request.HttpMethod with
-                | "GET" ->
-                    let nameValueCollection = System.Web.HttpUtility.ParseQueryString context.Request.Url.Query
-                    let queryParameters =
-                        nameValueCollection.AllKeys
-                        |> Seq.map (fun key -> key, nameValueCollection.Get(key))
-                        |> Map.ofSeq
+                    match context.Request.HttpMethod with
+                    | "GET" ->
+                        let nameValueCollection = System.Web.HttpUtility.ParseQueryString context.Request.Url.Query
+                        let queryParameters =
+                            nameValueCollection.AllKeys
+                            |> Seq.map (fun key -> key, nameValueCollection.Get(key))
+                            |> Map.ofSeq
 
-                    invokeOnNext poller observer
-                        (Get (path, queryParameters), reply)
-                | "POST" ->
-                    let body = getBody context.Request
-                    match body with
-                    | Ok body ->
                         invokeOnNext poller observer
-                            (Post(path, body), reply)
-                    | Error error ->
-                        writeTextResponse context.Response StatusCode.UnsupportedMediaType error
-                | _ ->
-                        writeEmptyResponse context.Response StatusCode.MethodNotAllowed
-        
+                            (Get (path, queryParameters), reply)
+                    | "POST" ->
+                        let body = getBody context.Request
+                        match body with
+                        | Ok body ->
+                            invokeOnNext poller observer
+                                (Post(path, body), reply)
+                        | Error error ->
+                            writeTextResponse context.Response StatusCode.UnsupportedMediaType error
+                    | _ ->
+                            writeEmptyResponse context.Response StatusCode.MethodNotAllowed
+                with
+                | :? System.Net.HttpListenerException -> source.Cancel()
+            
         let task = new System.Threading.Tasks.Task(async, System.Threading.Tasks.TaskCreationOptions.LongRunning)
         task.Start()
         task.ContinueWith(fun task ->
-            if task.IsFaulted then 
+            if task.IsFaulted then
                 System.Environment.FailFast("http thread crashed", task.Exception.Flatten().InnerException) 
             ) |> ignore
     
