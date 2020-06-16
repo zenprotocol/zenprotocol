@@ -241,6 +241,7 @@ module Wallet =
         | ExportZenPublicKey
         | ImportZenPublicKey of string
         | RemoveAccount of password:string
+        | ChangePassword of oldPassword: string * newPassword: string 
         | RawTransactionCreate of outputs:List<Hash * Spend>
         | RawTransactionSign of RawTransaction * password:string
         | GetKeys of password:string
@@ -308,6 +309,9 @@ module Wallet =
 
     let getMnemonicPhrase client password =
         Request.send<Request, Result<string, string>> client serviceName (GetMnemonicPhrase password)
+        
+    let changeSecure client oldPass newPass =
+        send<unit> client serviceName (ChangePassword (oldPass,newPass))
 
     let importWatchOnlyAddress client address =
         Request.send<Request, Result<unit,string>> client serviceName (ImportWatchOnlyAddress address)
