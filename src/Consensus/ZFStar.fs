@@ -130,14 +130,22 @@ let private fsToFstInput (input: Input) : input =
         PointedOutput <| (outpoint, output)
     | Input.Mint spend ->
         Mint <| fsToFstSpend spend
+    
+let fsToFstList (list:list<'a>): Prims.list<'a> =
+    let rec tail acc = function 
+        | [] -> acc
+        | hd :: tl -> tail (Prims.Cons (hd,acc)) tl
+    tail Prims.Nil (list |> List.rev)
 
-let rec fsToFstList : list<'a> -> Prims.list<'a> = function
-    | hd :: tl -> Prims.Cons (hd, (fsToFstList tl))
-    | [] -> Prims.Nil
-
-let rec fstToFsList : Prims.list<'a> -> list<'a> = function
-    | Prims.Cons(hd, tl) -> hd::fstToFsList tl
-    | Prims.Nil -> []
+let fstToFsList (ls: Prims.list<'a>) : list<'a> =
+    let rec fstToFsListAux (ls: Prims.list<'a>) (acc : list<'a>) : list<'a> =
+        match ls with
+        | Prims.Nil ->
+            acc
+        | Prims.Cons(hd, tl) ->
+            fstToFsListAux tl (hd :: acc)
+    fstToFsListAux ls [] |> List.rev
+        
 
 let private fsToFstPointedOutput ((outpoint, output):PointedOutput) : pointedOutput =
     { txHash = Hash.bytes outpoint.txHash; index = outpoint.index }, fsToFstOutput output
