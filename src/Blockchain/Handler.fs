@@ -311,30 +311,30 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
             state.cgp
         |> requestId.reply<CGP.T>
     | GetCgpHistory ->
-        let currentInterval = state.tipState.tip.header.blockNumber / chain.intervalLength
 
-        let getBlockState blockNumber =
+        let getBlockState blockNumber header =
             let rec findBlock (header:ExtendedBlockHeader.T) =
                 if header.header.blockNumber = blockNumber then
-                    BlockRepository.getBlockState session header.hash
+                    (BlockRepository.getBlockState session header.hash).cgp, header 
                 else
                     BlockRepository.getHeader session header.header.parent
                     |> findBlock
 
-            findBlock state.tipState.tip
+            findBlock header
 
-        let rec getCGP interval cgpList =
+        let rec getCGP interval header cgpList =
             if interval = 0ul then
                cgpList
             else
-                let blockState:BlockState.T = getBlockState (interval * chain.intervalLength)
+                let (cgp, lastHeader) = getBlockState (interval * chain.intervalLength) header
 
-                (blockState.cgp :: cgpList)
-                |> getCGP (interval - 1ul)
-        let listCgp =
-            []
-            |> getCGP currentInterval
-        listCgp
+                (cgp :: cgpList)
+                |> getCGP (interval - 1ul) lastHeader
+         
+        let currentInterval = CGP.getInterval chain state.tipState.tip.header.blockNumber
+                
+        []
+        |> getCGP currentInterval state.tipState.tip
         |> List.mapi (fun i cgp -> (uint32 i,cgp))
         |> requestId.reply<(uint32 * CGP.T) list>
     |> ignore
