@@ -119,7 +119,7 @@ let private connectTip
                         MemPool.handleBlock block origState.mempool
                 }
 
-let rec private connectTips
+let private connectTips
     ( env       : Env             )
     ( op        : Operation       )
     ( origState : OriginState     )

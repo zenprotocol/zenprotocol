@@ -412,8 +412,7 @@ module Serialization =
             then nextV
             elif nextV >= pown 2u 25 then raise SerializationException     //will be > 2^32
             else
-                let res = readVersion (nextV * 128u) (counter + 1) stream
-                res
+                readVersion (nextV * 128u) (counter + 1) stream
 
         let private readSubtype stream =
             let len = Byte.read stream
