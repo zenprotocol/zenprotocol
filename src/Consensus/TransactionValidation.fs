@@ -159,8 +159,10 @@ let private checkInputsVersion (txSkeleton:TxSkeleton.T) =
 let checkWeight chain tx txSkeleton = 
     Weight.transactionWeight tx txSkeleton
     >>= (fun txWeight ->
-        if txWeight <= chain.maxBlockWeight then
-            Ok()
+        if CGP.Connection.isPayoutTransaction chain (Transaction.toExtended tx) then
+            Ok ()
+        elif txWeight <= chain.maxBlockWeight then //check transaction weight minus block
+            Ok ()
         else
             Error "transaction weight exceeds maximum")
     |> Result.mapError General
