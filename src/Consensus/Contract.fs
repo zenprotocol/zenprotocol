@@ -78,12 +78,8 @@ with
 
 type T = Contract
 
-let compatibilityPath = 
-    (Platform.workingDirectory, "compatibility", "v0_contract_hints")
-    |> Path.Combine
-
 let compatibilityFiles = 
-    compatibilityPath
+    ZFStar.compatibilityPath
     |> Directory.GetFiles
     |> Array.map Path.GetFileName
 
@@ -167,22 +163,24 @@ let getFunctions assembly =
 let compile (contractsPath:string)
             (contract:ContractV0) =
     let hash = computeHash Version0 contract.code
+    
+    let hashString = hash.AsString
 
-    let contractId = ContractId (Version0,hash)
-
+    let hintsFile = sprintf "Z%s" <| Infrastructure.ZFStar.changeExtention ".fst.hints" hashString
+    
     let hints =
-        match Array.tryFind ((=) (sprintf "Z%s" contractId.AsString)) compatibilityFiles with
-        | Some file -> 
-            (compatibilityPath, file)
+        match Array.tryFind ((=) hintsFile) compatibilityFiles with
+        | Some file ->
+            (ZFStar.compatibilityPath, file)
             |> Path.Combine
             |> File.ReadAllText
-        | None -> 
+        | None ->
             contract.hints
 
     hash
     |> getModuleName
     |> ZFStar.compile contractsPath contract.code hints contract.rlimit
-    |> Result.map (fun _ -> contractId)
+    |> Result.map (fun _ -> ContractId (Version0,hash))
 
 let recordHints (code:string) : Result<string, string> =
     code
