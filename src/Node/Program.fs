@@ -184,6 +184,9 @@ let main argv =
     let chain = getChain config
     let chainParams = Chain.getChainParameters chain
     let dataPath = Platform.combine config.dataPath config.chain
+    let seeds =
+        config.seeds
+        |> Seq.choose (Endpoint.parseIp config.bind)
 
     use brokerActor = createBroker serviceBusAddress publisherAddress
     
@@ -197,7 +200,7 @@ let main argv =
     use blockchainActor = Blockchain.Main.main dataPath chainParams busName wipe
 
     use networkActor =
-        Network.Main.main dataPath busName chainParams config.externalIp config.listen config.bind config.seeds wipe seed
+        Network.Main.main dataPath busName chainParams config.externalIp config.listen config.bind seeds wipe seed
 
     use walletActor =
         if wipeFull then Wallet.Main.Full elif wipe then Wallet.Main.Reset else Wallet.Main.NoWipe
