@@ -33,5 +33,16 @@ let isValid (address:string) =
             | UriHostNameType.IPv6 -> true
             | _ -> false
         else false
+        
+let tryGetFirstIpFromHost (address:string) (bindPort:string) : Option<string>  =
+    try
+        Some (sprintf "%s:%d" (Dns.GetHostAddresses(address).[0].ToString()) (getPort bindPort))
+    with _ ->
+        None 
             
+let parseIp bindPort (address:string) =
+    if isValid address then
+        Some address
+    else
+        tryGetFirstIpFromHost address bindPort
             

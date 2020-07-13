@@ -214,3 +214,17 @@ module Connection =
             | Some payout ->
                 cgpWitness.messageBody
                 |> checkMessageBody payout
+
+    let isPayoutTransaction
+        ( chainParams: ChainParameters     )
+        ( tx         : TransactionExtended )
+        : bool =
+            not <| List.isEmpty (extractPayoutWitnesses chainParams tx)
+    
+    let isPayoutTransactionInBlock
+        ( chainParams: ChainParameters )
+        ( block         : Block        )
+        : bool =
+            List.filter (isPayoutTransaction chainParams) block.transactions
+            |> List.isSingleton
+    

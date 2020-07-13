@@ -336,6 +336,17 @@ let parseCheckPasswordJson json =
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
 
+let parseChangePassword json =
+    try
+        let json = ChangePasswordJson.Parse json
+
+        if String.length json.Old = 0 || String.length json.New = 0 then
+            Error "Password are empty"
+        else
+            Ok (json.Old, json.New)
+    with _ as ex ->
+        Error ("Json is invalid: " + ex.Message)
+
 let parseTransactionsRequestJson query =
     match Map.tryFind "take" query, Map.tryFind "skip" query with
     | Some take, Some skip ->

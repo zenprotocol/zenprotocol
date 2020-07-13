@@ -176,6 +176,13 @@ type CheckPasswordJson = JsonProvider<"""
 }
 """>
 
+type ChangePasswordJson = JsonProvider<"""
+{
+    "old": "secret",
+    "new": "secret"
+}
+""">
+
 type BlockHeaderJson = JsonProvider<"""
 {
     "version": 2,

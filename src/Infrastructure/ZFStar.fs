@@ -10,12 +10,16 @@ open Logary.Message
 open FSharpx.Functional.Prelude
 
 let private fsChecker = FSharpChecker.Create()
-let private changeExtention extention path = Path.ChangeExtension (path, extention)
+let changeExtention extention path = Path.ChangeExtension (path, extention)
 
 let private (/) a b = Path.Combine (a,b)
 
 let private error s =
     sprintf "%s: %s" s
+
+let compatibilityPath = 
+    (Platform.workingDirectory, "compatibility", "v0_contract_hints")
+    |> Path.Combine
 
 let private compile' path moduleName code =
     try
@@ -103,7 +107,7 @@ let initOutputDir moduleName =
             Platform.workingDirectory / "../../test-contracts"
             |> Platform.normalizeNameToFileSystem
         else
-            Platform.normalizeNameToFileSystem (Path.GetTempPath()) / Path.GetRandomFileName()
+            Platform.normalizeNameToFileSystem compatibilityPath
 #else
     let oDir = Platform.normalizeNameToFileSystem (Path.GetTempPath()) / Path.GetRandomFileName()
 #endif
@@ -209,6 +213,7 @@ let recordHints code moduleName =
                  "--z3rlimit";(2723280u * 2u).ToString()
                  "--use_cached_modules"
                  "--record_hints"
+                 "--use_hints"
                  ]
             |> wrapFStar "record hints" hintsFile)
     finally

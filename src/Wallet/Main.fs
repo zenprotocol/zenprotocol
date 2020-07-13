@@ -204,6 +204,10 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             error
             |> reply<bool> requestId
             NoAccount
+        | ChangePassword _ ->
+            error
+            |> reply<bool> requestId
+            NoAccount
         | GetMnemonicPhrase _ ->
             error
             |> reply<string> requestId
@@ -354,6 +358,13 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
            |> reply<string> requestId
 
            accountStatus
+           
+        | ChangePassword (oldPass, newPass) ->
+            Account.changeSecure dataAccess session (oldPass, newPass)
+            |> reply<unit> requestId
+            
+            accountStatus
+            
 
         | ImportWatchOnlyAddress address ->
             Account.importWatchOnlyAddress dataAccess session chain address

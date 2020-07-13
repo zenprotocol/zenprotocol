@@ -6,6 +6,8 @@ externalIp: null
 listen: true
 bind: "*:29555"
 seeds:
+  - seed1-testnet.zp.io
+  - seed2-testnet.zp.io
   - 18.217.45.241:29555
   - 18.224.187.36:29555
 

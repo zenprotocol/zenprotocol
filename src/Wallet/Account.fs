@@ -502,6 +502,17 @@ let getTransactionCount dataAccess session view =
     let account = DataAccess.Account.get dataAccess session
     List.length (View.Outputs.getAll view dataAccess session |> getOutputsInfo account.blockNumber)
 
+let changeSecure dataAccess session (oldP,newP) =
+    let account = DataAccess.Account.get dataAccess session
+    
+    let updateSecure seed =
+        { account with secureMnemonicPhrase = Secured.create newP seed }
+        |> DataAccess.Account.put dataAccess session
+        Ok ()
+    
+    getMnemonicPhrase dataAccess session oldP
+    |> Result.bind updateSecure
+    
 // returns list of pubickeys with their correlating HD paths
 let getKeys dataAccess session password =
     let account = DataAccess.Account.get dataAccess session

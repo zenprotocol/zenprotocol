@@ -301,6 +301,19 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
                 replyError error
         | Error error ->
             replyError error
+    | Post ("/wallet/changepassword", Some body) ->
+        match parseChangePassword body with
+        | Ok (oldPassword, newPassword) ->
+            match Wallet.changeSecure client oldPassword newPassword with
+            | Ok _ ->
+                "Password changed"
+                |> JsonValue.String
+                |> JsonContent
+                |> reply StatusCode.OK
+            | Error error ->
+                replyError error
+        | Error error ->
+            replyError error
     | Get ("/wallet/address", _) ->
         match Wallet.getAddress client with
         | Ok address ->

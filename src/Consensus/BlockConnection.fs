@@ -229,16 +229,20 @@ module Weight =
     let check
         : Check = fun state env -> result {
         
-        let! weight =
-            Weight.blockWeight env.getUTXO env.block state.utxoSet
-        
-        let maxWeight =
-            env.chainParams.maxBlockWeight
-        
-        if weight <= maxWeight then
+        if CGP.Connection.isPayoutTransactionInBlock env.chainParams env.block then
+            // no need to check the other transactions as the transaction validation prevents big transactions
             return state
-        else
-            return! Error "block weight exceeds maximum"
+        else 
+            let! weight =
+                Weight.blockWeight env.getUTXO env.block state.utxoSet
+            
+            let maxWeight =
+                env.chainParams.maxBlockWeight
+            
+            if weight <= maxWeight then
+                return state
+            else
+                return! Error "block weight exceeds maximum"
         }
 
 module PayoutTx =
