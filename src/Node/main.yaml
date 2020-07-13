@@ -6,6 +6,13 @@ externalIp: null
 listen: true
 bind: "*:9655"
 seeds:
+  - seed1.zp.io
+  - seed2.zp.io
+  - seed3.zp.io
+  - seed4.zp.io
+  - seed5.zp.io
+  - seed6.zp.io
+  - seed7.zp.io
   - 34.213.103.167:9655
   - 35.163.150.86:9655
   - 52.10.102.149:9655
