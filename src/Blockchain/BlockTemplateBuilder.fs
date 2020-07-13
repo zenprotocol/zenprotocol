@@ -11,6 +11,7 @@ open Result
 
 open Blockchain.State
 
+open Consensus.CGP
 open Logary.Message
 
 module ZData = Zen.Types.Data
@@ -153,7 +154,7 @@ let selectOrderedTransactions (chain:Chain.ChainParameters) (session:DatabaseCon
 
     let tryAddTransaction (state, added, notAdded, altered, weight) (ex,wt) =
         let newWeight = weight+wt
-        if newWeight > maxWeight then (state, added, notAdded, false, weight) else
+        if newWeight > maxWeight && (not <| Connection.isPayoutTransaction chain ex) then (state, added, notAdded, false, weight) else
         validateInContext chain getUTXO contractPath blockNumber timestamp
             state.activeContractSet state.contractCache state.utxoSet (ContractStateRepository.get session) ContractStates.asDatabase ex
         |> function
