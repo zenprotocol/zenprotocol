@@ -1,5 +1,6 @@
 ﻿module Api.Helpers
 
+open Consensus.Chain
 open FSharp.Data
 open Api.Types
 open Consensus.Types
@@ -88,52 +89,13 @@ let contractEncoder chain (tx:Transaction) =
 
             JsonValue.Record [| ("contractId", JsonValue.String (contractId.ToString())); ("address",JsonValue.String address); ("code",JsonValue.String c.code) |]
         | _ -> JsonValue.Null
-
-let transactionEncoder chain (tx:Transaction) =
-    JsonValue.Record
-        [|
-            ("version",JsonValue.Number ((decimal) tx.version));
-            ("inputs", JsonValue.Array [| for i in tx.inputs -> inputEncoder i |]);
-            ("outputs", JsonValue.Array [| for op in tx.outputs -> outputEncoder chain op |])
-            ("contract", contractEncoder chain tx)
-            // witnesses not yet set
-        |]
-    |> omitNullFields
-    
-let transactionHistoryEncoder chain txHash asset (amount:int64) (confirmations:uint32) lock=
-    JsonValue.Record
-        [|
-            ("txHash",JsonValue.String (Hash.toString txHash));
-            ("asset", JsonValue.String (Asset.toString asset));
-            ("amount", JsonValue.Number (decimal amount))
-            ("confirmations", JsonValue.Number (decimal confirmations))
-            ("lock", lockEncoder chain lock)
-        |]
-    |> omitNullFields
-
-let blockHeaderEncoder (bh:BlockHeader) =
-    BlockHeaderJson.Root (
-        version=(int)bh.version,
-        parent=bh.parent.AsString,
-        blockNumber=(int)bh.blockNumber,
-        timestamp=(int64)bh.timestamp,
-        difficulty=(int)bh.difficulty,
-        nonce=[|(int64)(fst bh.nonce);(int64)(snd bh.nonce)|],
-        commitments=bh.commitments.AsString
-    ) |> fun j -> j.JsonValue
-
-let blockEncoder chain blockHash (bk:Block) =
-    let txsJson =
-        JsonValue.Record
-            [| for ex in bk.transactions do
-                yield (ex.txHash |> Consensus.Hash.toString, transactionEncoder chain ex.tx)
-            |]
-    JsonValue.Record
-        [|
-            ("hash", blockHash |> Consensus.Hash.toString  |> JsonValue.String)
-            ("header", blockHeaderEncoder bk.header);
-            ("transactions", txsJson)
-        |]
+        
+let sigHashEncoder (sigHash:SigHash) =
+    match sigHash with
+    | TxHash -> "txHash"
+    | FollowingWitnesses -> "FollowingWitnesses"
+    | UnknownSigHash n -> sprintf "Unknown Sig Hash %A" n
+    |> JsonValue.String
 
 let dataEncoder chain data =
 
@@ -220,8 +182,67 @@ let dataEncoder chain data =
 
     JsonValue.Record [| dataName data, dataValue data |]
 
+let witnessEncoder (chain:Chain) (witnesses:Witness) =
+    match witnesses with
+    | PKWitness (sigHash, pubKey, signature) ->
+        let address = Address.encode chain (Address.PK (PublicKey.hash pubKey))
+        let signs = Signature.toString signature
+        JsonValue.Record [| ("sigHash", sigHashEncoder sigHash); ("address",JsonValue.String address); ("signature",JsonValue.String signs) |]
+    | ContractWitness (cw) ->
+        let msgBody=
+            cw.messageBody
+            |> Option.map (dataEncoder chain)
+            |> Option.defaultValue JsonValue.Null
+            
+        JsonValue.Record [| ("contractId", JsonValue.String ( ContractId.toString cw.contractId)); ("command",JsonValue.String cw.command); ("code", msgBody) |]
+    | HighVWitness (version, bytes) ->
+        JsonValue.Record [| ("version", JsonValue.Number (decimal version)); ("bytes",JsonValue.String (FsBech32.Base16.encode bytes)) |]
 
+let transactionEncoder chain (tx:Transaction) =
+    JsonValue.Record
+        [|
+            ("version",JsonValue.Number ((decimal) tx.version));
+            ("inputs", JsonValue.Array [| for i in tx.inputs -> inputEncoder i |]);
+            ("outputs", JsonValue.Array [| for op in tx.outputs -> outputEncoder chain op |])
+            ("contract", contractEncoder chain tx)
+            ("witness", JsonValue.Array [| for witness in tx.witnesses -> witnessEncoder chain witness |])
+        |]
+    |> omitNullFields
+    
+let transactionHistoryEncoder chain txHash asset (amount:int64) (confirmations:uint32) lock=
+    JsonValue.Record
+        [|
+            ("txHash",JsonValue.String (Hash.toString txHash));
+            ("asset", JsonValue.String (Asset.toString asset));
+            ("amount", JsonValue.Number (decimal amount))
+            ("confirmations", JsonValue.Number (decimal confirmations))
+            ("lock", lockEncoder chain lock)
+        |]
+    |> omitNullFields
 
+let blockHeaderEncoder (bh:BlockHeader) =
+    BlockHeaderJson.Root (
+        version=(int)bh.version,
+        parent=bh.parent.AsString,
+        blockNumber=(int)bh.blockNumber,
+        timestamp=(int64)bh.timestamp,
+        difficulty=(int)bh.difficulty,
+        nonce=[|(int64)(fst bh.nonce);(int64)(snd bh.nonce)|],
+        commitments=bh.commitments.AsString
+    ) |> fun j -> j.JsonValue
+
+let blockEncoder chain blockHash (bk:Block) =
+    let txsJson =
+        JsonValue.Record
+            [| for ex in bk.transactions do
+                yield (ex.txHash |> Consensus.Hash.toString, transactionEncoder chain ex.tx)
+            |]
+    JsonValue.Record
+        [|
+            ("hash", blockHash |> Consensus.Hash.toString  |> JsonValue.String)
+            ("header", blockHeaderEncoder bk.header);
+            ("transactions", txsJson)
+        |]
 let payoutEncoder chain (recipient:Recipient,spend: Spend list) =
     let res =
         recipientEncoder chain recipient, spend
