@@ -174,25 +174,27 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
 
         reply StatusCode.OK (JsonContent (JsonValue.Number (count |> decimal)))
 
-    | Get ("/blockchain/headers", _) ->
-        let headers = Blockchain.getHeaders client
-
-        let json =
-            headers
-            |> List.map (fun header ->
-                let hash = Block.hash header
-                new HeadersResponseJson.Root(
-                                                Hash.toString hash, header.timestamp |> int64,
-                                                Timestamp.toString header.timestamp,
-                                                header.blockNumber |> int,
-                                                "0x" + header.difficulty.ToString("x"),
-                                                Difficulty.uncompress header.difficulty |> Hash.toString
-                                                ))
+    | Get("/blockchain/headers", query) ->
+        match parseHeadersRequestJson query, Blockchain.getTip client with
+        | Ok (blockNumber, take), Some (_,header) ->
+            int header.blockNumber - blockNumber
+            |> Blockchain.getHeaders client take
+            |> List.map headerEncoder
+            |> List.map (fun json -> json.JsonValue)
+            |> List.toArray
+            |> JsonValue.Array 
+            |> JsonContent
+            |> reply StatusCode.OK
+        | Error _, None
+        | _, None
+        | _, Some _ ->
+            Blockchain.getAllHeaders client
+            |> List.map headerEncoder
             |> List.map (fun json -> json.JsonValue)
             |> List.toArray
             |> JsonValue.Array
-
-        reply StatusCode.OK (JsonContent json)
+            |> JsonContent
+            |> reply StatusCode.OK
 
     | Get ("/blockchain/info", _) ->
         match Blockchain.tryGetBlockChainInfo client with

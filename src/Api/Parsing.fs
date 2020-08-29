@@ -359,6 +359,27 @@ let parseTransactionsRequestJson query =
         | _ ->
             Error "Invalid values"
     | _ -> Error "Invalid values"
+    
+let parseHeadersRequestJson query =
+    match Map.tryFind "take" query  with
+    | Some take ->
+        let blockNumber =
+            Map.tryFind "blockNumber" query
+            |> Option.map System.Int32.TryParse
+            |> Option.filter fst
+            |> Option.map snd
+            |> Option.defaultValue 0
+                
+        match System.Int32.TryParse take with
+        | (true,take) ->
+            if take < 0 then
+                Error "Invalid values"
+            else
+                Ok (blockNumber,take)
+        | _ ->
+            Error "Invalid values"
+    | None ->
+        Error "missing query data"
 
 let parseAddress json =
     try

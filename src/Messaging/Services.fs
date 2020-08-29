@@ -50,7 +50,8 @@ module Blockchain =
         | GetActiveContracts
         | GetActiveContract of ContractId
         | GetBlockChainInfo
-        | GetHeaders
+        | GetAllHeaders
+        | GetHeaders of blockNumber: int * take: int
         | GetMempool
         | GetTransaction of Hash
         | CheckTransaction of TransactionExtended
@@ -143,8 +144,11 @@ module Blockchain =
     let handleHeaders client peerId headers =
         HandleHeaders (peerId,headers) |> Command.send client serviceName
 
-    let getHeaders client =
-        GetHeaders |> Request.send<Request, BlockHeader list> client serviceName
+    let getAllHeaders client =
+        GetAllHeaders |> Request.send<Request, BlockHeader list> client serviceName
+        
+    let getHeaders client take blockNumber  =
+        GetHeaders (blockNumber, take) |> Request.send<Request, BlockHeader list> client serviceName
 
     let getMempool client =
         GetMempool |> Request.send<Request, (Hash.Hash * Transaction) list> client serviceName

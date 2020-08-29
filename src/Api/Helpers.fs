@@ -272,3 +272,14 @@ let cgpHistoryEncoder chain (cgpList:(uint32 * CGP.T) list) =
     |> List.toArray
     |> JsonValue.Array
     |> omitNullFields
+
+
+let headerEncoder header =
+    new HeadersResponseJson.Root(
+        Hash.toString (Block.hash header),
+        header.timestamp |> int64,
+        Infrastructure.Timestamp.toString header.timestamp,
+        header.blockNumber |> int,
+        "0x" + header.difficulty.ToString("x"),
+        Difficulty.uncompress header.difficulty |> Hash.toString
+    )

@@ -17,6 +17,18 @@ let tryGetHeader session hash =
 let getHeader session hash =
     Collection.get session.context.blocks session.session hash
 
+let getAllMainHeader session =
+    Collection.getAll session.context.blocks session.session
+    |> List.filter (fun x -> x.status = ExtendedBlockHeader.BlockStatus.MainChain)
+    |> List.sortBy (fun x -> x.header.blockNumber)
+
+let getMainHeaderPaginate session blockNumber take =
+    getAllMainHeader session
+    |> List.map (fun ext -> ext.header)
+    |> List.rev
+    |> fun xs -> if List.length xs <= blockNumber then [] else List.skip blockNumber xs
+    |> List.truncate take
+
 let saveHeader session (block:ExtendedBlockHeader.T) =
     Collection.put session.context.blocks session.session block.hash block
 
@@ -35,7 +47,7 @@ let getFullBlock session (block:ExtendedBlockHeader.T) =
         transactions=transactions
     }
 
-let saveFullBlock session blockHash (block:Block) =    
+let saveFullBlock session blockHash (block:Block) =
     // Save all transactions
     List.iter (fun ex -> Collection.put session.context.transactions session.session ex.txHash ex) block.transactions
 
@@ -75,7 +87,7 @@ let tryGetTip session =
 
         Some (header,blockState.ema,blockState.cgp)
     | None -> None
-    
+
 let tryGetJustTip session =
     SingleValue.tryGet session.context.tip session.session
 

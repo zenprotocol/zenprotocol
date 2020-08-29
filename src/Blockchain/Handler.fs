@@ -204,7 +204,7 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
                 code = contract.code
             }:ActiveContract)
         |> requestId.reply<ActiveContract option>
-    | GetHeaders ->
+    | GetAllHeaders ->
         let rec getHeaders tip headers =
             let header = BlockRepository.getHeader session tip
 
@@ -214,6 +214,9 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
                 getHeaders header.header.parent (header.header :: headers)
 
         getHeaders state.tipState.tip.hash []
+        |> requestId.reply<BlockHeader list>
+    | GetHeaders (blockNumber, take) ->
+        BlockRepository.getMainHeaderPaginate session blockNumber take
         |> requestId.reply<BlockHeader list>
     | GetMempool ->
         MemPool.toList state.memoryState.mempool
