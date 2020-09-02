@@ -86,19 +86,19 @@ let fstCode = """
         |> C.ret
     """
 
-[<Test>][<Parallelizable>]
+[<Test>]
 let ``Should record hints``() =
     ZFStar.recordHints fstCode (getModuleName fstCode)
     |> Result.map (fun _ -> ())
     |> shouldBeOk ()
 
-[<Test>][<Parallelizable>]
+[<Test>]
 let ``Should compile``() =
     compile fstCode
     |> Result.map (fun _ -> ())
     |> shouldBeOk ()
 
-[<Test>][<Parallelizable>]
+[<Test>]
 let ``Should get some metrics from hints module``() =
     ZFStar.recordHints fstCode (getModuleName fstCode)
     |> Result.bind (ZFStar.calculateMetrics)
