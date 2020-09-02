@@ -49,6 +49,7 @@
     <Compile Include="TestWallet.fs" />
     <Compile Include="Helper.fs" />
     <Compile Include="SignedWitnessTests.fs" />
+    <Compile Include="StepDefinitionsModules.fs" />
     <Compile Include="StepDefinitions.fs" />
     <Compile Include="TransactionHelpers.fs" />
     <Compile Include="TransactionNunitHelpers.fs" />
