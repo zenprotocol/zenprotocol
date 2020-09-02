@@ -10,7 +10,7 @@ open Hash
 open Infrastructure
 open Messaging.Services.AddressDB
 open Zen.Types.Data
-open Result
+open Messaging.Services.Wallet
 
 let addOutput outputs outpoint output =
     Map.add outpoint output outputs
@@ -59,11 +59,11 @@ let empty = {
     contractConfirmations = Map.empty
 }
 
-let witnessPoint txHash tx cw =
+let witnessPoint txHash witnesses cw =
     {
         txHash = txHash
         index =
-            tx.witnesses
+            witnesses
             |> List.findIndex ((=) (ContractWitness cw))
             |> uint32
     }
@@ -109,8 +109,8 @@ module ContractConfirmations =
         |> Option.defaultWith (fun _ ->
             ContractConfirmations.get dataAccess session witnessPoint)
 
-let mapTxOutputs tx txHash confirmationStatus =
-    tx.outputs
+let mapUnspentTxOutputs outputs txHash confirmationStatus =
+    outputs
     |> List.mapi (fun index output -> uint32 index, output)
     |> List.choose (fun (index, output) ->
         match output.lock with
@@ -118,15 +118,15 @@ let mapTxOutputs tx txHash confirmationStatus =
         | PK pkHash -> Some (Address.PK pkHash, index, output)
         | Contract contractId -> Some (Address.Contract contractId, index, output)
         | _ -> None)
-    |> List.map (fun (address, index, output) -> address, { txHash = txHash; index = index }, output)
-    |> List.map (fun (address, outpoint, output) -> address, outpoint, {
-        address = address
-        outpoint = outpoint
-        spend = output.spend
-        lock = output.lock
-        status = Unspent
-        confirmationStatus = confirmationStatus
-    })
+    |> List.map (fun (address, index, output) ->
+        {    
+            address = address
+            outpoint = { txHash = txHash; index = index }
+            spend = output.spend
+            lock = output.lock
+            status = Unspent
+            confirmationStatus = confirmationStatus
+        })
 
 let addMempoolTransaction dataAccess session txHash tx view =
     tx.inputs
@@ -143,11 +143,11 @@ let addMempoolTransaction dataAccess session txHash tx view =
         )
     ) (Some view)
     |> Option.map (fun view ->
-        mapTxOutputs tx txHash Unconfirmed
-        |> List.fold (fun view (address, outpoint, output) ->  
+        mapUnspentTxOutputs tx.outputs txHash Unconfirmed 
+        |> List.fold (fun view dbOutput ->  
         {
-            outpointOutputs = addOutput view.outpointOutputs outpoint output
-            addressOutpoints = addAddressOutpoints view.addressOutpoints address [ outpoint ]
+            outpointOutputs = addOutput view.outpointOutputs dbOutput.outpoint dbOutput
+            addressOutpoints = addAddressOutpoints view.addressOutpoints dbOutput.address [ dbOutput.outpoint ]
             contractHistory = view.contractHistory
             contractData = view.contractData
             contractConfirmations = view.contractConfirmations
@@ -156,7 +156,7 @@ let addMempoolTransaction dataAccess session txHash tx view =
         tx.witnesses
         |> List.fold (fun view -> function 
             | ContractWitness cw ->
-                let witnessPoint = witnessPoint txHash tx cw
+                let witnessPoint = witnessPoint txHash tx.witnesses cw
                     
                 {
                     outpointOutputs = view.outpointOutputs
@@ -174,3 +174,94 @@ let addMempoolTransaction dataAccess session txHash tx view =
         
 let fromMempool dataAccess session =
     List.fold (fun view (txHash,tx) -> addMempoolTransaction dataAccess session txHash tx view) empty
+    
+
+let getOutputs dataAccess session view mode addresses : PointedOutput list =
+    AddressOutpoints.get view dataAccess session addresses
+    |> OutpointOutputs.get view dataAccess session
+    |> List.choose (fun dbOutput -> 
+        if mode <> UnspentOnly || dbOutput.status = Unspent then 
+            Some (dbOutput.outpoint, { spend = dbOutput.spend; lock = dbOutput.lock })
+        else
+            None)
+
+let getBalance dataAccess session view mode addresses =
+    getOutputs dataAccess session view mode addresses 
+    |> List.fold (fun balance (_,output) ->
+        match Map.tryFind output.spend.asset balance with
+        | Some amount -> Map.add output.spend.asset (amount + output.spend.amount) balance
+        | None -> Map.add output.spend.asset output.spend.amount balance
+    ) Map.empty
+
+let getConfirmations blockNumber =
+    function
+    | Confirmed (blockNumber',_,blockIndex) ->
+        blockNumber - blockNumber' + 1ul, blockIndex
+    | Unconfirmed ->
+        0ul,0
+
+let getOutputsInfo blockNumber outputs = 
+
+    let incoming = List.map (fun (output:DBOutput) ->
+        let txHash = output.outpoint.txHash
+        let confirmations,blockIndex = getConfirmations blockNumber output.confirmationStatus
+
+        txHash, output.spend.asset, output.spend.amount |> bigint,confirmations,blockIndex,output.lock) outputs
+
+    let outgoing = List.choose (fun (output:DBOutput) ->
+        match output.status with
+        | Unspent -> None
+        | Spent (txHash,confirmationStatus) ->
+            let confirmations,blockIndex = getConfirmations blockNumber confirmationStatus
+
+            (txHash, output.spend.asset, output.spend.amount |> bigint |> (*) -1I,confirmations,blockIndex,output.lock)
+            |> Some) outputs
+
+    incoming @ outgoing
+    |> List.fold (fun txs (txHash, asset, amount, confirmations, blockIndex, lock) ->
+        match Map.tryFind (txHash, asset) txs with
+        | None -> Map.add (txHash, asset) (amount, confirmations, blockIndex, lock) txs
+        | Some (amount',_,_,lock) -> Map.add (txHash, asset) (amount + amount', confirmations, blockIndex, lock) txs) Map.empty
+    |> Map.toSeq
+    |> Seq.map (fun ((txHash, asset),(amount, confirmations, blockIndex, lock)) ->
+        if amount >= 0I then
+            (txHash,TransactionDirection.In, {asset=asset;amount = uint64 amount}, confirmations, blockIndex, lock)
+        else
+            (txHash,TransactionDirection.Out, {asset=asset;amount = amount * -1I |> uint64}, confirmations, blockIndex, lock))
+    |> List.ofSeq
+
+let getTransactionCount dataAccess session view blockNumber addresses =
+    let outputs =
+        AddressOutpoints.get view dataAccess session addresses
+        |> OutpointOutputs.get view dataAccess session
+    List.length (outputs |> getOutputsInfo blockNumber)
+
+let getHistory dataAccess session view skip take addresses =
+    let account = DataAccess.Tip.get dataAccess session
+    
+    AddressOutpoints.get view dataAccess session addresses
+    |> OutpointOutputs.get view dataAccess session
+    |> getOutputsInfo account.blockNumber
+    |> List.sortWith Wallet.Account.txComparer
+    |> Wallet.Account.paginate skip take
+    |> List.map (fun (txHash,direction,spend,confirmations,_,lock) -> txHash,direction,spend,confirmations,lock)
+
+let getContractHistory dataAccess session view skip take contractId =
+    let account = DataAccess.Tip.get dataAccess session
+
+    let comparer a1 a2 =
+        let comparer (index1, block1) (index2, block2) = 
+            if index1 = index2 then
+                block2 - block1
+            else        
+                int (index2 - index1)
+        comparer (snd a1) (snd a2)
+    
+    ContractHistory.get view dataAccess session contractId
+    |> List.map (fun witnessPoint ->
+        ContractData.get view dataAccess session witnessPoint,
+        ContractConfirmations.get view dataAccess session witnessPoint
+        |> getConfirmations account.blockNumber)
+    |> List.sortWith comparer
+    |> Wallet.Account.paginate skip take
+    |> List.map (fun ((command, messageBody, txHash), (confirmations, _)) -> command, messageBody, txHash, confirmations)

@@ -47,13 +47,13 @@ let init databaseContext =
     | None ->
             SingleValue.put dbVersion session DbVersion
     | Some 1 ->
-        Platform.cleanDirectory "addressDB"      
+        Platform.cleanDirectory "addressDB"
         SingleValue.put dbVersion session DbVersion
-    | Some DbVersion -> 
+    | Some DbVersion ->
         ()
-    | Some version ->  
+    | Some version ->
         failwithf "AddressDB: wrong db version, expected %d but got %d" DbVersion version
-        
+
     let t = {
         outpointOutputs = outpointOutputs
         addressOutpoints = addressOutpoints

@@ -179,6 +179,12 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
             Some header.header
             |> requestId.reply<Types.BlockHeader option>
         | None -> requestId.reply<Types.BlockHeader option> None
+    | GetAllBlocks ->
+        /// TODO: return Block instead of byte array
+        BlockRepository.getAllMainHeader session
+        |> List.map (fun header -> header.hash, (Serialization.Block.serialize (BlockRepository.getFullBlock session header)))
+        |> Map.ofList
+        |> requestId.reply<Map<Hash.Hash, byte array>>
     | GetTip ->
         if state.tipState.tip <> ExtendedBlockHeader.empty then
             Some (state.tipState.tip.hash, state.tipState.tip.header)

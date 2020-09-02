@@ -1,5 +1,6 @@
 module AddressDB.Repository
 
+open Blockchain.Tally.Types
 open Consensus
 open Types
 open Wallet.Types
@@ -11,222 +12,175 @@ open Messaging.Services.Wallet
 open AddressDB
 open Result
 
-let empty = 
+type Action =
+    | UndoBlock
+    | AddBlock
+
+type SyncAction = Action * Block
+
+let empty =
     {
         blockHash = Hash.zero
         blockNumber = 0ul
     }
+module Input =
 
-let getOutputs dataAccess session view mode addresses : PointedOutput list =
-    View.AddressOutpoints.get view dataAccess session addresses
-    |> View.OutpointOutputs.get view dataAccess session
-    |> List.choose (fun dbOutput -> 
-        if mode <> UnspentOnly || dbOutput.status = Unspent then 
-            Some (dbOutput.outpoint, { spend = dbOutput.spend; lock = dbOutput.lock })
-        else
-            None)
-
-let getBalance dataAccess session view mode addresses =
-    getOutputs dataAccess session view mode addresses 
-    |> List.fold (fun balance (_,output) ->
-        match Map.tryFind output.spend.asset balance with
-        | Some amount -> Map.add output.spend.asset (amount + output.spend.amount) balance
-        | None -> Map.add output.spend.asset output.spend.amount balance
-    ) Map.empty
-
-let getConfirmations blockNumber =
-    function
-    | Confirmed (blockNumber',_,blockIndex) ->
-        blockNumber - blockNumber' + 1ul, blockIndex
-    | Unconfirmed ->
-        0ul,0
-
-let getOutputsInfo blockNumber outputs = 
-
-    let incoming = List.map (fun (output:DBOutput) ->
-        let txHash = output.outpoint.txHash
-        let confirmations,blockIndex = getConfirmations blockNumber output.confirmationStatus
-
-        txHash, output.spend.asset, output.spend.amount |> bigint,confirmations,blockIndex,output.lock) outputs
-
-    let outgoing = List.choose (fun (output:DBOutput) ->
-        match output.status with
-        | Unspent -> None
-        | Spent (txHash,confirmationStatus) ->
-            let confirmations,blockIndex = getConfirmations blockNumber confirmationStatus
-
-            (txHash, output.spend.asset, output.spend.amount |> bigint |> (*) -1I,confirmations,blockIndex,output.lock)
-            |> Some) outputs
-
-    incoming @ outgoing
-    |> List.fold (fun txs (txHash, asset, amount, confirmations, blockIndex, lock) ->
-        match Map.tryFind (txHash, asset) txs with
-        | None -> Map.add (txHash, asset) (amount, confirmations, blockIndex, lock) txs
-        | Some (amount',_,_,lock) -> Map.add (txHash, asset) (amount + amount', confirmations, blockIndex, lock) txs) Map.empty
-    |> Map.toSeq
-    |> Seq.map (fun ((txHash, asset),(amount, confirmations, blockIndex, lock)) ->
-        if amount >= 0I then
-            (txHash,TransactionDirection.In, {asset=asset;amount = uint64 amount}, confirmations, blockIndex, lock)
-        else
-            (txHash,TransactionDirection.Out, {asset=asset;amount = amount * -1I |> uint64}, confirmations, blockIndex, lock))
-    |> List.ofSeq
-
-let getTransactionCount dataAccess session view blockNumber addresses =
-    let outputs =
-        View.AddressOutpoints.get view dataAccess session addresses
-        |> View.OutpointOutputs.get view dataAccess session
-    List.length (outputs |> getOutputsInfo blockNumber)
-
-let getHistory dataAccess session view skip take addresses =
-    let account = DataAccess.Tip.get dataAccess session
-    
-    View.AddressOutpoints.get view dataAccess session addresses
-    |> View.OutpointOutputs.get view dataAccess session
-    |> getOutputsInfo account.blockNumber
-    |> List.sortWith Wallet.Account.txComparer
-    |> Wallet.Account.paginate skip take
-    |> List.map (fun (txHash,direction,spend,confirmations,_,lock) -> txHash,direction,spend,confirmations,lock)
-
-let getContractHistory dataAccess session view skip take contractId =
-    let account = DataAccess.Tip.get dataAccess session
-
-    let comparer a1 a2 =
-        let comparer (index1, block1) (index2, block2) = 
-            if index1 = index2 then
-                block2 - block1
-            else        
-                int (index2 - index1)
-        comparer (snd a1) (snd a2)
-    
-    View.ContractHistory.get view dataAccess session contractId
-    |> List.map (fun witnessPoint ->
-        View.ContractData.get view dataAccess session witnessPoint,
-        View.ContractConfirmations.get view dataAccess session witnessPoint
-        |> getConfirmations account.blockNumber)
-    |> List.sortWith comparer
-    |> Wallet.Account.paginate skip take
-    |> List.map (fun ((command, messageBody, txHash), (confirmations, _)) -> command, messageBody, txHash, confirmations)
-    
-let private witnessIndex tx =
-    List.tryFindIndex (fun witness ->
-        match witness with
-        | ContractWitness _ -> true
-        | _ -> false) tx.witnesses
-    |> ofOption "missing contract witness"
-    |> get
-    |> uint32
-
-let addBlock dataAccess session blockHash block =
-    let account = DataAccess.Tip.get dataAccess session
-
-    if account.blockHash = blockHash || block.header.blockNumber < account.blockNumber then
-        // we already handled the block, skip
-        ()
-    elif account.blockHash <> block.header.parent then
-        failwithf "trying to add a block to account but account in different chain %A %A" (block.header.blockNumber) (account.blockNumber)
-    else
-    
-    eventX "AddressDB adding block #{blockNumber}"
-    >> setField "blockNumber" block.header.blockNumber
-    |> Log.info
-
-    block.transactions
-    |> List.mapi (fun blockIndex ex -> blockIndex, ex.tx, ex.txHash)
-    |> List.iter (fun (blockIndex, tx, txHash) ->
-        let confirmationStatus = Confirmed (block.header.blockNumber, blockHash, blockIndex)
-        
-        confirmationStatus
-        |> View.mapTxOutputs tx txHash
-        |> List.iter (fun (address, outpoint, output) ->
-            DataAccess.OutpointOutputs.put dataAccess session outpoint output
-            DataAccess.AddressOutpoints.put dataAccess session address outpoint
-        )
-        
-        tx.inputs
-        |> List.iter (function
-            | Outpoint outpoint ->
-                match DataAccess.OutpointOutputs.tryGet dataAccess session outpoint with
-                | Some output ->
-                    { output with status = Spent (txHash, confirmationStatus) }
-                    |> DataAccess.OutpointOutputs.put dataAccess session outpoint
-                | None ->
+    let private update op dataAccess session input status =
+        match input with
+         | Outpoint outpoint ->
+            match DataAccess.OutpointOutputs.tryGet dataAccess session outpoint with
+            | Some output ->
+                { output with status = status }
+                |> DataAccess.OutpointOutputs.put dataAccess session outpoint
+            | None ->
+                match op with
+                | Add ->
                     failwithf "AddressDB could not resolve outpoint"
-            | _ -> ()
-        )
-            
-        tx.witnesses
-        |> List.iter (function 
-            | ContractWitness cw -> 
-                let witnessPoint = View.witnessPoint txHash tx cw
-
-                DataAccess.ContractData.put dataAccess session witnessPoint (cw.command, cw.messageBody)
-                DataAccess.ContractHistory.put dataAccess session cw.contractId witnessPoint
-                DataAccess.ContractConfirmations.put dataAccess session witnessPoint confirmationStatus
-            | _ -> 
-                ()
-        )
-    )
-
-    { account with blockNumber = block.header.blockNumber; blockHash = blockHash}
-    |> DataAccess.Tip.put dataAccess session
-
-let undoBlock dataAccess session blockHash block =
-    let account = DataAccess.Tip.get dataAccess session
-
-    if account.blockHash = block.header.parent || block.header.blockNumber > account.blockNumber then
-        // we already undo this block, skipping
-        ()
-    elif account.blockHash <> blockHash then
-        failwithf "trying to undo a block to account but account in different chain %A %A" (block.header.blockNumber) (account.blockNumber)
-    else
-
-    List.rev block.transactions
-    |> List.iter (fun ex ->
-        // Unmark outputs as spent
-        ex.tx.inputs
-        |> List.iter (fun input ->
-            match input with
-            | Outpoint outpoint ->
-                match DataAccess.OutpointOutputs.tryGet dataAccess session outpoint with
-                | Some output ->
-                    {output with status = Unspent}
-                    |> DataAccess.OutpointOutputs.put dataAccess session outpoint
-                | None ->
+                | Remove ->
                     ()
-            | _ -> ()
+         | _ -> ()
 
-        )
 
-        // Delete outputs
-        ex.tx.outputs
-        |> List.mapi (fun index _ -> {txHash = ex.txHash; index = uint32 index})
-        |> List.iter (fun outpoint ->
+    let updateAll op dataAccess session inputs txHash confirmationStatus =
+        for input in inputs do
+            match op with
+            | Add ->
+                Spent (txHash, confirmationStatus)
+            | Remove ->
+                Unspent
+            |> update op dataAccess session input
+
+module Output =
+    /// the iterator is used to handle the the update of a block, when added we work on DBOutput
+    /// while when we remove we map the output to outpoint to remove from the database
+    type private Iterator =
+        | DBOutput of DBOutput
+        | Outpoint of Outpoint
+
+    let private update dataAccess session outputIterator =
+        match outputIterator with
+        | DBOutput dbOutput ->
+            DataAccess.OutpointOutputs.put dataAccess session dbOutput.outpoint dbOutput
+            DataAccess.AddressOutpoints.put dataAccess session dbOutput.address dbOutput.outpoint
+        | Outpoint outpoint ->
             match DataAccess.OutpointOutputs.tryGet dataAccess session outpoint with
             | Some output ->
                 DataAccess.OutpointOutputs.delete dataAccess session outpoint
                 DataAccess.AddressOutpoints.delete dataAccess session output.address outpoint
-            | None -> ()
-        )
-        
-        ex.tx.witnesses
-        |> List.iter (function 
+            | None ->
+                ()
+
+    let private mapOutputs op outputs txHash confirmationStatus =
+        match op with
+        | Add ->
+            confirmationStatus
+            |> View.mapUnspentTxOutputs outputs txHash
+            |> List.map DBOutput
+        | Remove ->
+            outputs
+            |> List.mapi (fun index _ -> Outpoint {txHash = txHash; index = uint32 index})
+
+
+    let updateAll op dataAccess session outputs txHash confirmationStatus =
+
+        let outputs = mapOutputs op outputs txHash confirmationStatus
+
+        for output in outputs do
+            update dataAccess session output
+
+
+module Witness =
+
+    let updateAll op dataAccess session witnesses txHash confirmationStatus  =
+
+        for witness in witnesses do
+            match witness with
             | ContractWitness cw ->
-                let witnessPoint = View.witnessPoint ex.txHash ex.tx cw
-                
-                DataAccess.ContractData.delete dataAccess session witnessPoint
-                DataAccess.ContractHistory.delete dataAccess session cw.contractId witnessPoint
-                DataAccess.ContractConfirmations.delete dataAccess session witnessPoint
+                let witnessPoint = View.witnessPoint txHash witnesses cw
+
+                match op with
+                | Add ->
+                    DataAccess.ContractData.put dataAccess session witnessPoint (cw.command, cw.messageBody)
+                    DataAccess.ContractHistory.put dataAccess session cw.contractId witnessPoint
+                    DataAccess.ContractConfirmations.put dataAccess session witnessPoint confirmationStatus
+                | Remove ->
+                    DataAccess.ContractData.delete dataAccess session witnessPoint
+                    DataAccess.ContractHistory.delete dataAccess session cw.contractId witnessPoint
+                    DataAccess.ContractConfirmations.delete dataAccess session witnessPoint
             | _ ->
                 ()
-        )
-    )
+module Block =
 
-    {account with blockNumber = block.header.blockNumber - 1ul; blockHash = block.header.parent}
-    |> DataAccess.Tip.put dataAccess session
+    let private transactions (op : UpdateOperation) block =
 
-type private SyncAction =
-    | Undo of Block * Hash
-    | Add of Block * Hash
+        let blockHash = Block.hash block.header
+
+        match op with
+        | Add ->
+            block.transactions
+            |> List.mapi (fun index ex -> Confirmed (block.header.blockNumber, blockHash, index),ex)
+        | Remove ->
+            block.transactions
+            |> List.rev
+            |> List.map (fun ex -> Unconfirmed, ex)
+
+    let update op dataAccess session block =
+
+        lazy
+
+        for (confirmationStatus,ex) in transactions op block do
+             Input  .updateAll op dataAccess session ex.tx.inputs    ex.txHash confirmationStatus
+             Output .updateAll op dataAccess session ex.tx.outputs   ex.txHash confirmationStatus
+             Witness.updateAll op dataAccess session ex.tx.witnesses ex.txHash confirmationStatus
+
+module Tip =
+
+    let update op dataAccess session block =
+
+        lazy
+
+        match op with
+        | Add ->
+            {blockNumber = block.header.blockNumber; blockHash = (Block.hash block.header)}
+        | Remove ->
+            {blockNumber = block.header.blockNumber - 1ul; blockHash = block.header.parent}
+        |> DataAccess.Tip.put dataAccess session
+
+
+let log op block =
+
+    eventX "AddressDB {operation} block #{blockNumber} of block {blockHash}"
+    >> setField "operation" (match op with | Add -> "adding" | Remove -> "removing")
+    >> setField "blockNumber" block.header.blockNumber
+    >> setField "blockHash" (Hash.toString (Block.hash block.header))
+    |> Log.info
+
+let updateBlock (op:UpdateOperation) dataAccess session (block:Block) : unit =
+    let tipHash = DataAccess.Tip.tryGet dataAccess session |> Option.defaultValue empty
+
+    match op with
+    | Add ->
+        if tipHash.blockHash <> block.header.parent then
+            failwithf "trying to add a block to the tip but the tip is in different chain"
+    | Remove ->
+        if tipHash.blockHash <> Block.hash block.header then
+            failwithf "trying to remove a block from the tip but the tip is in different chain"
+
+    seq {
+        yield Block.update op dataAccess session block
+        yield Tip  .update op dataAccess session block
+    }
+    |> Seq.iter (fun x -> x.Force())
+
+    log op block
+
+
+let addBlock =
+    updateBlock Add
+
+let undoBlock =
+    updateBlock Remove
+
 
 let sync dataAccess session tipBlockHash (tipHeader:BlockHeader) (getHeader:Hash -> BlockHeader) (getBlock:Hash -> Block) =
     let account = DataAccess.Tip.get dataAccess session
@@ -239,23 +193,59 @@ let sync dataAccess session tipBlockHash (tipHeader:BlockHeader) (getHeader:Hash
         if x = y && i = j then acc
         elif i > j
         then
-            locate (((getHeader x).parent, i-1ul), (y,j)) (Add (getBlock x, x) :: acc)
+            locate (((getHeader x).parent, i-1ul), (y,j)) ((AddBlock, getBlock x) :: acc)
         elif i < j
         then
-            locate ((x,i), ((getHeader y).parent, j-1ul)) (Undo (getBlock y, y) :: acc)
+            locate ((x,i), ((getHeader y).parent, j-1ul)) ((UndoBlock, getBlock y) :: acc)
         else
-            locate (((getHeader x).parent, i-1ul), ((getHeader y).parent, j-1ul)) (Add (getBlock x, x) :: Undo (getBlock y,y) :: acc)
+            locate (((getHeader x).parent, i-1ul), ((getHeader y).parent, j-1ul)) ((AddBlock, getBlock x) :: (UndoBlock, getBlock y) :: acc)
 
-    let actions = locate ((tipBlockHash, tipHeader.blockNumber), (account.blockHash, account.blockNumber)) []
+    let actions = locate ((tipBlockHash, tipHeader.blockNumber),
+                          (account.blockHash, account.blockNumber)) []
 
-    let toUndo, toAdd = List.partition (function | Undo _ -> true | _ -> false) actions
+    let toUndo, toAdd = List.partition (function | UndoBlock, _ -> true | _ -> false) actions
     let toUndo = List.rev toUndo     // Blocks to be undo were found backwards.
     let sortedActions = toUndo @ toAdd
 
     sortedActions
     |> List.iter (function
-        | Undo (block,hash) -> undoBlock dataAccess session hash block
-        | Add (block,hash) -> addBlock dataAccess session hash block)
+        | UndoBlock, block -> undoBlock dataAccess session block
+        | AddBlock, block -> addBlock dataAccess session block)
+
+let fastSync dataAccess session tipBlockHash (tipHeader:BlockHeader) (headers: Map<Hash.Hash,Block>) =
+    let account = DataAccess.Tip.get dataAccess session
+    // Find the fork block of the account and the blockchain, logging actions
+    // to perform. Undo each block in the account's chain but not the blockchain,
+    // and add each block in the blockchain but not the account's chain.
+    let getBlock hash = headers |> Map.find hash
+
+    let rec locate ((x,i),(y,j)) acc =
+
+        if x = y && i = j then acc
+        elif i > j
+        then
+            locate (((getBlock x).header.parent, i-1ul), (y,j))
+                ((AddBlock, getBlock x) :: acc)
+        elif i < j
+        then
+            locate ((x,i), ((getBlock y).header.parent, j-1ul))
+                ((UndoBlock, getBlock y) :: acc)
+        else
+            locate (((getBlock x).header.parent, i-1ul), ((getBlock y).header.parent, j-1ul))
+                ((AddBlock, getBlock x) :: (UndoBlock, getBlock y) :: acc)
+
+    let actions = locate ((tipBlockHash, tipHeader.blockNumber),
+                          (account.blockHash, account.blockNumber)) []
+
+    let toUndo, toAdd = List.partition (function | UndoBlock, _ -> true | _ -> false) actions
+    let toUndo = List.rev toUndo     // Blocks to be undo were found backwards.
+    let sortedActions = toUndo @ toAdd
+
+    sortedActions
+    |> List.iter (function
+        | UndoBlock, block -> undoBlock dataAccess session block
+        | AddBlock, block -> addBlock dataAccess session block
+        )
 
 let init dataAccess session =
     DataAccess.Tip.put dataAccess session empty
@@ -267,4 +257,3 @@ let reset dataAccess session =
     DataAccess.AddressOutpoints.truncate dataAccess session
     DataAccess.ContractData.truncate dataAccess session
     DataAccess.ContractConfirmations.truncate dataAccess session
-    

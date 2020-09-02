@@ -1,5 +1,6 @@
 module AddressDB.Main
 
+open Blockchain
 open DataAccess
 open Infrastructure
 open Messaging.Services
@@ -18,33 +19,36 @@ let eventHandler client event dataAccess session view =
     | TransactionAddedToMemPool (txHash,tx) ->
         View.addMempoolTransaction dataAccess session txHash tx view
     | BlockAdded (blockHash,block) ->
-        Repository.addBlock dataAccess session blockHash block
+        Repository.addBlock dataAccess session block
 
         Blockchain.getMempool client
         |> View.fromMempool dataAccess session
     | BlockRemoved (blockHash,block) ->
-        Repository.undoBlock dataAccess session blockHash block
+        Repository.undoBlock dataAccess session block
         View.empty
     | _ ->
         view
 
-let rec private sync dataAccess session client =
+let private sync dataAccess session client =
     match Blockchain.getTip client with
-    | Some (tipBlockHash,tipHeader) ->
-        Repository.sync dataAccess session tipBlockHash tipHeader (Blockchain.getBlockHeader client >> Option.get) (Blockchain.getBlock client false >> Option.get)
-        
-        match Blockchain.getTip client with
-        | Some (currentTipBlockHash,_) when currentTipBlockHash = tipBlockHash ->
-            eventX "AddressDB synced to block #{blockNumber} {blockHash}"
-            >> setField "blockNumber" tipHeader.blockNumber
-            >> setField "blockHash" (Hash.toString tipBlockHash)
-            |> Log.info
-            
-            Blockchain.getMempool client
-            |> View.fromMempool dataAccess session
-        | _ -> // tip has changed while syncing, sync again
-            sync dataAccess session client
-    | None -> View.empty
+    | Some (tipBlockHash, tipHeader) ->
+        let account = DataAccess.Tip.get dataAccess session
+        if tipHeader.blockNumber - account.blockNumber > 500ul then
+            Blockchain.getAllBlocks client
+            |> Map.map (fun _ b -> Serialization.Block.deserialize b |> Option.get) //this is sent over the messaging bus so we can be sure about the existences
+            |> Repository.fastSync dataAccess session tipBlockHash tipHeader
+        else
+            Repository.sync dataAccess session tipBlockHash tipHeader (Blockchain.getBlockHeader client >> Option.get) (Blockchain.getBlock client false >> Option.get)
+
+        eventX "AddressDB synced to block #{blockNumber} {blockHash}"
+        >> setField "blockNumber" tipHeader.blockNumber
+        >> setField "blockHash" (Hash.toString tipBlockHash)
+        |> Log.info
+
+        Blockchain.getMempool client
+        |> View.fromMempool dataAccess session
+    | None ->
+        View.empty
 
 let commandHandler client command dataAccess session view =
     match command with
@@ -60,26 +64,26 @@ let requestHandler chain (requestId:RequestId) request dataAccess session view =
     match request with
     | GetBalance addresses ->
         decodeAddresses addresses
-        <@> Repository.getBalance dataAccess session view UnspentOnly
+        <@> View.getBalance dataAccess session view UnspentOnly
         |> reply<BalanceResponse> requestId
     | GetOutputs (addresses, mode) ->
         decodeAddresses addresses
-        <@> Repository.getOutputs dataAccess session view mode
+        <@> View.getOutputs dataAccess session view mode
         |> reply<List<PointedOutput>> requestId
     | GetTransactionCount (addresses, blockNumber) ->
         decodeAddresses addresses
-        <@> Repository.getTransactionCount dataAccess session view blockNumber
+        <@> View.getTransactionCount dataAccess session view blockNumber
         |> reply<int> requestId
     | GetTransactions (addresses, skip, take) ->
         decodeAddresses addresses
-        <@> Repository.getHistory dataAccess session view skip take
+        <@> View.getHistory dataAccess session view skip take
         |> reply<TransactionsResponse> requestId
     | GetContractHistory (contractId, skip, take) ->
-        Repository.getContractHistory dataAccess session view skip take contractId
+        View.getContractHistory dataAccess session view skip take contractId
         |> Ok
         |> reply<ContractHistoryResponse> requestId
     |> ignore
-    
+
     view
 
 type Wipe =
@@ -93,7 +97,7 @@ let main dataPath busName chain (wipe:Wipe) =
     if wipe = Full then
         eventX "Wiping AddressDB database"
         |> Log.info
-        
+
         if System.IO.Directory.Exists dataPath then
             System.IO.Directory.Delete (dataPath,true)
 
@@ -104,22 +108,22 @@ let main dataPath busName chain (wipe:Wipe) =
         let client = ServiceBus.Client.create busName
         use session = DatabaseContext.createSession databaseContext
 
-        match DataAccess.Tip.tryGet dataAccess session with 
-        | None -> 
+        match DataAccess.Tip.tryGet dataAccess session with
+        | None ->
             eventX "Creating AddressDB"
             |> Log.info
-            
+
             Repository.init dataAccess session
         | Some _ -> ()
-            
+
         if wipe = Reset then
             eventX "Resetting AddressDB"
             |> Log.info
-            
+
             Repository.reset dataAccess session
-                
+
         let view = sync dataAccess session client
-            
+
         Session.commit session
 
         let sbObservable =
@@ -129,7 +133,7 @@ let main dataPath busName chain (wipe:Wipe) =
                 | ServiceBus.Agent.Request (requestId, r) -> requestHandler chain requestId r
                 | ServiceBus.Agent.Command command -> commandHandler client command
             )
-                
+
         let ebObservable =
             ebObservable
             |> Observable.map (eventHandler client)
@@ -141,7 +145,7 @@ let main dataPath busName chain (wipe:Wipe) =
                 let view = handler dataAccess session view
 
                 Session.commit session
-                
+
                 view
             ) view
 
