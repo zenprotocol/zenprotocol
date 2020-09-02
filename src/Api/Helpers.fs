@@ -182,21 +182,43 @@ let dataEncoder chain data =
 
     JsonValue.Record [| dataName data, dataValue data |]
 
-let witnessEncoder (chain:Chain) (witnesses:Witness) =
-    match witnesses with
+let witnessEncoder (chain:Chain) (witness:Witness) =
+    match witness with
     | PKWitness (sigHash, pubKey, signature) ->
-        let address = Address.encode chain (Address.PK (PublicKey.hash pubKey))
-        let signs = Signature.toString signature
-        JsonValue.Record [| ("sigHash", sigHashEncoder sigHash); ("address",JsonValue.String address); ("signature",JsonValue.String signs) |]
-    | ContractWitness (cw) ->
+        JsonValue.Record [|
+            ("sigHash", sigHashEncoder sigHash)
+            ("hash",JsonValue.String (PublicKey.hash pubKey).AsString)
+            ("address",JsonValue.String (Address.encode chain (Address.PK (PublicKey.hash pubKey))))
+            ("signature",JsonValue.String (Signature.toString signature))
+        |]
+        |> fun j -> JsonValue.Record [| ("PKWitness", j) |]
+
+    | ContractWitness cw ->
         let msgBody=
             cw.messageBody
             |> Option.map (dataEncoder chain)
             |> Option.defaultValue JsonValue.Null
             
-        JsonValue.Record [| ("contractId", JsonValue.String ( ContractId.toString cw.contractId)); ("command",JsonValue.String cw.command); ("code", msgBody) |]
+        let encoded =
+            cw.messageBody
+            |> Option.map Serialization.Data.serialize
+            |> Option.map Base16.encode
+            |> Option.defaultValue ""
+            |> JsonValue.String
+            
+        JsonValue.Record [|
+            ("contractId", JsonValue.String ( ContractId.toString cw.contractId))
+            ("command",JsonValue.String cw.command)
+            ("messageBody", msgBody)
+            ("messageBodyRaw", encoded)
+        |]
+        |> fun j -> JsonValue.Record [| ("ContractWitness", j) |]
     | HighVWitness (version, bytes) ->
-        JsonValue.Record [| ("version", JsonValue.Number (decimal version)); ("bytes",JsonValue.String (FsBech32.Base16.encode bytes)) |]
+        JsonValue.Record [|
+            ("version", JsonValue.Number (decimal version))
+            ("bytes",JsonValue.String (FsBech32.Base16.encode bytes))
+        |]
+        |> fun j -> JsonValue.Record [| ("HighWitness", j) |]
 
 let transactionEncoder chain (tx:Transaction) =
     JsonValue.Record
