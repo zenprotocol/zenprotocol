@@ -185,6 +185,11 @@ let main argv =
 
     let chainParams = Chain.getChainParameters chain
     let dataPath = Platform.combine config.dataPath config.chain
+    
+    eventX "DB is stored at: {dataPath}"
+    >> setField "dataPath" (Platform.getAbsolutePath dataPath)
+    |> Log.info
+    
     let seeds =
         config.seeds
         |> Seq.choose (Endpoint.parseIp config.bind)
