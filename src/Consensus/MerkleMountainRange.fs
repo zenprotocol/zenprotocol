@@ -18,17 +18,33 @@ let private isPerfect length =
         
     bits = 1        
     
-let private findSplitIndex length = 
-    Seq.initInfinite (fun i -> pown 2 i)
-    |> Seq.find (fun i -> i * 2 >= length)
-     
+let private log2 x =
+    log x / log 2.0
+    
+let private findSplitIndex length =
+    /// 2 ^ ( ceil(log2(x)) - 1)  
+    if length = 1 then
+        1
+    else
+        length
+        |> float
+        |> log2
+        |> ceil
+        |> fun x -> x - 1.0
+        |> int
+        |> fun x -> 1 <<< x
+
 let private getHash tree =
     match tree with 
     | Node (hash,_,_,_) -> hash
     | Leaf (hash) -> hash 
-    
+let innerPrefix = [|105uy|] // 'i'
+
 let private joinHashes left right =
-    Hash.computeMultiple (seq {yield (getHash left |> Hash.bytes); yield (getHash right |> Hash.bytes)})        
+    Hash.computeMultiple (seq {yield innerPrefix; yield (left |> Hash.bytes); yield (right |> Hash.bytes)})        
+
+let private joinTreeHashes left right =
+    joinHashes (getHash left) (getHash right)
      
 let create<'k,'v when 'k : comparison> (serializer:'k -> 'v->Hash.Hash) = 
     {tree=None;serializer=serializer; data = Map.empty }
@@ -50,18 +66,17 @@ let add key value mmr =
         match tree with
         | Leaf left ->
             let leftLeaf = Leaf left
-            let hash = joinHashes leftLeaf leaf
+            let hash = joinTreeHashes leftLeaf leaf
             Node (hash, 2, leftLeaf, leaf)
         | Node (hash,length,left,right) ->
-            match isPerfect length with
-            | true ->
+            if isPerfect length then
                 let left = Node (hash,length,left,right)
-                let hash = joinHashes left leaf
+                let hash = joinTreeHashes left leaf
                 
                 Node (hash, length + 1, left, leaf)
-            | false ->
+            else
                 let right = add' right
-                let hash = joinHashes left right
+                let hash = joinTreeHashes left right
                 
                 Node (hash, length + 1, left, right)
     
@@ -87,15 +102,14 @@ let update key value mmr =
         | Node (_,length,left,right) ->
             let splitIndex = findSplitIndex length
             
-            match index < splitIndex with
-            | true ->
+            if index < splitIndex then
                 let left = update' left index
-                let hash = joinHashes left right
+                let hash = joinTreeHashes left right
                                 
                 Node (hash, length, left, right)
-            | false ->
+            else
                 let right = update' right (index - splitIndex)
-                let hash = joinHashes left right
+                let hash = joinTreeHashes left right
                                                 
                 Node (hash, length, left, right)
         
@@ -113,13 +127,12 @@ let createAuditPath mmr key =
         | Node (_,length,left,right) ->
             let splitIndex = findSplitIndex length
             
-            match index < splitIndex with
-            | true ->
+            if index < splitIndex then
                 let path = createAuditPath' left index
                 let rightHash = getHash right                                
                 
                 rightHash :: path
-            | false ->
+            else
                 let path = createAuditPath' right (index - splitIndex)
                 let leftHash = getHash left                                
                 
@@ -138,15 +151,14 @@ let verify mmr root auditPath index key value =
             let splitIndex = findSplitIndex length
             
             let leftHash,rightHash = 
-                match index < splitIndex with
-                | true -> 
+                if index < splitIndex then
                     let leftHash = verify' tail index
                     leftHash, head
-                | false ->
+                else
                     let rightHash = verify' tail (index - splitIndex)
                     head,rightHash
-                
-            Hash.computeMultiple (seq {yield (Hash.bytes leftHash); yield (Hash.bytes rightHash)})
+                    
+            joinHashes leftHash rightHash
             
     let root' = verify' auditPath index
     
