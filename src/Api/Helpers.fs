@@ -84,10 +84,23 @@ let contractEncoder chain (tx:Transaction) =
         match tx.contract with
         | Some (V0 c) ->
             let contractId = Contract.makeContractId Version0 c.code
+            
+            let sacrifice =
+                tx.outputs
+                |> List.filter(fun output -> output.lock = ActivationSacrifice)
+                |> List.sumBy (fun output -> output.spend.amount)
+            let activationSacrificePerBlock = (getChainParameters chain).sacrificePerByteBlock * (String.length c.code |> uint64)
+            let numberOfBlocks = sacrifice / activationSacrificePerBlock 
 
             let address = Address.encode chain (Address.Contract contractId)
 
-            JsonValue.Record [| ("contractId", JsonValue.String (contractId.ToString())); ("address",JsonValue.String address); ("code",JsonValue.String c.code) |]
+            JsonValue.Record
+                [|
+                   ("contractId", JsonValue.String (contractId.ToString()))
+                   ("address",JsonValue.String address)
+                   ("code",JsonValue.String c.code)
+                   ("expire", JsonValue.String (numberOfBlocks |> string))
+                |]
         | _ -> JsonValue.Null
         
 let sigHashEncoder (sigHash:SigHash) =
