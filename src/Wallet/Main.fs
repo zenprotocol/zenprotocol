@@ -249,7 +249,10 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             error
             |> reply<Map<PublicKey, string>> requestId
             NoAccount
-
+        | GetUtxo _ ->
+            error
+            |> reply<Map<PublicKey, string>> requestId
+            NoAccount
     | Exist view ->
         let chainParams = Consensus.Chain.getChainParameters chain
         match request with
@@ -417,6 +420,11 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
         | GetKeys password ->
             Account.getKeys dataAccess session password
             |> reply<Map<PublicKey, string>> requestId
+
+            accountStatus
+        | GetUtxo ->
+            Account.getUtxo dataAccess session view
+            |> reply<List<PointedOutput>> requestId
 
             accountStatus
 

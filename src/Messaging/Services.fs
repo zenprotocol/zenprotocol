@@ -253,6 +253,8 @@ module Wallet =
         | RawTransactionCreate of outputs:List<Hash * Spend>
         | RawTransactionSign of RawTransaction * password:string
         | GetKeys of password:string
+        | GetUtxo
+
         
     let serviceName = "wallet"
 
@@ -353,6 +355,9 @@ module Wallet =
 
     let getKeys client password =
         Request.send<Request, Result<Map<Crypto.PublicKey, string>,string>> client serviceName (GetKeys password)
+        
+    let getUtxo client =
+        Request.send<Request, Result<List<PointedOutput>,string>> client serviceName GetUtxo
 
 module AddressDB =
     open Wallet

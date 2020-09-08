@@ -252,12 +252,23 @@ let getBalance dataAccess session view confirmations =
     |> List.filter (fun output -> Set.contains output.pkHash spendableAddresses && output.status = Unspent)
     |> foldToBalance
 
-let getUnspentOutputs dataAccess session view confirmations =
-    let account = DataAccess.Account.get dataAccess session
-
+let private getAccountUtxo dataAccess session view confirmations account =
     View.Outputs.getAll view dataAccess session
     |> List.filter (fun output -> match output.status with | Unspent _-> true | _ -> false)
     |> List.filter (filterOutputByConfirmations account confirmations)
+
+let getUtxo dataAccess session view =
+    result {
+    let account = DataAccess.Account.get dataAccess session
+
+    return getAccountUtxo dataAccess session view 0ul account
+           |> List.map (fun output -> Types.PointedOutput (output.outpoint, {spend=output.spend; lock=output.lock})) 
+    }
+
+let getUnspentOutputs dataAccess session view confirmations =
+    let account = DataAccess.Account.get dataAccess session
+
+    getAccountUtxo dataAccess session view confirmations account
     |> List.map (fun output -> output.outpoint,{lock=output.lock;spend=output.spend})
 
 let addBlock dataAccess session blockHash block =

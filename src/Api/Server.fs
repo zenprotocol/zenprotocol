@@ -665,6 +665,17 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
 
         parseConfirmations query reply get
 
+    | Get ("/wallet/utxo", _) ->
+        match Wallet.getUtxo client with
+        | Ok pointedOutputs ->
+            pointedOutputs
+            |> Seq.map (pointedOutputEncoder chain)
+            |> Seq.toArray
+            |> JsonValue.Array
+            |> JsonContent
+            |> reply StatusCode.OK
+        | Error error ->
+            replyError error
     | Get ("/wallet/addressoutputs",query) ->
         match Map.tryFind "address" query with
         | Some address ->
