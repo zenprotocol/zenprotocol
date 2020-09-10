@@ -808,16 +808,16 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
         |> JsonContent
         |> reply StatusCode.OK
     | Get("/blockchain/candidates", query) ->
-        let tipInterval =
-            Blockchain.getTip client
-            |> Option.map (fun (_,h)-> h.blockNumber)
-            |> Option.defaultValue 0ul
-            |> CGP.getInterval ((Chain.getChainParameters chain))
-        let interval =
-            Map.tryFind "interval" query
-            |> Option.map (fun x -> uint32 x)
-            |> Option.defaultValue tipInterval
-        Blockchain.getCandidates client interval
+        query
+        |> Map.tryFind "interval"
+        |> Option.map uint32
+        |> Option.defaultValue (
+                Blockchain.getTip client
+                |> Option.map (fun (_,h)-> h.blockNumber)
+                |> Option.defaultValue 0ul
+                |> CGP.getInterval (getChainParameters chain)
+        )
+        |> Blockchain.getCandidates client
         |> List.map (payoutEncoder chain)
         |> List.toArray
         |> JsonValue.Array
