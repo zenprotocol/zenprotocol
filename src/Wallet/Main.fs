@@ -47,7 +47,16 @@ let eventHandler client event dataAccess session accountStatus =
 let private sync dataAccess session client =
     match Blockchain.getTip client with
     | Some (tipBlockHash,tipHeader) ->
-        Account.sync dataAccess session tipBlockHash tipHeader (Blockchain.getBlockHeader client >> Option.get) (Blockchain.getBlock client false >> Option.get)
+        let account = 
+            Account.tryGet dataAccess session
+            |> Option.map (fun x -> x.blockNumber)
+            |> Option.defaultValue 0ul
+        if tipHeader.blockNumber - account > 500ul then
+            Blockchain.getAllBlocks client
+            |> Map.map (fun _ b -> Serialization.Block.deserialize b |> Option.get) //this is sent over the messaging bus so we can be sure about the existences
+            |> Account.fastSync dataAccess session tipBlockHash tipHeader
+        else
+            Account.sync dataAccess session tipBlockHash tipHeader (Blockchain.getBlockHeader client >> Option.get) (Blockchain.getBlock client false >> Option.get)
 
         eventX "Account synced to block #{blockNumber} {blockHash}"
         >> setField "blockNumber" tipHeader.blockNumber
