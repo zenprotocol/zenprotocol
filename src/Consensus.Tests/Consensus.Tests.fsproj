@@ -191,7 +191,7 @@
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
       <ItemGroup>
         <Reference Include="FsBech32">
-          <HintPath>..\..\packages\FsBech32\lib\net45\FsBech32.dll</HintPath>
+          <HintPath>..\..\packages\FsBech32\lib\net47\FsBech32.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>

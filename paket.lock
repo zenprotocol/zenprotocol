@@ -10,9 +10,6 @@ NUGET
     FAKE (4.64.13)
     FParsec (1.0.3)
       FSharp.Core (>= 4.0.0.1)
-    FsBech32 (0.1.0.7)
-      FSharp.Compiler.Tools
-      FSharp.Core
     FsCheck (3.0.0-alpha4)
       FSharp.Core (>= 4.0.0.1)
     FsCheck.NUnit (3.0.0-alpha4)
@@ -145,15 +142,18 @@ NUGET
     ZFStar (0.0.26)
   remote: https://www.myget.org/F/zenprotocol/api/v2
     CGPContract (0.0.3)
+    FsBech32 (0.1.4)
+      FSharp.Compiler.Tools
+      FSharp.Core
     zen_secp256k1_linux (0.1.0.26-v6ad5cdb42a1a)
     zen_secp256k1_osx (0.1.0.26-v6ad5cdb42a1a)
     zen_z3_linux (4.5.1.8-v1f29cebd4df)
     zen_z3_osx (4.5.1.8-v1f29cebd4df6)
     zen_z3_windows (4.5.1.7-v1f29cebd4df)
-    Zulib (0.3.40)
+    Zulib (0.3.41)
       BouncyCastle
       FAKE (>= 4.0 < 5.0)
-      FsBech32 (>= 0.1.0.7)
+      FsBech32 (>= 0.1.4)
       FsCheck
       FSharp.Compatibility.OCaml
       FSharpx.Collections
