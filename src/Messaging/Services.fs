@@ -48,6 +48,7 @@ module Blockchain =
         | GetBlockByNumber of uint32
         | GetBlockHeader of Hash
         | GetAllBlocks
+        | GetBlocks of blockNumber: int * take: int
         | GetActiveContracts
         | GetActiveContract of ContractId
         | GetBlockChainInfo
@@ -114,6 +115,9 @@ module Blockchain =
 
     let getAllBlocks client =
         Request.send<Request,Map<Hash.Hash, byte array>> client serviceName GetAllBlocks
+    
+    let getBlocks client take blockNumber  =
+        GetBlocks (blockNumber, take) |> Request.send<Request,List<uint32 * byte array>> client serviceName
     
     let getBlockHeader client blockHash =
         Request.send<Request,BlockHeader option> client serviceName (GetBlockHeader blockHash)

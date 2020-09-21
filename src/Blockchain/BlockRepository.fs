@@ -24,7 +24,6 @@ let getAllMainHeader session =
 
 let getMainHeaderPaginate session blockNumber take =
     getAllMainHeader session
-    |> List.map (fun ext -> ext.header)
     |> List.rev
     |> fun xs -> if List.length xs <= blockNumber then [] else List.skip blockNumber xs
     |> List.truncate take

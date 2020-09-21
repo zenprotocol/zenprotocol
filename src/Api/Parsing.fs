@@ -360,15 +360,15 @@ let parseTransactionsRequestJson query =
             Error "Invalid values"
     | _ -> Error "Invalid values"
     
-let parseHeadersRequestJson query =
-    match Map.tryFind "take" query  with
+let parseHeadersRequestJson query defaultTip =
+    match Map.tryFind "take" query with
     | Some take ->
         let blockNumber =
             Map.tryFind "blockNumber" query
             |> Option.map System.Int32.TryParse
             |> Option.filter fst
             |> Option.map snd
-            |> Option.defaultValue 0
+            |> Option.defaultValue defaultTip
                 
         match System.Int32.TryParse take with
         | (true,take) ->
@@ -380,7 +380,6 @@ let parseHeadersRequestJson query =
             Error "Invalid values"
     | None ->
         Error "missing query data"
-
 let parseAddress json =
     try
         let address = AddressJson.Parse json

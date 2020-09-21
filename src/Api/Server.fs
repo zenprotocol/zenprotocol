@@ -175,9 +175,15 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
         reply StatusCode.OK (JsonContent (JsonValue.Number (count |> decimal)))
 
     | Get("/blockchain/headers", query) ->
-        match parseHeadersRequestJson query, Blockchain.getTip client with
-        | Ok (blockNumber, take), Some (_,header) ->
-            int header.blockNumber - blockNumber
+        let tip =
+                Blockchain.getTip client
+                |> Option.map snd
+                |> Option.map (fun x -> x.blockNumber)
+                |> Option.defaultValue 0ul
+                |> int
+        match parseHeadersRequestJson query tip with
+        | Ok (blockNumber, take)->
+            tip - blockNumber
             |> Blockchain.getHeaders client take
             |> List.map headerEncoder
             |> List.map (fun json -> json.JsonValue)
@@ -185,9 +191,7 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
             |> JsonValue.Array 
             |> JsonContent
             |> reply StatusCode.OK
-        | Error _, None
-        | _, None
-        | _, Some _ ->
+        | Error _ ->
             Blockchain.getAllHeaders client
             |> List.map headerEncoder
             |> List.map (fun json -> json.JsonValue)
@@ -572,7 +576,7 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
                           TextContent (sprintf "block not found")
                           |> reply StatusCode.NotFound
                       | Some block ->
-                          reply StatusCode.OK (JsonContent <| blockEncoder chain (Block.hash block.header) block)
+                          reply StatusCode.OK (JsonContent <| blockEncoder chain block)
               | None ->
                   TextContent (sprintf "hash or blockNumber are missing")
                   |> reply StatusCode.BadRequest
@@ -588,7 +592,28 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
                     TextContent (sprintf "block not found")
                     |> reply StatusCode.NotFound
                 | Some block ->
-                    reply StatusCode.OK (JsonContent <| blockEncoder chain hash block)
+                    reply StatusCode.OK (JsonContent <| blockEncoder chain block)
+                    
+    | Get ("/blockchain/blocks", query) ->
+        let blockNumber, take =
+            let tip =
+                Blockchain.getTip client
+                |> Option.map snd
+                |> Option.map (fun x -> x.blockNumber)
+                |> Option.defaultValue 0ul
+                |> int
+                
+            parseHeadersRequestJson query tip
+            |> Option.ofResult
+            |> Option.map (fun (blockNumber, take) -> (tip - blockNumber, take))
+            |> Option.defaultValue (0, tip)
+            
+        Blockchain.getBlocks client take blockNumber
+        |> List.map blockRawEncoder
+        |> List.toArray
+        |> JsonValue.Array 
+        |> JsonContent
+        |> reply StatusCode.OK
 
     | Get ("/blockchain/transaction", query) ->
         match Map.tryFind "hash" query with

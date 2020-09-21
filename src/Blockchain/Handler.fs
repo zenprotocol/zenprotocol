@@ -179,6 +179,11 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
             Some header.header
             |> requestId.reply<Types.BlockHeader option>
         | None -> requestId.reply<Types.BlockHeader option> None
+    | GetBlocks (blockNumber, take) ->
+        /// TODO: return Block instead of byte array
+        BlockRepository.getMainHeaderPaginate session blockNumber take
+        |> List.map (fun header -> header.header.blockNumber, (Serialization.Block.serialize (BlockRepository.getFullBlock session header)))
+        |> requestId.reply<List<uint32 * byte array>>
     | GetAllBlocks ->
         /// TODO: return Block instead of byte array
         BlockRepository.getAllMainHeader session
@@ -223,6 +228,7 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
         |> requestId.reply<BlockHeader list>
     | GetHeaders (blockNumber, take) ->
         BlockRepository.getMainHeaderPaginate session blockNumber take
+        |> List.map (fun header -> header.header)
         |> requestId.reply<BlockHeader list>
     | GetMempool ->
         MemPool.toList state.memoryState.mempool

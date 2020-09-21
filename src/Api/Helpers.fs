@@ -266,7 +266,7 @@ let blockHeaderEncoder (bh:BlockHeader) =
         commitments=bh.commitments.AsString
     ) |> fun j -> j.JsonValue
 
-let blockEncoder chain blockHash (bk:Block) =
+let blockEncoder chain (bk : Block) =
     let txsJson =
         JsonValue.Record
             [| for ex in bk.transactions do
@@ -274,11 +274,16 @@ let blockEncoder chain blockHash (bk:Block) =
             |]
     JsonValue.Record
         [|
-            ("hash", blockHash |> Consensus.Hash.toString  |> JsonValue.String)
+            ("hash", bk.header |> Block.hash |> Consensus.Hash.toString |> JsonValue.String)
             ("header", blockHeaderEncoder bk.header);
             ("transactions", txsJson)
         |]
-let payoutEncoder chain (recipient:Recipient,spend: Spend list) =
+let blockRawEncoder (bn : uint32, raw : byte array) =
+    JsonValue.Record [|
+        "blockNumber", bn |> decimal |> JsonValue.Number;
+         "rawBlock", raw |> FsBech32.Base16.encode |> JsonValue.String
+    |]
+let payoutEncoder chain (recipient : Recipient, spend : Spend list) =
     let res =
         recipientEncoder chain recipient, spend
         |> List.map spendEncoder
@@ -287,7 +292,7 @@ let payoutEncoder chain (recipient:Recipient,spend: Spend list) =
     res 
     |> (fun (r,s) -> PayoutResultJson.Root(r,s).JsonValue)
 
-let cgpEncoder chain (interval:uint32) (cgp:CGP.T)  =
+let cgpEncoder chain (interval : uint32) (cgp : CGP.T)  =
     let result =
         match cgp.payout with
         | Some payout ->
@@ -295,7 +300,7 @@ let cgpEncoder chain (interval:uint32) (cgp:CGP.T)  =
         | _ -> emptyRecord
     JsonValue.Record
         [|
-            ("interval", JsonValue.Number ((decimal)interval))
+            ("interval", JsonValue.Number (decimal interval))
             ("allocation", JsonValue.Number (decimal cgp.allocation))
             ("payout", result)
         |]
