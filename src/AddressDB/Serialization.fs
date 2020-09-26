@@ -42,6 +42,9 @@ module Address =
     let serialize = serialize size write
     let deserialize = deserialize read
 
+module Asset =
+        let serialize = serialize Asset.size Asset.write
+        let deserialize = deserialize Asset.read
 
 module Output =
     let size output =

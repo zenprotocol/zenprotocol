@@ -10,6 +10,9 @@ open Infrastructure
 open Messaging.Services
 open Messaging.Services.Wallet
 open AddressDB
+open Consensus.Types
+open Consensus.Types
+open Consensus.Types
 open Result
 
 type Action =
@@ -109,6 +112,23 @@ module Witness =
                     DataAccess.ContractConfirmations.delete dataAccess session witnessPoint
             | _ ->
                 ()
+module Mint =
+
+    let updateAll op dataAccess session tx =
+
+        for input in tx.inputs do
+            match input with
+            | Mint spend ->
+                match op with
+                | Add ->
+                    tx.witnesses
+                    |> List.choose (fun x -> match x with | ContractWitness cw -> Some (cw.command, cw.messageBody) | _ -> None)
+                    |> List.head //as we have  mint then surely we have a cw
+                    |> DataAccess.ContractAssets.put dataAccess session spend.asset
+                | Remove ->
+                    DataAccess.ContractAssets.delete dataAccess session spend.asset
+            | _ -> ()
+                    
 module Block =
 
     let private transactions (op : UpdateOperation) block =
@@ -132,6 +152,7 @@ module Block =
              Input  .updateAll op dataAccess session ex.tx.inputs    ex.txHash confirmationStatus
              Output .updateAll op dataAccess session ex.tx.outputs   ex.txHash confirmationStatus
              Witness.updateAll op dataAccess session ex.tx.witnesses ex.txHash confirmationStatus
+             Mint   .updateAll op dataAccess session ex.tx
 
 module Tip =
 

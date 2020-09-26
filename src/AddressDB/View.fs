@@ -265,3 +265,6 @@ let getContractHistory dataAccess session view skip take contractId =
     |> List.sortWith comparer
     |> Wallet.Account.paginate skip take
     |> List.map (fun ((command, messageBody, txHash), (confirmations, _)) -> command, messageBody, txHash, confirmations)
+
+let getContractAsset dataAccess session asset =
+    ContractAssets.tryGet dataAccess session asset

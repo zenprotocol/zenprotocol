@@ -340,6 +340,11 @@ type GetOutputsJson = JsonProvider<"""
 
 type GetTransactionCountJson = GetBalanceJson
 
+type GetAssetsJson = JsonProvider<"""
+{
+    "asset": "asset"
+}""">
+
 type ContractExecuteFromTransactionJson = JsonProvider<"""
 {
     "address": "address",

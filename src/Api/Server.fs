@@ -861,7 +861,7 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
         |> JsonValue.Array
         |> JsonContent
         |> reply StatusCode.OK
-        | Post("/addressdb/transactioncount", Some json) ->
+    | Post("/addressdb/transactioncount", Some json) ->
             match parseTransactionCountJson chain json with
             | Error error -> replyError error
             | Ok address ->
@@ -877,6 +877,36 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
                     | Error error -> replyError error
                 | None ->
                 replyError "No tip"
+     | Post("/addressdb/contract/mint", Some json) ->
+            match parseAsset json with
+            | Error error ->
+                replyError error
+            | Ok address ->
+                match AddressDB.getContractAssets client address with
+                | Ok (Some (command, messageBody)) ->
+                    [|
+                        
+                        "command",
+                            command
+                            |> JsonValue.String
+                        "messageBody",
+                            messageBody
+                            |> Option.map (dataEncoder chain)
+                            |> Option.defaultValue JsonValue.Null
+                        "messageBodyRaw",
+                            messageBody
+                            |> Option.map Serialization.Data.serialize
+                            |> Option.map Base16.encode
+                            |> Option.defaultValue ""
+                            |> JsonValue.String
+                    |]
+                    |> JsonValue.Record
+                    |> JsonContent
+                    |> reply StatusCode.OK
+                | Ok None ->
+                    replyError "No data"
+                | Error error ->
+                    replyError error
     | Post("/addressdb/contract/history", Some json) ->
         parseGetContractHistoryJson json
         >>= AddressDB.getContractHistory client

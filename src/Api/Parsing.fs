@@ -460,6 +460,17 @@ let parseTransactionCountJson chain json =
         checkAddresses chain json.Addresses
     with _ as ex ->
         Error ("Json invalid: " + ex.Message)
+        
+let parseAsset json =
+    try
+        let json = GetAssetsJson.Parse json
+
+        match Asset.fromString json.Asset with
+        | Some (Asset (c,hash)) when Hash.zero <> hash -> Ok (Asset(c,hash))
+        | _ -> Error "invalid asset"
+
+    with _ as ex ->
+        Error ("Json invalid: " + ex.Message)
 
 let parseGetContractHistoryJson json =
     try
