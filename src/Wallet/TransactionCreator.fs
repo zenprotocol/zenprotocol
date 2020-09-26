@@ -301,7 +301,7 @@ let createExecuteCGP chainParams dataAccess session (view:View.T) executeContrac
     createExecuteContractTransaction chainParams dataAccess session view executeContract password contractId command data false None Map.empty
 
 
-let createActivateContractTransaction chainParams dataAccess session view chain password code (numberOfBlocks:uint32) (limit:uint32 option) =
+let createActivateContractTransaction chainParams dataAccess session view password code (numberOfBlocks:uint32) (limit:uint32 option) =
     result {
         let contractId = Contract.makeContractId Version0 code
         
@@ -323,7 +323,7 @@ let createActivateContractTransaction chainParams dataAccess session view chain 
         let codeLength = String.length code |> uint64
 
         let activationFee = queries * rlimit / 100ul |> uint64
-        let activationSacrifice = chain.sacrificePerByteBlock * codeLength * (uint64 numberOfBlocks)
+        let activationSacrifice = chainParams.sacrificePerByteBlock * codeLength * (uint64 numberOfBlocks)
 
         let outputs =
             [

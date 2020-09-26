@@ -14,8 +14,6 @@ open Result
 open System
 open Logary.Message
 open Wallet
-open Wallet
-open Wallet
 
 type AccountStatus =
     | Exist of View.T
@@ -323,7 +321,7 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             accountStatus
         | ActivateContract (publish, code, numberOfBlocks, rlimit, password) ->
                 let tx =
-                    TransactionCreator.createActivateContractTransaction chainParams dataAccess session view chainParams password code numberOfBlocks rlimit
+                    TransactionCreator.createActivateContractTransaction chainParams dataAccess session view password code numberOfBlocks rlimit
                     <@> fun tx -> tx, Consensus.Contract.makeContractId Version0 code
                 reply<ActivateContractResponse> requestId tx
                 publishTx dataAccess session client view publish (Result.map fst tx)
