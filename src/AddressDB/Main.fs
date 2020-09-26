@@ -32,13 +32,16 @@ let eventHandler client event dataAccess session view =
 let private sync dataAccess session client =
     match Blockchain.getTip client with
     | Some (tipBlockHash, tipHeader) ->
-        let account = DataAccess.Tip.get dataAccess session
-        if tipHeader.blockNumber - account.blockNumber > 500ul then
-            Blockchain.getAllBlocks client
+        let account = 
+            DataAccess.Tip.tryGet dataAccess session
+            |> Option.map (fun x -> x.blockNumber)
+            |> Option.defaultValue 0ul
+
+        if tipHeader.blockNumber <> account then 
+            Blockchain.getAllBlocks client (int account)
             |> Map.map (fun _ b -> Serialization.Block.deserialize b |> Option.get) //this is sent over the messaging bus so we can be sure about the existences
-            |> Repository.fastSync dataAccess session tipBlockHash tipHeader
-        else
-            Repository.sync dataAccess session tipBlockHash tipHeader (Blockchain.getBlockHeader client >> Option.get) (Blockchain.getBlock client false >> Option.get)
+            |> Repository.sync dataAccess session tipBlockHash tipHeader
+
 
         eventX "AddressDB synced to block #{blockNumber} {blockHash}"
         >> setField "blockNumber" tipHeader.blockNumber

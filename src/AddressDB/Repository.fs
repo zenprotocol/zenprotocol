@@ -181,38 +181,7 @@ let addBlock =
 let undoBlock =
     updateBlock Remove
 
-
-let sync dataAccess session tipBlockHash (tipHeader:BlockHeader) (getHeader:Hash -> BlockHeader) (getBlock:Hash -> Block) =
-    let account = DataAccess.Tip.get dataAccess session
-
-    // Find the fork block of the account and the blockchain, logging actions
-    // to perform. Undo each block in the account's chain but not the blockchain,
-    // and add each block in the blockchain but not the account's chain.
-    let rec locate ((x,i),(y,j)) acc =
-
-        if x = y && i = j then acc
-        elif i > j
-        then
-            locate (((getHeader x).parent, i-1ul), (y,j)) ((AddBlock, getBlock x) :: acc)
-        elif i < j
-        then
-            locate ((x,i), ((getHeader y).parent, j-1ul)) ((UndoBlock, getBlock y) :: acc)
-        else
-            locate (((getHeader x).parent, i-1ul), ((getHeader y).parent, j-1ul)) ((AddBlock, getBlock x) :: (UndoBlock, getBlock y) :: acc)
-
-    let actions = locate ((tipBlockHash, tipHeader.blockNumber),
-                          (account.blockHash, account.blockNumber)) []
-
-    let toUndo, toAdd = List.partition (function | UndoBlock, _ -> true | _ -> false) actions
-    let toUndo = List.rev toUndo     // Blocks to be undo were found backwards.
-    let sortedActions = toUndo @ toAdd
-
-    sortedActions
-    |> List.iter (function
-        | UndoBlock, block -> undoBlock dataAccess session block
-        | AddBlock, block -> addBlock dataAccess session block)
-
-let fastSync dataAccess session tipBlockHash (tipHeader:BlockHeader) (headers: Map<Hash.Hash,Block>) =
+let sync dataAccess session tipBlockHash (tipHeader:BlockHeader) (headers: Map<Hash.Hash,Block>) =
     let account = DataAccess.Tip.get dataAccess session
     // Find the fork block of the account and the blockchain, logging actions
     // to perform. Undo each block in the account's chain but not the blockchain,

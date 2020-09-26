@@ -47,7 +47,7 @@ module Blockchain =
         | GetBlock of mainChain:bool * Hash
         | GetBlockByNumber of uint32
         | GetBlockHeader of Hash
-        | GetAllBlocks
+        | GetAllBlocks of from: int
         | GetBlocks of blockNumber: int * take: int
         | GetActiveContracts
         | GetActiveContract of ContractId
@@ -113,8 +113,9 @@ module Blockchain =
         GetBlockTemplate pkHash
         |> Request.trySend<Request,Block> client serviceName
 
-    let getAllBlocks client =
-        Request.send<Request,Map<Hash.Hash, byte array>> client serviceName GetAllBlocks
+    let getAllBlocks client from =
+        GetAllBlocks from
+        |> Request.send<Request,Map<Hash.Hash, byte array>> client serviceName 
     
     let getBlocks client take blockNumber  =
         GetBlocks (blockNumber, take) |> Request.send<Request,List<uint32 * byte array>> client serviceName

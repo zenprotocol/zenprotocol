@@ -21,11 +21,14 @@ let getAllMainHeader session =
     Collection.getAll session.context.blocks session.session
     |> List.filter (fun x -> x.status = ExtendedBlockHeader.BlockStatus.MainChain)
     |> List.sortBy (fun x -> x.header.blockNumber)
-
-let getMainHeaderPaginate session blockNumber take =
+    
+let getMainHeaderFrom session blockNumber =
     getAllMainHeader session
     |> List.rev
     |> fun xs -> if List.length xs <= blockNumber then [] else List.skip blockNumber xs
+
+let getMainHeaderPaginate session blockNumber take =
+    getMainHeaderFrom session blockNumber
     |> List.truncate take
 
 let saveHeader session (block:ExtendedBlockHeader.T) =

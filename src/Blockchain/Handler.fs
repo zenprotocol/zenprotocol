@@ -184,9 +184,9 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
         BlockRepository.getMainHeaderPaginate session blockNumber take
         |> List.map (fun header -> header.header.blockNumber, (Serialization.Block.serialize (BlockRepository.getFullBlock session header)))
         |> requestId.reply<List<uint32 * byte array>>
-    | GetAllBlocks ->
+    | GetAllBlocks from ->
         /// TODO: return Block instead of byte array
-        BlockRepository.getAllMainHeader session
+        BlockRepository.getMainHeaderFrom session from
         |> List.map (fun header -> header.hash, (Serialization.Block.serialize (BlockRepository.getFullBlock session header)))
         |> Map.ofList
         |> requestId.reply<Map<Hash.Hash, byte array>>
