@@ -45,7 +45,7 @@ let contractPath =
 
 let getContractV0 code =
     result {
-        let! hints = Contract.recordHints code
+        let! hints = Contract.recordHints 2723280u code
         let! queries = Infrastructure.ZFStar.totalQueries hints
     
         let contract = {

@@ -244,7 +244,7 @@ let mutable testingState = {
                 let contractId, code = getContractId contractLabel
 
                 let hints =
-                    match Contract.recordHints code with
+                    match Contract.recordHints 2723280u code with
                     | Ok hints -> hints
                     | Error error -> failwith error
 

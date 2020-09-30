@@ -237,7 +237,7 @@ module Wallet =
         | GetBalance
         | ImportSeed of string list * password:string
         | Send of publish:bool*outputs:List<Lock * Spend> * password:string
-        | ActivateContract of publish:bool*string * uint32 * password:string
+        | ActivateContract of publish:bool* code:string * numberOfBlocks:uint32 * rlimit:uint32 option * password:string
         | ExtendContract of publish:bool*ContractId * uint32 * password:string
         | ExecuteContract of publish:bool*ContractId * string * data option * provideReturnAddress:bool * sign:string option * Map<Asset, uint64> * password:string
         | ExecuteCGP of publish:bool * password:string
@@ -286,8 +286,8 @@ module Wallet =
     let createTransaction client publish outputs password =
         send<Transaction> client serviceName (Send (publish, outputs, password))
 
-    let activateContract client publish code numberOfBlocks password =
-        send<ActivateContractResponse> client serviceName (ActivateContract (publish, code, numberOfBlocks, password))
+    let activateContract client publish code numberOfBlocks rlimit password =
+        send<ActivateContractResponse> client serviceName (ActivateContract (publish, code, numberOfBlocks, rlimit, password))
 
     let extendContract client publish address numberOfBlocks password =
         send<Transaction> client serviceName (ExtendContract (publish, address, numberOfBlocks, password))

@@ -244,7 +244,7 @@ let createContractRecord code =
 
         let! hints = Measure.measure
                         (sprintf "recording hints for contract %A" contractId)
-                        (lazy(Contract.recordHints code))
+                        (lazy(Contract.recordHints 2723280u code))
         let! queries = ZFStar.totalQueries hints
 
         return

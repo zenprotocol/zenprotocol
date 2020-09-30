@@ -13,6 +13,7 @@ open Serialization
 open Serialization
 open Blockchain.Tally.Types
 open Logary.Message
+open Wallet
 
 [<Literal>]
 let DbVersion = 2
@@ -94,7 +95,7 @@ let updateVersionClean t session =
         let (ContractId (_, contractHash)) = contractKey.contractId
         let moduleName = Contract.getModuleName contractHash
         
-        Infrastructure.ZFStar.recordHints contractKey.code moduleName
+        Infrastructure.ZFStar.recordHints TransactionCreator.Rlimit contractKey.code moduleName
         <@> (fun hints -> 
             Infrastructure.ZFStar.compile t.contractPath contractKey.code hints (2723280u * 10u) moduleName
         )

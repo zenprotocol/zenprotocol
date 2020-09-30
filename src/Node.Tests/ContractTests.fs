@@ -58,7 +58,7 @@ let ``Contract should activate and execute``() =
     |> get |> i
 
     let response = 
-        contractActivateRequestJson sampleContractCode 10 password
+        contractActivateRequestJson sampleContractCode 10 2723280 password
         |> post "wallet/contract/activate"
         |> ContractActivateResponseJson.Parse
 
@@ -82,7 +82,7 @@ let ``Contract should activate and execute (from transaction)``() =
     |> get |> i
     
     let response = 
-        contractActivateRequestJson sampleContractCode 10 password
+        contractActivateRequestJson sampleContractCode 10 2723280 password
         |> post "wallet/contract/activate"
         |> ContractActivateResponseJson.Parse
 

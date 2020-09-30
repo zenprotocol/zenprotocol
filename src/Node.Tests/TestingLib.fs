@@ -261,7 +261,7 @@ module Contract =
 
 
     let activate index code numOfBlocks =
-        activateContract (getURL index) code numOfBlocks password
+        activateContract (getURL index) code numOfBlocks 0 password
 
     let execute index address command messageBody asset amount =
         execute (getURL index) address command messageBody asset amount password

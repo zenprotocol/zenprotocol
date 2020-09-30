@@ -98,6 +98,7 @@ let contractEncoder chain (tx:Transaction) =
                 [|
                    ("contractId", JsonValue.String (contractId.ToString()))
                    ("address",JsonValue.String address)
+                   ("rlimit",JsonValue.String (string c.rlimit))
                    ("code",JsonValue.String c.code)
                    ("expire", JsonValue.String (numberOfBlocks |> string))
                 |]

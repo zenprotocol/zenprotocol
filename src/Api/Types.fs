@@ -57,6 +57,7 @@ type SendRequestJson = JsonProvider<"""
 type ContractActivateRequestJson = JsonProvider<"""
 {
     "code": "string",
+    "rlimit": 2723280,
     "numberOfBlocks": 1,
     "password": "password"
 }

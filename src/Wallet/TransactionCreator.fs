@@ -19,7 +19,7 @@ module Cost = Zen.Cost.Realized
 type ActiveContract = Messaging.Services.Blockchain.ActiveContract
 
 [<Literal>]
-let rlimit = 2723280u
+let Rlimit = 2723280u
 
 let result = new ResultBuilder<string>()
 
@@ -301,13 +301,15 @@ let createExecuteCGP chainParams dataAccess session (view:View.T) executeContrac
     createExecuteContractTransaction chainParams dataAccess session view executeContract password contractId command data false None Map.empty
 
 
-let createActivateContractTransaction chainParams dataAccess session view chain password code (numberOfBlocks:uint32) =
+let createActivateContractTransaction chainParams dataAccess session view chain password code (numberOfBlocks:uint32) (limit:uint32 option) =
     result {
         let contractId = Contract.makeContractId Version0 code
+        
+        let rlimit = limit |> Option.defaultValue Rlimit
 
         let! hints = Measure.measure
                         (sprintf "recording hints for contract %A" contractId)
-                        (lazy(Contract.recordHints code))
+                        (lazy(Contract.recordHints rlimit code))
         let! queries = ZFStar.totalQueries hints
 
         let contract =

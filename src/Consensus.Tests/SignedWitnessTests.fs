@@ -71,7 +71,7 @@ let mutable acs = ActiveContractSet.empty
 
 [<OneTimeSetUp>]
 let setup () =
-    let hints = Contract.recordHints code |> Result.get
+    let hints = Contract.recordHints 2723280u code |> Result.get
     let contractActivation =
         {
             code=code;

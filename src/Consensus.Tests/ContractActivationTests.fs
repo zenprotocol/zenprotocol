@@ -32,7 +32,7 @@ let unwrap =
     | error -> failwith <| sprintf "%A" error
 
 let recordHints =
-    Consensus.Contract.recordHints
+    Consensus.Contract.recordHints 2723280u
     >> unwrap
 
 let totalQueries =

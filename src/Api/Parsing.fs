@@ -208,6 +208,12 @@ let parseContractExecuteFromTransactionJson chain json =
 let parseContractActivateJson json =
     try
         let json = ContractActivateRequestJson.Parse json
+        
+        let rlimit =
+            if json.Rlimit < (int TransactionCreator.Rlimit) then
+                None
+            else
+                Some (uint32 json.Rlimit)
 
         if String.length json.Code = 0 then
             Error "Contract code is empty"
@@ -216,7 +222,7 @@ let parseContractActivateJson json =
         else if json.NumberOfBlocks = 0 then
             Error "Number of blocks is zero"
         else
-            Ok (json.Code, uint32 json.NumberOfBlocks, json.Password)
+            Ok (json.Code, uint32 json.NumberOfBlocks, rlimit,  json.Password)
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
 

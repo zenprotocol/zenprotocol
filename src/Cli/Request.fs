@@ -34,11 +34,11 @@ module Request =
         |> ImportSeedJson.Root(pass, words).JsonValue.Request
         |> getResponse
 
-    let activateContract getUri code numberOfBlocks pass =
+    let activateContract getUri code numberOfBlocks rlimit pass =
         "wallet/contract/activate"
         |> getUri
         |> ContractActivateRequestJson.Root(
-            code, numberOfBlocks, pass
+            code, numberOfBlocks, rlimit, pass
             ).JsonValue.Request 
         |> getResponse
 

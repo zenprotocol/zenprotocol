@@ -321,9 +321,9 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
 
             reply<RawTransaction> requestId raw
             accountStatus
-        | ActivateContract (publish, code, numberOfBlocks, password) ->
+        | ActivateContract (publish, code, numberOfBlocks, rlimit, password) ->
                 let tx =
-                    TransactionCreator.createActivateContractTransaction chainParams dataAccess session view chainParams password code numberOfBlocks
+                    TransactionCreator.createActivateContractTransaction chainParams dataAccess session view chainParams password code numberOfBlocks rlimit
                     <@> fun tx -> tx, Consensus.Contract.makeContractId Version0 code
                 reply<ActivateContractResponse> requestId tx
                 publishTx dataAccess session client view publish (Result.map fst tx)

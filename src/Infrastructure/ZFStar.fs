@@ -191,7 +191,7 @@ let calculateMetrics hints =
         ()
 #endif
 
-let recordHints code moduleName =
+let recordHints rlimit code moduleName =
     let oDir, file = initOutputDir moduleName
     let originalFile = changeExtention ".orig.fst" file
     let hintsFile = oDir / changeExtention ".fst.hints" file
@@ -210,7 +210,7 @@ let recordHints code moduleName =
         elaborate originalFile elaboratedFile
         |> Result.bind (fun _ ->
             fstar oDir elaboratedFile [
-                 "--z3rlimit";(2723280u * 2u).ToString()
+                 "--z3rlimit";(string rlimit)
                  "--use_cached_modules"
                  "--record_hints"
                  "--use_hints"

@@ -449,8 +449,8 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
     | Post ("/wallet/contract/activate", Some body) ->
         match parseContractActivateJson body with
         | Error error -> replyError error
-        | Ok (code, numberOfBlocks, password) ->
-            match Wallet.activateContract client true code numberOfBlocks password with
+        | Ok (code, numberOfBlocks, rlimit, password) ->
+            match Wallet.activateContract client true code numberOfBlocks rlimit password with
             | Ok (tx, contractId) ->
                 let address =
                     Address.Contract contractId
