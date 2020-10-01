@@ -14,7 +14,7 @@ open Zen.Types.Data
 let private getBytes str = Encoding.UTF8.GetBytes (str : string)
 
 [<Literal>]
-let DbVersion = 2
+let DbVersion = 3
 
 type T = {
     outpointOutputs: Collection<Outpoint, DBOutput>
@@ -47,8 +47,8 @@ let init databaseContext =
 
     match SingleValue.tryGet dbVersion session with
     | None ->
-            SingleValue.put dbVersion session DbVersion
-    | Some 1 ->
+        SingleValue.put dbVersion session DbVersion
+    | Some version when version < DbVersion->
         Platform.cleanDirectory "addressDB"
         SingleValue.put dbVersion session DbVersion
     | Some DbVersion ->
