@@ -24,11 +24,12 @@ let getAllMainHeader session =
     
 let getMainHeaderFrom session blockNumber =
     getAllMainHeader session
-    |> List.rev
     |> fun xs -> if List.length xs <= blockNumber then [] else List.skip blockNumber xs
 
 let getMainHeaderPaginate session blockNumber take =
-    getMainHeaderFrom session blockNumber
+    getAllMainHeader session
+    |> List.rev
+    |> fun xs -> if List.length xs <= blockNumber then [] else List.skip blockNumber xs
     |> List.truncate take
 
 let saveHeader session (block:ExtendedBlockHeader.T) =
