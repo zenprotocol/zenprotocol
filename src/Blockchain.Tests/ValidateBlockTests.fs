@@ -1103,3 +1103,21 @@ let ``Out of order dependent transactions are rearranged``() =
 
     List.length validatedTransactions |> should equal 2
     validatedTransactions |> should equal validatedTransactions_
+
+[<Test>]
+let ``should get all the blocks in mainchain`` () =
+    use databaseContext = DatabaseContext.createEmpty (tempDir())
+
+    use session = DatabaseContext.createSession databaseContext
+    let state = getGenesisState session
+    let mainChain, _ = createChainFromGenesis 9 0
+    
+    
+    let _,state = validateChain session mainChain state
+    
+    //printfn "%A" (BlockRepository.getMainHeaderPaginate session 0 2)
+    let headers = BlockRepository.getMainHeaderFrom session 8
+    should equal headers.[0].header.blockNumber 9ul
+    should equal headers.[1].header.blockNumber 10ul
+    
+    ()

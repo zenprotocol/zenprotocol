@@ -22,6 +22,19 @@ let createBroker () =
         Actor.signal shim
         Poller.run poller
     )
+let getTestnetActors () =
+    [
+        createBroker ()
+        Blockchain.Main.main dataPath (Chain.getChainParameters Chain.Test) busName false
+        Network.Main.main dataPath busName (Chain.getChainParameters Chain.Test) "" false "" [] false false
+        Wallet.Main.main dataPath busName Chain.Test Wallet.Main.Wipe.NoWipe
+        AddressDB.Main.main dataPath busName Chain.Test AddressDB.Main.NoWipe
+        Api.Main.main Chain.Test busName apiUri
+    ]
+    |> List.rev
+    |> List.map Disposables.toDisposable
+    |> Disposables.fromList
+
 
 let getActors () =
     [

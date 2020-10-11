@@ -51,6 +51,7 @@
     <Compile Include="TestingLib.fs" />
     <Compile Include="ContractTests.fs" />
     <Compile Include="AddressDBTests.fs" />
+    <Compile Include="SimpleApiTests.fs" />
     <Content Include="paket.references" />
   </ItemGroup>
   <ItemGroup>
