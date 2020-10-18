@@ -17,7 +17,7 @@ let contractPath = tempDir()
 let rlimit = 2723280u
 
 let compile code = result {
-    let! hints = Contract.recordHints code
+    let! hints = Contract.recordHints 2723280u code
     let! queries = Infrastructure.ZFStar.totalQueries hints
 
     let contract : Consensus.Types.ContractV0 = {

@@ -10,6 +10,8 @@ if (args.includes('--version')) {
 
 const node = start(args);
 
+console.log('Default path is: ' + args[2]);
+
 node.stdout.pipe(process.stdout);
 node.stderr.pipe(process.stderr);
 

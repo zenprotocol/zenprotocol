@@ -1,5 +1,6 @@
 ﻿module Api.Helpers
 
+open Consensus.Chain
 open FSharp.Data
 open Api.Types
 open Consensus.Types
@@ -83,57 +84,32 @@ let contractEncoder chain (tx:Transaction) =
         match tx.contract with
         | Some (V0 c) ->
             let contractId = Contract.makeContractId Version0 c.code
+            
+            let sacrifice =
+                tx.outputs
+                |> List.filter(fun output -> output.lock = ActivationSacrifice)
+                |> List.sumBy (fun output -> output.spend.amount)
+            let activationSacrificePerBlock = (getChainParameters chain).sacrificePerByteBlock * (String.length c.code |> uint64)
+            let numberOfBlocks = sacrifice / activationSacrificePerBlock 
 
             let address = Address.encode chain (Address.Contract contractId)
 
-            JsonValue.Record [| ("contractId", JsonValue.String (contractId.ToString())); ("address",JsonValue.String address); ("code",JsonValue.String c.code) |]
+            JsonValue.Record
+                [|
+                   ("contractId", JsonValue.String (contractId.ToString()))
+                   ("address",JsonValue.String address)
+                   ("rlimit",JsonValue.String (string c.rlimit))
+                   ("code",JsonValue.String c.code)
+                   ("expire", JsonValue.String (numberOfBlocks |> string))
+                |]
         | _ -> JsonValue.Null
-
-let transactionEncoder chain (tx:Transaction) =
-    JsonValue.Record
-        [|
-            ("version",JsonValue.Number ((decimal) tx.version));
-            ("inputs", JsonValue.Array [| for i in tx.inputs -> inputEncoder i |]);
-            ("outputs", JsonValue.Array [| for op in tx.outputs -> outputEncoder chain op |])
-            ("contract", contractEncoder chain tx)
-            // witnesses not yet set
-        |]
-    |> omitNullFields
-    
-let transactionHistoryEncoder chain txHash asset (amount:int64) (confirmations:uint32) lock=
-    JsonValue.Record
-        [|
-            ("txHash",JsonValue.String (Hash.toString txHash));
-            ("asset", JsonValue.String (Asset.toString asset));
-            ("amount", JsonValue.Number (decimal amount))
-            ("confirmations", JsonValue.Number (decimal confirmations))
-            ("lock", lockEncoder chain lock)
-        |]
-    |> omitNullFields
-
-let blockHeaderEncoder (bh:BlockHeader) =
-    BlockHeaderJson.Root (
-        version=(int)bh.version,
-        parent=bh.parent.AsString,
-        blockNumber=(int)bh.blockNumber,
-        timestamp=(int64)bh.timestamp,
-        difficulty=(int)bh.difficulty,
-        nonce=[|(int64)(fst bh.nonce);(int64)(snd bh.nonce)|],
-        commitments=bh.commitments.AsString
-    ) |> fun j -> j.JsonValue
-
-let blockEncoder chain blockHash (bk:Block) =
-    let txsJson =
-        JsonValue.Record
-            [| for ex in bk.transactions do
-                yield (ex.txHash |> Consensus.Hash.toString, transactionEncoder chain ex.tx)
-            |]
-    JsonValue.Record
-        [|
-            ("hash", blockHash |> Consensus.Hash.toString  |> JsonValue.String)
-            ("header", blockHeaderEncoder bk.header);
-            ("transactions", txsJson)
-        |]
+        
+let sigHashEncoder (sigHash:SigHash) =
+    match sigHash with
+    | TxHash -> "txHash"
+    | FollowingWitnesses -> "FollowingWitnesses"
+    | UnknownSigHash n -> sprintf "Unknown Sig Hash %A" n
+    |> JsonValue.String
 
 let dataEncoder chain data =
 
@@ -220,9 +196,95 @@ let dataEncoder chain data =
 
     JsonValue.Record [| dataName data, dataValue data |]
 
+let witnessEncoder (chain:Chain) (witness:Witness) =
+    match witness with
+    | PKWitness (sigHash, pubKey, signature) ->
+        JsonValue.Record [|
+            ("sigHash", sigHashEncoder sigHash)
+            ("hash",JsonValue.String (PublicKey.hash pubKey).AsString)
+            ("address",JsonValue.String (Address.encode chain (Address.PK (PublicKey.hash pubKey))))
+            ("signature",JsonValue.String (Signature.toString signature))
+        |]
+        |> fun j -> JsonValue.Record [| ("PKWitness", j) |]
 
+    | ContractWitness cw ->
+        let msgBody=
+            cw.messageBody
+            |> Option.map (dataEncoder chain)
+            |> Option.defaultValue JsonValue.Null
+            
+        let encoded =
+            cw.messageBody
+            |> Option.map Serialization.Data.serialize
+            |> Option.map Base16.encode
+            |> Option.defaultValue ""
+            |> JsonValue.String
+            
+        JsonValue.Record [|
+            ("contractId", JsonValue.String ( ContractId.toString cw.contractId))
+            ("command",JsonValue.String cw.command)
+            ("messageBody", msgBody)
+            ("messageBodyRaw", encoded)
+        |]
+        |> fun j -> JsonValue.Record [| ("ContractWitness", j) |]
+    | HighVWitness (version, bytes) ->
+        JsonValue.Record [|
+            ("version", JsonValue.Number (decimal version))
+            ("bytes",JsonValue.String (FsBech32.Base16.encode bytes))
+        |]
+        |> fun j -> JsonValue.Record [| ("HighWitness", j) |]
 
-let payoutEncoder chain (recipient:Recipient,spend: Spend list) =
+let transactionEncoder chain (tx:Transaction) =
+    JsonValue.Record
+        [|
+            ("version",JsonValue.Number ((decimal) tx.version));
+            ("inputs", JsonValue.Array [| for i in tx.inputs -> inputEncoder i |]);
+            ("outputs", JsonValue.Array [| for op in tx.outputs -> outputEncoder chain op |])
+            ("contract", contractEncoder chain tx)
+            ("witness", JsonValue.Array [| for witness in tx.witnesses -> witnessEncoder chain witness |])
+        |]
+    |> omitNullFields
+    
+let transactionHistoryEncoder chain txHash asset (amount:int64) (confirmations:uint32) lock=
+    JsonValue.Record
+        [|
+            ("txHash",JsonValue.String (Hash.toString txHash));
+            ("asset", JsonValue.String (Asset.toString asset));
+            ("amount", JsonValue.Number (decimal amount))
+            ("confirmations", JsonValue.Number (decimal confirmations))
+            ("lock", lockEncoder chain lock)
+        |]
+    |> omitNullFields
+
+let blockHeaderEncoder (bh:BlockHeader) =
+    BlockHeaderJson.Root (
+        version=(int)bh.version,
+        parent=bh.parent.AsString,
+        blockNumber=(int)bh.blockNumber,
+        timestamp=(int64)bh.timestamp,
+        difficulty=(int)bh.difficulty,
+        nonce=[|(int64)(fst bh.nonce);(int64)(snd bh.nonce)|],
+        commitments=bh.commitments.AsString
+    ) |> fun j -> j.JsonValue
+
+let blockEncoder chain (bk : Block) =
+    let txsJson =
+        JsonValue.Record
+            [| for ex in bk.transactions do
+                yield (ex.txHash |> Consensus.Hash.toString, transactionEncoder chain ex.tx)
+            |]
+    JsonValue.Record
+        [|
+            ("hash", bk.header |> Block.hash |> Consensus.Hash.toString |> JsonValue.String)
+            ("header", blockHeaderEncoder bk.header);
+            ("transactions", txsJson)
+        |]
+let blockRawEncoder (bn : uint32, raw : byte array) =
+    JsonValue.Record [|
+        "blockNumber", bn |> decimal |> JsonValue.Number;
+         "rawBlock", raw |> FsBech32.Base16.encode |> JsonValue.String
+    |]
+let payoutEncoder chain (recipient : Recipient, spend : Spend list) =
     let res =
         recipientEncoder chain recipient, spend
         |> List.map spendEncoder
@@ -231,7 +293,7 @@ let payoutEncoder chain (recipient:Recipient,spend: Spend list) =
     res 
     |> (fun (r,s) -> PayoutResultJson.Root(r,s).JsonValue)
 
-let cgpEncoder chain (interval:uint32) (cgp:CGP.T)  =
+let cgpEncoder chain (interval : uint32) (cgp : CGP.T)  =
     let result =
         match cgp.payout with
         | Some payout ->
@@ -239,7 +301,7 @@ let cgpEncoder chain (interval:uint32) (cgp:CGP.T)  =
         | _ -> emptyRecord
     JsonValue.Record
         [|
-            ("interval", JsonValue.Number ((decimal)interval))
+            ("interval", JsonValue.Number (decimal interval))
             ("allocation", JsonValue.Number (decimal cgp.allocation))
             ("payout", result)
         |]
@@ -251,3 +313,14 @@ let cgpHistoryEncoder chain (cgpList:(uint32 * CGP.T) list) =
     |> List.toArray
     |> JsonValue.Array
     |> omitNullFields
+
+
+let headerEncoder header =
+    new HeadersResponseJson.Root(
+        Hash.toString (Block.hash header),
+        header.timestamp |> int64,
+        Infrastructure.Timestamp.toString header.timestamp,
+        header.blockNumber |> int,
+        "0x" + header.difficulty.ToString("x"),
+        Difficulty.uncompress header.difficulty |> Hash.toString
+    )

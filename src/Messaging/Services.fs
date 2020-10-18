@@ -47,10 +47,13 @@ module Blockchain =
         | GetBlock of mainChain:bool * Hash
         | GetBlockByNumber of uint32
         | GetBlockHeader of Hash
+        | GetAllBlocks of from: int
+        | GetBlocks of blockNumber: int * take: int
         | GetActiveContracts
         | GetActiveContract of ContractId
         | GetBlockChainInfo
-        | GetHeaders
+        | GetAllHeaders
+        | GetHeaders of blockNumber: int * take: int
         | GetMempool
         | GetTransaction of Hash
         | CheckTransaction of TransactionExtended
@@ -110,6 +113,13 @@ module Blockchain =
         GetBlockTemplate pkHash
         |> Request.trySend<Request,Block> client serviceName
 
+    let getAllBlocks client from =
+        GetAllBlocks from
+        |> Request.send<Request,Map<Hash.Hash, byte array>> client serviceName 
+    
+    let getBlocks client take blockNumber  =
+        GetBlocks (blockNumber, take) |> Request.send<Request,List<uint32 * byte array>> client serviceName
+    
     let getBlockHeader client blockHash =
         Request.send<Request,BlockHeader option> client serviceName (GetBlockHeader blockHash)
 
@@ -143,8 +153,11 @@ module Blockchain =
     let handleHeaders client peerId headers =
         HandleHeaders (peerId,headers) |> Command.send client serviceName
 
-    let getHeaders client =
-        GetHeaders |> Request.send<Request, BlockHeader list> client serviceName
+    let getAllHeaders client =
+        GetAllHeaders |> Request.send<Request, BlockHeader list> client serviceName
+        
+    let getHeaders client take blockNumber  =
+        GetHeaders (blockNumber, take) |> Request.send<Request, BlockHeader list> client serviceName
 
     let getMempool client =
         GetMempool |> Request.send<Request, (Hash.Hash * Transaction) list> client serviceName
@@ -224,7 +237,7 @@ module Wallet =
         | GetBalance
         | ImportSeed of string list * password:string
         | Send of publish:bool*outputs:List<Lock * Spend> * password:string
-        | ActivateContract of publish:bool*string * uint32 * password:string
+        | ActivateContract of publish:bool* code:string * numberOfBlocks:uint32 * rlimit:uint32 option * password:string
         | ExtendContract of publish:bool*ContractId * uint32 * password:string
         | ExecuteContract of publish:bool*ContractId * string * data option * provideReturnAddress:bool * sign:string option * Map<Asset, uint64> * password:string
         | ExecuteCGP of publish:bool * password:string
@@ -245,6 +258,8 @@ module Wallet =
         | RawTransactionCreate of outputs:List<Hash * Spend>
         | RawTransactionSign of RawTransaction * password:string
         | GetKeys of password:string
+        | GetUtxo
+
         
     let serviceName = "wallet"
 
@@ -271,8 +286,8 @@ module Wallet =
     let createTransaction client publish outputs password =
         send<Transaction> client serviceName (Send (publish, outputs, password))
 
-    let activateContract client publish code numberOfBlocks password =
-        send<ActivateContractResponse> client serviceName (ActivateContract (publish, code, numberOfBlocks, password))
+    let activateContract client publish code numberOfBlocks rlimit password =
+        send<ActivateContractResponse> client serviceName (ActivateContract (publish, code, numberOfBlocks, rlimit, password))
 
     let extendContract client publish address numberOfBlocks password =
         send<Transaction> client serviceName (ExtendContract (publish, address, numberOfBlocks, password))
@@ -345,6 +360,9 @@ module Wallet =
 
     let getKeys client password =
         Request.send<Request, Result<Map<Crypto.PublicKey, string>,string>> client serviceName (GetKeys password)
+        
+    let getUtxo client =
+        Request.send<Request, Result<List<PointedOutput>,string>> client serviceName GetUtxo
 
 module AddressDB =
     open Wallet
@@ -364,6 +382,7 @@ module AddressDB =
         | GetTransactions of addresses:string list * skip: int * take: int
         | GetContractHistory of contractId : ContractId * skip: int * take: int
         | GetTransactionCount of addresses:string list * uint32
+        | GetContractAssets of asset: Asset
 
     let serviceName = "addressDB"
     let resyncAccount client =
@@ -391,3 +410,7 @@ module AddressDB =
     let getTransactionCount client args =
         GetTransactionCount args
         |> send<int> client
+        
+    let getContractAssets client args =
+        GetContractAssets args
+        |> send<option<string * Zen.Types.Data.data option>> client

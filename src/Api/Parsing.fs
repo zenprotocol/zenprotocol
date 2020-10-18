@@ -208,6 +208,12 @@ let parseContractExecuteFromTransactionJson chain json =
 let parseContractActivateJson json =
     try
         let json = ContractActivateRequestJson.Parse json
+        
+        let rlimit =
+            if json.Rlimit < (int TransactionCreator.Rlimit) then
+                None
+            else
+                Some (uint32 json.Rlimit)
 
         if String.length json.Code = 0 then
             Error "Contract code is empty"
@@ -216,7 +222,7 @@ let parseContractActivateJson json =
         else if json.NumberOfBlocks = 0 then
             Error "Number of blocks is zero"
         else
-            Ok (json.Code, uint32 json.NumberOfBlocks, json.Password)
+            Ok (json.Code, uint32 json.NumberOfBlocks, rlimit,  json.Password)
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
 
@@ -359,7 +365,27 @@ let parseTransactionsRequestJson query =
         | _ ->
             Error "Invalid values"
     | _ -> Error "Invalid values"
-
+    
+let parseHeadersRequestJson query defaultTip =
+    match Map.tryFind "take" query with
+    | Some take ->
+        let blockNumber =
+            Map.tryFind "blockNumber" query
+            |> Option.map System.Int32.TryParse
+            |> Option.filter fst
+            |> Option.map snd
+            |> Option.defaultValue defaultTip
+                
+        match System.Int32.TryParse take with
+        | (true,take) ->
+            if take < 0 then
+                Error "Invalid values"
+            else
+                Ok (blockNumber,take)
+        | _ ->
+            Error "Invalid values"
+    | None ->
+        Error "missing query data"
 let parseAddress json =
     try
         let address = AddressJson.Parse json
@@ -438,6 +464,17 @@ let parseTransactionCountJson chain json =
         let json = GetTransactionCountJson.Parse json
 
         checkAddresses chain json.Addresses
+    with _ as ex ->
+        Error ("Json invalid: " + ex.Message)
+        
+let parseAsset json =
+    try
+        let json = GetAssetsJson.Parse json
+
+        match Asset.fromString json.Asset with
+        | Some (Asset (c,hash)) when Hash.zero <> hash -> Ok (Asset(c,hash))
+        | _ -> Error "invalid asset"
+
     with _ as ex ->
         Error ("Json invalid: " + ex.Message)
 

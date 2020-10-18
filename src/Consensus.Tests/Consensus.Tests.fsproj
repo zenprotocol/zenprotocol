@@ -49,6 +49,7 @@
     <Compile Include="TestWallet.fs" />
     <Compile Include="Helper.fs" />
     <Compile Include="SignedWitnessTests.fs" />
+    <Compile Include="StepDefinitionsModules.fs" />
     <Compile Include="StepDefinitions.fs" />
     <Compile Include="TransactionHelpers.fs" />
     <Compile Include="TransactionNunitHelpers.fs" />
@@ -59,7 +60,7 @@
     <Compile Include="BlockHeaderTests.fs" />
     <Compile Include="DifficultyTests.fs" />
     <Compile Include="CryptoTests.fs" />
-    <Content Include="MerkleMountainRangeTests.fs" />
+    <Compile Include="MerkleMountainRangeTests.fs" />
     <Compile Include="MerkleTreeTests.fs" />
     <Compile Include="SparseMerkleTreeTests.fs" />
     <Compile Include="TransactionTests.fs" />
@@ -190,7 +191,7 @@
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
       <ItemGroup>
         <Reference Include="FsBech32">
-          <HintPath>..\..\packages\FsBech32\lib\net45\FsBech32.dll</HintPath>
+          <HintPath>..\..\packages\FsBech32\lib\net47\FsBech32.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>

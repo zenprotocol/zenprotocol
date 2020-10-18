@@ -51,6 +51,7 @@
     <Compile Include="TestingLib.fs" />
     <Compile Include="ContractTests.fs" />
     <Compile Include="AddressDBTests.fs" />
+    <Compile Include="SimpleApiTests.fs" />
     <Content Include="paket.references" />
   </ItemGroup>
   <ItemGroup>
@@ -166,7 +167,7 @@
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.7'">
       <ItemGroup>
         <Reference Include="FsBech32">
-          <HintPath>..\..\packages\FsBech32\lib\net45\FsBech32.dll</HintPath>
+          <HintPath>..\..\packages\FsBech32\lib\net47\FsBech32.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>

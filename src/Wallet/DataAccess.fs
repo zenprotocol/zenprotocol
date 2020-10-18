@@ -13,7 +13,7 @@ open Wallet.Serialization
 let private getBytes str = Encoding.UTF8.GetBytes (str : string)
 
 [<Literal>]
-let DbVersion = 1
+let DbVersion = 2
 
 type T = {
     outputs: Collection<Outpoint, Output>
@@ -37,12 +37,24 @@ let init databaseContext =
     let dbVersion = SingleValue.create databaseContext "dbVersion" Version.serialize Version.deserialize
 
     match SingleValue.tryGet dbVersion session with
-    | Some version when version <> DbVersion ->
-        failwithf "Wallet: wrong db version, expected %d but got %d" DbVersion version
     | None ->
         SingleValue.put dbVersion session DbVersion
-    | _ -> () // TODO: in the future we should have here db upgrade script
-
+    | Some version when version < DbVersion->
+        Collection.truncate outputs session
+        Collection.truncate addresses session
+        MultiCollection.truncate addressOutputs session
+        match SingleValue.tryGet account session with
+        | Some acc ->
+            {acc with blockHash = Hash.zero; blockNumber = 0ul}
+            |> SingleValue.put account session
+        | None ->
+            ()
+        
+        SingleValue.put dbVersion session DbVersion
+    | Some DbVersion ->
+        ()
+    | Some version ->
+        failwithf "Wallet: wrong db version expected %d but got %d" DbVersion version
     let t = {
         outputs = outputs
         addresses = addresses

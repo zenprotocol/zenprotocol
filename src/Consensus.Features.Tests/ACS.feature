@@ -83,6 +83,47 @@ Feature: Active Contract Set
     And validating block bkMain containing txMainOfContract extending tip
     Then tip should be bkMain
 
+  Scenario: Complex reorgs
+
+    Given genesisTx locks 10 Zen to key1
+    And genesisTx locks 10 Zen to key2
+    And genesisTx locks 10 Zen to key2
+    And genesisTx locks 10 Zen to key3
+    And genesisTx locks 10 Zen to key4
+    And genesis has genesisTx
+    
+    And activationTx has the input genesisTx index 0
+    And activationTx activates c1 for 1000 blocks
+    And activationTx locks change Zen to activationTxChangeKey
+    When signing activationTx with key1
+    And validating block b1 containing activationTx extending tip
+    Then c1 should be active for 999 blocks
+
+    Given txMain locks 10 Zen to mainKey3
+    And txMain has the input genesisTx index 1
+    When executing c1 on txMain returning txMainOfContract
+    And signing txMainOfContract with key2
+    And validating block bkMain containing txMainOfContract extending b1
+    
+    Given txMainBis locks 10 Zen to mainBisKey3
+    And txMainBis has the input genesisTx index 2 
+    When executing c1 on txMainBis returning txMainBisOfContract
+    And signing txMainBisOfContract with key2
+
+    Given tx2 has the input txMainBisOfContract index 0
+    And tx2 locks 10 Zen to tx2_key1
+    When signing tx2 with mainBisKey3
+
+    When validating block mainChainBlock containing txMainOfContract,txMainBisOfContract,tx2 extending b1
+    
+    Given tx3 has the input genesisTx index 4
+    And tx3 locks 10 Zen to tx3_key1
+    When signing tx3 with key4
+
+    And validating block mainTip containing tx3 extending mainChainBlock
+
+    Then tip should be mainTip
+
   Scenario: A contract becomes deactivated on a reorg
     Given genesisTx locks 10 Zen to key1
     And genesis has genesisTx

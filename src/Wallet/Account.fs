@@ -252,12 +252,23 @@ let getBalance dataAccess session view confirmations =
     |> List.filter (fun output -> Set.contains output.pkHash spendableAddresses && output.status = Unspent)
     |> foldToBalance
 
-let getUnspentOutputs dataAccess session view confirmations =
-    let account = DataAccess.Account.get dataAccess session
-
+let private getAccountUtxo dataAccess session view confirmations account =
     View.Outputs.getAll view dataAccess session
     |> List.filter (fun output -> match output.status with | Unspent _-> true | _ -> false)
     |> List.filter (filterOutputByConfirmations account confirmations)
+
+let getUtxo dataAccess session view =
+    result {
+    let account = DataAccess.Account.get dataAccess session
+
+    return getAccountUtxo dataAccess session view 0ul account
+           |> List.map (fun output -> Types.PointedOutput (output.outpoint, {spend=output.spend; lock=output.lock})) 
+    }
+
+let getUnspentOutputs dataAccess session view confirmations =
+    let account = DataAccess.Account.get dataAccess session
+
+    getAccountUtxo dataAccess session view confirmations account
     |> List.map (fun output -> output.outpoint,{lock=output.lock;spend=output.spend})
 
 let addBlock dataAccess session blockHash block =
@@ -317,6 +328,10 @@ let addBlock dataAccess session blockHash block =
 
     {account with blockNumber = block.header.blockNumber; blockHash = blockHash}
     |> DataAccess.Account.put dataAccess session
+    eventX "Wallet adding block #{blockNumber} of block {blockHash}"
+    >> setField "blockNumber" block.header.blockNumber
+    >> setField "blockHash"   blockHash.AsString
+    |> Log.debug
 
 let undoBlock dataAccess session blockHash block =
     let account = DataAccess.Account.get dataAccess session
@@ -360,39 +375,51 @@ let undoBlock dataAccess session blockHash block =
 
     {account with blockNumber = block.header.blockNumber - 1ul; blockHash = block.header.parent}
     |> DataAccess.Account.put dataAccess session
+    eventX "Wallet remove block #{blockNumber} of block {blockHash}"
+    >> setField "blockNumber" block.header.blockNumber
+    >> setField "blockHash"   blockHash.AsString
+    |> Log.debug
 
-type private SyncAction =
-    | Undo of Block * Hash
-    | Add of Block * Hash
+type Action =
+    | UndoBlock
+    | AddBlock
 
-let sync dataAccess session tipBlockHash (tipHeader:BlockHeader) (getHeader:Hash -> BlockHeader) (getBlock:Hash -> Block) =
+type SyncAction = Action * Block * Hash
+
+let sync dataAccess session tipBlockHash (tipHeader:BlockHeader) (headers: Map<Hash.Hash,Block>) =
     let account = DataAccess.Account.get dataAccess session
-
     // Find the fork block of the account and the blockchain, logging actions
     // to perform. Undo each block in the account's chain but not the blockchain,
     // and add each block in the blockchain but not the account's chain.
+    let getBlock hash = headers |> Map.find hash
+
     let rec locate ((x,i),(y,j)) acc =
 
         if x = y && i = j then acc
         elif i > j
         then
-            locate (((getHeader x).parent, i-1ul), (y,j)) (Add (getBlock x, x) :: acc)
+            locate (((getBlock x).header.parent, i-1ul), (y,j))
+                ((AddBlock, getBlock x, x) :: acc)
         elif i < j
         then
-            locate ((x,i), ((getHeader y).parent, j-1ul)) (Undo (getBlock y, y) :: acc)
+            locate ((x,i), ((getBlock y).header.parent, j-1ul))
+                ((UndoBlock, getBlock y, y) :: acc)
         else
-            locate (((getHeader x).parent, i-1ul), ((getHeader y).parent, j-1ul)) (Add (getBlock x, x) :: Undo (getBlock y,y) :: acc)
+            locate (((getBlock x).header.parent, i-1ul), ((getBlock y).header.parent, j-1ul))
+                ((AddBlock, getBlock x, x) :: (UndoBlock, getBlock y, y) :: acc)
 
-    let actions = locate ((tipBlockHash, tipHeader.blockNumber), (account.blockHash, account.blockNumber)) []
+    let actions = locate ((tipBlockHash, tipHeader.blockNumber),
+                          (account.blockHash, account.blockNumber)) []
 
-    let toUndo, toAdd = List.partition (function | Undo _ -> true | _ -> false) actions
+    let toUndo, toAdd = List.partition (function | UndoBlock, _, _ -> true | _ -> false) actions
     let toUndo = List.rev toUndo     // Blocks to be undo were found backwards.
     let sortedActions = toUndo @ toAdd
 
     sortedActions
     |> List.iter (function
-        | Undo (block,hash) -> undoBlock dataAccess session hash block
-        | Add (block,hash) -> addBlock dataAccess session hash block)
+        | UndoBlock, block,hash -> undoBlock dataAccess session hash block
+        | AddBlock, block,hash -> addBlock dataAccess session hash block
+        )
 
 let delete dataAccess session =
     DataAccess.Outputs.truncate dataAccess session

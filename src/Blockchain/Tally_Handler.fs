@@ -529,8 +529,8 @@ let updateTallyBlockFromHeaders op env utxoSet headers =
                 BlockRepository.getFullBlock env.session header
             match op with
             | Add ->
-                addBlock env.session env.chainParams utxoSet block
                 utxoSet <- updateUtxo env.session block utxoSet
+                addBlock env.session env.chainParams utxoSet block
 
             | Remove ->
                 utxoSet <- updateUtxo env.session block utxoSet

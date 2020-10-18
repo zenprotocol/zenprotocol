@@ -14,7 +14,7 @@ open Zen.Types.Data
 let private getBytes str = Encoding.UTF8.GetBytes (str : string)
 
 [<Literal>]
-let DbVersion = 2
+let DbVersion = 3
 
 type T = {
     outpointOutputs: Collection<Outpoint, DBOutput>
@@ -22,6 +22,7 @@ type T = {
     contractHistory: MultiCollection<ContractId, WitnessPoint>
     contractData: Collection<WitnessPoint, string * data option>
     contractConfirmations: Collection<WitnessPoint, Wallet.Types.ConfirmationStatus>
+    contractAssets: Collection<Asset, string * data option>
     tip: SingleValue<Tip>
     dbVersion: SingleValue<int>
 }
@@ -40,26 +41,28 @@ let init databaseContext =
     let contractData = Collection.create session "contracData" WitnessPoint.serialize ContractData.serialize ContractData.deserialize
     let contractHistory = MultiCollection.create session "contractHistory" Serialization.ContractId.serialize WitnessPoint.serialize WitnessPoint.deserialize
     let contractConfirmations = Collection.create session "contractConfirmations" WitnessPoint.serialize ConfirmationStatus.serialize ConfirmationStatus.deserialize
+    let contractAssets = Collection.create session "contractAssets" Asset.serialize ContractData.serialize ContractData.deserialize
     let tip = SingleValue.create databaseContext "blockchain" Tip.serialize Tip.deserialize
     let dbVersion = SingleValue.create databaseContext "dbVersion" Version.serialize Version.deserialize
 
     match SingleValue.tryGet dbVersion session with
     | None ->
-            SingleValue.put dbVersion session DbVersion
-    | Some 1 ->
-        Platform.cleanDirectory "addressDB"      
         SingleValue.put dbVersion session DbVersion
-    | Some DbVersion -> 
+    | Some version when version < DbVersion->
+        Platform.cleanDirectory "addressDB"
+        SingleValue.put dbVersion session DbVersion
+    | Some DbVersion ->
         ()
-    | Some version ->  
+    | Some version ->
         failwithf "AddressDB: wrong db version, expected %d but got %d" DbVersion version
-        
+
     let t = {
         outpointOutputs = outpointOutputs
         addressOutpoints = addressOutpoints
         contractHistory = contractHistory
         contractData = contractData
         contractConfirmations = contractConfirmations
+        contractAssets = contractAssets
         tip = tip
         dbVersion = dbVersion
     }
@@ -101,6 +104,14 @@ module ContractData =
     let put t = Collection.put t.contractData
     let delete t = Collection.delete t.contractData
     let truncate t = Collection.truncate t.contractData
+
+module ContractAssets =
+    let get t = Collection.get t.contractAssets
+    let tryGet t = Collection.tryGet t.contractAssets
+    let put t = Collection.put t.contractAssets
+    let delete t = Collection.delete t.contractAssets
+    let truncate t = Collection.truncate t.contractAssets
+
 
 module ContractHistory =
     let get t = MultiCollection.get t.contractHistory

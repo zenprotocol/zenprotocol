@@ -108,7 +108,7 @@ let createWalletWithChange (outputs : List<Output>) : Contract.ContractWallet =
     |> List.map ( fun (p, out) -> (p, { out with spend = { out.spend with amount = out.spend.amount * 2UL } }) )
 
 let compile code = lazy (result {
-    let! hints = Contract.recordHints code
+    let! hints = Contract.recordHints 2723280u code
     let! queries = Infrastructure.ZFStar.totalQueries hints
 
     let contract = {

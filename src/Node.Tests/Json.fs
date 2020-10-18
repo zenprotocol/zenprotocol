@@ -18,10 +18,11 @@ let importSeedJson password mnemonicPhrase =
         mnemonicPhrase
     )).JsonValue
 
-let contractActivateRequestJson code blocks password =
+let contractActivateRequestJson code blocks rlimit password =
     (new ContractActivateRequestJson.Root(
         code, 
-        blocks, 
+        blocks,
+        rlimit,
         password
     )).JsonValue
 

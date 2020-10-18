@@ -28,7 +28,7 @@ let getUTXO _ = UtxoSet.NoOutput
 let getContractState _ = None
 
 let compile code = lazy (result {
-    let! hints = Contract.recordHints code
+    let! hints = Contract.recordHints 2723280u code
     let! queries = Infrastructure.ZFStar.totalQueries hints
 
     let contract = {

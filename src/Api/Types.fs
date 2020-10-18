@@ -57,6 +57,7 @@ type SendRequestJson = JsonProvider<"""
 type ContractActivateRequestJson = JsonProvider<"""
 {
     "code": "string",
+    "rlimit": 2723280,
     "numberOfBlocks": 1,
     "password": "password"
 }
@@ -339,6 +340,11 @@ type GetOutputsJson = JsonProvider<"""
 }""">
 
 type GetTransactionCountJson = GetBalanceJson
+
+type GetAssetsJson = JsonProvider<"""
+{
+    "asset": "asset"
+}""">
 
 type ContractExecuteFromTransactionJson = JsonProvider<"""
 {

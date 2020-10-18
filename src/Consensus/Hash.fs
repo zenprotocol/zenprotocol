@@ -11,6 +11,7 @@ let Length = 32
 type Hash = Hash of byte[] with
     override x.ToString() =
         let (Hash bytes) = x
+        
         Base16.encode bytes
     member x.AsString = x.ToString()
 

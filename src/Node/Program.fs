@@ -134,6 +134,8 @@ let main argv =
     else 
         config.Load("main.yaml")
 
+    chain <- getChain config
+
     List.iter (fun arg ->
         match arg with
 #if DEBUG
@@ -181,9 +183,13 @@ let main argv =
             ()
     ) (results.GetAllResults())
 
-    let chain = getChain config
     let chainParams = Chain.getChainParameters chain
     let dataPath = Platform.combine config.dataPath config.chain
+    
+    eventX "DB is stored at: {dataPath}"
+    >> setField "dataPath" (Platform.getAbsolutePath dataPath)
+    |> Log.info
+    
     let seeds =
         config.seeds
         |> Seq.choose (Endpoint.parseIp config.bind)

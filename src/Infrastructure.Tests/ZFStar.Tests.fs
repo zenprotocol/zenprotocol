@@ -65,7 +65,7 @@ let getModuleName (code : string) =
 
 let compile fstCode =
     let moduleName = getModuleName fstCode
-    ZFStar.recordHints fstCode moduleName
+    ZFStar.recordHints 2723280u fstCode moduleName
     |> Result.bind (fun hints -> ZFStar.compile assemblyDirectory fstCode hints rlimit moduleName)
     |> Result.bind (fun _ -> ZFStar.load assemblyDirectory moduleName)
 
@@ -86,21 +86,21 @@ let fstCode = """
         |> C.ret
     """
 
-[<Test>][<Parallelizable>]
+[<Test>]
 let ``Should record hints``() =
-    ZFStar.recordHints fstCode (getModuleName fstCode)
+    ZFStar.recordHints 2723280u fstCode (getModuleName fstCode)
     |> Result.map (fun _ -> ())
     |> shouldBeOk ()
 
-[<Test>][<Parallelizable>]
+[<Test>]
 let ``Should compile``() =
     compile fstCode
     |> Result.map (fun _ -> ())
     |> shouldBeOk ()
 
-[<Test>][<Parallelizable>]
+[<Test>]
 let ``Should get some metrics from hints module``() =
-    ZFStar.recordHints fstCode (getModuleName fstCode)
+    ZFStar.recordHints 2723280u fstCode (getModuleName fstCode)
     |> Result.bind (ZFStar.calculateMetrics)
     |> Result.map (fun (maxFuel, maxIFuel) -> maxFuel > 0 && maxIFuel > 0)
     |> shouldBeOk true

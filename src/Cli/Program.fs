@@ -19,7 +19,7 @@ type SendArgs =
         member arg.Usage = ""
 
 type ActivateContractArgs =
-    | [<MainCommand("COMMAND");ExactlyOnce>] ActivateContract_Arguments of file:string * numberOfBlocks:int
+    | [<MainCommand("COMMAND");ExactlyOnce>] ActivateContract_Arguments of file:string * numberOfBlocks:int * rlimit:int
     interface IArgParserTemplate with
         member arg.Usage = ""
 
@@ -234,7 +234,7 @@ let main argv =
             import getUri words pass
             |> printResponse
         | Some (Activate args) ->
-            let file, numberOfBlocks = args.GetResult <@ ActivateContract_Arguments @>
+            let file, numberOfBlocks, rlimit = args.GetResult <@ ActivateContract_Arguments @>
             let password = readPassword()
             match File.Exists file with
             | false ->
@@ -242,7 +242,7 @@ let main argv =
             | true ->
                 let code = File.ReadAllText file
                 let result =
-                    activateContract getUri code numberOfBlocks password
+                    activateContract getUri code numberOfBlocks rlimit password
                     |> ContractActivateResponseJson.Parse
 
                 printfn "Contract activated.\nAddress: %s\nContract Id: %s" result.Address result.ContractId

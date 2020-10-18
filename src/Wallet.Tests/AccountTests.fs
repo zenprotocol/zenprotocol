@@ -322,7 +322,6 @@ let ``account sync up``() =
         difficulty = 0ul
         nonce = 0UL,0UL
     }
-    let startBlockHash = Block.hash startBlockHeader
 
     let account = DataAccess.Account.get dataAccess session
 
@@ -353,14 +352,9 @@ let ``account sync up``() =
 
     let blockHash = Block.hash block.header
 
-    Account.sync dataAccess session blockHash block.header (fun hash ->
-        if hash = startBlockHash then
-            startBlockHeader
-        elif hash = blockHash then
-            header
-        else
-            failwithf "invalid block %A" hash
-        ) (fun _ -> block)
+    let blocksMap = Map.add blockHash block Map.empty
+    
+    Account.sync dataAccess session blockHash block.header blocksMap
 
     let account = DataAccess.Account.get dataAccess session
 
@@ -395,20 +389,15 @@ let ``sync up from empty wallet``() =
 
     let blockHash = Block.hash block.header
 
+    let mutable blocksMap = Map.add blockHash block Map.empty
+    
     let genesisBlock = Block.createGenesis chainParams [Transaction.toExtended rootTx] (0UL,0UL)
     let genesisHeader = genesisBlock.header
+    let genesisHash = Block.hash genesisHeader
 
-    let getHeader = function
-    | h when h = localGenesisHash -> genesisHeader
-    | h when h = blockHash -> header
-    | h -> failwithf "unexpected block hash %A" h
+    blocksMap <- Map.add genesisHash genesisBlock blocksMap
 
-    let getBlock = function
-    | h when h = localGenesisHash -> genesisBlock
-    | h when h = blockHash -> block
-    | h -> failwithf "unexpected block hash %A" h
-
-    Account.sync dataAccess session blockHash header getHeader getBlock
+    Account.sync dataAccess session blockHash header blocksMap
 
     let account = DataAccess.Account.get dataAccess session
 
@@ -431,6 +420,8 @@ let ``account reorg``() =
         nonce = 0UL,0UL
     }
 
+    let mutable blockMaps = Map.empty 
+
     let startHash = Block.hash startBlockHeader
 
     let account = DataAccess.Account.get dataAccess session
@@ -440,7 +431,6 @@ let ``account reorg``() =
 
     let output = {lock = PK accountPKHash; spend={asset=Asset.Zen;amount=10UL}}
     let tx = {version=Version0;inputs=[];outputs=[output];witnesses=[];contract=None}
-    let txHash = Transaction.hash tx
 
     let header = {
         version = 0ul
@@ -462,6 +452,8 @@ let ``account reorg``() =
     }
 
     let blockHash = Block.hash block.header
+    
+    blockMaps <- Map.add blockHash block blockMaps
 
     let header2 = {
        version = 0ul
@@ -484,25 +476,14 @@ let ``account reorg``() =
 
     let blockHash2 = Block.hash block2.header
 
-    let getHeader = function
-    | h when h = startHash -> startBlockHeader
-    | h when h = blockHash -> header
-    | h when h = blockHash2 -> header2
-    | bh -> failwithf "unexpected %A" bh
-
-    let getBlock = function
-    | h when h = startHash -> failwithf "Unexpected deref of start block"
-    | h when h = blockHash -> block
-    | h when h = blockHash2 -> block2
-    | bh -> failwithf "unexpected %A" bh
-
-    Account.sync dataAccess session blockHash header getHeader getBlock
+    Account.sync dataAccess session blockHash header blockMaps
     let account = DataAccess.Account.get dataAccess session
 
     account.blockHash |> should equal blockHash
     account.blockNumber |> should equal header.blockNumber
 
-    Account.sync dataAccess session blockHash2 header2 getHeader getBlock
+    blockMaps <- Map.add blockHash2 block2 blockMaps
+    Account.sync dataAccess session blockHash2 header2 blockMaps
     let account = DataAccess.Account.get dataAccess session
 
     account.blockHash |> should equal blockHash2
@@ -626,20 +607,15 @@ let ``Should get expected history``() =
 
     let blockHash = Block.hash block.header
 
+    let mutable blocksMap = Map.add blockHash block Map.empty
+    
     let genesisBlock = Block.createGenesis chainParams [Transaction.toExtended rootTx] (0UL,0UL)
     let genesisHeader = genesisBlock.header
+    let genesisHash = Block.hash genesisHeader
 
-    let getHeader = function
-    | h when h = localGenesisHash -> genesisHeader
-    | h when h = blockHash -> header
-    | h -> failwithf "unexpected block hash %A" h
+    blocksMap <- Map.add genesisHash genesisBlock blocksMap
 
-    let getBlock = function
-    | h when h = localGenesisHash -> genesisBlock
-    | h when h = blockHash -> block
-    | h -> failwithf "unexpected block hash %A" h
-
-    Account.sync dataAccess session blockHash header getHeader getBlock
+    Account.sync dataAccess session blockHash header blocksMap
 
     let tx2Hash = Transaction.hash tx2
     let output3A = {lock = PK Hash.zero; spend={asset=Asset.Zen;amount=3UL}}

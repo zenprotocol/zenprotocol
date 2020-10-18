@@ -182,11 +182,11 @@ let compile (contractsPath:string)
     |> ZFStar.compile contractsPath contract.code hints contract.rlimit
     |> Result.map (fun _ -> ContractId (Version0,hash))
 
-let recordHints (code:string) : Result<string, string> =
+let recordHints rlimit (code:string) : Result<string, string> =
     code
     |> computeHash Version0
     |> getModuleName
-    |> ZFStar.recordHints code
+    |> ZFStar.recordHints rlimit code
 
 let getCost contract = contract.costFn
 

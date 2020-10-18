@@ -1,8 +1,19 @@
 module Consensus.MerkleTree
-
+let private log2 x =
+    log x / log 2.0
+    
 let private findSplitIndex length =
-    Seq.initInfinite (fun i -> pown 2 i)
-    |> Seq.find (fun i -> i * 2 >= length)
+    /// 2 ^ ( ceil(log2(x)) - 1)  
+    if length = 1 then
+        1
+    else
+        length
+        |> float
+        |> log2
+        |> ceil
+        |> fun x -> x - 1.0
+        |> int
+        |> fun x -> 1 <<< x 
 
 let innerPrefix = [|105uy|] // 'i'
 

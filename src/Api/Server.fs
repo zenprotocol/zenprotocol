@@ -174,25 +174,31 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
 
         reply StatusCode.OK (JsonContent (JsonValue.Number (count |> decimal)))
 
-    | Get ("/blockchain/headers", _) ->
-        let headers = Blockchain.getHeaders client
-
-        let json =
-            headers
-            |> List.map (fun header ->
-                let hash = Block.hash header
-                new HeadersResponseJson.Root(
-                                                Hash.toString hash, header.timestamp |> int64,
-                                                Timestamp.toString header.timestamp,
-                                                header.blockNumber |> int,
-                                                "0x" + header.difficulty.ToString("x"),
-                                                Difficulty.uncompress header.difficulty |> Hash.toString
-                                                ))
+    | Get("/blockchain/headers", query) ->
+        let tip =
+                Blockchain.getTip client
+                |> Option.map snd
+                |> Option.map (fun x -> x.blockNumber)
+                |> Option.defaultValue 0ul
+                |> int
+        match parseHeadersRequestJson query tip with
+        | Ok (blockNumber, take)->
+            tip - blockNumber
+            |> Blockchain.getHeaders client take
+            |> List.map headerEncoder
+            |> List.map (fun json -> json.JsonValue)
+            |> List.toArray
+            |> JsonValue.Array 
+            |> JsonContent
+            |> reply StatusCode.OK
+        | Error _ ->
+            Blockchain.getAllHeaders client
+            |> List.map headerEncoder
             |> List.map (fun json -> json.JsonValue)
             |> List.toArray
             |> JsonValue.Array
-
-        reply StatusCode.OK (JsonContent json)
+            |> JsonContent
+            |> reply StatusCode.OK
 
     | Get ("/blockchain/info", _) ->
         match Blockchain.tryGetBlockChainInfo client with
@@ -443,8 +449,8 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
     | Post ("/wallet/contract/activate", Some body) ->
         match parseContractActivateJson body with
         | Error error -> replyError error
-        | Ok (code, numberOfBlocks, password) ->
-            match Wallet.activateContract client true code numberOfBlocks password with
+        | Ok (code, numberOfBlocks, rlimit, password) ->
+            match Wallet.activateContract client true code numberOfBlocks rlimit password with
             | Ok (tx, contractId) ->
                 let address =
                     Address.Contract contractId
@@ -570,7 +576,7 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
                           TextContent (sprintf "block not found")
                           |> reply StatusCode.NotFound
                       | Some block ->
-                          reply StatusCode.OK (JsonContent <| blockEncoder chain (Block.hash block.header) block)
+                          reply StatusCode.OK (JsonContent <| blockEncoder chain block)
               | None ->
                   TextContent (sprintf "hash or blockNumber are missing")
                   |> reply StatusCode.BadRequest
@@ -586,7 +592,28 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
                     TextContent (sprintf "block not found")
                     |> reply StatusCode.NotFound
                 | Some block ->
-                    reply StatusCode.OK (JsonContent <| blockEncoder chain hash block)
+                    reply StatusCode.OK (JsonContent <| blockEncoder chain block)
+                    
+    | Get ("/blockchain/blocks", query) ->
+        let blockNumber, take =
+            let tip =
+                Blockchain.getTip client
+                |> Option.map snd
+                |> Option.map (fun x -> x.blockNumber)
+                |> Option.defaultValue 0ul
+                |> int
+                
+            parseHeadersRequestJson query tip
+            |> Option.ofResult
+            |> Option.map (fun (blockNumber, take) -> (tip - blockNumber, take))
+            |> Option.defaultValue (0, tip)
+            
+        Blockchain.getBlocks client take blockNumber
+        |> List.map blockRawEncoder
+        |> List.toArray
+        |> JsonValue.Array 
+        |> JsonContent
+        |> reply StatusCode.OK
 
     | Get ("/blockchain/transaction", query) ->
         match Map.tryFind "hash" query with
@@ -663,6 +690,17 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
 
         parseConfirmations query reply get
 
+    | Get ("/wallet/utxo", _) ->
+        match Wallet.getUtxo client with
+        | Ok pointedOutputs ->
+            pointedOutputs
+            |> Seq.map (pointedOutputEncoder chain)
+            |> Seq.toArray
+            |> JsonValue.Array
+            |> JsonContent
+            |> reply StatusCode.OK
+        | Error error ->
+            replyError error
     | Get ("/wallet/addressoutputs",query) ->
         match Map.tryFind "address" query with
         | Some address ->
@@ -808,22 +846,22 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
         |> JsonContent
         |> reply StatusCode.OK
     | Get("/blockchain/candidates", query) ->
-        let tipInterval =
-            Blockchain.getTip client
-            |> Option.map (fun (_,h)-> h.blockNumber)
-            |> Option.defaultValue 0ul
-            |> CGP.getInterval ((Chain.getChainParameters chain))
-        let interval =
-            Map.tryFind "interval" query
-            |> Option.map (fun x -> uint32 x)
-            |> Option.defaultValue tipInterval
-        Blockchain.getCandidates client interval
+        query
+        |> Map.tryFind "interval"
+        |> Option.map uint32
+        |> Option.defaultValue (
+                Blockchain.getTip client
+                |> Option.map (fun (_,h)-> h.blockNumber)
+                |> Option.defaultValue 0ul
+                |> CGP.getInterval (getChainParameters chain)
+        )
+        |> Blockchain.getCandidates client
         |> List.map (payoutEncoder chain)
         |> List.toArray
         |> JsonValue.Array
         |> JsonContent
         |> reply StatusCode.OK
-        | Post("/addressdb/transactioncount", Some json) ->
+    | Post("/addressdb/transactioncount", Some json) ->
             match parseTransactionCountJson chain json with
             | Error error -> replyError error
             | Ok address ->
@@ -839,6 +877,36 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
                     | Error error -> replyError error
                 | None ->
                 replyError "No tip"
+     | Post("/addressdb/contract/mint", Some json) ->
+            match parseAsset json with
+            | Error error ->
+                replyError error
+            | Ok address ->
+                match AddressDB.getContractAssets client address with
+                | Ok (Some (command, messageBody)) ->
+                    [|
+                        
+                        "command",
+                            command
+                            |> JsonValue.String
+                        "messageBody",
+                            messageBody
+                            |> Option.map (dataEncoder chain)
+                            |> Option.defaultValue JsonValue.Null
+                        "messageBodyRaw",
+                            messageBody
+                            |> Option.map Serialization.Data.serialize
+                            |> Option.map Base16.encode
+                            |> Option.defaultValue ""
+                            |> JsonValue.String
+                    |]
+                    |> JsonValue.Record
+                    |> JsonContent
+                    |> reply StatusCode.OK
+                | Ok None ->
+                    replyError "No data"
+                | Error error ->
+                    replyError error
     | Post("/addressdb/contract/history", Some json) ->
         parseGetContractHistoryJson json
         >>= AddressDB.getContractHistory client

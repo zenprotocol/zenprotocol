@@ -189,7 +189,8 @@ let invalid timestamp blockHash ibd = effectsWriter {
     | DownloadingBlocks (syncing, downloading, _) ->
 
         if List.exists (fst >> (=) blockHash) downloading.inprogress then
-            eventX "Invalid block. Disconnect node and restart Initial Block Download"
+            eventX "Invalid block: {blockHash} Disconnect node and restart Initial Block Download"
+            >> setField "blockHash" blockHash.AsString
             |> Log.info
 
             // we cancel the IBD and re-ask for a tip

@@ -151,3 +151,14 @@ let cleanDirectory path =
     removeDirectory path
 
     Directory.CreateDirectory path |> ignore
+
+
+let getAbsolutePath (dataPath: string) =
+
+    if dataPath.StartsWith "./" then dataPath.Substring(2)
+    else dataPath
+    |> combine System.Environment.CurrentDirectory
+
+let moveDirectory sourcePath destPath =
+    if Directory.Exists sourcePath then
+        Directory.Move(sourcePath,destPath)

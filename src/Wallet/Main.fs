@@ -14,8 +14,6 @@ open Result
 open System
 open Logary.Message
 open Wallet
-open Wallet
-open Wallet
 
 type AccountStatus =
     | Exist of View.T
@@ -47,7 +45,15 @@ let eventHandler client event dataAccess session accountStatus =
 let private sync dataAccess session client =
     match Blockchain.getTip client with
     | Some (tipBlockHash,tipHeader) ->
-        Account.sync dataAccess session tipBlockHash tipHeader (Blockchain.getBlockHeader client >> Option.get) (Blockchain.getBlock client false >> Option.get)
+        let account = 
+            Account.tryGet dataAccess session
+            |> Option.map (fun x -> x.blockNumber)
+            |> Option.defaultValue 0ul
+
+        if tipHeader.blockNumber <> account then 
+            Blockchain.getAllBlocks client (int account)
+            |> Map.map (fun _ b -> Serialization.Block.deserialize b |> Option.get) //this is sent over the messaging bus so we can be sure about the existences
+            |> Account.sync dataAccess session tipBlockHash tipHeader
 
         eventX "Account synced to block #{blockNumber} {blockHash}"
         >> setField "blockNumber" tipHeader.blockNumber
@@ -249,7 +255,10 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             error
             |> reply<Map<PublicKey, string>> requestId
             NoAccount
-
+        | GetUtxo _ ->
+            error
+            |> reply<Map<PublicKey, string>> requestId
+            NoAccount
     | Exist view ->
         let chainParams = Consensus.Chain.getChainParameters chain
         match request with
@@ -310,9 +319,9 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
 
             reply<RawTransaction> requestId raw
             accountStatus
-        | ActivateContract (publish, code, numberOfBlocks, password) ->
+        | ActivateContract (publish, code, numberOfBlocks, rlimit, password) ->
                 let tx =
-                    TransactionCreator.createActivateContractTransaction chainParams dataAccess session view chainParams password code numberOfBlocks
+                    TransactionCreator.createActivateContractTransaction chainParams dataAccess session view password code numberOfBlocks rlimit
                     <@> fun tx -> tx, Consensus.Contract.makeContractId Version0 code
                 reply<ActivateContractResponse> requestId tx
                 publishTx dataAccess session client view publish (Result.map fst tx)
@@ -417,6 +426,11 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
         | GetKeys password ->
             Account.getKeys dataAccess session password
             |> reply<Map<PublicKey, string>> requestId
+
+            accountStatus
+        | GetUtxo ->
+            Account.getUtxo dataAccess session view
+            |> reply<List<PointedOutput>> requestId
 
             accountStatus
 
