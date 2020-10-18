@@ -41,7 +41,6 @@ let init databaseContext =
         SingleValue.put dbVersion session DbVersion
     | Some version when version < DbVersion->
         Collection.truncate outputs session
-        Collection.truncate addresses session
         MultiCollection.truncate addressOutputs session
         match SingleValue.tryGet account session with
         | Some acc ->
