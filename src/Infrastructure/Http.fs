@@ -102,6 +102,11 @@ module Server =
                     let context = listener.GetContext()
 
                     let path = removePostfixSlash context.Request.Url.AbsolutePath
+                    
+                    context.Response.AddHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+                    context.Response.AddHeader("Access-Control-Allow-Methods", "GET, POST");
+                    context.Response.AddHeader("Access-Control-Max-Age", "1728000");
+                    context.Response.AppendHeader("Access-Control-Allow-Origin", "*");
 
                     let reply = writeResponse context.Response
 
@@ -123,6 +128,9 @@ module Server =
                                 (Post(path, body), reply)
                         | Error error ->
                             writeTextResponse context.Response StatusCode.UnsupportedMediaType error
+                    | "OPTIONS" ->
+                            writeEmptyResponse context.Response StatusCode.Accepted
+                        
                     | _ ->
                             writeEmptyResponse context.Response StatusCode.MethodNotAllowed
                 with
