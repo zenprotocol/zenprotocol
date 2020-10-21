@@ -3,6 +3,7 @@ module Cli.Request
 open FSharp.Data
 open Api.Types
 open Util
+open Consensus
 
 
 module Request =
@@ -158,7 +159,7 @@ module Load =
              difficulty = (float json.Difficulty)
              medianTime = (uint64 json.MedianTime)
              initialBlockDownload = json.InitialBlockDownload
-             tipBlockHash = (Consensus.Hash.fromString json.Tip |> Infrastructure.Result.get)
+             tipBlockHash = (Hash.fromString json.Tip |> Option.get)
             }
             
     let activeContracts (getUri : string -> string) =

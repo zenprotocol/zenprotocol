@@ -50,10 +50,8 @@ let toString (h:Hash) =
     h.ToString()
 
 let fromString encoded =
-    match Base16.decode encoded with
-    | Some decoded when Array.length decoded = Length
-        -> Hash decoded |> Ok
-    | _ -> Error "Could not decode hash"
+    Base16.decode encoded
+    |> Option.bind fromBytes
 
 let isValid (Hash hash) =
     Array.length hash = Length

@@ -37,6 +37,9 @@
     <OtherFlags>--warnon:1182</OtherFlags>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="FsBech32, Version=0.1.0.0, Culture=neutral, PublicKeyToken=null">
+      <HintPath>..\..\packages\FsBech32\lib\net47\FsBech32.dll</HintPath>
+    </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="System" />
     <Reference Include="System.Core" />

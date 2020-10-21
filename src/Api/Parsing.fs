@@ -20,11 +20,6 @@ let private getSpend asset amount =
     | Some asset -> Ok { asset = asset; amount = uint64 amount }
     | None -> Error "invalid asset"
 
-let private getOutpoint txHash index =
-    Hash.fromString txHash
-    |> Result.mapError (fun _ -> "invalid txHash")
-    <@> fun txHash -> { txHash = txHash; index = index }
-
 let parseSendJson chain json =
     try
         let json = SendRequestJson.Parse json
@@ -325,9 +320,9 @@ let parseSignJson json =
             Error "Password is empty"
         else
             match Hash.fromString json.Message with
-            | Ok message ->
+            | Some message ->
                 Ok (message, json.Path, json.Password)
-            | _ -> Error "invalid message"
+            | None -> Error "invalid message"
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
 

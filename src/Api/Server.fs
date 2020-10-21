@@ -583,10 +583,10 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
 
         | Some h ->
             match Hash.fromString h with
-            | Error _ ->
+            | None ->
                 TextContent (sprintf "couldn't decode hash")
                 |> reply StatusCode.BadRequest
-            | Ok hash ->
+            | Some hash ->
                 match Blockchain.getBlock client true hash with
                 | None ->
                     TextContent (sprintf "block not found")
@@ -621,6 +621,7 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
             let hex = (Map.tryFind "hex" query |> Option.defaultValue "false") = "true"
 
             Hash.fromString hash
+            |> Result.ofOption "could not deserialize Hash"
             |> Result.bind (Blockchain.getTransaction client >> ofOption "transaction not found")
             |> Result.map (fun (tx,confirmations) ->
                 let confirmations = "confirmations", (confirmations |> decimal |> JsonValue.Number)

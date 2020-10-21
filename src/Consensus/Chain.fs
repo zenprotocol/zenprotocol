@@ -48,7 +48,7 @@ let mainParameters =
         smoothingFactor=28I;
         maxBlockWeight=8_000_000_000I;
         sacrificePerByteBlock=1UL;
-        genesisHashHash=Hash.fromString "eea8718b5edf1f621cd6e495a6b2f0aada2b18f075aa0159d55ee648279b3c5e" |> get;
+        genesisHashHash=Hash.fromString "eea8718b5edf1f621cd6e495a6b2f0aada2b18f075aa0159d55ee648279b3c5e" |> Option.get;
         genesisTime= new System.DateTime(2018,6,30,17,0,0,System.DateTimeKind.Utc) |> Infrastructure.Timestamp.fromDateTime // 1530378000000UL
         networkId=1000ul
         contractSacrificePerBytePerBlock=ContractSacrificePerBytePerBlock
@@ -75,7 +75,7 @@ let testParameters =
         sacrificePerByteBlock=1UL;
         genesisHashHash =
             Hash.fromString "5488069e4be0551a3c886543845c332633731c536853209c2dbe04c035946490"
-            |> get
+            |> Option.get
             |> Hash.computeOfHash
         genesisTime=1535968146719UL
         networkId=2016ul
@@ -93,7 +93,7 @@ let testParameters =
         genesisTotal=1UL
     }
 
-let localGenesisHash = Hash.fromString "6d678ab961c8b47046da8d19c0de5be07eb0fe1e1e82ad9a5b32145b5d4811c7" |> get
+let localGenesisHash = Hash.fromString "6d678ab961c8b47046da8d19c0de5be07eb0fe1e1e82ad9a5b32145b5d4811c7" |> Option.get
 
 let localParameters = {
     testParameters with
