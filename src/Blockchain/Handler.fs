@@ -113,7 +113,7 @@ let handleCommand chainParams command session timestamp (state:State) =
         | RequestHeaders (peerId, from, endHash) ->
             effectsWriter {
                 if state.tipState.tip.hash <> Hash.zero then
-                    do! InitialBlockDownload.getHeaders chainParams session peerId from endHash
+                    do! InitialBlockDownload.getHeaders session peerId from endHash
 
                 return state
             }

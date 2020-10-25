@@ -239,7 +239,7 @@ let tick now ibd = effectsWriter {
                 return DownloadingBlocks (syncing, downloading, now)
 }
 
-let getHeaders (chainParams:Chain.ChainParameters) session peerId from endHash =
+let getHeaders session peerId from endHash =
     let rec getHeaders (fromHeader:ExtendedBlockHeader.T) toHash left acc =
         if fromHeader.hash = toHash || left = 0 then
             acc |> List.rev

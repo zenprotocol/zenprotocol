@@ -332,7 +332,7 @@ let ``getting headers from genesis``() =
         |> BlockRepository.saveHeader session) headers
 
     let effect, _  =
-        getHeaders chain session peerId [Hash.zero] (List.last headers |> Block.hash)
+        getHeaders session peerId [Hash.zero] (List.last headers |> Block.hash)
         |> Writer.unwrap
 
     effect |> should equal [
@@ -362,7 +362,7 @@ let ``getting headers from unknown hash``() =
         |> BlockRepository.saveHeader session) headers
 
     let effect, _  =
-        getHeaders chain session peerId [Hash.compute "HELLO"B] (List.last headers |> Block.hash)
+        getHeaders session peerId [Hash.compute "HELLO"B] (List.last headers |> Block.hash)
         |> Writer.unwrap
 
     effect |> should equal [
@@ -405,7 +405,7 @@ let ``getting headers from none main chain hash``() =
     |> BlockRepository.saveHeader session
 
     let effect, _  =
-        getHeaders chain session peerId [Block.hash sideBlock.header] (List.last headers |> Block.hash)
+        getHeaders session peerId [Block.hash sideBlock.header] (List.last headers |> Block.hash)
         |> Writer.unwrap
 
     effect |> should equal [
@@ -435,7 +435,7 @@ let ``getting headers from middle``() =
         |> BlockRepository.saveHeader session) headers
 
     let effect, _  =
-        getHeaders chain session peerId [headers.[1000] |> Block.hash] (List.last headers |> Block.hash)
+        getHeaders session peerId [headers.[1000] |> Block.hash] (List.last headers |> Block.hash)
         |> Writer.unwrap
 
     effect |> should equal [
@@ -478,7 +478,7 @@ let ``getting headers from multiple hashes``() =
     |> BlockRepository.saveHeader session
 
     let effect, _  =
-        getHeaders chain session peerId [Block.hash sideBlock.header;Block.hash headers.[3]; Block.hash headers.[2]] (List.last headers |> Block.hash)
+        getHeaders session peerId [Block.hash sideBlock.header;Block.hash headers.[3]; Block.hash headers.[2]] (List.last headers |> Block.hash)
         |> Writer.unwrap
 
     effect |> should equal [
