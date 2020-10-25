@@ -60,7 +60,7 @@ let ``Contract should activate and execute``() =
     let response = 
         contractActivateRequestJson sampleContractCode 10 2723280 password
         |> post "wallet/contract/activate"
-        |> ContractActivateResponseJson.Parse
+        |> ContractActivateOrExtendResponseJson.Parse
 
     [ ] //spend
     |> contractExecuteRequestJson response.Address "" "" true "" password 
@@ -84,7 +84,7 @@ let ``Contract should activate and execute (from transaction)``() =
     let response = 
         contractActivateRequestJson sampleContractCode 10 2723280 password
         |> post "wallet/contract/activate"
-        |> ContractActivateResponseJson.Parse
+        |> ContractActivateOrExtendResponseJson.Parse
 
     TxSkeleton.empty
     |> TxSkeleton.serialize

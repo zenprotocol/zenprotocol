@@ -40,7 +40,7 @@ let ``AddressDB should show contract history``() =
     let response = 
         contractActivateRequestJson sampleContractCode 10 2723280 password
         |> post "wallet/contract/activate"
-        |> ContractActivateResponseJson.Parse
+        |> ContractActivateOrExtendResponseJson.Parse
 
     [ ] //spend
     |> contractExecuteRequestJson response.Address "mock command" "" true "" password 

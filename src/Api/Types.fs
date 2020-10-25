@@ -12,10 +12,12 @@ type BalanceResponseJson = JsonProvider<"""
 ]
 """>
 
-type ContractActivateResponseJson = JsonProvider<"""
+type ContractActivateOrExtendResponseJson = JsonProvider<"""
 {
     "address" : "address",
-    "contractId" : "contractId"
+    "contractId" : "contractId",
+    "txHash": "txHash",
+    "numberOfBlocks": "txHash"
 }
 """>
 

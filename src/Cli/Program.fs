@@ -243,7 +243,7 @@ let main argv =
                 let code = File.ReadAllText file
                 let result =
                     activateContract getUri code numberOfBlocks rlimit password
-                    |> ContractActivateResponseJson.Parse
+                    |> ContractActivateOrExtendResponseJson.Parse
 
                 printfn "Contract activated.\nAddress: %s\nContract Id: %s" result.Address result.ContractId
         | Some (Extend args) ->

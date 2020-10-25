@@ -452,10 +452,17 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
         | Ok (code, numberOfBlocks, rlimit, password) ->
             match Wallet.activateContract client true code numberOfBlocks rlimit password with
             | Ok (tx, contractId) ->
+                let txHash  = Transaction.hash tx         
                 let address =
                     Address.Contract contractId
                     |> Address.encode chain
-                let json = new ContractActivateResponseJson.Root (address, ContractId.toString contractId)
+                let json = 
+                    new ContractActivateOrExtendResponseJson.Root (
+                                                                      address,
+                                                                      ContractId.toString contractId,
+                                                                      txHash.AsString,
+                                                                      string numberOfBlocks
+                                                                    )
                 reply StatusCode.OK (JsonContent json.JsonValue)
             | Error error ->
                 replyError error
@@ -465,7 +472,18 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
         | Ok (contractId, numberOfBlocks, password) ->
             match Wallet.extendContract client true contractId numberOfBlocks password with
             | Ok tx ->
-                reply StatusCode.OK NoContent
+                let txHash  = Transaction.hash tx         
+                let address =
+                    Address.Contract contractId
+                    |> Address.encode chain
+                let json = 
+                    new ContractActivateOrExtendResponseJson.Root (
+                                                                      address,
+                                                                      ContractId.toString contractId,
+                                                                      txHash.AsString,
+                                                                      string numberOfBlocks
+                                                                    )
+                reply StatusCode.OK (JsonContent json.JsonValue)
             | Error error ->
                 replyError error
     | Post ("/wallet/contract/execute", Some body) ->
