@@ -44,15 +44,15 @@ module NewTemplate =
 let private decode stream =
     let readMessage messageId stream =
             match messageId with
-        | NewTemplateMessageId ->
-            match NewTemplate.read stream with
-            | None,stream -> None,stream
-            | Some msg, stream -> Some (NewTemplate msg), stream
-        | StopMessageId ->
-            Some Stop, stream
-        | ExitMessageId ->
-            Some Exit, stream
-        | _ -> None, stream
+            | NewTemplateMessageId ->
+                match NewTemplate.read stream with
+                | None,stream -> None,stream
+                | Some msg, stream -> Some (NewTemplate msg), stream
+            | StopMessageId ->
+                Some Stop, stream
+            | ExitMessageId ->
+                Some Exit, stream
+            | _ -> None, stream
 
     let r = reader {
                 let! signature = Stream.readNumber2

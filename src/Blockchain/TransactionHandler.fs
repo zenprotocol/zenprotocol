@@ -20,7 +20,7 @@ let private validateOrphanTransaction chainParams session contractPath blockNumb
         {
             match TransactionValidation.validateInContext chainParams (getUTXO session) contractPath (blockNumber + 1ul) timestamp
                     state.activeContractSet state.contractCache state.utxoSet (getContractState session) state.contractStates ex with
-            | Ok (tx, acs, contractCache, contractStates) ->
+            | Ok (_, acs, contractCache, contractStates) ->
                 let utxoSet = UtxoSet.handleTransaction (getUTXO session) ex.txHash ex.tx state.utxoSet
                 let mempool = MemPool.add ex state.mempool
 

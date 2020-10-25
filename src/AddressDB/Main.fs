@@ -18,12 +18,12 @@ let eventHandler client event dataAccess session view =
     match event with
     | TransactionAddedToMemPool (txHash,tx) ->
         View.addMempoolTransaction dataAccess session txHash tx view
-    | BlockAdded (blockHash,block) ->
+    | BlockAdded (_,block) ->
         Repository.addBlock dataAccess session block
 
         Blockchain.getMempool client
         |> View.fromMempool dataAccess session
-    | BlockRemoved (blockHash,block) ->
+    | BlockRemoved (_,block) ->
         Repository.undoBlock dataAccess session block
         View.empty
     | _ ->
@@ -53,7 +53,7 @@ let private sync dataAccess session client =
     | None ->
         View.empty
 
-let commandHandler client command dataAccess session view =
+let commandHandler client command dataAccess session _ =
     match command with
     | Resync ->
         Repository.reset dataAccess session

@@ -255,7 +255,7 @@ let createContractRecord code =
                     queries = queries })
     }
 
-let createActivationTransactionFromContract chainParams (contractId, ({queries=queries;code=code} as contractV0)) (numberOfBlocks:uint32) (account, extendedKey) =
+let createActivationTransactionFromContract chainParams (_, ({queries=queries;code=code} as contractV0)) (numberOfBlocks:uint32) (account, extendedKey) =
 
     result {
         let codeLength = String.length code |> uint64

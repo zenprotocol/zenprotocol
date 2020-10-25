@@ -5,7 +5,7 @@ type ReaderResult<'env, 'err, 'a> = 'env -> Result<'a, 'err>
 let bind (k : 'a -> 'env -> Result<'b, 'err>) (m : 'env -> Result<'a, 'err>) (env : 'env) : Result<'b, 'err> =
     m env |> Result.bind (fun x -> k x env)
 
-let ret (x : 'a) (env : 'env) : Result<'a, 'err> =
+let ret (x : 'a) (_ : 'env) : Result<'a, 'err> =
     Ok x
 
 let eval (env : 'env) (m : ReaderResult<'env, 'err, 'a>) : Result<'a, 'err> =

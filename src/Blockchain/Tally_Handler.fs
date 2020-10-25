@@ -219,7 +219,7 @@ module Handler =
             | PK pkHash when outp.spend.asset = Asset.Zen ->
                 map
                 |> updateMap op pkHash outp.spend.amount
-            | Coinbase (blockNumber,pkHash) when outp.spend.asset = Asset.Zen ->
+            | Coinbase (_,pkHash) when outp.spend.asset = Asset.Zen ->
                 map
                 |> updateMap op pkHash outp.spend.amount
             | _ ->

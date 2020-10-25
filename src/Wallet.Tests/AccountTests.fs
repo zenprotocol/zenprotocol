@@ -266,7 +266,7 @@ let ``create execute contract transaction``() =
 
     // last pkwitness should use FollowingWitnesses
     List.findBack (function | PKWitness _ -> true | _ -> false) tx.witnesses
-    |> function PKWitness (sigHash,_,_) -> sigHash
+    |> function PKWitness (sigHash,_,_) -> sigHash | _ -> failwith "Not supposed to be here"
     |> should equal FollowingWitnesses
 
 
@@ -304,7 +304,7 @@ let ``create execute contract transaction without explicitly spending any Zen sh
 
     // last pkwitness should use FollowingWitnesses
     List.findBack (function | PKWitness _ -> true | _ -> false) tx.witnesses
-    |> function PKWitness (sigHash,_,_) -> sigHash
+    |> function PKWitness (sigHash,_,_) -> sigHash | _ -> failwith "Not supposed to be here"
     |> should equal FollowingWitnesses
 
 
@@ -694,8 +694,6 @@ let ``sign contract wintess``() =
         |> Hash.computeMultiple
 
     let publicKey = ExtendedKey.derivePath "m/0'" privateKey |> Result.get |> ExtendedKey.getPublicKey |> Result.get
-
-    let (Crypto.PublicKey pk) = publicKey
 
     match tx.witnesses.[1] with
     | ContractWitness cw ->

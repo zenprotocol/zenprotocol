@@ -266,7 +266,7 @@ let ``sign with FollowingWitnesses sighash``() =
         Transaction.sign [(secret2, publicKey2)] TxHash tx
         |> Transaction.sign [(secret, publicKey)] FollowingWitnesses
 
-    let sigHash = signedTx.witnesses.[0] |> function PKWitness (sigHash,_,_) -> sigHash
+    let sigHash = signedTx.witnesses.[0] |> function PKWitness (sigHash,_,_) -> sigHash | _ -> failwith "Not supposed to be here"
     sigHash |> should equal FollowingWitnesses
 
     inputsValidation 1ul 0UL acs utxos signedTx
@@ -299,7 +299,7 @@ let ``sign with FollowingWitnesses sighash last input in tx``() =
         Transaction.sign [(secret2, publicKey2)] FollowingWitnesses tx
         |> Transaction.sign [(secret, publicKey)] TxHash
 
-    let sigHash = signedTx.witnesses.[1] |> function PKWitness (sigHash,_,_) -> sigHash
+    let sigHash =  signedTx.witnesses.[1] |> function | PKWitness (sigHash,_,_) -> sigHash | _ -> failwith "Not supposed to be here"
     sigHash |> should equal FollowingWitnesses
 
     inputsValidation 1ul 0UL acs utxos signedTx

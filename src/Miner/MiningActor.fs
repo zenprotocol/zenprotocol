@@ -24,7 +24,7 @@ let getRandomNonce () =
 
     System.BitConverter.ToUInt64 (array,0)
 
-let create (chain:ChainParameters) busName address =
+let create busName address =
     let findNonce client (template:Block) nonce =
         let mutable found = false
         let mutable attemptsLeft = 200_000 // number of attempts before trying to fetch a message

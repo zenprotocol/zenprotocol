@@ -866,7 +866,6 @@ let ``Valid template for two transactions which don't depend on each other``() =
     let balances = TestWallet.getBalance rootAccount
     let asset, amount = balances |> Map.toList |> List.head
     let firstAmount = amount / 4UL
-    let secondAmount = amount - firstAmount
     let splitTx =
         TestWallet.createTransaction testParameters (publicKeyHash rootAccount) {asset=asset;amount=firstAmount} rootAccountData
         |>  Result.get
@@ -1113,9 +1112,8 @@ let ``should get all the blocks in mainchain`` () =
     let mainChain, _ = createChainFromGenesis 9 0
     
     
-    let _,state = validateChain session mainChain state
+    let _ = validateChain session mainChain state
     
-    //printfn "%A" (BlockRepository.getMainHeaderPaginate session 0 2)
     let headers = BlockRepository.getMainHeaderFrom session 8
     should equal headers.[0].header.blockNumber 9ul
     should equal headers.[1].header.blockNumber 10ul

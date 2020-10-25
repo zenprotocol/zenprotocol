@@ -181,8 +181,6 @@ let ``contract witness with no signature``() =
             contract=None
         }
 
-    let txHash = Transaction.hash tx
-
 
     let contractWintess = ContractWitness {
                                               contractId=contractId;

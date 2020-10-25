@@ -222,7 +222,7 @@ let main argv =
 
     use minerActor =
         if config.miner.enabled then
-            Miner.Main.main busName chainParams config.miner.threads
+            Miner.Main.main busName config.miner.threads
             |> Disposables.toDisposable
         else
             Disposables.empty

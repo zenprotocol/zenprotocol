@@ -74,7 +74,7 @@ let commandHandler client command dataAccess session accountStatus =
         |> Log.info
 
         accountStatus
-    | Exist view ->
+    | Exist _ ->
         match command with
         | Resync ->
             Account.reset dataAccess session

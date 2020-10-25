@@ -32,7 +32,7 @@ let ``serialize and deserialize publickey``() =
 
 [<Test>]
 let ``serialize and deserialize signature``() =
-    let secretKey, publicKey = KeyPair.create()
+    let secretKey, _ = KeyPair.create()
 
     let msg = Array.create MessageLength 0uy
     let random = new System.Random()

@@ -212,7 +212,6 @@ let ``Should execute contract chain and get a valid transaction``() =
 
     let blockNumber = 1u
     let timestamp = 1_000_000UL
-    let context = {blockNumber=blockNumber;timestamp=timestamp}
 
     let inputTx =
         {

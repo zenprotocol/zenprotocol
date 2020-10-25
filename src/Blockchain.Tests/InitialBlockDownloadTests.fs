@@ -52,7 +52,6 @@ let createHeaders from _to =
 
 [<Test>]
 let ``from genesis``() =
-    let idb = Inactive
 
     let effects, ibd =
         start 0UL Hash.zero Block.genesisParent peerId peerHeader
@@ -246,7 +245,6 @@ let ``block invalid``() =
 
 [<Test>]
 let ``timeout on get headers request``() =
-    let idb = Inactive
 
     let _, ibd =
         start 0UL Hash.zero Block.genesisParent peerId peerHeader
@@ -287,7 +285,7 @@ let ``timeout on downloading``() =
         processHeaders chain session 1000UL peerId headers ibd
         |> Writer.unwrap
 
-    let effects,ibd =
+    let _,ibd =
         InitialBlockDownload.received 2000UL (Block.hash headers.[0]) ibd
         |> Writer.unwrap
 

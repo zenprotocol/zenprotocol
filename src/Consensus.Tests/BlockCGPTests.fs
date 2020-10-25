@@ -26,7 +26,7 @@ let context0 = { blockNumber=1u; timestamp = 1UL }
 let contractPath =
     NUnit.Framework.TestContext.CurrentContext.TestDirectory
 
-let changeMessageBody messageBody =
+let changeMessageBody _ =
     ZFStar.fsToFstList []
     |> ZData.List
     |> ZData.Collection

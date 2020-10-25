@@ -425,8 +425,8 @@ let ``can connect valid block``() =
 
 [<Test>]
 let ``can connect block with coinbase only``() =
-    let rootAccount = createTestAccount()
-    let account1, _ = create()
+    let _ = createTestAccount()
+    let _ = create()
 
     let acs = ActiveContractSet.empty
     let utxoSet = UtxoSet.asDatabase |> UtxoSet.handleTransaction getUTXO rootTxHash rootTx
