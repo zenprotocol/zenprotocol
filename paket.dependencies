@@ -4,28 +4,22 @@ source https://nuget.org/api/v2
 framework: 47
 
 nuget FSharp.Core 4.3.4
-nuget NUnit
 nuget FsUnit
 nuget FsCheck.NUnit >= 3.0.0-alpha2
-nuget FAKE
-nuget FSharp.Compatibility.OCaml
-nuget FSharpx.Collections
 nuget AsyncIO >= 0.1.60
 nuget NetMQ >= 4.0.0.207-pre
 nuget FsNetMQ >= 0.2.8.0
 nuget FsPickler
 nuget FSharp.Control.Reactive
 nuget System.Reactive.Compatibility
-//nuget System.Reactive.Linq
-nuget BouncyCastle
 nuget FSharp.Configuration
+nuget FSharp.Compiler.Tools
 nuget Argu
 nuget FSharp.Data
 nuget ZFStar 0.0.26 
 nuget Zen.FSharp.Compiler.Service 17.0.2
 nuget ZFS-Tools 0.0.24 
 nuget FSharpx.Extras
-nuget Newtonsoft.Json
 nuget Base58Check
 nuget NBitcoin
 nuget secp256k1-vc140

@@ -53,6 +53,7 @@
     <Compile Include="Main.fs" />
     <Content Include="Message.xml" />
     <Content Include="paket.references" />
+    <Content Include="app.config" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />

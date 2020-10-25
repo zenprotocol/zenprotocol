@@ -1,5 +1,4 @@
-FSharp.Core
-FSharp.Compiler.Tools
 FsNetMQ
+FSharp.Core redirects: on
 Logary
 Zulib

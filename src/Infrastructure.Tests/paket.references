@@ -1,17 +1,8 @@
-FSharp.Core
-NUnit
+FSharp.Core redirects: on
 FsUnit
 FsNetMQ
 FSharp.Control.Reactive
 System.Reactive.Compatibility
 FSharp.Data
-FSharp.Compiler.Tools
-zen_z3_linux
-zen_z3_osx
-ZFStar
-System.Reflection.Metadata
-FSharp.Compatibility.OCaml
-BouncyCastle
-FsBech32
 Logary
 Zulib

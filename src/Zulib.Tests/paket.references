@@ -1,6 +1,5 @@
-﻿NUnit
 FsUnit
-FsBech32
 FsCheck.NUnit
 FSharp.Data
+FSharp.Core redirects: on
 Zulib

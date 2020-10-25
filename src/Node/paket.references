@@ -1,17 +1,10 @@
 FsNetMQ
+FSharp.Core redirects: on
 FSharp.Control.Reactive
 System.Reactive.Compatibility
 FSharp.Configuration
 Argu
-FSharp.Core
 zen_secp256k1_linux
-zen_z3_linux
 zen_secp256k1_osx
-zen_z3_osx
-zen_z3_windows
-FSharp.Compiler.Tools
-ZFStar
-System.Reflection.Metadata
-FsBech32
 Logary
 Zulib

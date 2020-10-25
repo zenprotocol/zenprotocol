@@ -1,8 +1,7 @@
 FsNetMQ
-FSharp.Core
 FSharpx.Extras
 FSharp.Control.Reactive
+FSharp.Core redirects: on
 System.Reactive.Compatibility
-FSharp.Compiler.Tools
 Logary
 Zulib

@@ -1,10 +1,6 @@
 zen_secp256k1_linux
-zen_z3_linux
 zen_secp256k1_osx
-zen_z3_osx
 SpecFlow.NUnit
 Logary
-FSharp.Compatibility.OCaml
-ZFStar
-System.Reflection.Metadata
 Zulib
+FSharp.Core redirects: on

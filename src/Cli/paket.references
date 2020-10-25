@@ -1,5 +1,5 @@
-FSharp.Core
 FSharp.Data
+FSharp.Core redirects: on
 Argu
 FSharp.Compiler.Tools
 NBitcoin

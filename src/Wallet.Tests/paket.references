@@ -1,10 +1,8 @@
-FSharp.Core
-NUnit
 FsUnit
+FSharp.Core redirects: on
 FsCheck.NUnit
 zen_secp256k1_linux
 zen_secp256k1_osx
-FSharp.Compiler.Tools
 Base58Check
 NBitcoin
 Zulib
