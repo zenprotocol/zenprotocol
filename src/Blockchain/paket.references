@@ -1,5 +1,6 @@
 FsNetMQ
 FSharpx.Extras
+FSharp.Compiler.Tools
 FSharp.Control.Reactive
 FSharp.Core redirects: on
 System.Reactive.Compatibility

@@ -1,6 +1,7 @@
 FsNetMQ
 FSharp.Control.Reactive
 FSharp.Data
+FSharp.Compiler.Tools
 FSharp.Core redirects: on
 Newtonsoft.Json
 Logary

@@ -1,5 +1,6 @@
 FsUnit
 FSharp.Core redirects: on
+FSharp.Compiler.Tools
 FsCheck.NUnit
 zen_secp256k1_linux
 zen_secp256k1_osx
