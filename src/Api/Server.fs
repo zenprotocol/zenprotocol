@@ -17,6 +17,7 @@ open Logary.Message
 open Api.Helpers
 open Consensus.Chain
 open FSharp.Data
+open FSharp.Data
 open FsBech32
 open Hash
 open Messaging.Services
@@ -531,8 +532,8 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
             msgBody
             |> Option.map Data.serialize
             |> Option.map Base16.encode
-            |> Option.defaultValue ""
-            |> JsonValue.String
+            |> Option.map JsonValue.String
+            |> Option.defaultValue JsonValue.Null
         JsonValue.Record
             [|
                 ("raw", raw)
@@ -902,9 +903,12 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
                 replyError error
             | Ok address ->
                 match AddressDB.getContractAssets client address with
-                | Ok (Some (command, messageBody)) ->
+                | Ok (Some (pk,command, messageBody)) ->
                     [|
-                        
+                        "sender",
+                            pk
+                            |> Option.map JsonValue.String
+                            |> Option.defaultValue JsonValue.Null
                         "command",
                             command
                             |> JsonValue.String
@@ -916,8 +920,8 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
                             messageBody
                             |> Option.map Serialization.Data.serialize
                             |> Option.map Base16.encode
-                            |> Option.defaultValue ""
-                            |> JsonValue.String
+                            |> Option.map JsonValue.String
+                            |> Option.defaultValue JsonValue.Null
                     |]
                     |> JsonValue.Record
                     |> JsonContent

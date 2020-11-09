@@ -120,3 +120,23 @@ module ContractData =
     let serialize = serialize size write
     let deserialize = deserialize read
     
+    
+module ContractAsset =
+    let size (pk, command, messageBody) =
+        Option.size String.size pk +
+        String.size command +
+        Option.size Data.size messageBody
+
+    let write stream (pk,command, messageBody) =
+        Option.write stream String.write pk
+        String.write stream command
+        Option.write stream Data.write messageBody
+
+    let read reader =
+        let pk = Option.read String.read reader
+        let command = String.read reader
+        let messageBody = Option.read Data.read reader
+        pk, command, messageBody
+
+    let serialize = serialize size write
+    let deserialize = deserialize read

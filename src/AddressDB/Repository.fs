@@ -114,6 +114,13 @@ module Witness =
                 ()
 module Mint =
 
+    module CryptoPublicKey = Crypto.PublicKey
+
+    let private extractPK ( signature: (Crypto.PublicKey * 'a) option ) =
+        match signature with
+        | Some (pk , _) -> Some (CryptoPublicKey.toString pk)
+        | None -> None
+
     let updateAll op dataAccess session tx =
 
         for input in tx.inputs do
@@ -122,8 +129,8 @@ module Mint =
                 match op with
                 | Add ->
                     tx.witnesses
-                    |> List.choose (fun x -> match x with | ContractWitness cw -> Some (cw.command, cw.messageBody) | _ -> None)
-                    |> List.head //as we have  mint then surely we have a cw
+                    |> List.choose (fun x -> match x with | ContractWitness cw -> Some (extractPK cw.signature, cw.command, cw.messageBody) | _ -> None)
+                    |> List.head //as we have mint then surely we have a cw
                     |> DataAccess.ContractAssets.put dataAccess session spend.asset
                 | Remove ->
                     DataAccess.ContractAssets.delete dataAccess session spend.asset

@@ -217,8 +217,8 @@ let witnessEncoder (chain:Chain) (witness:Witness) =
             cw.messageBody
             |> Option.map Serialization.Data.serialize
             |> Option.map Base16.encode
-            |> Option.defaultValue ""
-            |> JsonValue.String
+            |> Option.map JsonValue.String
+            |> Option.defaultValue JsonValue.Null
             
         JsonValue.Record [|
             ("contractId", JsonValue.String ( ContractId.toString cw.contractId))

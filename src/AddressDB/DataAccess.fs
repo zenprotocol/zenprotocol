@@ -22,7 +22,7 @@ type T = {
     contractHistory: MultiCollection<ContractId, WitnessPoint>
     contractData: Collection<WitnessPoint, string * data option>
     contractConfirmations: Collection<WitnessPoint, Wallet.Types.ConfirmationStatus>
-    contractAssets: Collection<Asset, string * data option>
+    contractAssets: Collection<Asset,string option* string * data option>
     tip: SingleValue<Tip>
     dbVersion: SingleValue<int>
 }
@@ -41,7 +41,7 @@ let init databaseContext =
     let contractData = Collection.create session "contracData" WitnessPoint.serialize ContractData.serialize ContractData.deserialize
     let contractHistory = MultiCollection.create session "contractHistory" Serialization.ContractId.serialize WitnessPoint.serialize WitnessPoint.deserialize
     let contractConfirmations = Collection.create session "contractConfirmations" WitnessPoint.serialize ConfirmationStatus.serialize ConfirmationStatus.deserialize
-    let contractAssets = Collection.create session "contractAssets" Asset.serialize ContractData.serialize ContractData.deserialize
+    let contractAssets = Collection.create session "contractAssets" Asset.serialize ContractAsset.serialize ContractAsset.deserialize
     let tip = SingleValue.create databaseContext "blockchain" Tip.serialize Tip.deserialize
     let dbVersion = SingleValue.create databaseContext "dbVersion" Version.serialize Version.deserialize
 

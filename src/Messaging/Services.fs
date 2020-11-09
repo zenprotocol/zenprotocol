@@ -413,4 +413,4 @@ module AddressDB =
         
     let getContractAssets client args =
         GetContractAssets args
-        |> send<option<string * Zen.Types.Data.data option>> client
+        |> send<option<string option * string * Zen.Types.Data.data option>> client

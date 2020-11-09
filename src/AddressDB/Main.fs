@@ -88,7 +88,7 @@ let requestHandler chain (requestId:RequestId) request dataAccess session view =
     | GetContractAssets asset ->
         View.getContractAsset dataAccess session asset
         |> Ok
-        |> reply<option<string * Zen.Types.Data.data option>> requestId
+        |> reply<option<string option * string * Zen.Types.Data.data option>> requestId
     |> ignore
 
     view
