@@ -467,8 +467,8 @@ let parseAsset json =
         let json = GetAssetsJson.Parse json
 
         match Asset.fromString json.Asset with
-        | Some (Asset (c,hash)) when Hash.zero <> hash -> Ok (Asset(c,hash))
-        | _ -> Error "invalid asset"
+        | Some asset -> Ok asset
+        | None -> Error "invalid asset"
 
     with _ as ex ->
         Error ("Json invalid: " + ex.Message)
