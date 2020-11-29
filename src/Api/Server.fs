@@ -701,7 +701,7 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
             match Wallet.getReceivedByAddress client confirmations with
             | Ok received ->
                 Map.toSeq received
-                |> Seq.map (fun ((address,asset),amount) -> (new ReceivedByAddressJson.Root(address, Asset.toString asset, int64 amount)).JsonValue)
+                |> Seq.map (fun ((address,asset),amount) -> (new ReceivedByAddressJson.Root(address, Asset.toString asset, string amount)).JsonValue)
                 |> Seq.toArray
                 |> JsonValue.Array
                 |> JsonContent
@@ -729,7 +729,7 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
                 outputs
                 |> List.map (fun ((outpoint:Types.Outpoint),(spend:Types.Spend),confirmations,spent) ->
                     new AddressOutputJson.Root(new AddressOutputJson.Outpoint(Hash.toString outpoint.txHash, outpoint.index |> int32),
-                        Asset.toString spend.asset, spend.amount |> int64, int confirmations,spent))
+                        Asset.toString spend.asset, string spend.amount, int confirmations,spent))
                 |> List.map (fun json -> json.JsonValue)
                 |> List.toArray
                 |> JsonValue.Array
@@ -760,7 +760,7 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
                 | Ok balances ->
                     balances
                     |> Map.toSeq
-                    |> Seq.map (fun (asset,amount) -> new SpendJson.Root(Asset.toString asset, int64 amount))
+                    |> Seq.map (fun (asset,amount) -> new SpendJson.Root(Asset.toString asset, string amount))
                     |> Seq.map (fun json -> json.JsonValue)
                     |> Seq.toArray
                     |> JsonValue.Array

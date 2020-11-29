@@ -26,7 +26,7 @@ type CreateRawTransactionJson = JsonProvider<"""
     "outputs": [{
         "address": "address",
         "asset": "asset",
-        "amount": 2147483649
+        "amount": "amount"
     }]
 }
 """>
@@ -50,7 +50,7 @@ type SendRequestJson = JsonProvider<"""
     "outputs": [{
         "address": "address",
         "asset": "asset",
-        "amount": 2147483649
+        "amount": "amount"
     }],
     "password": "password"
 }
@@ -85,7 +85,7 @@ type ContractExecuteRequestJson = JsonProvider<"""
     "spends": [
         {
             "asset": "asset",
-            "amount": 2147483649
+            "amount": "amount"
         }
     ],
     "password": "password"
@@ -138,7 +138,7 @@ type TransactionsResponseJson = JsonProvider<"""
     {
         "txHash": "hash",
         "asset":"asset",
-        "amount":2147483453648,
+        "amount":"amount",
         "confirmations": 0,
         "lock": "lock"
     }
@@ -252,7 +252,7 @@ type AllocationRequestJson = JsonProvider<"""
 type SpendJson = JsonProvider<"""
 {
     "asset": "c234",
-    "amount": 1234567890000
+    "amount": "amount"
 }
 """>
 
@@ -273,7 +273,7 @@ type ReceivedByAddressJson = JsonProvider<"""
 {
     "address":"address",
     "asset":"asset",
-    "amount":1234567890000
+    "amount":"amount"
 }
 """>
 
@@ -284,7 +284,7 @@ type AddressOutputJson = JsonProvider<"""
         "index": 0
     },
     "asset":"abcd",
-    "amount":1234567890000,
+    "amount":"amount",
     "confirmations":0,
     "spent":true
 }

@@ -217,7 +217,7 @@ let main argv =
             printfn "==================================================="
 
             Array.iter (fun (txHash, asset, amount, confirmations) ->
-                printfn "%s\t%s\t%d\t%d" txHash asset amount confirmations
+                printfn "%s\t%s\t%s\t%d" txHash asset amount confirmations
             ) transactions
         | Some (Address _) ->
             let result =
