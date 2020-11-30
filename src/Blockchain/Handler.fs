@@ -346,11 +346,11 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
                 (cgp :: cgpList)
                 |> getCGP (interval - 1ul) lastHeader
          
-        let currentInterval = CGP.getInterval chain state.tipState.tip.header.blockNumber
+        let currentInterval = CGP.getInterval chain state.tipState.tip.header.blockNumber - 1ul
                 
         []
         |> getCGP currentInterval state.tipState.tip
-        |> List.mapi (fun i cgp -> (uint32 i,cgp))
+        |> List.mapi (fun i cgp -> (uint32 i + 1ul,cgp))
         |> requestId.reply<(uint32 * CGP.T) list>
     |> ignore
 
