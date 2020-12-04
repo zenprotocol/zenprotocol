@@ -4,6 +4,7 @@ open FSharp.Configuration
 open Argu
 open Infrastructure
 open Consensus
+open Endpoint
 open Logary.Message
 
 module Actor = FsNetMQ.Actor
@@ -11,10 +12,10 @@ module Actor = FsNetMQ.Actor
 type Wipe =
     | Full
 
-#if DEBUG
 [<Literal>]
 let Localhost = "127.0.0.1"
-#endif
+[<Literal>]
+let LocalhostString = "localhost"
 
 [<NoAppSettings>]
 type Argument =
@@ -33,6 +34,7 @@ type Argument =
     | Data_Path of string
     | Service_Bus of string
     | Publisher of string
+    | ConnectWallet
     with
         interface IArgParserTemplate with
             member s.Usage =
@@ -48,6 +50,7 @@ type Argument =
                 | Data_Path _ -> "set the data folder path"
                 | Service_Bus _ -> "expose the service bus over zeromq address"
                 | Publisher _ -> "expose the publisher over zeromq address"
+                | ConnectWallet _ -> "connect the new desktop wallet"
 #if DEBUG
                 | Local _ -> "local mode, used for debugging. specify zero value for host, other for client"
 #endif
@@ -124,6 +127,7 @@ let main argv =
     let mutable wipe = false
     let mutable wipeFull = false
     let mutable seed = false
+    let mutable wallet = true
     let mutable addressDb = false
     let mutable serviceBusAddress = None
     let mutable publisherAddress = None
@@ -140,17 +144,15 @@ let main argv =
         match arg with
 #if DEBUG
         | Local idx ->
-            let getEndpoint port idx = sprintf "%s:%i" Localhost (port + idx)
-
             chain <- Chain.Local
             config.dataPath <- sprintf "./data/local/%i" idx
             config.chain <- "local"
             config.externalIp <- Localhost
-            config.bind <- getEndpoint 10000 idx
-            config.api.bind <- getEndpoint 20000 idx
+            config.bind <- getEndpoint Localhost (10000 + idx)
+            config.api.bind <- getEndpoint Localhost (20000 + idx) 
             config.seeds.Clear ()
 
-            if idx <> 0 then config.seeds.Add (getEndpoint 10000 0)
+            if idx <> 0 then config.seeds.Add (getEndpoint Localhost 10000)
 #endif
         | Api address ->
             config.api.enabled <- true
@@ -158,6 +160,11 @@ let main argv =
         | Bind address ->
             config.bind <- address
             config.listen <- true
+        | ConnectWallet ->
+            config.api.enabled <- true
+            config.api.bind <- getEndpoint LocalhostString (getPort config.api.bind)
+            wallet <- false 
+            addressDb <- true
         | Ip ip ->
             config.externalIp <- ip
         | Wipe full ->
@@ -209,8 +216,12 @@ let main argv =
         Network.Main.main dataPath busName chainParams config.externalIp config.listen config.bind seeds wipe seed
 
     use walletActor =
-        if wipeFull then Wallet.Main.Full elif wipe then Wallet.Main.Reset else Wallet.Main.NoWipe
-        |> Wallet.Main.main dataPath busName chain
+        if wallet then
+            if wipeFull then Wallet.Main.Full elif wipe then Wallet.Main.Reset else Wallet.Main.NoWipe
+            |> Wallet.Main.main dataPath busName chain
+            |> Disposables.toDisposable
+        else
+            Disposables.empty
 
     use addressDbActor =
         if addressDb then
