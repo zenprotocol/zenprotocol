@@ -61,6 +61,7 @@ module Blockchain =
         | GetCandidates of uint32
         | GetBlockReward of uint32
         | GetCGP
+        | GetWinner
         | GetCgpHistory
 
     type Response = unit
@@ -185,6 +186,10 @@ module Blockchain =
     let getCgp client =
         GetCGP 
         |> Request.send<Request, CGP.T> client serviceName
+        
+    let getWinner client =
+        GetWinner
+        |> Request.send<Request,Winner option> client serviceName
         
     let getCgpHistory client =
         GetCgpHistory

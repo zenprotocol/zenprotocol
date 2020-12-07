@@ -681,6 +681,22 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
             >> reply StatusCode.OK)
         |> Result.mapError replyError
         |> ignore
+    | Get ("/blockchain/winner", _) ->
+        let interval =
+                Blockchain.getTip client
+                |> Option.map snd
+                |> Option.map (fun x -> x.blockNumber)
+                |> Option.defaultValue 0ul
+                |> CGP.getInterval (Chain.getChainParameters chain)
+                
+        match Blockchain.getWinner client with
+        | Some ({allocation=Some al ;payout= payout}) ->
+            ({allocation= al; payout=payout}:CGP.T)
+            |> cgpEncoder chain interval
+            |> JsonContent
+            |> reply StatusCode.OK 
+        | _ ->
+            reply StatusCode.BadRequest NoContent
     | Post ("/wallet/importwatchonlyaddress", Some json) ->
         match Parsing.parseAddress json with
         | Ok address ->

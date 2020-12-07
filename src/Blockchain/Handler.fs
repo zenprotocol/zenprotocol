@@ -316,6 +316,10 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
         blockReward blockNumber state.cgp.allocation
         |> (+) (blockAllocation blockNumber state.cgp.allocation)
         |> requestId.reply
+    | GetWinner ->
+        CGP.getInterval chain state.tipState.tip.header.blockNumber
+        |> Tally.Handler.getWinner session
+        |> requestId.reply<Winner option>
     | GetCGP ->
         let blockNumber = state.tipState.tip.header.blockNumber + 1ul
         if CGP.isPayoutBlock chain blockNumber then
