@@ -46,6 +46,8 @@
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="Helpers.fs" />
+    <Compile Include="BlockTemplateCache.fs" />
+    <Compile Include="Config.fs" />
     <Compile Include="Parsing.fs" />
     <Compile Include="Server.fs" />
     <Compile Include="Main.fs" />

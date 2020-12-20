@@ -13,9 +13,10 @@ type Content =
     | NoContent
 
 type ReplyFunction = StatusCode -> Content -> unit
+type Query = Map<string,string>
 
 type Request =
-    | Get of path : string * query: Map<string,string>
+    | Get of path : string * query : Query
     | Post of path : string * Body
 
 type Context = Request * ReplyFunction

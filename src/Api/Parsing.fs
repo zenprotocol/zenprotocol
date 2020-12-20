@@ -9,11 +9,12 @@ open Serialization.Serialization
 open Crypto
 open Types
 open FsBech32
-open System.Text
 open Newtonsoft.Json
 open Wallet
 open Infrastructure
 open Infrastructure.Result
+open Infrastructure.Http
+open Config
 
 let private getSpend asset amount =
     match Asset.fromString asset with
@@ -483,3 +484,29 @@ let parseGetContractHistoryJson json =
         <@> fun contractId -> contractId, json.Skip, json.Take
     with _ as ex ->
         Error ("Json invalid: " + ex.Message)
+        
+        
+let handleTxResult config result =
+    match result with
+    | Error error ->
+        config.replyError error
+    | Ok tx ->
+        Transaction.hash tx
+        |> Hash.toString
+        |> JsonValue.String
+        |> JsonContent
+        |> config.reply StatusCode.OK
+
+let handleRawTxResult config result =
+    match result with
+    | Error error ->
+        config.replyError error
+    | Ok raw ->
+        let txHash = Transaction.fromRaw raw |> Transaction.hash |> Hash.toString
+        let hex = Serialization.RawTransaction.toHex raw
+
+        (new RawTransactionResultJson.Root(txHash, hex)).JsonValue
+        |> JsonContent
+        |> config.reply StatusCode.OK
+
+
