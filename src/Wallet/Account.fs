@@ -535,7 +535,7 @@ let changeSecure dataAccess session (oldP,newP) =
     let updateSecure seed =
         { account with secureMnemonicPhrase = Secured.create newP seed }
         |> DataAccess.Account.put dataAccess session
-        Ok ()
+        |> Ok
     
     getMnemonicPhrase dataAccess session oldP
     |> Result.bind updateSecure
