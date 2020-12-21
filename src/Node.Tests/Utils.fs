@@ -10,6 +10,8 @@ open Consensus
 open Infrastructure
 
 module Actor = FsNetMQ.Actor
+[<Literal>]
+let private RunActor = true
 
 let createBroker () =
      Actor.create (fun shim ->
@@ -27,8 +29,8 @@ let getTestnetActors () =
         createBroker ()
         Blockchain.Main.main dataPath (Chain.getChainParameters Chain.Test) busName false
         Network.Main.main dataPath busName (Chain.getChainParameters Chain.Test) "" false "" [] false false
-        Wallet.Main.main dataPath busName Chain.Test Wallet.Main.Wipe.NoWipe
-        AddressDB.Main.main dataPath busName Chain.Test AddressDB.Main.NoWipe
+        Wallet.Main.main dataPath busName Chain.Test RunActor Wallet.Main.Wipe.NoWipe
+        AddressDB.Main.main dataPath busName Chain.Test RunActor AddressDB.Main.NoWipe 
         Api.Main.main Chain.Test busName apiUri
     ]
     |> List.rev
@@ -41,8 +43,8 @@ let getActors () =
         createBroker ()
         Blockchain.Main.main dataPath chainParams busName false
         Network.Main.main dataPath busName chainParams "" false "" [] false false
-        Wallet.Main.main dataPath busName chain Wallet.Main.Wipe.NoWipe
-        AddressDB.Main.main dataPath busName chain AddressDB.Main.NoWipe
+        Wallet.Main.main dataPath busName chain RunActor Wallet.Main.Wipe.NoWipe
+        AddressDB.Main.main dataPath busName chain RunActor AddressDB.Main.NoWipe
         Api.Main.main chain busName apiUri
     ]
     |> List.rev

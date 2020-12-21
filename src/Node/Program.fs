@@ -129,20 +129,12 @@ module Init =
         else
             Disposables.empty
     let wallet (config:MainConfig) =
-        if config.wallet then
-            if config.wipeFull then Wallet.Main.Full elif config.wipe then Wallet.Main.Reset else Wallet.Main.NoWipe
-            |> Wallet.Main.main config.dataPath busName config.chain
-            |> Disposables.toDisposable
-        else
-            Disposables.empty
-        
+        if config.wipeFull then Wallet.Main.Full elif config.wipe then Wallet.Main.Reset else Wallet.Main.NoWipe
+        |> Wallet.Main.main config.dataPath busName config.chain config.wallet
+
     let addressDb (config:MainConfig) =
-        if config.addressDb then
-            if config.wipeFull then AddressDB.Main.Full elif config.wipe then AddressDB.Main.Reset else AddressDB.Main.NoWipe
-            |> AddressDB.Main.main config.dataPath busName config.chain
-            |> Disposables.toDisposable
-        else
-            Disposables.empty
+        if config.wipeFull then AddressDB.Main.Full elif config.wipe then AddressDB.Main.Reset else AddressDB.Main.NoWipe
+        |> AddressDB.Main.main config.dataPath busName config.chain config.addressDb
     
     let miner (config:MainConfig) =
         if config.miner then
