@@ -113,6 +113,12 @@ let getChainParameters = function
     | Main -> mainParameters
     | Test -> testParameters
     | Local -> localParameters
+    
+let getChain (chainParams: ChainParameters) =
+    match chainParams.name with
+    | "main" -> Main
+    | "testnet" -> Test
+    | _ -> Local
 
 let getPeriod blockNumber =
     if blockNumber < 2ul then 0ul
