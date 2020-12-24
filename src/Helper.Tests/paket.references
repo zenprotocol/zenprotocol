@@ -1,0 +1,11 @@
+FsNetMQ
+FSharp.Compiler.Tools
+System.Reactive.Compatibility
+zen_secp256k1_linux
+zen_secp256k1_osx
+NBitcoin
+FsUnit
+FSharp.Core redirects: on
+FSharp.Data
+Zulib
+Logary

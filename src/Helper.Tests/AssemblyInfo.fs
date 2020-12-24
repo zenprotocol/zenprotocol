@@ -1,4 +1,4 @@
-﻿namespace Node.Tests.AssemblyInfo
+﻿namespace Helper.Tests.AssemblyInfo
 
 open System.Reflection
 open System.Runtime.CompilerServices
@@ -7,11 +7,11 @@ open System.Runtime.InteropServices
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[<assembly: AssemblyTitle("Node.Tests")>]
+[<assembly: AssemblyTitle("Helper.Tests")>]
 [<assembly: AssemblyDescription("")>]
 [<assembly: AssemblyConfiguration("")>]
 [<assembly: AssemblyCompany("")>]
-[<assembly: AssemblyProduct("Node.Tests")>]
+[<assembly: AssemblyProduct("Helper.Tests")>]
 [<assembly: AssemblyCopyright("Copyright ©  $year$")>]
 [<assembly: AssemblyTrademark("")>]
 [<assembly: AssemblyCulture("")>]

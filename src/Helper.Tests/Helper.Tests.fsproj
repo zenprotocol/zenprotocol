@@ -9,8 +9,8 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{DFD94DF5-02C9-48A6-A885-902727A15026}</ProjectGuid>
     <OutputType>Library</OutputType>
-    <RootNamespace>Node.Tests</RootNamespace>
-    <AssemblyName>Node.Tests</AssemblyName>
+    <RootNamespace>Helper.Tests</RootNamespace>
+    <AssemblyName>Helper.Tests</AssemblyName>
     <TargetFrameworkVersion>v4.7</TargetFrameworkVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <DocumentationFile>bin\$(Configuration)\$(AssemblyName).xml</DocumentationFile>
@@ -23,7 +23,7 @@
     <OutputPath>bin\$(Configuration)\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Debug\Node.Tests.XML</DocumentationFile>
+    <DocumentationFile>bin\Debug\Helper.Tests.XML</DocumentationFile>
     <OtherFlags>--warnon:1182</OtherFlags>
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
@@ -46,13 +46,6 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Setup.fs" />
-    <Compile Include="Config.fs" />
-    <Compile Include="Json.fs" />
-    <Compile Include="Utils.fs" />
-    <Compile Include="TestingLib.fs" />
-    <Compile Include="ContractTests.fs" />
-    <Compile Include="AddressDBTests.fs" />
-    <Compile Include="SimpleApiTests.fs" />
     <Content Include="paket.references" />
   </ItemGroup>
   <ItemGroup>

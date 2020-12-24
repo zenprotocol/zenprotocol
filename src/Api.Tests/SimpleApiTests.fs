@@ -1,4 +1,4 @@
-module Node.Tests.SimpleApiTests
+module Api.Tests.SimpleApiTests
 
 open NUnit.Framework
 open FsUnit
@@ -16,11 +16,10 @@ let i = ignore
 
 let chainParams = (Chain.getChainParameters Chain.Test)
 
-
-//[<SetUp>]
-//[<TearDown>]
-//let clean() =
-//    Platform.cleanDirectory dataPath
+[<SetUp>]
+[<TearDown>]
+let clean() =
+    Platform.cleanDirectory dataPath
 
 module Blocks =
     let private fromHex hex =
