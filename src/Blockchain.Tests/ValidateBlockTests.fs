@@ -8,24 +8,16 @@ open Consensus.Chain
 open Infrastructure
 open Blockchain
 open Blockchain.State
-open FsCheck
 open Messaging.Events
 open Messaging.Services.Network
-open Wallet
 open Blockchain.DatabaseContext
 open Consensus.Tests.SampleContract
 open Consensus.Contract
 open Consensus.Tests
-open Tests.ContractCode
-open Api.Types
 
 open System
 open Blockchain.Tally
 open Blockchain.Tests
-open Consensus.Tests
-open Consensus.Tests
-open Consensus.Tests
-open TestsInfrastructure.Constraints
 open Messaging.Services
 open Helper
 
@@ -63,7 +55,6 @@ let rootAccount, rootExtendedKey = rootAccountData
 
 let createTransaction account =
     Result.get <| TestWallet.createTransaction testParameters (publicKeyHash account) {asset=Asset.Zen;amount=rootAmount} (account, snd rootAccountData)
-
 
 // Default initial state of mempool and utxoset
 let utxoSet = UtxoSet.asDatabase

@@ -170,7 +170,7 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             error
             |> reply<string> requestId
             NoAccount
-        | GetTransactionCount _ ->
+        | GetTransactionCount ->
             error
             |> reply<int> requestId
             NoAccount

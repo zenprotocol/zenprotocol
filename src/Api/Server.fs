@@ -393,11 +393,6 @@ module Blockchain =
             |> config.reply StatusCode.OK
 
 module AddressDB =
-    let resync
-        (config: Config)
-        : unit =
-            AddressDB.resyncAccount config.client
-            config.reply StatusCode.OK NoContent
     let balance
         (config: Config)
         (body: string)
@@ -542,6 +537,11 @@ module AddressDB =
                     |> JsonContent
                     |> config.reply StatusCode.OK
                 | Error error -> config.replyError error
+    let resync
+        (config: Config)
+        : unit =
+            AddressDB.resyncAccount config.client
+            config.reply StatusCode.OK NoContent
 
 module Wallet =
     let publicKey
@@ -679,7 +679,7 @@ module Wallet =
             match parseImportSeedJson body with
             | Ok (words, key) ->
                 match Wallet.importSeed config.client words key with
-                | Ok _ -> config.reply StatusCode.OK NoContent
+                | Ok _ -> config.reply StatusCode.OK (TextContent "account imported")
                 | Error error -> config.replyError error
             | Error error ->
                 config.replyError error
@@ -693,8 +693,7 @@ module Wallet =
                 match Wallet.getMnemonicPhrase config.client password with
                 | Ok mnemonicPhrase ->
                     mnemonicPhrase
-                    |> JsonValue.String
-                    |> JsonContent
+                    |> TextContent
                     |> config.reply StatusCode.OK
                 | Error error ->
                     config.replyError error
@@ -882,7 +881,7 @@ module Wallet =
                     |> JsonContent
                     |> config.reply StatusCode.OK
                 | Error error -> config.replyError error
-            | _ -> config.replyError "address is missing"
+            | None-> config.replyError "address is missing"
 
 
     let resync
@@ -890,6 +889,7 @@ module Wallet =
         : unit =
             Wallet.resyncAccount config.client
             config.reply StatusCode.OK NoContent
+
     module Contract =
         let activate
             (config: Config)
@@ -1066,10 +1066,40 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
     match request with
     | Get ("/network/connections/count", _) ->
         Network.connectionCount config
+    | Get("/address/decode", query) ->
+        Address.decode config query
     | Get("/blockchain/headers", query) ->
         Blockchain.headers config query
     | Get ("/blockchain/info", _) ->
         Blockchain.info config
+    | Get ("/blockchain/cgp", _) ->
+        Blockchain.cgp config
+    | Get ("/blockchain/cgp/history", _) ->
+        Blockchain.cgpHistory config
+    | Get ("/blockchain/contract/cgp", _) ->
+        Blockchain.cgpContract config
+    | Post ("/blockchain/publishblock", Some body) ->
+       Blockchain.publishBlock config body
+    | Post ("/blockchain/submitheader", Some body) ->
+        Blockchain.submitHeader config body
+    | Get ("/blockchain/blocktemplate", query) ->
+        Blockchain.blocktemplate config query
+    | Get ("/blockchain/block", query) ->
+        Blockchain.block config query
+    | Get ("/blockchain/blocks", query) ->
+        Blockchain.blocks config query
+    | Get ("/blockchain/transaction", query) ->
+        Blockchain.transaction config query
+    | Post ("/blockchain/publishtransaction", Some body) ->
+        Blockchain.publishTransaction config body
+    | Post ("/blockchain/contract/execute", Some body) ->
+        Blockchain.contractExecute config body
+    | Get ("/blockchain/winner", _) ->
+        Blockchain.winner config
+    | Get("/blockchain/totalzp",_) ->
+        Blockchain.totalZP config
+    | Get("/blockchain/candidates", query) ->
+        Blockchain.candidates config query
     | Get ("/contract/active", _) ->
         Contract.active config chain
     | Get ("/contract/contractId", query) ->
@@ -1121,33 +1151,6 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
     | Get  ("/wallet/resync", _)
     | Post ("/wallet/resync", _) ->
         Wallet.resync config
-    | Get  ("/addressdb/resync", _)
-    | Post ("/addressdb/resync", _) ->
-        AddressDB.resync config
-    | Get ("/blockchain/cgp", _) ->
-        Blockchain.cgp config
-    | Get ("/blockchain/cgp/history", _) ->
-        Blockchain.cgpHistory config
-    | Get ("/blockchain/contract/cgp", _) ->
-        Blockchain.cgpContract config
-    | Post ("/blockchain/publishblock", Some body) ->
-       Blockchain.publishBlock config body
-    | Post ("/blockchain/submitheader", Some body) ->
-        Blockchain.submitHeader config body
-    | Get ("/blockchain/blocktemplate", query) ->
-        Blockchain.blocktemplate config query
-    | Get ("/blockchain/block", query) ->
-        Blockchain.block config query
-    | Get ("/blockchain/blocks", query) ->
-        Blockchain.blocks config query
-    | Get ("/blockchain/transaction", query) ->
-        Blockchain.transaction config query
-    | Post ("/blockchain/publishtransaction", Some body) ->
-        Blockchain.publishTransaction config body
-    | Post ("/blockchain/contract/execute", Some body) ->
-        Blockchain.contractExecute config body
-    | Get ("/blockchain/winner", _) ->
-        Blockchain.winner config
     | Post ("/wallet/importwatchonlyaddress", Some body) ->
         Wallet.importWatchOnlyAddress config body
     | Post ("/wallet/getnewaddress", _) ->
@@ -1158,8 +1161,6 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
         Wallet.utxo config
     | Get ("/wallet/addressoutputs",query) ->
         Wallet.addressOutputs config query
-    | Get("/address/decode", query) ->
-        Address.decode config query
     | Get("/wallet/addressbalance", query) ->
         Wallet.addressBalance config query
     | Get("/blockchain/blockreward", query) ->
@@ -1172,16 +1173,15 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
        Wallet.importZenPublicKey config body
     | Post("/wallet/remove", Some body) ->
         Wallet.remove config body
+    | Get  ("/addressdb/resync", _)
+    | Post ("/addressdb/resync", _) ->
+        AddressDB.resync config
     | Post("/addressdb/balance", Some body) ->
         AddressDB.balance config body
     | Post("/addressdb/outputs", Some body) ->
         AddressDB.outputs config body
     | Post("/addressdb/transactions", Some body) ->
        AddressDB.transactions config body
-    | Get("/blockchain/totalzp",_) ->
-        Blockchain.totalZP config
-    | Get("/blockchain/candidates", query) ->
-        Blockchain.candidates config query
     | Post("/addressdb/transactioncount", Some body) ->
         AddressDB.transactionCount config body
     | Post("/addressdb/contract/mint", Some body) ->
