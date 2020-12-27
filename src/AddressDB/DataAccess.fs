@@ -22,7 +22,7 @@ type T = {
     contractHistory: MultiCollection<ContractId, WitnessPoint>
     contractData: Collection<WitnessPoint, string * data option>
     contractConfirmations: Collection<WitnessPoint, Wallet.Types.ConfirmationStatus>
-    contractAssets: Collection<Asset,string option* string * data option>
+    contractAssets: Collection<Asset,uint32 * string option* string * data option>
     tip: SingleValue<Tip>
     dbVersion: SingleValue<int>
 }

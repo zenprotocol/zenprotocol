@@ -122,21 +122,24 @@ module ContractData =
     
     
 module ContractAsset =
-    let size (pk, command, messageBody) =
+    let size (_, pk, command, messageBody) =
+        4 +
         Option.size String.size pk +
         String.size command +
         Option.size Data.size messageBody
 
-    let write stream (pk,command, messageBody) =
+    let write (stream:Stream) ((blockNumber:uint32), pk, command, messageBody) =
+        stream.writeNumber4 blockNumber
         Option.write stream String.write pk
         String.write stream command
         Option.write stream Data.write messageBody
 
-    let read reader =
+    let read (reader:Stream) =
+        let blockNumber = reader.readNumber4 ()
         let pk = Option.read String.read reader
         let command = String.read reader
         let messageBody = Option.read Data.read reader
-        pk, command, messageBody
+        blockNumber, pk, command, messageBody
 
     let serialize = serialize size write
     let deserialize = deserialize read

@@ -121,7 +121,7 @@ module Mint =
         | Some (pk , _) -> Some (CryptoPublicKey.toString pk)
         | None -> None
 
-    let updateAll op dataAccess session tx =
+    let updateAll op dataAccess session tx blockNumber =
 
         for input in tx.inputs do
             match input with
@@ -129,7 +129,7 @@ module Mint =
                 match op with
                 | Add ->
                     tx.witnesses
-                    |> List.choose (fun x -> match x with | ContractWitness cw -> Some (extractPK cw.signature, cw.command, cw.messageBody) | _ -> None)
+                    |> List.choose (fun x -> match x with | ContractWitness cw -> Some (blockNumber, extractPK cw.signature, cw.command, cw.messageBody) | _ -> None)
                     |> List.head //as we have mint then surely we have a cw
                     |> DataAccess.ContractAssets.put dataAccess session spend.asset
                 | Remove ->
@@ -159,7 +159,7 @@ module Block =
              Input  .updateAll op dataAccess session ex.tx.inputs    ex.txHash confirmationStatus
              Output .updateAll op dataAccess session ex.tx.outputs   ex.txHash confirmationStatus
              Witness.updateAll op dataAccess session ex.tx.witnesses ex.txHash confirmationStatus
-             Mint   .updateAll op dataAccess session ex.tx
+             Mint   .updateAll op dataAccess session ex.tx block.header.blockNumber
 
 module Tip =
 

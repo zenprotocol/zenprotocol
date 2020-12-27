@@ -6,11 +6,11 @@ open Wallet.Address
 open Consensus.Types
 open DataAccess
 open Types
-open Hash
 open Infrastructure
 open Messaging.Services.AddressDB
 open Zen.Types.Data
 open Messaging.Services.Wallet
+module CryptoPublicKey = Crypto.PublicKey
 
 let addOutput outputs outpoint output =
     Map.add outpoint output outputs
@@ -30,6 +30,16 @@ let addContractHistory contractData contractId data =
         | Some data -> data
         | None -> []
     Map.add contractId data contractData
+
+let addContractAsset
+    (contractAssetData:Map<Asset, uint32 * string option * string * data option>)
+    (mintLists: List<Asset * uint32 * string option * string * data option>) =
+        let mutable mintMap = contractAssetData
+        for mint in mintLists do
+            match mint with
+            | asset,blockNumber, sender, command, msgBody ->
+               mintMap <- Map.add asset (blockNumber, sender, command, msgBody) mintMap
+        mintMap
     
 let setContractData contractData witnessPoint data =
     Map.add witnessPoint data contractData
@@ -43,6 +53,7 @@ type T =
         addressOutpoints: Map<Address, List<Outpoint>>
         contractHistory: Map<ContractId, List<WitnessPoint>>
         contractData: Map<WitnessPoint, string * data option>
+        contractAsset: Map<Asset, uint32 * string option * string * data option>
         contractConfirmations: Map<WitnessPoint, ConfirmationStatus>
     }
     with
@@ -56,6 +67,7 @@ let empty = {
     addressOutpoints = Map.empty
     contractHistory = Map.empty
     contractData = Map.empty
+    contractAsset = Map.empty
     contractConfirmations = Map.empty
 }
 
@@ -96,6 +108,14 @@ module ContractHistory =
     let get view dataAccess session contractId =
         ContractHistory.get dataAccess session contractId @ get' view contractId
         
+module ContractAssets =
+    let get (view:T) dataAccess session asset =
+        match ContractAssets.tryGet dataAccess session asset with
+        | Some a ->
+            Some a
+        | None -> Map.tryFind asset view.contractAsset
+
+        
 module ContractData =
     let get view dataAccess session witnessPoint =
         Map.tryFind witnessPoint view.contractData
@@ -127,8 +147,21 @@ let mapUnspentTxOutputs outputs txHash confirmationStatus =
             status = Unspent
             confirmationStatus = confirmationStatus
         })
+let private extractPK ( signature: (Crypto.PublicKey * 'a) option ) =
+        match signature with
+        | Some (pk , _) -> Some (CryptoPublicKey.toString pk)
+        | None -> None
 
 let addMempoolTransaction dataAccess session txHash tx view =
+    let account = DataAccess.Tip.get dataAccess session
+    let mintsList =
+        tx.inputs
+        |> List.choose (function | Mint spend-> Some spend.asset | _ -> None)
+        |> List.map (fun asset ->
+                    tx.witnesses
+                    |> List.choose (fun x -> match x with | ContractWitness cw -> Some (asset,account.blockNumber, extractPK cw.signature, cw.command, cw.messageBody) | _ -> None)
+                    |> List.head)
+
     tx.inputs
     |> List.choose (function | Outpoint outpoint -> Some outpoint | _ -> None)
     |> List.fold (fun view outpoint ->
@@ -150,6 +183,7 @@ let addMempoolTransaction dataAccess session txHash tx view =
             addressOutpoints = addAddressOutpoints view.addressOutpoints dbOutput.address [ dbOutput.outpoint ]
             contractHistory = view.contractHistory
             contractData = view.contractData
+            contractAsset = view.contractAsset
             contractConfirmations = view.contractConfirmations
         }) view)
     |> Option.map (fun view ->
@@ -163,13 +197,15 @@ let addMempoolTransaction dataAccess session txHash tx view =
                     addressOutpoints = view.addressOutpoints
                     contractHistory = addContractHistory view.contractHistory cw.contractId [ witnessPoint ]
                     contractData = setContractData view.contractData witnessPoint (cw.command, cw.messageBody)
+                    contractAsset = view.contractAsset
                     contractConfirmations = setContractConfirmationStatus view.contractConfirmations witnessPoint Unconfirmed
                 }                
             | _ ->
                 view
         ) view)
     |> function
-    | Some view' -> view'
+    | Some view' ->
+        {view' with contractAsset = addContractAsset view.contractAsset mintsList}
     | None -> view
         
 let fromMempool dataAccess session =
@@ -266,5 +302,5 @@ let getContractHistory dataAccess session view skip take contractId =
     |> Wallet.Account.paginate skip take
     |> List.map (fun ((command, messageBody, txHash), (confirmations, _)) -> command, messageBody, txHash, confirmations)
 
-let getContractAsset dataAccess session asset =
-    ContractAssets.tryGet dataAccess session asset
+let getContractAsset dataAccess session view asset =
+    ContractAssets.get view dataAccess session asset

@@ -440,8 +440,12 @@ module AddressDB =
                 config.replyError error
             | Ok address ->
                 match AddressDB.getContractAssets config.client address with
-                | Ok (Some (pk,command, messageBody)) ->
+                | Ok (Some (blockNumber ,pk, command, messageBody)) ->
                     [|
+                        "executionBlock",
+                            blockNumber
+                            |> decimal
+                            |> JsonValue.Number
                         "sender",
                             pk
                             |> Option.map JsonValue.String

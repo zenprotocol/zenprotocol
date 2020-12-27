@@ -81,6 +81,9 @@ let ``should get contract history`` () =
     let body = Constants.executeContract
 
     Api.Server.Wallet.Contract.execute config body
+    
+    Api.Server.Blockchain.info config
+    
     let expectedContent =
         Api.Types.ContractCommandHistoryResultJson.Parse ("[{\"command\": \"this command\",\"messageBody\": null,\"txHash\": \"42cf3f7cac8baa63f620d770a82e03cef9fd877da450e8b6b47cf267d3ad732a\",\"confirmations\": 0}]")
         |> Array.map (fun x -> x.JsonValue)
@@ -113,7 +116,13 @@ let ``should get contract mint`` () =
     let body = Constants.executeContract
 
     Api.Server.Wallet.Contract.execute config body
-    let expectedContent = TextContent "No data" //TODO: get the Asset mint information as well for default asset
+    let body = Constants.publishSecondBlock
+
+    Api.Server.Blockchain.publishBlock config body
+    
+    Api.Server.Blockchain.info config
+    
+    let expectedContent = JsonContent <| JsonValue.Parse Constants.contractMint
     let body = "{\"asset\": \"0000000060de85a214850bf6192e7c4416fbccaf3cfcc0a927dd6b770a70ff08d24046d3\"}"
 
     Api.Server.AddressDB.contractMint (debugConfig expectedContent) body
