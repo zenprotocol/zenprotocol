@@ -112,7 +112,7 @@ let processHeaders chain session timestamp peerId (headers:BlockHeader list) ibd
                     else
                         List.skip maxDownloading missingBlocks, List.take maxDownloading missingBlocks
 
-                for (hash,block) in blocksToDownload do
+                for (hash,_) in blocksToDownload do
                     do! getBlockFrom peerId hash
 
                 let inprogress =

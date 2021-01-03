@@ -6,7 +6,7 @@ open Consensus.Serialization.Serialization
 open Infrastructure.Timestamp
 
 module Address =
-    let size ((address:string),(timestamp:Timestamp)) =
+    let size ((address:string),_) =
         4 + System.Text.Encoding.ASCII.GetByteCount address + 8
 
     let write (stream:Stream) ((address:string),(timestamp:Timestamp)) =

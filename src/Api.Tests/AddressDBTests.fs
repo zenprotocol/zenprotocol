@@ -129,7 +129,7 @@ let ``should get contract mint`` () =
     let expectedContent = JsonContent <| JsonValue.Parse Constants.contractMint
     let body = "{\"asset\": \"0000000060de85a214850bf6192e7c4416fbccaf3cfcc0a927dd6b770a70ff08d24046d3\"}"
 
-    Api.Server.AddressDB.contractMint (debugConfig expectedContent) body
+    Api.Server.AddressDB.contractMint (contentConfig expectedContent) body
 #endif
 #if DEBUG
 [<Test>]
@@ -185,7 +185,7 @@ let ``Should get contract info`` () =
     let contentConfig e = {contentConfig e with client = client; chain = Chain.getChain chainParams }
     let body = Constants.contractInfo
     let expectedContent = JsonContent <| JsonValue.Parse Constants.contractInfoResponse
-    Api.Server.AddressDB.contractInfo (debugConfig expectedContent) body
+    Api.Server.AddressDB.contractInfo (contentConfig expectedContent) body
 #endif
 #if DEBUG
 [<Test>]

@@ -138,7 +138,7 @@ type T =
 
 
 module Hello =
-    let getMessageSize (msg:Hello) =
+    let getMessageSize (_:Hello) =
         0 +
             4 +
             4 +
@@ -166,7 +166,7 @@ module Hello =
 
 
 module HelloAck =
-    let getMessageSize (msg:HelloAck) =
+    let getMessageSize (_:HelloAck) =
         0 +
             4 +
             4 +
@@ -189,7 +189,7 @@ module HelloAck =
         }
 
 module Ping =
-    let getMessageSize (msg:Ping) =
+    let getMessageSize (_:Ping) =
             4
 
     let write (msg:Ping) stream =
@@ -204,7 +204,7 @@ module Ping =
         }
 
 module Pong =
-    let getMessageSize (msg:Pong) =
+    let getMessageSize (_:Pong) =
             4
 
     let write (msg:Pong) stream =
@@ -323,7 +323,7 @@ module GetTransactions =
 
 module GetBlock =
     let blockHashSize = 32
-    let getMessageSize (msg:GetBlock) =
+    let getMessageSize (_:GetBlock) =
             32
 
     let write (msg:GetBlock) stream =
@@ -356,7 +356,7 @@ module Block =
 
 module Tip =
     let blockHeaderSize = 100
-    let getMessageSize (msg:Tip) =
+    let getMessageSize (_:Tip) =
             100
 
     let write (msg:Tip) stream =
@@ -372,7 +372,7 @@ module Tip =
 
 module NewBlock =
     let blockHeaderSize = 100
-    let getMessageSize (msg:NewBlock) =
+    let getMessageSize (_:NewBlock) =
             100
 
     let write (msg:NewBlock) stream =
@@ -431,7 +431,7 @@ module Headers =
         }
 
 module UnknownMessage =
-    let getMessageSize (msg:UnknownMessage) =
+    let getMessageSize (_:UnknownMessage) =
             1
 
     let write (msg:UnknownMessage) stream =

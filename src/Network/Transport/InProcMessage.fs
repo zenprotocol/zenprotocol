@@ -299,7 +299,7 @@ module Connected =
 
 module Accepted =
     let peerIdSize = 4
-    let getMessageSize (msg:Accepted) =
+    let getMessageSize (_:Accepted) =
             4
 
     let write (msg:Accepted) stream =
@@ -409,7 +409,7 @@ module PublishAddresses =
 
 module GetAddresses =
     let peerIdSize = 4
-    let getMessageSize (msg:GetAddresses) =
+    let getMessageSize (_:GetAddresses) =
             4
 
     let write (msg:GetAddresses) stream =
@@ -482,7 +482,7 @@ module SendAddresses =
 
 module GetMemPool =
     let peerIdSize = 4
-    let getMessageSize (msg:GetMemPool) =
+    let getMessageSize (_:GetMemPool) =
             4
 
     let write (msg:GetMemPool) stream =
@@ -612,7 +612,7 @@ module Block =
 module Tip =
     let peerIdSize = 4
     let blockHeaderSize = 100
-    let getMessageSize (msg:Tip) =
+    let getMessageSize (_:Tip) =
         0 +
             4 +
             100 +
@@ -636,7 +636,7 @@ module Tip =
 
 module PublishBlock =
     let blockHeaderSize = 100
-    let getMessageSize (msg:PublishBlock) =
+    let getMessageSize (_:PublishBlock) =
             100
 
     let write (msg:PublishBlock) stream =
@@ -654,7 +654,7 @@ module PublishBlock =
 module NewBlock =
     let blockHeaderSize = 100
     let peerIdSize = 4
-    let getMessageSize (msg:NewBlock) =
+    let getMessageSize (_:NewBlock) =
         0 +
             100 +
             4 +
@@ -678,7 +678,7 @@ module NewBlock =
 
 module GetBlock =
     let blockHashSize = 32
-    let getMessageSize (msg:GetBlock) =
+    let getMessageSize (_:GetBlock) =
             32
 
     let write (msg:GetBlock) stream =
@@ -696,7 +696,7 @@ module GetBlock =
 module GetBlockFrom =
     let peerIdSize = 4
     let blockHashSize = 32
-    let getMessageSize (msg:GetBlockFrom) =
+    let getMessageSize (_:GetBlockFrom) =
         0 +
             4 +
             32 +
@@ -722,7 +722,7 @@ module GetBlockFrom =
 module BlockRequest =
     let peerIdSize = 4
     let blockHashSize = 32
-    let getMessageSize (msg:BlockRequest) =
+    let getMessageSize (_:BlockRequest) =
         0 +
             4 +
             32 +
@@ -775,7 +775,7 @@ module SendBlock =
 module SendTip =
     let peerIdSize = 4
     let blockHeaderSize = 100
-    let getMessageSize (msg:SendTip) =
+    let getMessageSize (_:SendTip) =
         0 +
             4 +
             100 +
@@ -799,7 +799,7 @@ module SendTip =
 
 module GetTip =
     let peerIdSize = 4
-    let getMessageSize (msg:GetTip) =
+    let getMessageSize (_:GetTip) =
             4
 
     let write (msg:GetTip) stream =
@@ -950,7 +950,7 @@ module Headers =
 
 module DisconnectPeer =
     let peerIdSize = 4
-    let getMessageSize (msg:DisconnectPeer) =
+    let getMessageSize (_:DisconnectPeer) =
             4
 
     let write (msg:DisconnectPeer) stream =

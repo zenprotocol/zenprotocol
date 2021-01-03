@@ -80,11 +80,9 @@ type MainConfig =
         externalIp: string
         listen: bool
     }
-
-module Local =
-    
-    let addGenesis (config:MainConfig) =
 #if DEBUG
+module Local =
+    let addGenesis (config:MainConfig) =
         if config.chain = Chain.Local then
             let block =
                 "000000000000000000000000000000000000000000000000000000000000000000000000000000013ca83bcc8483b5a8706a8fed28e4ec64952d7d6b65624c8e8026f48cf177176700000160e073fe8f20ffffff0000000000000000000000000000000003b01098756bcf637bef2a161bd49412cad0a10adf12e64a694c41f9c5b971642029f0999def953f2a14ad6c143e2a0ebf3b4f794d8b17fc1203c12365427c09d3be653064be80f760b9d471dc9afbac2b24236c9f2eb0f08b7427942852dc780201000000000001022030759b07ca01caf8e524fc279946a1e96afc3546ee5f1fd4a1cfaf644763c2b4002c010000"
@@ -94,8 +92,8 @@ module Local =
             use client = ServiceBus.Client.create busName
 
             Messaging.Services.Blockchain.validateMinedBlock client block
-#endif
         ()
+#endif
 
 module Init =
     
@@ -314,9 +312,9 @@ let main argv =
     use addressDbActor  = Init.addressDb config
 
     use minerActor      = Init.miner config
-        
+#if DEBUG        
     Local.addGenesis config
-
+#endif
     use event = new Threading.ManualResetEvent(false)
 
     Console.CancelKeyPress.Add (fun e ->

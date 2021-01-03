@@ -72,7 +72,6 @@ let ``Should check existance``() =
 let ``Should import mnemonicPhrase``() =
     use actors = getBasicActors()
     let client = ServiceBus.Client.create Utils.busName
-    let config = {config with client = client }
     let contentConfig e = contentConfig e |> fun conf -> {conf with client = client }
     
     let expectedContent = TextContent "account imported"
