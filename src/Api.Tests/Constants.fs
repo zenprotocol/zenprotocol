@@ -37,6 +37,9 @@ let sendTo =
 let activateContract =
     sprintf "{\"code\": %A, \"rlimit\": 2723280, \"numberOfBlocks\": 10, \"password\": %A}" sampleContractCode password
 
+let contractInfo =
+    sprintf "{\"code\": %A, \"rlimit\": 2723280}" sampleContractCode
+
 let walletKeys =
     "[{\"publicKey\": \"02b43a1cb4cb6472e1fcd71b237eb9c1378335cd200dd07536594348d9e450967e\",\"path\": \"m/44'/258'/0'/0/0\"},{\"publicKey\": \"029ae9b49e60259958302fab6c9be333775fd7ada72f11643218dcf23e5f37ec92\",\"path\": \"m/44'/258'/0'/1/0\"}]"
 
@@ -189,3 +192,46 @@ let contractMint =
   "messageBodyRaw": null
 }
 """
+
+let contractInfoResponse =
+#if DEBUG
+    """
+{
+    "contractId": "0000000060de85a214850bf6192e7c4416fbccaf3cfcc0a927dd6b770a70ff08d24046d3",
+    "address": "ctzn1qqqqqqqrqm6z6y9y9p0mpjtnugst0hn908n7vp2f8m44hwznsluydyszx6vjk2kpw",
+    "hints": "[\"dec09bb14444fd7a849d2a2b0c04bd60\",[[\"Z60de85a214850bf6192e7c4416fbccaf3cfcc0a927dd6b770a70ff08d24046d3.mainFunction\",1,2,1,[\"@MaxIFuel_assumption\",\"@query\",\"Prims_pretyping_ae567c2fb75be05905677af440075565\",\"Zen.Cost.Realized_interpretation_Tm_arrow_8f884e5a479333b9416793675b7e962b\",\"Zen.Types.Main_pretyping_5bd8c5a85db081605d2f2b0ef5761cbb\",\"Zen.Types.Main_pretyping_8d0bd552ce32ff91a3c9f4725122e3be\",\"data_typing_intro_Zen.Types.Main.Anonymous@tok\",\"equation_Prims.nat\",\"equation_Z60de85a214850bf6192e7c4416fbccaf3cfcc0a927dd6b770a70ff08d24046d3.cf\",\"equation_Zen.Base.cast\",\"equation_Zen.Base.op_Bar_Greater\",\"equation_Zen.Types.Main.maxCost\",\"fuel_guarded_inversion_Zen.Types.Main.context\",\"function_token_typing_Prims.nat\",\"function_token_typing_Zen.Cost.Realized.ret\",\"int_typing\",\"lemma_Zen.Cost.Realized.force_inc\",\"lemma_Zen.Cost.Realized.force_ret\",\"primitive_Prims.op_Addition\",\"proj_equation_Zen.Types.Main.CostFunc_f\",\"proj_equation_Zen.Types.Main.CostFunc_n\",\"projection_inverse_BoxInt_proj_0\",\"projection_inverse_Zen.Types.Main.CostFunc_f\",\"projection_inverse_Zen.Types.Main.CostFunc_n\",\"refinement_interpretation_Prims_Tm_refine_ba523126f67e00e7cd55f0b92f16681d\",\"refinement_interpretation_Zen.Types.Main_Tm_refine_8ae4abcfc6bc8d4903b7e1f40e070ec2\",\"string_inversion\",\"token_correspondence_Z60de85a214850bf6192e7c4416fbccaf3cfcc0a927dd6b770a70ff08d24046d3.cf\",\"token_correspondence_Zen.Base.cast\",\"token_correspondence_Zen.Cost.Realized.ret\",\"token_correspondence_Zen.Types.Main.__proj__CostFunc__item__f\"],0,\"3fdd7bdf779881c809f45995a79e96d4\"]]]\n",
+    "queries": 31,
+    "rlimit": 2723280
+}
+"""
+#else
+    """
+{
+    "contractId": "0000000060de85a214850bf6192e7c4416fbccaf3cfcc0a927dd6b770a70ff08d24046d3",
+    "address": "ctzn1qqqqqqqrqm6z6y9y9p0mpjtnugst0hn908n7vp2f8m44hwznsluydyszx6vjk2kpw",
+    "hints": "[\"dec09bb14444fd7a849d2a2b0c04bd60\",[[\"Z60de85a214850bf6192e7c4416fbccaf3cfcc0a927dd6b770a70ff08d24046d3.mainFunction\",1,2,1,[\"@MaxIFuel_assumption\",\"@query\",\"Prims_pretyping_ae567c2fb75be05905677af440075565\",\"Zen.Cost.Realized_interpretation_Tm_arrow_8f884e5a479333b9416793675b7e962b\",\"Zen.Types.Main_pretyping_5bd8c5a85db081605d2f2b0ef5761cbb\",\"Zen.Types.Main_pretyping_8d0bd552ce32ff91a3c9f4725122e3be\",\"data_typing_intro_Zen.Types.Main.Anonymous@tok\",\"equation_Prims.nat\",\"equation_Z60de85a214850bf6192e7c4416fbccaf3cfcc0a927dd6b770a70ff08d24046d3.cf\",\"equation_Zen.Base.cast\",\"equation_Zen.Base.op_Bar_Greater\",\"equation_Zen.Types.Main.maxCost\",\"fuel_guarded_inversion_Zen.Types.Main.context\",\"function_token_typing_Prims.nat\",\"function_token_typing_Zen.Cost.Realized.ret\",\"int_typing\",\"lemma_Zen.Cost.Realized.force_inc\",\"lemma_Zen.Cost.Realized.force_ret\",\"primitive_Prims.op_Addition\",\"proj_equation_Zen.Types.Main.CostFunc_f\",\"proj_equation_Zen.Types.Main.CostFunc_n\",\"projection_inverse_BoxInt_proj_0\",\"projection_inverse_Zen.Types.Main.CostFunc_f\",\"projection_inverse_Zen.Types.Main.CostFunc_n\",\"refinement_interpretation_Prims_Tm_refine_ba523126f67e00e7cd55f0b92f16681d\",\"refinement_interpretation_Zen.Types.Main_Tm_refine_8ae4abcfc6bc8d4903b7e1f40e070ec2\",\"string_inversion\",\"token_correspondence_Z60de85a214850bf6192e7c4416fbccaf3cfcc0a927dd6b770a70ff08d24046d3.cf\",\"token_correspondence_Zen.Base.cast\",\"token_correspondence_Zen.Cost.Realized.ret\",\"token_correspondence_Zen.Types.Main.__proj__CostFunc__item__f\"],0,\"60bd37f1ba6f035bc725b38ead0d4c5a\"]]]\n",
+    "queries": 31,
+    "rlimit": 2723280
+}
+"""
+#endif
+let contractActivateResponse =
+#if DEBUG
+    "{\"address\": \"ctzn1qqqqqqqrqm6z6y9y9p0mpjtnugst0hn908n7vp2f8m44hwznsluydyszx6vjk2kpw\",\"contractId\": \"0000000060de85a214850bf6192e7c4416fbccaf3cfcc0a927dd6b770a70ff08d24046d3\",\"txHash\": \"a4279de5058efaa4c38054acfe9a84ec87eea6c0690e195db31769b647e2cbde\",\"numberOfBlocks\": \"10\"}"
+#else
+    "{\"address\": \"ctzn1qqqqqqqrqm6z6y9y9p0mpjtnugst0hn908n7vp2f8m44hwznsluydyszx6vjk2kpw\",\"contractId\": \"0000000060de85a214850bf6192e7c4416fbccaf3cfcc0a927dd6b770a70ff08d24046d3\",\"txHash\": \"0814631952dd143e9771958ed69bbff300ca6b866077d819a621fdd342ff8a2c\",\"numberOfBlocks\": \"10\"}"
+#endif
+
+let contractExecuteResponse =
+#if DEBUG
+    "5886229dd4d3002d34918dd2649c79b0f28c235dc4b8637984151ba75488ed66"
+#else
+    "42cf3f7cac8baa63f620d770a82e03cef9fd877da450e8b6b47cf267d3ad732a"
+#endif
+
+let contractExecute =
+#if DEBUG
+    "[{\"command\": \"this command\",\"messageBody\": null,\"txHash\": \"5886229dd4d3002d34918dd2649c79b0f28c235dc4b8637984151ba75488ed66\",\"confirmations\": 0}]"
+#else
+    "[{\"command\": \"this command\",\"messageBody\": null,\"txHash\": \"42cf3f7cac8baa63f620d770a82e03cef9fd877da450e8b6b47cf267d3ad732a\",\"confirmations\": 0}]"
+#endif

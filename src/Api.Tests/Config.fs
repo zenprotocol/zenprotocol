@@ -1,7 +1,6 @@
 module Api.Tests.Config
 
 open Consensus
-open Types
 open Infrastructure.Http
 open Infrastructure.ServiceBus
 open Api.BlockTemplateCache

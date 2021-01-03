@@ -19,7 +19,7 @@ let clean() =
     Platform.cleanDirectory dataPath
 
 let i = ignore
-
+#if DEBUG
 [<Test>]
 let ``Contract should activate and execute (from transaction)``() =
     use actors = getActors()
@@ -50,3 +50,4 @@ let ``Contract should activate and execute (from transaction)``() =
     |> Option.map Hash.toString
     |> Option.defaultValue "should not be None"
     |> should equal "d5c5663e704f1c68b9bd3137c5a51222f5946d615d91d82190d74af7deeb6ac9"
+#endif

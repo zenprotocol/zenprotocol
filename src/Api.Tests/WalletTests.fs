@@ -353,7 +353,7 @@ let ``Should create a transaction``() =
 
        
     Api.Server.Wallet.createTransaction (contentConfig expectedContent) body
-
+#if DEBUG    
 [<Test>]
 let ``Should activate a contract``() =
     let chainParams = { Utils.chainParams with genesisHashHash = Hash.fromString "46d1e8e4d397bbcf13f96346dfb998d7445600806d09e6e5d1740b3d8412fd24" |> Option.get |> Hash.computeOfHash }
@@ -373,15 +373,16 @@ let ``Should activate a contract``() =
     Api.Server.Wallet.resync config
     
     let expectedContent =
-        Api.Types.ContractActivateOrExtendResponseJson.Parse ("{\"address\": \"ctzn1qqqqqqqrqm6z6y9y9p0mpjtnugst0hn908n7vp2f8m44hwznsluydyszx6vjk2kpw\",\"contractId\": \"0000000060de85a214850bf6192e7c4416fbccaf3cfcc0a927dd6b770a70ff08d24046d3\",\"txHash\": \"0814631952dd143e9771958ed69bbff300ca6b866077d819a621fdd342ff8a2c\",\"numberOfBlocks\": \"10\"}")
+        Constants.contractActivateResponse
+        |> Api.Types.ContractActivateOrExtendResponseJson.Parse
         |> fun x -> x.JsonValue
         |> JsonContent
     let body = Constants.activateContract
 
     Api.Server.Wallet.Contract.activate (contentConfig expectedContent) body
+#endif    
     
-    
-    
+#if DEBUG    
 [<Test>]
 let ``Should execute a contract``() =
     let chainParams = { Utils.chainParams with genesisHashHash = Hash.fromString "46d1e8e4d397bbcf13f96346dfb998d7445600806d09e6e5d1740b3d8412fd24" |> Option.get |> Hash.computeOfHash }
@@ -403,11 +404,11 @@ let ``Should execute a contract``() =
     let body = Constants.activateContract
     Api.Server.Wallet.Contract.activate config body
     
-    let expectedContent = JsonContent <| JsonValue.String "42cf3f7cac8baa63f620d770a82e03cef9fd877da450e8b6b47cf267d3ad732a"
+    let expectedContent = JsonContent <| JsonValue.String Constants.contractExecuteResponse
     let body = Constants.executeContract
    
     Api.Server.Wallet.Contract.execute (contentConfig expectedContent) body
-
+#endif
 [<Test>]
 let ``Should get transaction count``() =
     let chainParams = { Utils.chainParams with genesisHashHash = Hash.fromString "46d1e8e4d397bbcf13f96346dfb998d7445600806d09e6e5d1740b3d8412fd24" |> Option.get |> Hash.computeOfHash }

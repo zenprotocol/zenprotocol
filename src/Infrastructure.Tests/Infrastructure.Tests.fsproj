@@ -43,6 +43,7 @@
     <Content Include="app.config" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Setup.fs" />
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="EndpointTests.fs" />
     <Compile Include="EventBus.Tests.fs" />

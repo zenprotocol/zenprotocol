@@ -20,7 +20,7 @@ let clean() =
     Platform.cleanDirectory dataPath
 
 let i = ignore
-
+#if DEBUG
 [<Test>]
 let ``AddressDB should show contract history``() =
     use actors = getActors()
@@ -56,7 +56,8 @@ let ``AddressDB should show contract history``() =
     |> parseContractCommandHistoryResultJson
     |> Array.map (fun (fst, _, _) -> fst)
     |> should contain "mock command"
-    
+#endif
+#if DEBUG    
 [<Test>]
 let ``should get contract history`` () =
     let chainParams = { Utils.chainParams with genesisHashHash = Hash.fromString "46d1e8e4d397bbcf13f96346dfb998d7445600806d09e6e5d1740b3d8412fd24" |> Option.get |> Hash.computeOfHash }
@@ -85,13 +86,16 @@ let ``should get contract history`` () =
     Api.Server.Blockchain.info config
     
     let expectedContent =
-        Api.Types.ContractCommandHistoryResultJson.Parse ("[{\"command\": \"this command\",\"messageBody\": null,\"txHash\": \"42cf3f7cac8baa63f620d770a82e03cef9fd877da450e8b6b47cf267d3ad732a\",\"confirmations\": 0}]")
+        Constants.contractExecute
+        |> Api.Types.ContractCommandHistoryResultJson.Parse
         |> Array.map (fun x -> x.JsonValue)
         |> JsonValue.Array
         |> JsonContent
     let body = "{\"contractId\": \"0000000060de85a214850bf6192e7c4416fbccaf3cfcc0a927dd6b770a70ff08d24046d3\", \"skip\": 0, \"take\": 10}"
 
-    Api.Server.AddressDB.contractHistory (contentConfig expectedContent) body    
+    Api.Server.AddressDB.contractHistory (contentConfig expectedContent) body
+#endif
+#if DEBUG
 [<Test>]
 let ``should get contract mint`` () =
     let chainParams = { Utils.chainParams with genesisHashHash = Hash.fromString "46d1e8e4d397bbcf13f96346dfb998d7445600806d09e6e5d1740b3d8412fd24" |> Option.get |> Hash.computeOfHash }
@@ -126,6 +130,8 @@ let ``should get contract mint`` () =
     let body = "{\"asset\": \"0000000060de85a214850bf6192e7c4416fbccaf3cfcc0a927dd6b770a70ff08d24046d3\"}"
 
     Api.Server.AddressDB.contractMint (debugConfig expectedContent) body
+#endif
+#if DEBUG
 [<Test>]
 let ``Should get transactions``() =
     let chainParams = { Utils.chainParams with genesisHashHash = Hash.fromString "46d1e8e4d397bbcf13f96346dfb998d7445600806d09e6e5d1740b3d8412fd24" |> Option.get |> Hash.computeOfHash }
@@ -169,8 +175,19 @@ let ``Should get transactions``() =
     let body = Constants.transactionSkipTakeTwoAddress
 
     Api.Server.AddressDB.transactions (debugConfig expectedContent) body
-
-
+#endif
+#if DEBUG
+[<Test>]
+let ``Should get contract info`` () =
+    let chainParams = { Utils.chainParams with genesisHashHash = Hash.fromString "46d1e8e4d397bbcf13f96346dfb998d7445600806d09e6e5d1740b3d8412fd24" |> Option.get |> Hash.computeOfHash }
+    use actors = customChainActor chainParams
+    let client = ServiceBus.Client.create Utils.busName
+    let contentConfig e = {contentConfig e with client = client; chain = Chain.getChain chainParams }
+    let body = Constants.contractInfo
+    let expectedContent = JsonContent <| JsonValue.Parse Constants.contractInfoResponse
+    Api.Server.AddressDB.contractInfo (debugConfig expectedContent) body
+#endif
+#if DEBUG
 [<Test>]
 let ``Should get outputs``() =
     let chainParams = { Utils.chainParams with genesisHashHash = Hash.fromString "46d1e8e4d397bbcf13f96346dfb998d7445600806d09e6e5d1740b3d8412fd24" |> Option.get |> Hash.computeOfHash }
@@ -197,15 +214,15 @@ let ``Should get outputs``() =
     let body = Constants.addressDBOutputs
 
     Api.Server.AddressDB.outputs (debugConfig expectedContent) body
-    let expectedContent = JsonContent <| JsonValue.String "03ae57cd8ee6339ad138bf2c1c7dae7b3571d839bc987a818d8c067a7801a784"
+
+
     let body = Constants.sendTo
    
-    Api.Server.Wallet.send (contentConfig expectedContent) body
- 
+    Api.Server.Wallet.send config body
+    
     Api.Server.Blockchain.info config
     Api.Server.Blockchain.info config
-    
-    
+        
     let expectedContent =
         Constants.oneOutpointAfterSend
         |> Api.Types.TransactionsResponseJson.Parse
@@ -215,6 +232,7 @@ let ``Should get outputs``() =
     let body = Constants.addressDBOutputs
 
     Api.Server.AddressDB.outputs (debugConfig expectedContent) body
+#endif
 
 
 [<Test>]
@@ -245,6 +263,7 @@ let ``Should get some balance``() =
     Api.Server.AddressDB.balance (contentConfig expectedContent) body
 
 
+#if DEBUG
 [<Test>]    
 let ``Should get transaction count``() =
     let chainParams = { Utils.chainParams with genesisHashHash = Hash.fromString "46d1e8e4d397bbcf13f96346dfb998d7445600806d09e6e5d1740b3d8412fd24" |> Option.get |> Hash.computeOfHash }
@@ -278,3 +297,4 @@ let ``Should get transaction count``() =
     let expectedContent = JsonContent <| JsonValue.Number 2M
     let body = Constants.transactionTwoAddress
     Api.Server.AddressDB.transactionCount (contentConfig expectedContent) body
+#endif
