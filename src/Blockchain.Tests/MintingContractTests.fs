@@ -180,7 +180,7 @@ let ``Contract should detect unsupported command``() =
                 |> Types.Data.Lock
 
     let data =
-        Dictionary.add "returnAddress"B returnAddress  Dictionary.empty
+        Dictionary.add "returnAddress"B returnAddress (Map.empty, 0ul)
         |> Cost.Realized.__force
         |> Types.Data.Dict
         |> Types.Data.Collection
@@ -218,7 +218,7 @@ let ``Should buy``() =
         |> Types.Data.Lock
 
     let data =
-        Dictionary.add "returnAddress"B returnAddress  Dictionary.empty
+        Dictionary.add "returnAddress"B returnAddress (Map.empty, 0ul)
         |> Cost.Realized.__force
         |> Types.Data.Dict
         |> Types.Data.Collection
@@ -298,7 +298,7 @@ let ``Should redeem``() =
         |> Types.Data.Lock
 
     let data =
-        Dictionary.add "returnAddress"B returnAddress  Dictionary.empty
+        Dictionary.add "returnAddress"B returnAddress (Map.empty, 0ul)
         |> Cost.Realized.__force
         |> Types.Data.Dict
         |> Types.Data.Collection

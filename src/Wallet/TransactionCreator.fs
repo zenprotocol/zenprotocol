@@ -164,7 +164,7 @@ let addReturnAddressToData pkHash data =
 
     match data with
     | Some (ZData.Collection (ZData.Dict dict)) -> addReturnAddressToData' dict
-    | None -> addReturnAddressToData' Zen.Dictionary.empty
+    | None -> addReturnAddressToData' (Map.empty, 0ul)
     | _ -> Error "data can only be empty or dict in order to add return address"
 
 let private signFirstWitness signKey tx = result {

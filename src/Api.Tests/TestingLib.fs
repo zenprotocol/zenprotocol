@@ -244,7 +244,7 @@ module Contract =
                     |> Map.ofList
                 ZData.Collection (ZData.Dict (map, Map.count map |> uint32))
             let signatures =
-                Zen.Dictionary.add signatureString signatureData Zen.Dictionary.empty
+                Zen.Dictionary.add signatureString signatureData (Map.empty, 0ul)
                 |> Cost.__force
 
             Zen.Dictionary.add ballotString (ZData.String ballotSer) signatures

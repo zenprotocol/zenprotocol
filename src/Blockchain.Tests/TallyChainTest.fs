@@ -138,7 +138,7 @@ let createVoteData ballot blockNumber =
             |> Map.ofList
         Zen.Types.Data.Collection (Zen.Types.Data.Dict (map, Map.count map |> uint32))
     let signatures =
-        Zen.Dictionary.add signatureString signatureData Zen.Dictionary.empty
+        Zen.Dictionary.add signatureString signatureData (Map.empty, 0ul)
         |> Zen.Cost.Realized.__force
 
     Zen.Dictionary.add ballotString (Zen.Types.Data.String ballotSer) signatures

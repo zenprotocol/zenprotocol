@@ -229,7 +229,7 @@ let ``Should execute contract chain and get a valid transaction``() =
             |> Types.Data.Lock
 
         let data =
-            Dictionary.add "returnAddress"B returnAddress  Dictionary.empty
+            Dictionary.add "returnAddress"B returnAddress (Map.empty, 0ul)
             |> Cost.Realized.__force
             |> Types.Data.Dict
             |> Types.Data.Collection
