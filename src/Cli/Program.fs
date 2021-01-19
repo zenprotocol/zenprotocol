@@ -136,7 +136,7 @@ type Arguments =
             | Wallet_Create _ -> "create a wallet from a newly generated mnemonic phrase"
             | Blockchain_Info _ -> "get blockchain info"
             | WalletKeys _ -> "get wallet keys"
-            | SignMessage _ -> "get wallet keys"
+            | SignMessage _ -> "sign message with your privates"
 
 // read from console, hiding input text
 let readMasked(): string =
