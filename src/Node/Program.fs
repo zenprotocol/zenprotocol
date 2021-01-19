@@ -36,6 +36,7 @@ type Argument =
     | Service_Bus of string
     | Publisher of string
     | ConnectWallet
+    | Origin of string option
     with
         interface IArgParserTemplate with
             member s.Usage =
@@ -52,6 +53,7 @@ type Argument =
                 | Service_Bus _ -> "expose the service bus over zeromq address"
                 | Publisher _ -> "expose the publisher over zeromq address"
                 | ConnectWallet _ -> "connect the new desktop wallet"
+                | Origin _ -> "add CORS origin"
 #if DEBUG
                 | Local _ -> "local mode, used for debugging. specify zero value for host, other for client"
 #endif
@@ -79,6 +81,7 @@ type MainConfig =
         minerThreads: int
         externalIp: string
         listen: bool
+        origin: Http.Origin
     }
 #if DEBUG
 module Local =
@@ -122,7 +125,7 @@ module Init =
         
     let api (config:MainConfig) =
         if config.api then
-            Api.Main.main config.chain busName config.apiBind
+            Api.Main.main config.chain busName config.apiBind config.origin
             |> Disposables.toDisposable
         else
             Disposables.empty
@@ -163,6 +166,7 @@ module Config =
         let mutable serviceBusAddress = None
         let mutable publisherAddress = None
         let mutable chain = Chain.Main
+        let mutable origin = Http.No
 
         if List.contains Test (results.GetAllResults()) then
             config.Load("test.yaml")
@@ -173,6 +177,14 @@ module Config =
 
         List.iter (fun arg ->
             match arg with
+            | Origin str ->
+                match str with
+                | Some any when any = "any" ->
+                    origin <- Http.Any
+                | Some custom ->
+                    origin <- Http.Custom custom
+                | None ->
+                    origin <- Http.No
             | Test _ -> ()
 #if DEBUG
             | Local idx ->
@@ -195,7 +207,8 @@ module Config =
             | ConnectWallet ->
                 config.api.enabled <- true
                 config.api.bind <- getEndpoint LocalhostString (getPort config.api.bind)
-                wallet <- false 
+                wallet <- false
+                origin <- Http.Any
                 addressDb <- true
             | Ip ip ->
                 config.externalIp <- ip
@@ -244,6 +257,7 @@ module Config =
             apiBind           = config.api.bind
             externalIp        = config.externalIp
             listen            = config.listen
+            origin            = origin
         }
 module CheckPlatform =
     

@@ -7,6 +7,11 @@ type StatusCode = System.Net.HttpStatusCode
 
 type Body = string option
 
+type Origin =
+    | Any
+    | Custom of string
+    | No
+
 type Content =
     | TextContent of string
     | JsonContent of JsonValue
@@ -33,7 +38,7 @@ module Server =
                 x.observer.Dispose()
                 (x.listener :> System.IDisposable).Dispose()
 
-    let private getBody (request : System.Net.HttpListenerRequest) =
+    let private getBody (request : System.Net.HttpListenerRequest) : Result<string option,string> =
         match request.HasEntityBody with
         | false -> Ok None
         | true ->
@@ -93,8 +98,12 @@ module Server =
     let private removePostfixSlash (path : string) =
         if path.EndsWith("/") then path.Substring(0, path.Length - 1)
         else path
+    let private addCORS (context:System.Net.HttpListenerContext) =
+        context.Response.AddHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
+        context.Response.AddHeader("Access-Control-Allow-Methods", "GET, POST")
+        context.Response.AddHeader("Access-Control-Max-Age", "1728000")
 
-    let private subscribe poller (listener:System.Net.HttpListener) observer =
+    let private subscribe poller (origin:Origin) (listener:System.Net.HttpListener) observer =
         let source = new System.Threading.CancellationTokenSource()
 
         let async () =
@@ -103,11 +112,13 @@ module Server =
                     let context = listener.GetContext()
 
                     let path = removePostfixSlash context.Request.Url.AbsolutePath
-                    
-                    context.Response.AddHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-                    context.Response.AddHeader("Access-Control-Allow-Methods", "GET, POST");
-                    context.Response.AddHeader("Access-Control-Max-Age", "1728000");
-                    context.Response.AppendHeader("Access-Control-Allow-Origin", "*");
+                    match origin with
+                    | Any -> 
+                        context.Response.AppendHeader("Access-Control-Allow-Origin", "*" )
+                    | Custom s ->
+                        context.Response.AppendHeader("Access-Control-Allow-Origin", s)
+                    | No ->
+                        ()
 
                     let reply = writeResponse context.Response
 
@@ -130,6 +141,11 @@ module Server =
                         | Error error ->
                             writeTextResponse context.Response StatusCode.UnsupportedMediaType error
                     | "OPTIONS" ->
+                            match origin with
+                            | No ->
+                                ()
+                            | _ ->
+                                addCORS context
                             writeEmptyResponse context.Response StatusCode.Accepted
                         
                     | _ ->
@@ -148,14 +164,14 @@ module Server =
         { new System.IDisposable with
            member this.Dispose() = source.Cancel() }
 
-    let create poller address =
+    let create poller origin address =
         let listener = new System.Net.HttpListener()
         listener.Prefixes.Add(sprintf "http://%s/" address)
         let observable =
             Observable.publish
                 {
                     new System.IObservable<_> with
-                        member this.Subscribe(observer : System.IObserver<_>) = subscribe poller listener observer
+                        member this.Subscribe(observer : System.IObserver<_>) = subscribe poller origin listener observer
                 }
 
         listener.Start()

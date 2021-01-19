@@ -16,9 +16,9 @@ let eventHandler event (state:State) =
         state
     | _ -> state
 
-let main chain busName bind =
+let main chain busName bind origin =
     Actor.create<unit,unit,Event,State> busName "Api" (fun poller _ ebObservable ->            
-        let server = Server.create chain poller busName bind
+        let server = Server.create chain poller busName bind origin
                 
         let ebObservable = 
             ebObservable
