@@ -99,14 +99,23 @@ module Blockchain =
             | Ok (blockNumber, take)->
                 tip - blockNumber
                 |> Blockchain.getHeaders config.client take
+                |> List.map headerEncoder
+                |> List.map (fun json -> json.JsonValue)
+                |> List.toArray
+                |> JsonValue.Array
+                |> JsonContent
+                |> config.reply StatusCode.OK
             | Error _ ->
-                Blockchain.getAllHeaders config.client
-            |> List.map headerEncoder
-            |> List.map (fun json -> json.JsonValue)
-            |> List.toArray
-            |> JsonValue.Array
-            |> JsonContent
-            |> config.reply StatusCode.OK
+                if config.isRemote then
+                    config.replyError "Not available in a remote node yet"
+                else 
+                    Blockchain.getAllHeaders config.client
+                    |> List.map headerEncoder
+                    |> List.map (fun json -> json.JsonValue)
+                    |> List.toArray
+                    |> JsonValue.Array
+                    |> JsonContent
+                    |> config.reply StatusCode.OK
 
     let blocktemplate
         (config: Config)
@@ -281,7 +290,7 @@ module Blockchain =
                 let json = (
                     new BlockChainInfoJson.Root(
                         info.chain,
-                        info.blocks|> int,
+                        info.blocks |> int,
                         info.headers |> int,
                         info.difficulty |> decimal,
                         info.medianTime |> int64,
@@ -321,8 +330,13 @@ module Blockchain =
     let cgpHistory
         (config: Config)
         : unit =
-            let cgp = Blockchain.getCgpHistory config.client
-            config.reply StatusCode.OK (JsonContent <| (cgpHistoryEncoder config.chain cgp))
+            if config.isRemote then
+                config.replyError "Not available in a remote node yet"
+            else 
+                Blockchain.getCgpHistory config.client
+                |> cgpHistoryEncoder config.chain
+                |> JsonContent
+                |> config.reply StatusCode.OK 
     let totalZP
         (config: Config)
         : unit =
@@ -440,7 +454,7 @@ module AddressDB =
                 config.replyError error
             | Ok address ->
                 match AddressDB.getContractAssets config.client address with
-                | Ok (Some (blockNumber ,pk, command, messageBody)) ->
+                | Ok (Some (blockNumber, pk, command, messageBody)) ->
                     [|
                         "executionBlock",
                             blockNumber
@@ -507,38 +521,41 @@ module AddressDB =
         (config: Config)
         (body: string)
         : unit =
-            parseAddressDBContractInfo body
-            >>= AddressDB.getContractInfo config.client
-            <@> (fun (contractId, contractV0) ->
-                let address =
-                    Address.Contract contractId
-                    |> Address.encode config.chain
-                [|
-                    "contractId",
-                        contractId
-                        |> ContractId.toString
-                        |> JsonValue.String
-                    "address",
-                        address
-                        |> JsonValue.String
-                    "hints",
-                        contractV0.hints
-                        |> JsonValue.String
-                    "queries",
-                        contractV0.queries
-                        |> decimal
-                        |> JsonValue.Number
-                    "rlimit",
-                        contractV0.rlimit
-                        |> decimal
-                        |> JsonValue.Number
-                |]
-                |> JsonValue.Record
-            )
-            <@> JsonContent
-            <@> config.reply StatusCode.OK
-            |> Result.mapError config.replyError
-            |> ignore
+            if config.isRemote then
+                config.replyError "Not available in a remote node yet"
+            else 
+                parseAddressDBContractInfo body
+                >>= AddressDB.getContractInfo config.client
+                <@> (fun (contractId, contractV0) ->
+                    let address =
+                        Address.Contract contractId
+                        |> Address.encode config.chain
+                    [|
+                        "contractId",
+                            contractId
+                            |> ContractId.toString
+                            |> JsonValue.String
+                        "address",
+                            address
+                            |> JsonValue.String
+                        "hints",
+                            contractV0.hints
+                            |> JsonValue.String
+                        "queries",
+                            contractV0.queries
+                            |> decimal
+                            |> JsonValue.Number
+                        "rlimit",
+                            contractV0.rlimit
+                            |> decimal
+                            |> JsonValue.Number
+                    |]
+                    |> JsonValue.Record
+                )
+                <@> JsonContent
+                <@> config.reply StatusCode.OK
+                |> Result.mapError config.replyError
+                |> ignore
     let outputs
         (config: Config)
         (body: string)
@@ -580,8 +597,11 @@ module AddressDB =
     let resync
         (config: Config)
         : unit =
-            AddressDB.resyncAccount config.client
-            config.reply StatusCode.OK NoContent
+            if config.isRemote then
+                config.replyError "Not available in a remote node yet"
+            else
+                AddressDB.resyncAccount config.client
+                config.reply StatusCode.OK NoContent
 
 module Wallet =
     let publicKey
@@ -1094,13 +1114,14 @@ module Address =
                     | Error error ->
                         config.replyError error
 
-let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTemplateCache) =
+let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTemplateCache) (isRemote:bool) =
     let config = {
         reply         = reply
         replyError    = fun error -> reply StatusCode.BadRequest (TextContent error)
         client        = client
         chain         = chain
         templateCache = templateCache
+        isRemote      = isRemote
     }
 
     match request with
@@ -1233,7 +1254,7 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
     | _ ->
         config.replyError "unmatched request"
 
-let create chain poller busName bind origin =
+let create chain poller busName bind origin isRemote =
     let httpAgent = Http.Server.create poller origin bind
 
     eventX "Api running on {bind}"
@@ -1247,7 +1268,7 @@ let create chain poller busName bind origin =
         Http.Server.observable httpAgent
         |> Observable.map (fun request ->
             fun (server:T) ->
-                handleRequest chain client request blockTemplateCache
+                handleRequest chain client request blockTemplateCache isRemote
                 server
         )
 

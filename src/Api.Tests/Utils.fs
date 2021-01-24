@@ -13,6 +13,8 @@ let private RunActor = true
 let busName = "test"
 let chain = Chain.Local
 
+let isRemote = false
+
 let chainParams = Chain.getChainParameters chain
 let tempDir () =
     System.IO.Path.Combine
@@ -37,7 +39,7 @@ let getTestnetActors () =
         Blockchain.Main.main dataPath (Chain.getChainParameters Chain.Test) busName false
         Network.Main.main dataPath busName (Chain.getChainParameters Chain.Test) "" false "" [] false false
         Wallet.Main.main dataPath busName Chain.Test RunActor Wallet.Main.Wipe.NoWipe
-        Api.Main.main Chain.Test busName apiUri Http.No
+        Api.Main.main Chain.Test busName apiUri Http.No isRemote
     ]
     |> List.rev
     |> List.map Disposables.toDisposable
@@ -51,7 +53,7 @@ let getActors () =
         Network.Main.main dataPath busName chainParams "" false "" [] false false
         Wallet.Main.main dataPath busName chain RunActor Wallet.Main.Wipe.NoWipe
         AddressDB.Main.main dataPath busName chain RunActor AddressDB.Main.NoWipe
-        Api.Main.main chain busName apiUri Http.No
+        Api.Main.main chain busName apiUri Http.No isRemote
     ]
     |> List.rev
     |> List.map Disposables.toDisposable
@@ -64,7 +66,7 @@ let getBasicActors () =
         Blockchain.Main.main dataPath chainParams busName false
         Network.Main.main dataPath busName chainParams "" false "" [] false false
         Wallet.Main.main dataPath busName chain RunActor Wallet.Main.Wipe.NoWipe
-        Api.Main.main chain busName apiUri Http.No
+        Api.Main.main chain busName apiUri Http.No isRemote
     ]
     |> List.rev
     |> List.map Disposables.toDisposable
@@ -78,7 +80,7 @@ let customChainActor chainParams =
         Network.Main.main dataPath busName chainParams "" false "" [] false false
         Wallet.Main.main dataPath busName chain RunActor Wallet.Main.Wipe.NoWipe
         AddressDB.Main.main dataPath busName chain RunActor AddressDB.Main.NoWipe
-        Api.Main.main chain busName apiUri Http.No
+        Api.Main.main chain busName apiUri Http.No isRemote
     ]
     |> List.rev
     |> List.map Disposables.toDisposable
@@ -92,7 +94,7 @@ let customChainBasicActor chainParams =
         Network.Main.main dataPath busName chainParams "" false "" [] false false
         Wallet.Main.main dataPath busName chain RunActor Wallet.Main.Wipe.NoWipe
         AddressDB.Main.main dataPath busName chain RunActor AddressDB.Main.NoWipe
-        Api.Main.main chain busName apiUri Http.No
+        Api.Main.main chain busName apiUri Http.No isRemote
     ]
     |> List.rev
     |> List.map Disposables.toDisposable

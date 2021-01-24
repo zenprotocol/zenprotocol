@@ -37,6 +37,7 @@ type Argument =
     | Publisher of string
     | ConnectWallet
     | Origin of string option
+    | Remote
     with
         interface IArgParserTemplate with
             member s.Usage =
@@ -54,6 +55,7 @@ type Argument =
                 | Publisher _ -> "expose the publisher over zeromq address"
                 | ConnectWallet _ -> "connect the new desktop wallet"
                 | Origin _ -> "add CORS origin"
+                | Remote -> "automatically configure for remote usages"
 #if DEBUG
                 | Local _ -> "local mode, used for debugging. specify zero value for host, other for client"
 #endif
@@ -82,6 +84,7 @@ type MainConfig =
         externalIp: string
         listen: bool
         origin: Http.Origin
+        isRemote: bool
     }
 #if DEBUG
 module Local =
@@ -125,7 +128,7 @@ module Init =
         
     let api (config:MainConfig) =
         if config.api then
-            Api.Main.main config.chain busName config.apiBind config.origin
+            Api.Main.main config.chain busName config.apiBind config.origin config.isRemote
             |> Disposables.toDisposable
         else
             Disposables.empty
@@ -163,6 +166,7 @@ module Config =
         let mutable seed = false
         let mutable wallet = true
         let mutable addressDb = false
+        let mutable isRemote = false
         let mutable serviceBusAddress = None
         let mutable publisherAddress = None
         let mutable chain = Chain.Main
@@ -209,6 +213,10 @@ module Config =
                 config.api.bind <- getEndpoint LocalhostString (getPort config.api.bind)
                 wallet <- false
                 origin <- Http.Any
+                addressDb <- true
+            | Remote ->
+                isRemote <- true
+                wallet <- false
                 addressDb <- true
             | Ip ip ->
                 config.externalIp <- ip
@@ -258,6 +266,7 @@ module Config =
             externalIp        = config.externalIp
             listen            = config.listen
             origin            = origin
+            isRemote          = isRemote
         }
 module CheckPlatform =
     

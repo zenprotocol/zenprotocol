@@ -38,6 +38,7 @@ let private customConfig (c: Option<Content>) (s: Option<StatusCode>) r: Api.Con
         client = client
         chain = Chain.Local
         templateCache = BlockTemplateCache client
+        isRemote = false
     }
 
 let oKConfig content =

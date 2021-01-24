@@ -10,4 +10,5 @@ type Config = {
     client: FsNetMQ.Socket.T
     chain: Chain
     templateCache : BlockTemplateCache
+    isRemote : bool
 }
