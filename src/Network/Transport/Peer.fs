@@ -174,12 +174,13 @@ let handleConnectingState socket next peer msg =
             else
                 // TODO: save version
 
-                eventX "Connected to {address}"
-                >> setField "address" (match peer.mode with | Connector address -> address)
-                |> Log.info
-
                 match peer.mode with
                 | Connector address ->
+                    
+                    eventX "Connected to {address}"
+                    >> setField "address" address
+                    |> Log.info
+                    
                     let peerId = RoutingId.toBytes peer.routingId
                     next (InProcMessage.Connected {address=address;peerId=peerId})
                 | _ -> ()
@@ -269,7 +270,7 @@ let handleActiveState socket next peer msg randomPeerNonce =
             next (InProcMessage.NewTransactions {peerId=(RoutingId.toBytes peer.routingId);txHashes=txHashes})
             sendUpdateTimestamp next peer
             peer
-        | msg ->
+        | _ ->
             // TODO: unexpected msg, close peer
 
             peer
@@ -294,7 +295,7 @@ let handleTick socket peer =
                 | Active ->
                     {peer with ping=WaitingForPong (nonce, (getNow ()))}
                 | _ -> peer
-        | WaitingForPong (nonce,sentTime) ->
+        | WaitingForPong (_,sentTime) ->
             match (getNow ()) - sentTime > pingTimeout with
             | false -> peer
             | true -> closePeer socket NoPong peer

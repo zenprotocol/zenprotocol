@@ -11,27 +11,24 @@ open Consensus
 open Infrastructure.ServiceBus.Agent
 open Messaging
 open Messaging.Services
-open Network
 open Network.Message
 open Network.Transport
 open Serialization
 open Consensus.Chain
 open Logary.Message
-open Network
-open Network
 
 type State = Connector.T * TransactionPublisher.T * string option
 
 let maxConnections = 10
 
-let eventHandler transport event (connector,publisher,ownAddress) =
+let eventHandler event (connector,publisher,ownAddress) =
     match event with
-    | Event.TransactionAddedToMemPool (txHash, tx) ->
+    | Event.TransactionAddedToMemPool (txHash, _) ->
         let publisher = TransactionPublisher.add txHash publisher
         connector,publisher,ownAddress
     | _ -> connector,publisher,ownAddress
 
-let transportHandler transport seeds client addressBook now msg (connector,publisher,ownAddress) =
+let transportHandler transport client addressBook now msg (connector,publisher,ownAddress) =
     let requestAddresses peerId =
          if not (AddressBook.haveEnoughAddresses addressBook) then
             Transport.getAddresses transport peerId
@@ -277,7 +274,7 @@ let commandHandler transport command (state:State) =
         Transport.getTipFromAllPeers transport
         state
 
-let handleIpAddressFound bind transport now ipAddress (connector,publisher,ownAddress) =
+let handleIpAddressFound bind transport now ipAddress (connector,publisher,_) =
     let port = Endpoint.getPort bind
     let address = sprintf "%s:%d" ipAddress port
     let ownAddress = Some address
@@ -350,12 +347,12 @@ let main dataPath busName chainParams externalIp listen bind seeds wipe seed =
 
         let ebObservable =
             ebObservable
-            |> Observable.map (eventHandler transport)
+            |> Observable.map eventHandler
 
         let transportObservable =
             Transport.addToPoller poller transport
             |> Observable.map (fun _ -> Transport.recv transport)
-            |> Observable.map (transportHandler transport seeds client addressBook (Timestamp.now ()))
+            |> Observable.map (transportHandler transport client addressBook (Timestamp.now ()))
 
         let discoverIpObservable, discoverIpDisposable =
             if Option.isNone ownAddress && listen && not seed then

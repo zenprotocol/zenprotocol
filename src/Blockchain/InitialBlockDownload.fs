@@ -182,7 +182,7 @@ let received timestamp blockHash ibd = effectsWriter {
             return ibd
 }
 
-let invalid timestamp blockHash ibd = effectsWriter {
+let invalid blockHash ibd = effectsWriter {
     match ibd with
     | Inactive
     | GettingHeaders _ -> return ibd

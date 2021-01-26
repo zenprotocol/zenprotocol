@@ -233,10 +233,10 @@ let verifyEmpty tree root auditPath key =
 
     root' = root
 
-let addToRoot tree auditPath key value root =
+let addToRoot tree auditPath key value =
     verifyAuditPath tree key (Value value) auditPath N initialBase
 
-let removeFromRoot tree auditPath key root =
+let removeFromRoot tree auditPath key =
     verifyAuditPath tree key Empty auditPath N initialBase
 
 let tryFind<'a> key (tree:T<'a>) =

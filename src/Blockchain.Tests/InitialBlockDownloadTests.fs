@@ -233,7 +233,7 @@ let ``block invalid``() =
         |> Writer.unwrap
 
     let effects,ibd =
-        InitialBlockDownload.invalid 0UL (Block.hash headers.[0]) ibd
+        InitialBlockDownload.invalid (Block.hash headers.[0]) ibd
         |> Writer.unwrap
 
     isActive ibd |> should equal false
