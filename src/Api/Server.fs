@@ -136,6 +136,7 @@ module Blockchain =
             | Error error ->
                 error
                 |> config.replyError
+
     let block
         (config: Config)
         (query: Query)
@@ -171,6 +172,7 @@ module Blockchain =
                         |> config.reply StatusCode.NotFound
                     | Some block ->
                         config.reply StatusCode.OK (JsonContent <| blockEncoder config.chain block)
+
     let blocks
         (config: Config)
         (query: Query)
@@ -194,6 +196,7 @@ module Blockchain =
             |> JsonValue.Array
             |> JsonContent
             |> config.reply StatusCode.OK
+
     let transaction
         (config: Config)
         (query: Query)
@@ -264,6 +267,7 @@ module Blockchain =
                 | Some (_, bk, _) ->
                     validateBlock config {bk with header = header}
                 | _ -> config.replyError "block not found"
+
     let contractExecute
         (config: Config)
         (body:string)
@@ -298,6 +302,7 @@ module Blockchain =
                         info.tipBlockHash |> Hash.toString)).JsonValue
 
                 config.reply StatusCode.OK (JsonContent json)
+
     let winner
         (config: Config)
         : unit =
@@ -316,6 +321,7 @@ module Blockchain =
                 |> config.reply StatusCode.OK
             | _ ->
                 config.replyError "Winner was not found"
+
     let cgp
         (config: Config)
         : unit =
@@ -337,6 +343,7 @@ module Blockchain =
                 |> cgpHistoryEncoder config.chain
                 |> JsonContent
                 |> config.reply StatusCode.OK 
+
     let totalZP
         (config: Config)
         : unit =
@@ -345,23 +352,29 @@ module Blockchain =
             |> JsonValue.Number
             |> JsonContent
             |> config.reply StatusCode.OK
+
     let cgpContract
         (config: Config)
         : unit =
+            
             let cgp = Blockchain.getCgp config.client
+            
             let msgBody =
                 Option.map CGP.internalizeRecipient cgp.payout
                 |> Option.bind Consensus.CGP.Contract.createPayoutMsgBody
+            
             let raw =
                 msgBody
                 |> Option.map (dataEncoder config.chain)
                 |> Option.defaultValue JsonValue.Null
+            
             let encoded =
                 msgBody
                 |> Option.map Data.serialize
                 |> Option.map Base16.encode
                 |> Option.map JsonValue.String
                 |> Option.defaultValue JsonValue.Null
+            
             JsonValue.Record
                 [|
                     ("raw", raw)
@@ -370,6 +383,7 @@ module Blockchain =
                 |]
             |> JsonContent
             |> config.reply StatusCode.OK
+
     let blockreward
         (config: Config)
         (query:Query)
@@ -386,6 +400,7 @@ module Blockchain =
                     |> config.reply StatusCode.OK
                 else
                     config.replyError "invalid blockNumber"
+
     let candidates
         (config: Config)
         (query:Query)
@@ -407,6 +422,7 @@ module Blockchain =
             |> config.reply StatusCode.OK
 
 module AddressDB =
+
     let balance
         (config: Config)
         (body: string)
@@ -426,6 +442,7 @@ module AddressDB =
                     |> config.reply StatusCode.OK
                 | Error error ->
                     config.replyError error
+
     let transactionCount
         (config: Config)
         (body: string)
@@ -445,6 +462,7 @@ module AddressDB =
                     | Error error -> config.replyError error
                 | None ->
                 config.replyError "No tip"
+
     let contractMint
         (config: Config)
         (body: string)
@@ -485,6 +503,7 @@ module AddressDB =
                     config.replyError "No data"
                 | Error error ->
                     config.replyError error
+
     let contractHistory
         (config: Config)
         (body: string)
@@ -517,6 +536,7 @@ module AddressDB =
             <@> config.reply StatusCode.OK
             |> Result.mapError config.replyError
             |> ignore//TODO: check me
+
     let contractInfo
         (config: Config)
         (body: string)
@@ -556,6 +576,7 @@ module AddressDB =
                 <@> config.reply StatusCode.OK
                 |> Result.mapError config.replyError
                 |> ignore
+
     let outputs
         (config: Config)
         (body: string)
@@ -573,6 +594,7 @@ module AddressDB =
                     |> config.reply StatusCode.OK
                 | Error error ->
                     config.replyError error
+
     let transactions
         (config: Config)
         (body: string)
@@ -594,6 +616,7 @@ module AddressDB =
                     |> JsonContent
                     |> config.reply StatusCode.OK
                 | Error error -> config.replyError error
+
     let resync
         (config: Config)
         : unit =
@@ -604,6 +627,7 @@ module AddressDB =
                 config.reply StatusCode.OK NoContent
 
 module Wallet =
+
     let publicKey
         (config: Config)
         (body: string)
@@ -619,6 +643,7 @@ module Wallet =
                     |> config.reply StatusCode.OK
                 | Error error ->
                     config.replyError error
+
     let importWatchOnlyAddress
         (config: Config)
         (body: string)
@@ -630,6 +655,7 @@ module Wallet =
                 | Error error -> config.replyError error
             | Error error ->
                 config.replyError error
+
     let sign
         (config: Config)
         (body: string)
@@ -645,6 +671,7 @@ module Wallet =
                     |> config.reply StatusCode.OK
                 | Error error ->
                     config.replyError error
+
     let balance
         (config: Config)
         : unit =
@@ -660,6 +687,7 @@ module Wallet =
                 |> config.reply StatusCode.OK
             | Error error ->
                 config.replyError error
+
     let getNewAddress
         (config: Config)
         : unit =
@@ -669,6 +697,7 @@ module Wallet =
                 |> JsonContent
                 |> config.reply StatusCode.OK
             | Error error -> config.replyError error
+
     let restoreNewAddresses
         (config: Config)
         (body: string)
@@ -678,6 +707,7 @@ module Wallet =
             | Ok max ->
                 Wallet.restoreNewAddresses config.client max
                 config.reply StatusCode.OK NoContent
+
     let exist
         (config: Config)
         : unit =
@@ -689,6 +719,7 @@ module Wallet =
                 |> config.reply StatusCode.OK
             | Error error ->
                 config.replyError error
+
     let zenPublicKey
         (config: Config)
         : unit =
@@ -699,6 +730,7 @@ module Wallet =
                 |> config.reply StatusCode.OK
             | Error error ->
                 config.replyError error
+
     let checkPassword
         (config: Config)
         (body: string)
@@ -715,6 +747,7 @@ module Wallet =
                     config.replyError error
             | Error error ->
                 config.replyError error
+
     let changePassword
         (config: Config)
         (body: string)
@@ -743,6 +776,7 @@ module Wallet =
                 | Error error -> config.replyError error
             | Error error ->
                 config.replyError error
+
     let mnemonicphrase
         (config: Config)
         (body: string)
@@ -759,6 +793,7 @@ module Wallet =
                     config.replyError error
             | Error error ->
                 config.replyError error
+
     let send
         (config: Config)
         (body: string)
@@ -769,6 +804,7 @@ module Wallet =
                 |> handleTxResult config
             | Error error ->
                 config.replyError error
+
     let keys
         (config: Config)
         (body: string)
@@ -788,6 +824,7 @@ module Wallet =
                     config.replyError error
             | Error error ->
                 config.replyError error
+
     let createTransaction
         (config: Config)
         (body: string)
@@ -816,6 +853,7 @@ module Wallet =
                 | Ok _ ->
                     config.reply StatusCode.OK (TextContent "zenKey imported")
                 | Error error -> config.replyError error
+
     let remove
         (config: Config)
         (body: string)
@@ -827,6 +865,7 @@ module Wallet =
                 | Error error -> config.replyError error
             | Error error ->
                 config.replyError error
+
     let address
         (config: Config)
         : unit =
@@ -851,6 +890,7 @@ module Wallet =
                 |> config.reply StatusCode.OK
             | Error error ->
                 config.replyError error
+
     let utxo
         (config: Config)
         : unit =
@@ -864,6 +904,7 @@ module Wallet =
                 |> config.reply StatusCode.OK
             | Error error ->
                 config.replyError error
+
     let transactions
         (config: Config)
         (query:Query)
@@ -887,6 +928,7 @@ module Wallet =
                     config.replyError error
             | Error error ->
                 config.replyError error
+
     let receivedByAddress
         (config: Config)
         (query:Query)
@@ -903,6 +945,7 @@ module Wallet =
                 | Error error -> config.replyError error
 
             parseConfirmations query config get
+
     let addressOutputs
         (config: Config)
         (query:Query)
@@ -943,7 +986,6 @@ module Wallet =
                 | Error error -> config.replyError error
             | None-> config.replyError "address is missing"
 
-
     let resync
         (config: Config)
         : unit =
@@ -951,6 +993,7 @@ module Wallet =
             config.reply StatusCode.OK NoContent
 
     module Contract =
+
         let activate
             (config: Config)
             (body: string)
@@ -974,6 +1017,7 @@ module Wallet =
                         config.reply StatusCode.OK (JsonContent json.JsonValue)
                     | Error error ->
                         config.replyError error
+
         let extend
             (config: Config)
             (body: string)
@@ -997,6 +1041,7 @@ module Wallet =
                         config.reply StatusCode.OK (JsonContent json.JsonValue)
                     | Error error ->
                         config.replyError error
+
         let execute
             (config: Config)
             (body: string)
@@ -1006,6 +1051,7 @@ module Wallet =
                 | Ok (contractId, command, message, returnAddress, sign, spends, password) ->
                     Wallet.executeContract config.client true contractId command message returnAddress sign spends password
                     |> handleTxResult config
+
         let cgp
             (config: Config)
             (body: string)
@@ -1027,6 +1073,7 @@ module Wallet =
                     |> handleRawTxResult config
                 | Error error ->
                     config.replyError error
+
         let sign
             (config: Config)
             (body: string)
@@ -1037,6 +1084,7 @@ module Wallet =
                     |> handleRawTxResult config
                 | Error error ->
                     config.replyError error
+
         let publish
             (config: Config)
             (body: string)
@@ -1084,6 +1132,7 @@ module Contract =
             |> JsonValue.Array
             |> JsonContent
             |> config.reply StatusCode.OK
+
 module Network =
     let connectionCount
         (config: Config)
