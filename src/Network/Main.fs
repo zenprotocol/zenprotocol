@@ -216,6 +216,8 @@ let transportHandler transport client addressBook now msg (connector,publisher,o
         AddressBook.add now address now addressBook
 
         connector,publisher,ownAddress
+    | _ ->
+       connector,publisher,ownAddress
 
 let commandHandler transport command (state:State) =
     match command with
