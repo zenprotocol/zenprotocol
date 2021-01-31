@@ -382,8 +382,8 @@ module AddressDB =
         | Resync
 
     type Request =
-        | GetBalance of addresses:string list
-        | GetOutputs of addresses:string list * Mode
+        | GetBalance of addresses:string list * blockNumber:uint32 option
+        | GetOutputs of addresses:string list * Mode * blockNumber:uint32 option
         | GetTransactions of addresses:string list * skip: int * take: int
         | GetContractHistory of contractId : ContractId * skip: int * take: int
         | GetTransactionCount of addresses:string list * uint32
@@ -397,8 +397,8 @@ module AddressDB =
     //TODO: apply same convention to other services
     let private send<'a> client = Request.send<Request, Result<'a,string>> client serviceName
 
-    let getBalance client args =
-        GetBalance args
+    let getBalance client addressess blockNumber =
+        GetBalance (addressess, blockNumber)
         |> send<BalanceResponse> client
 
     let getOutputs client args =

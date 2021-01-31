@@ -429,8 +429,8 @@ module AddressDB =
         : unit =
             match parseGetBalanceJson config.chain body with
             | Error error -> config.replyError error
-            | Ok addresses ->
-                match AddressDB.getBalance config.client addresses with
+            | Ok (addresses,blockNumber) ->
+                match AddressDB.getBalance config.client addresses blockNumber with
                 | Ok balance ->
                     balance
                     |> Map.toSeq
@@ -583,8 +583,8 @@ module AddressDB =
         : unit =
             match parseGetOutputsJson config.chain body with
             | Error error -> config.replyError error
-            | Ok (addresses, mode) ->
-                match AddressDB.getOutputs config.client (addresses, mode) with
+            | Ok (addresses, mode, blockNumber) ->
+                match AddressDB.getOutputs config.client (addresses, mode, blockNumber) with
                 | Ok pointedOutputs ->
                     pointedOutputs
                     |> Seq.map (pointedOutputEncoder config.chain)

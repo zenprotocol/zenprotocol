@@ -441,9 +441,18 @@ let private checkAddresses chain addresses =
 
 let parseGetBalanceJson chain json =
     try
-        let json = GetBalanceJson.Parse json
-
+        
+        let json =
+            json
+            |> JsonValue.Parse
+            |> GetBalanceJson.Root
+        
+        let blockNumber =
+            json.BlockNumber
+            |> Option.map uint32
+        
         checkAddresses chain json.Addresses
+        >>= (fun addresses -> Ok (addresses,blockNumber))
     with _ as ex ->
         Error ("Json invalid: " + ex.Message)
 
@@ -459,14 +468,18 @@ let parseGetHistoryJson chain json =
 let parseGetOutputsJson chain json =
     try
         let json = GetOutputsJson.Parse json
+        
+        let blockNumber =
+            json.BlockNumber
+            |> Option.map uint32
 
         checkAddresses chain json.Addresses
         >>= fun addresses ->
             match json.Mode with
             | "all" ->
-                Ok (addresses, Messaging.Services.AddressDB.Mode.All)
+                Ok (addresses, Messaging.Services.AddressDB.Mode.All, blockNumber)
             | "unspentOnly" ->
-                Ok (addresses, Messaging.Services.AddressDB.Mode.UnspentOnly)
+                Ok (addresses, Messaging.Services.AddressDB.Mode.UnspentOnly, blockNumber)
             | _ ->
                 Error "unrecognized mode"
     with _ as ex ->

@@ -109,13 +109,13 @@ let requestHandler chain (requestId:RequestId) request dataAccess session (statu
     | Running view ->
         let decodeAddresses = Result.traverseResultM (Wallet.Address.decodeAny chain)
         match request with
-        | GetBalance addresses ->
+        | GetBalance (addresses, blockNumber) ->
             decodeAddresses addresses
-            <@> View.getBalance dataAccess session view UnspentOnly
+            <@> View.getBalance dataAccess session view UnspentOnly blockNumber
             |> reply<BalanceResponse> requestId
-        | GetOutputs (addresses, mode) ->
+        | GetOutputs (addresses, mode, blockNumber) ->
             decodeAddresses addresses
-            <@> View.getOutputs dataAccess session view mode
+            <@> View.getOutputs dataAccess session view mode blockNumber
             |> reply<List<PointedOutput>> requestId
         | GetTransactionCount (addresses, blockNumber) ->
             decodeAddresses addresses

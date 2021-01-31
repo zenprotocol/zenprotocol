@@ -331,9 +331,14 @@ type ImportZenPublicKey = JsonProvider<"""
 }""">
 
 type GetBalanceJson = JsonProvider<"""
-{
-    "addresses": ["abcd1234", "abcd1234" ]
-}""">
+[
+    {
+        "addresses": ["abcd1234", "abcd1234" ],
+        "blockNumber": "3"
+    },{
+        "addresses": ["abcd1234", "abcd1234" ]
+    }
+]""",SampleIsList=true>
 
 type GetHistoryJson = JsonProvider<"""
 {
@@ -343,12 +348,19 @@ type GetHistoryJson = JsonProvider<"""
 }""">
 
 type GetOutputsJson = JsonProvider<"""
-{
+[{
+    "addresses": ["abcd1234", "abcd1234" ],
+    "mode": "all",
+    "blockNumber": "3"
+},{
     "addresses": ["abcd1234", "abcd1234" ],
     "mode": "all"
-}""">
+}]""",SampleIsList=true>
 
-type GetTransactionCountJson = GetBalanceJson
+type GetTransactionCountJson = JsonProvider<"""
+{
+    "addresses": ["abcd1234", "abcd1234" ]
+}""">
 
 type GetAssetsJson = JsonProvider<"""
 {

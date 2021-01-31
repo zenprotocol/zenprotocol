@@ -211,18 +211,30 @@ let addMempoolTransaction dataAccess session txHash tx view =
 let fromMempool dataAccess session =
     List.fold (fun view (txHash,tx) -> addMempoolTransaction dataAccess session txHash tx view) empty
     
+let private filterDBOutput blockNumber dbOutput  =
+    
+    let compareToConfirmationStatus blockNumberUpperBound =
+        match dbOutput.confirmationStatus with
+        | Confirmed (databaseBlockNumber,_,_) ->
+            databaseBlockNumber <= blockNumberUpperBound
+        | _ -> false
+    
+    blockNumber
+    |> Option.map compareToConfirmationStatus
+    |> Option.defaultValue true
 
-let getOutputs dataAccess session view mode addresses : PointedOutput list =
+let getOutputs dataAccess session view mode (blockNumber: uint32 option) addresses : PointedOutput list =
     AddressOutpoints.get view dataAccess session addresses
     |> OutpointOutputs.get view dataAccess session
+    |> List.filter (filterDBOutput blockNumber)
     |> List.choose (fun dbOutput -> 
         if mode <> UnspentOnly || dbOutput.status = Unspent then 
             Some (dbOutput.outpoint, { spend = dbOutput.spend; lock = dbOutput.lock })
         else
             None)
 
-let getBalance dataAccess session view mode addresses =
-    getOutputs dataAccess session view mode addresses 
+let getBalance dataAccess session view mode (blockNumber: uint32 option) addresses =
+    getOutputs dataAccess session view mode blockNumber addresses
     |> List.fold (fun balance (_,output) ->
         match Map.tryFind output.spend.asset balance with
         | Some amount -> Map.add output.spend.asset (amount + output.spend.amount) balance
