@@ -503,6 +503,42 @@ module AddressDB =
             <@> config.reply StatusCode.OK
             |> Result.mapError config.replyError
             |> ignore//TODO: check me
+    let contractInfo
+        (config: Config)
+        (body: string)
+        : unit =
+            parseAddressDBContractInfo body
+            >>= AddressDB.getContractInfo config.client
+            <@> (fun (contractId, contractV0) ->
+                let address =
+                    Address.Contract contractId
+                    |> Address.encode config.chain
+                [|
+                    "contractId",
+                        contractId
+                        |> ContractId.toString
+                        |> JsonValue.String
+                    "address",
+                        address
+                        |> JsonValue.String
+                    "hints",
+                        contractV0.hints
+                        |> JsonValue.String
+                    "queries",
+                        contractV0.queries
+                        |> decimal
+                        |> JsonValue.Number
+                    "rlimit",
+                        contractV0.rlimit
+                        |> decimal
+                        |> JsonValue.Number
+                |]
+                |> JsonValue.Record
+            )
+            <@> JsonContent
+            <@> config.reply StatusCode.OK
+            |> Result.mapError config.replyError
+            |> ignore
     let outputs
         (config: Config)
         (body: string)
@@ -1192,6 +1228,8 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
         AddressDB.contractMint config body
     | Post("/addressdb/contract/history", Some body) ->
         AddressDB.contractHistory config body
+    | Post("/addressdb/contract/info", Some body) ->
+        AddressDB.contractInfo config body
     | _ ->
         config.replyError "unmatched request"
 

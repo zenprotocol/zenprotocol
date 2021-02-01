@@ -102,6 +102,9 @@ let requestHandler chain (requestId:RequestId) request dataAccess session (statu
         | GetContractAssets _ ->
             error
             |> reply<option<uint32 * string option * string * Zen.Types.Data.data option>> requestId
+        | GetContractInfo _ -> 
+            error
+            |> reply<ContractId * ContractV0> requestId
         status
     | Running view ->
         let decodeAddresses = Result.traverseResultM (Wallet.Address.decodeAny chain)
@@ -130,6 +133,9 @@ let requestHandler chain (requestId:RequestId) request dataAccess session (statu
             View.getContractAsset dataAccess session view asset
             |> Ok
             |> reply<option<uint32 * string option * string * Zen.Types.Data.data option>> requestId
+        | GetContractInfo (code, rlimit) ->
+            View.getContractInfo rlimit code
+            |> reply<ContractId * ContractV0> requestId
         
         status
 

@@ -388,6 +388,7 @@ module AddressDB =
         | GetContractHistory of contractId : ContractId * skip: int * take: int
         | GetTransactionCount of addresses:string list * uint32
         | GetContractAssets of asset: Asset
+        | GetContractInfo of code: string * rlimit: uint32 option
 
     let serviceName = "addressDB"
     let resyncAccount client =
@@ -419,3 +420,7 @@ module AddressDB =
     let getContractAssets client args =
         GetContractAssets args
         |> send<option<uint32 * string option * string * Zen.Types.Data.data option>> client
+
+    let getContractInfo client args =
+        GetContractInfo args
+        |> send<ContractId * ContractV0> client

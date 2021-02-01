@@ -80,13 +80,10 @@ module Tip =
 
 module OutpointOutputs =
     let get t = Collection.get t.outpointOutputs
-
     let tryGet t = Collection.tryGet t.outpointOutputs
     let put t = Collection.put t.outpointOutputs
-
     let delete t = Collection.delete t.outpointOutputs
     let truncate t = Collection.truncate t.outpointOutputs
-
     let contains t = Collection.containsKey t.outpointOutputs
 
 module AddressOutpoints =

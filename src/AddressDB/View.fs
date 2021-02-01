@@ -304,3 +304,23 @@ let getContractHistory dataAccess session view skip take contractId =
 
 let getContractAsset dataAccess session view asset =
     ContractAssets.get view dataAccess session asset
+let result = Result.ResultBuilder<string>()
+
+let getContractInfo limit code =
+    result {
+        let contractId = Contract.makeContractId Version0 code
+        
+        let rlimit = limit |> Option.defaultValue Wallet.TransactionCreator.Rlimit
+
+        let! hints = Measure.measure
+                        (sprintf "recording hints for contract %A" contractId)
+                        (lazy(Contract.recordHints rlimit code))
+        let! queries = ZFStar.totalQueries hints
+        
+        let contractV0 =
+            {   code = code
+                hints = hints
+                rlimit = rlimit
+                queries = queries }
+        return (contractId,contractV0)
+}

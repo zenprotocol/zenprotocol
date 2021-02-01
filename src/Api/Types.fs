@@ -65,6 +65,13 @@ type ContractActivateRequestJson = JsonProvider<"""
 }
 """>
 
+type ContractInfoRequestJson = JsonProvider<"""
+{
+    "code": "string",
+    "rlimit": 2723280
+}
+""">
+
 type ContractExtendRequestJson = JsonProvider<"""
 {
     "address": "address",

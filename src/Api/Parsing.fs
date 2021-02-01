@@ -201,6 +201,22 @@ let parseContractExecuteFromTransactionJson chain json =
     <@> (fun (json, contractId, tx, messageBody, sender) ->
         contractId, json.Command, messageBody, tx, sender)
 
+let parseAddressDBContractInfo json =
+    try
+        let json = ContractInfoRequestJson.Parse json
+        let rlimit =
+            if json.Rlimit < (int TransactionCreator.Rlimit) then
+                None
+            else
+                Some (uint32 json.Rlimit)
+
+        if String.length json.Code = 0 then
+            Error "Contract code is empty"
+        else
+            Ok (json.Code, rlimit)
+    with _ as ex ->
+        Error ("Json is invalid: " + ex.Message)
+
 let parseContractActivateJson json =
     try
         let json = ContractActivateRequestJson.Parse json
