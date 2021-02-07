@@ -347,6 +347,21 @@ type GetHistoryJson = JsonProvider<"""
     "take": 1000
 }""">
 
+type GetContractHistoryFilterByBlockJson = JsonProvider<"""
+{
+    "contractId": "abcd1234",
+    "start": 1000,
+    "end": 1000
+}""">
+
+type GetHistoryFilterByBlockJson = JsonProvider<"""
+{
+    "addresses": ["abcd1234", "abcd1234" ],
+    "start": 1000,
+    "end": 1000
+}
+""">
+
 type GetOutputsJson = JsonProvider<"""
 [{
     "addresses": ["abcd1234", "abcd1234" ],

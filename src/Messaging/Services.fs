@@ -385,7 +385,9 @@ module AddressDB =
         | GetBalance of addresses:string list * blockNumber:uint32 option
         | GetOutputs of addresses:string list * Mode * blockNumber:uint32 option
         | GetTransactions of addresses:string list * skip: int * take: int
+        | GetTransactionsByBlockNumber of addresses:string list * start: uint32 * stop: uint32
         | GetContractHistory of contractId : ContractId * skip: int * take: int
+        | GetContractHistoryByBlockNumber of contractId : ContractId * start: uint32 * stop: uint32
         | GetTransactionCount of addresses:string list * uint32
         | GetContractAssets of asset: Asset
         | GetContractInfo of code: string * rlimit: uint32 option
@@ -397,8 +399,8 @@ module AddressDB =
     //TODO: apply same convention to other services
     let private send<'a> client = Request.send<Request, Result<'a,string>> client serviceName
 
-    let getBalance client addressess blockNumber =
-        GetBalance (addressess, blockNumber)
+    let getBalance client addresses blockNumber =
+        GetBalance (addresses, blockNumber)
         |> send<BalanceResponse> client
 
     let getOutputs client args =
@@ -424,3 +426,11 @@ module AddressDB =
     let getContractInfo client args =
         GetContractInfo args
         |> send<ContractId * ContractV0> client
+        
+    let getContractHistoryByBlockNumber client args =
+        GetContractHistoryByBlockNumber args
+        |> send<ContractHistoryResponse> client
+    
+    let getTransactionsByBlockNumber client addresses start stop =
+        GetTransactionsByBlockNumber (addresses, start, stop)
+        |> send<TransactionsResponse> client

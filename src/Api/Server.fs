@@ -504,38 +504,53 @@ module AddressDB =
                 | Error error ->
                     config.replyError error
 
+    let private contractHistoryData
+        (config: Config)
+        data =
+            data
+            <@> List.map (fun (command, messageBody, txHash, confirmations) ->
+                    [|
+                        "command",
+                            command
+                            |> JsonValue.String
+                        "messageBody",
+                            messageBody
+                            |> Option.map (dataEncoder config.chain)
+                            |> Option.defaultValue JsonValue.Null
+                        "txHash",
+                            txHash
+                            |> Hash.toString
+                            |> JsonValue.String
+                        "confirmations",
+                            confirmations
+                            |> decimal
+                            |> JsonValue.Number
+                    |]
+                    |> JsonValue.Record
+                )
+                <@> List.toArray
+                <@> JsonValue.Array
+                <@> JsonContent
+                <@> config.reply StatusCode.OK
+                |> Result.mapError config.replyError
+            |> ignore//TODO: check me
+
     let contractHistory
         (config: Config)
         (body: string)
         : unit =
             parseGetContractHistoryJson body
             >>= AddressDB.getContractHistory config.client
-            <@> List.map (fun (command, messageBody, txHash, confirmations) ->
-                [|
-                    "command",
-                        command
-                        |> JsonValue.String
-                    "messageBody",
-                        messageBody
-                        |> Option.map (dataEncoder config.chain)
-                        |> Option.defaultValue JsonValue.Null
-                    "txHash",
-                        txHash
-                        |> Hash.toString
-                        |> JsonValue.String
-                    "confirmations",
-                        confirmations
-                        |> decimal
-                        |> JsonValue.Number
-                |]
-                |> JsonValue.Record
-            )
-            <@> List.toArray
-            <@> JsonValue.Array
-            <@> JsonContent
-            <@> config.reply StatusCode.OK
-            |> Result.mapError config.replyError
-            |> ignore//TODO: check me
+            |> contractHistoryData config
+
+    let contractHistoryByBlockNumber
+        (config: Config)
+        (body: string)
+        : unit =
+            parseGetContractHistoryByBlockNumber body
+            >>= AddressDB.getContractHistoryByBlockNumber config.client
+            |> contractHistoryData config
+            
 
     let contractInfo
         (config: Config)
@@ -595,6 +610,21 @@ module AddressDB =
                 | Error error ->
                     config.replyError error
 
+    let private getContractHistory
+        (config: Config)
+        txs =
+        let json =
+                txs
+                |> List.map (fun (txHash,direction, spend, confirmations, lock) ->
+                    let amount = (if direction = TransactionDirection.In then 1L else -1L) * int64 spend.amount
+
+                    transactionHistoryEncoder config.chain txHash spend.asset amount confirmations lock)
+                |> List.toArray
+                |> JsonValue.Array
+        (new TransactionsResponseJson.Root(json)).JsonValue
+        |> JsonContent
+        |> config.reply StatusCode.OK
+    
     let transactions
         (config: Config)
         (body: string)
@@ -604,17 +634,19 @@ module AddressDB =
             | Ok addresses ->
                 match AddressDB.getTransactions config.client addresses with
                 | Ok txs ->
-                    let json =
-                        txs
-                        |> List.map (fun (txHash,direction, spend, confirmations, lock) ->
-                            let amount = (if direction = TransactionDirection.In then 1L else -1L) * int64 spend.amount
-
-                            transactionHistoryEncoder config.chain txHash spend.asset amount confirmations lock)
-                        |> List.toArray
-                        |> JsonValue.Array
-                    (new TransactionsResponseJson.Root(json)).JsonValue
-                    |> JsonContent
-                    |> config.reply StatusCode.OK
+                    getContractHistory config txs
+                | Error error -> config.replyError error
+    
+    let transactionsByBlockNumber
+        (config: Config)
+        (body: string)
+        : unit =
+            match parseGetHistoryByBlockNumberJson config.chain body with
+            | Error error -> config.replyError error
+            | Ok (addresses, startBlock, endBlock) ->
+                match AddressDB.getTransactionsByBlockNumber config.client addresses startBlock endBlock with
+                | Ok txs ->
+                    getContractHistory config txs
                 | Error error -> config.replyError error
 
     let resync
@@ -1292,12 +1324,16 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
         AddressDB.outputs config body
     | Post("/addressdb/transactions", Some body) ->
        AddressDB.transactions config body
+    | Post("/addressdb/transactions/filterByBlockNumber", Some body) ->
+       AddressDB.transactionsByBlockNumber config body
     | Post("/addressdb/transactioncount", Some body) ->
         AddressDB.transactionCount config body
     | Post("/addressdb/contract/mint", Some body) ->
         AddressDB.contractMint config body
     | Post("/addressdb/contract/history", Some body) ->
         AddressDB.contractHistory config body
+    | Post("/addressdb/contract/history/filterByBlockNumber", Some body) ->
+        AddressDB.contractHistoryByBlockNumber config body
     | Post("/addressdb/contract/info", Some body) ->
         AddressDB.contractInfo config body
     | _ ->

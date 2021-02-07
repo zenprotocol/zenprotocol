@@ -465,6 +465,15 @@ let parseGetHistoryJson chain json =
     with _ as ex ->
         Error ("Json invalid: " + ex.Message)
 
+let parseGetHistoryByBlockNumberJson chain json =
+    try
+        let json = GetHistoryFilterByBlockJson.Parse json
+
+        checkAddresses chain json.Addresses
+        <@> fun addresses -> addresses, uint32 json.Start, uint32 json.End
+    with _ as ex ->
+        Error ("Json invalid: " + ex.Message)
+
 let parseGetOutputsJson chain json =
     try
         let json = GetOutputsJson.Parse json
@@ -514,7 +523,18 @@ let parseGetContractHistoryJson json =
     with _ as ex ->
         Error ("Json invalid: " + ex.Message)
         
+let parseGetContractHistoryByBlockNumber json =
+    try
+        let json = GetContractHistoryFilterByBlockJson.Parse json
+
+        json.ContractId
+        |> ContractId.fromString
+        |> Result.ofOption "invalid contractId"
+        <@> fun contractId -> contractId, uint32 json.Start,uint32 json.End
+    with _ as ex ->
+        Error ("Json invalid: " + ex.Message)
         
+             
 let handleTxResult config result =
     match result with
     | Error error ->

@@ -248,6 +248,19 @@ let getConfirmations blockNumber =
     | Unconfirmed ->
         0ul,0
 
+let private filterDBOutputStartEnd startBlock endBlock currentBlockNumber outputsInfos =
+    match outputsInfos with
+    | _,_,_,confirmation,_,_ ->
+        let confirmationStart = currentBlockNumber - startBlock + 1ul
+        let confirmationEnd   = currentBlockNumber - endBlock   + 1ul
+        confirmationEnd < confirmation && confirmation <= confirmationStart
+
+let private filterConfirmationStartEnd startBlock endBlock confirmation =
+    match snd confirmation with
+    | Confirmed (databaseBlockNumber,_,_) ->
+        startBlock <= databaseBlockNumber && databaseBlockNumber < endBlock
+    | Unconfirmed -> true
+
 let getOutputsInfo blockNumber outputs = 
 
     let incoming = List.map (fun (output:DBOutput) ->
@@ -294,25 +307,48 @@ let getHistory dataAccess session view skip take addresses =
     |> Wallet.Account.paginate skip take
     |> List.map (fun (txHash,direction,spend,confirmations,_,lock) -> txHash,direction,spend,confirmations,lock)
 
-let getContractHistory dataAccess session view skip take contractId =
+let getHistoryByBlockNumber dataAccess session view startBlock endBlock addresses =
     let account = DataAccess.Tip.get dataAccess session
+    
+    AddressOutpoints.get view dataAccess session addresses
+    |> OutpointOutputs.get view dataAccess session
+    |> getOutputsInfo account.blockNumber
+    |> List.filter (filterDBOutputStartEnd startBlock endBlock account.blockNumber)
+    |> List.sortWith Wallet.Account.txComparer
+    |> List.map (fun (txHash,direction,spend,confirmations,_,lock) -> txHash,direction,spend,confirmations,lock)
 
-    let comparer a1 a2 =
-        let comparer (index1, block1) (index2, block2) = 
+let private contractHistoryComparer a1 a2 =
+    let comparer (index1, block1) (index2, block2) = 
             if index1 = index2 then
                 block2 - block1
             else        
                 int (index2 - index1)
-        comparer (snd a1) (snd a2)
+    comparer (snd a1) (snd a2)
+
+let getContractHistory dataAccess session view skip take contractId =
+    let account = DataAccess.Tip.get dataAccess session
     
     ContractHistory.get view dataAccess session contractId
     |> List.map (fun witnessPoint ->
         ContractData.get view dataAccess session witnessPoint,
         ContractConfirmations.get view dataAccess session witnessPoint
         |> getConfirmations account.blockNumber)
-    |> List.sortWith comparer
+    |> List.sortWith contractHistoryComparer
     |> Wallet.Account.paginate skip take
     |> List.map (fun ((command, messageBody, txHash), (confirmations, _)) -> command, messageBody, txHash, confirmations)
+
+let getContractHistoryByBlockNumber dataAccess session view startBlock endBlock contractId =
+    let account = DataAccess.Tip.get dataAccess session
+    
+    ContractHistory.get view dataAccess session contractId
+    |> List.map (fun witnessPoint ->
+        ContractData.get view dataAccess session witnessPoint,
+        ContractConfirmations.get view dataAccess session witnessPoint)
+    |> List.filter (filterConfirmationStartEnd startBlock endBlock)
+    |> List.map (fun (contractData, confirmationStatus) -> contractData, confirmationStatus |> getConfirmations account.blockNumber)
+    |> List.sortWith contractHistoryComparer
+    |> List.map (fun ((command, messageBody, txHash), (confirmations, _)) -> command, messageBody, txHash, confirmations)
+
 
 let getContractAsset dataAccess session view asset =
     ContractAssets.get view dataAccess session asset
