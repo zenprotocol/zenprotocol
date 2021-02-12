@@ -89,7 +89,7 @@ let contains address book =
 
     Collection.containsKey book.addresses session address
 
-let haveEnoughAddresses book =
+let haveEnoughAddresses (_:T) =
     // TODO: check if we need more addresses
     false
 

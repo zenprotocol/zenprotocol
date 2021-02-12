@@ -1,4 +1,4 @@
-module Node.Tests.TestingLib
+module Api.Tests.TestingLib
 
 open Config
 open NBitcoin
@@ -139,7 +139,7 @@ module Node =
 
 
     let setGenesisBlock() =
-        Consensus.Block.createGenesis chainParams [ rootTxExtended ] (0UL, 0UL)
+        Consensus.Block.createGenesis Utils.chainParams [ rootTxExtended ] (0UL, 0UL)
         //not sure if we using it
 
     let getBlockHeader index : uint32 =
@@ -225,7 +225,7 @@ module Contract =
 
             let ballotSer = Ballot.serialize ballot |> FsBech32.Base16.encode |> ZFStar.fsToFstString
 
-            let message = Blockchain.Tally.VoteParser.hashBallot chainParams blockNumber ballotSer |> Hash.toString
+            let message = Blockchain.Tally.VoteParser.hashBallot Utils.chainParams blockNumber ballotSer |> Hash.toString
             // get keys
             let keys = Parser.publicKey (Wallet_.getKeys index)
 
@@ -244,7 +244,7 @@ module Contract =
                     |> Map.ofList
                 ZData.Collection (ZData.Dict (map, Map.count map |> uint32))
             let signatures =
-                Zen.Dictionary.add signatureString signatureData Zen.Dictionary.empty
+                Zen.Dictionary.add signatureString signatureData (Map.empty, 0ul)
                 |> Cost.__force
 
             Zen.Dictionary.add ballotString (ZData.String ballotSer) signatures

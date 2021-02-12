@@ -136,7 +136,7 @@ type Arguments =
             | Wallet_Create _ -> "create a wallet from a newly generated mnemonic phrase"
             | Blockchain_Info _ -> "get blockchain info"
             | WalletKeys _ -> "get wallet keys"
-            | SignMessage _ -> "get wallet keys"
+            | SignMessage _ -> "sign message with your privates"
 
 // read from console, hiding input text
 let readMasked(): string =
@@ -217,7 +217,7 @@ let main argv =
             printfn "==================================================="
 
             Array.iter (fun (txHash, asset, amount, confirmations) ->
-                printfn "%s\t%s\t%d\t%d" txHash asset amount confirmations
+                printfn "%s\t%s\t%s\t%d" txHash asset amount confirmations
             ) transactions
         | Some (Address _) ->
             let result =
@@ -243,7 +243,7 @@ let main argv =
                 let code = File.ReadAllText file
                 let result =
                     activateContract getUri code numberOfBlocks rlimit password
-                    |> ContractActivateResponseJson.Parse
+                    |> ContractActivateOrExtendResponseJson.Parse
 
                 printfn "Contract activated.\nAddress: %s\nContract Id: %s" result.Address result.ContractId
         | Some (Extend args) ->

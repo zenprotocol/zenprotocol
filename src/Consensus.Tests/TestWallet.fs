@@ -255,7 +255,7 @@ let createContractRecord code =
                     queries = queries })
     }
 
-let createActivationTransactionFromContract chainParams (contractId, ({queries=queries;code=code} as contractV0)) (numberOfBlocks:uint32) (account, extendedKey) =
+let createActivationTransactionFromContract chainParams (_, ({queries=queries;code=code} as contractV0)) (numberOfBlocks:uint32) (account, extendedKey) =
 
     result {
         let codeLength = String.length code |> uint64
@@ -309,7 +309,7 @@ let addReturnAddressToData publicKey data =
 
     match data with
     | Some (ZData.Collection (ZData.Dict dict)) -> addReturnAddressToData' dict
-    | None -> addReturnAddressToData' Zen.Dictionary.empty
+    | None -> addReturnAddressToData' (Map.empty, 0ul)
     | _ -> Error "data can only be empty or dict in order to add return address"
 
 let private signFirstWitness signKey tx = result {

@@ -20,6 +20,8 @@ let main dataPath chainParams busName wipe =
         if System.IO.Directory.Exists dataPath then
                 System.IO.Directory.Delete (dataPath,true)
 
+    let databaseContext = DatabaseContext.create dataPath
+
     Actor.create<Command,Request,Event,State> busName serviceName (fun poller sbObservable ebObservable  ->
         let publisher = EventBus.Publisher.create<Event> busName
         let client = ServiceBus.Client.create busName
@@ -41,8 +43,6 @@ let main dataPath chainParams busName wipe =
             Poller.addTimer poller ticker
             |> Observable.map (fun _ ->
                 Handler.tick chainParams)
-
-        let databaseContext = DatabaseContext.create dataPath
         
         use session = DatabaseContext.createSession databaseContext
         

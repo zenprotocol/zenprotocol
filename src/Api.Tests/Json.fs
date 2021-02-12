@@ -1,11 +1,10 @@
-module Node.Tests.Json
+module Api.Tests.Json
 
 open Consensus
 open Types
 open Api.Types
 open FSharp.Data
 open Infrastructure
-open Node.Tests
 
 let publishBlockJson block = 
     (new PublishBlockJson.Root(
@@ -43,7 +42,7 @@ let contractExecuteRequestJson address command messageBody returnAddress sign pa
         new ContractExecuteRequestJson.Options(returnAddress, sign),
         spends
         |> List.map (fun { asset = asset; amount = amount } -> asset.ToString(), int64 amount)
-        |> List.map (fun (asset, amount) -> new ContractExecuteRequestJson.Spend(asset, amount))
+        |> List.map (fun (asset, amount) -> new ContractExecuteRequestJson.Spend(asset, string amount))
         |> List.toArray,
         password
     )).JsonValue

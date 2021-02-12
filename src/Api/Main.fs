@@ -11,14 +11,14 @@ type State = Server.T
 
 let eventHandler event (state:State) =
     match event with
-    | TipChanged header ->
+    | TipChanged _ ->
         state.templateCache.newTip()
         state
     | _ -> state
 
-let main chain busName bind =
-    Actor.create<unit,unit,Event,State> busName "Api" (fun poller sbObservable ebObservable ->            
-        let server = Server.create chain poller busName bind
+let main chain busName bind origin isRemote =
+    Actor.create<unit,unit,Event,State> busName "Api" (fun poller _ ebObservable ->            
+        let server = Server.create chain poller busName bind origin isRemote
                 
         let ebObservable = 
             ebObservable

@@ -61,6 +61,7 @@ module Blockchain =
         | GetCandidates of uint32
         | GetBlockReward of uint32
         | GetCGP
+        | GetWinner
         | GetCgpHistory
 
     type Response = unit
@@ -185,6 +186,10 @@ module Blockchain =
     let getCgp client =
         GetCGP 
         |> Request.send<Request, CGP.T> client serviceName
+        
+    let getWinner client =
+        GetWinner
+        |> Request.send<Request,Winner option> client serviceName
         
     let getCgpHistory client =
         GetCgpHistory
@@ -377,12 +382,15 @@ module AddressDB =
         | Resync
 
     type Request =
-        | GetBalance of addresses:string list
-        | GetOutputs of addresses:string list * Mode
+        | GetBalance of addresses:string list * blockNumber:uint32 option
+        | GetOutputs of addresses:string list * Mode * blockNumber:uint32 option
         | GetTransactions of addresses:string list * skip: int * take: int
+        | GetTransactionsByBlockNumber of addresses:string list * start: uint32 * stop: uint32
         | GetContractHistory of contractId : ContractId * skip: int * take: int
+        | GetContractHistoryByBlockNumber of contractId : ContractId * start: uint32 * stop: uint32
         | GetTransactionCount of addresses:string list * uint32
         | GetContractAssets of asset: Asset
+        | GetContractInfo of code: string * rlimit: uint32 option
 
     let serviceName = "addressDB"
     let resyncAccount client =
@@ -391,8 +399,8 @@ module AddressDB =
     //TODO: apply same convention to other services
     let private send<'a> client = Request.send<Request, Result<'a,string>> client serviceName
 
-    let getBalance client args =
-        GetBalance args
+    let getBalance client addresses blockNumber =
+        GetBalance (addresses, blockNumber)
         |> send<BalanceResponse> client
 
     let getOutputs client args =
@@ -413,4 +421,16 @@ module AddressDB =
         
     let getContractAssets client args =
         GetContractAssets args
-        |> send<option<string * Zen.Types.Data.data option>> client
+        |> send<option<uint32 * string option * string * Zen.Types.Data.data option>> client
+
+    let getContractInfo client args =
+        GetContractInfo args
+        |> send<ContractId * ContractV0> client
+        
+    let getContractHistoryByBlockNumber client args =
+        GetContractHistoryByBlockNumber args
+        |> send<ContractHistoryResponse> client
+    
+    let getTransactionsByBlockNumber client addresses start stop =
+        GetTransactionsByBlockNumber (addresses, start, stop)
+        |> send<TransactionsResponse> client

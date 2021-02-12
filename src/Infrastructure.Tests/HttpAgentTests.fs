@@ -17,7 +17,7 @@ let runServer _ =
         use poller = Poller.create ()
         use observer = Poller.registerEndMessage poller shim
         
-        use httpAgent = Server.create poller "127.0.0.1:45123"
+        use httpAgent = Server.create poller No "127.0.0.1:45123"
         
         use observer = 
             Server.observable httpAgent |>

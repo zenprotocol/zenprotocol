@@ -52,7 +52,6 @@ let createHeaders from _to =
 
 [<Test>]
 let ``from genesis``() =
-    let idb = Inactive
 
     let effects, ibd =
         start 0UL Hash.zero Block.genesisParent peerId peerHeader
@@ -234,7 +233,7 @@ let ``block invalid``() =
         |> Writer.unwrap
 
     let effects,ibd =
-        InitialBlockDownload.invalid 0UL (Block.hash headers.[0]) ibd
+        InitialBlockDownload.invalid (Block.hash headers.[0]) ibd
         |> Writer.unwrap
 
     isActive ibd |> should equal false
@@ -246,7 +245,6 @@ let ``block invalid``() =
 
 [<Test>]
 let ``timeout on get headers request``() =
-    let idb = Inactive
 
     let _, ibd =
         start 0UL Hash.zero Block.genesisParent peerId peerHeader
@@ -287,7 +285,7 @@ let ``timeout on downloading``() =
         processHeaders chain session 1000UL peerId headers ibd
         |> Writer.unwrap
 
-    let effects,ibd =
+    let _,ibd =
         InitialBlockDownload.received 2000UL (Block.hash headers.[0]) ibd
         |> Writer.unwrap
 
@@ -334,7 +332,7 @@ let ``getting headers from genesis``() =
         |> BlockRepository.saveHeader session) headers
 
     let effect, _  =
-        getHeaders chain session peerId [Hash.zero] (List.last headers |> Block.hash)
+        getHeaders session peerId [Hash.zero] (List.last headers |> Block.hash)
         |> Writer.unwrap
 
     effect |> should equal [
@@ -364,7 +362,7 @@ let ``getting headers from unknown hash``() =
         |> BlockRepository.saveHeader session) headers
 
     let effect, _  =
-        getHeaders chain session peerId [Hash.compute "HELLO"B] (List.last headers |> Block.hash)
+        getHeaders session peerId [Hash.compute "HELLO"B] (List.last headers |> Block.hash)
         |> Writer.unwrap
 
     effect |> should equal [
@@ -407,7 +405,7 @@ let ``getting headers from none main chain hash``() =
     |> BlockRepository.saveHeader session
 
     let effect, _  =
-        getHeaders chain session peerId [Block.hash sideBlock.header] (List.last headers |> Block.hash)
+        getHeaders session peerId [Block.hash sideBlock.header] (List.last headers |> Block.hash)
         |> Writer.unwrap
 
     effect |> should equal [
@@ -437,7 +435,7 @@ let ``getting headers from middle``() =
         |> BlockRepository.saveHeader session) headers
 
     let effect, _  =
-        getHeaders chain session peerId [headers.[1000] |> Block.hash] (List.last headers |> Block.hash)
+        getHeaders session peerId [headers.[1000] |> Block.hash] (List.last headers |> Block.hash)
         |> Writer.unwrap
 
     effect |> should equal [
@@ -480,7 +478,7 @@ let ``getting headers from multiple hashes``() =
     |> BlockRepository.saveHeader session
 
     let effect, _  =
-        getHeaders chain session peerId [Block.hash sideBlock.header;Block.hash headers.[3]; Block.hash headers.[2]] (List.last headers |> Block.hash)
+        getHeaders session peerId [Block.hash sideBlock.header;Block.hash headers.[3]; Block.hash headers.[2]] (List.last headers |> Block.hash)
         |> Writer.unwrap
 
     effect |> should equal [

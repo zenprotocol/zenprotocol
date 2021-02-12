@@ -337,7 +337,7 @@ let private handleGenesisBlock
             |> Log.info
 
             let! ibd =
-                InitialBlockDownload.invalid env.timestamp blockHash state.initialBlockDownload
+                InitialBlockDownload.invalid blockHash state.initialBlockDownload
 
             return { state with initialBlockDownload = ibd }
         | Ok (block, connState) ->
@@ -449,7 +449,7 @@ let private handleMainChain
             |> Log.info
 
             let! ibd =
-                InitialBlockDownload.invalid env.timestamp blockHash state.initialBlockDownload
+                InitialBlockDownload.invalid blockHash state.initialBlockDownload
 
             return { state with initialBlockDownload = ibd }
         | Ok (block, connState) ->
@@ -725,7 +725,7 @@ let validateBlock
             >> setField "error" error
             |> Log.info
 
-            let! initialBlockDownload = InitialBlockDownload.invalid env.timestamp blockHash state.initialBlockDownload
+            let! initialBlockDownload = InitialBlockDownload.invalid blockHash state.initialBlockDownload
 
             return {state with initialBlockDownload = initialBlockDownload}
         | Ok block ->
@@ -765,7 +765,7 @@ let validateBlock
                     | ExtHeader.Invalid ->
                         // Ignoring the block
 
-                        let! initialBlockDownload = InitialBlockDownload.invalid env.timestamp blockHash state.initialBlockDownload
+                        let! initialBlockDownload = InitialBlockDownload.invalid blockHash state.initialBlockDownload
 
                         return {state with initialBlockDownload = initialBlockDownload}
 

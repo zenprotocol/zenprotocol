@@ -8,24 +8,16 @@ open Consensus.Chain
 open Infrastructure
 open Blockchain
 open Blockchain.State
-open FsCheck
 open Messaging.Events
 open Messaging.Services.Network
-open Wallet
 open Blockchain.DatabaseContext
 open Consensus.Tests.SampleContract
 open Consensus.Contract
 open Consensus.Tests
-open Tests.ContractCode
-open Api.Types
 
 open System
 open Blockchain.Tally
 open Blockchain.Tests
-open Consensus.Tests
-open Consensus.Tests
-open Consensus.Tests
-open TestsInfrastructure.Constraints
 open Messaging.Services
 open Helper
 
@@ -63,7 +55,6 @@ let rootAccount, rootExtendedKey = rootAccountData
 
 let createTransaction account =
     Result.get <| TestWallet.createTransaction testParameters (publicKeyHash account) {asset=Asset.Zen;amount=rootAmount} (account, snd rootAccountData)
-
 
 // Default initial state of mempool and utxoset
 let utxoSet = UtxoSet.asDatabase
@@ -866,7 +857,6 @@ let ``Valid template for two transactions which don't depend on each other``() =
     let balances = TestWallet.getBalance rootAccount
     let asset, amount = balances |> Map.toList |> List.head
     let firstAmount = amount / 4UL
-    let secondAmount = amount - firstAmount
     let splitTx =
         TestWallet.createTransaction testParameters (publicKeyHash rootAccount) {asset=asset;amount=firstAmount} rootAccountData
         |>  Result.get
@@ -1113,9 +1103,8 @@ let ``should get all the blocks in mainchain`` () =
     let mainChain, _ = createChainFromGenesis 9 0
     
     
-    let _,state = validateChain session mainChain state
+    let _ = validateChain session mainChain state
     
-    //printfn "%A" (BlockRepository.getMainHeaderPaginate session 0 2)
     let headers = BlockRepository.getMainHeaderFrom session 8
     should equal headers.[0].header.blockNumber 9ul
     should equal headers.[1].header.blockNumber 10ul

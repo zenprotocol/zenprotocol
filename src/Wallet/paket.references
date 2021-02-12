@@ -1,10 +1,8 @@
 FsNetMQ
-FSharp.Control.Reactive
-FSharp.Core
-FsBech32
+FSharp.Core redirects: on
 FSharp.Compiler.Tools
+FSharp.Control.Reactive
 Base58Check
 NBitcoin
-BouncyCastle
 Logary
 Zulib

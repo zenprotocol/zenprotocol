@@ -113,7 +113,7 @@ let handleCommand chainParams command session timestamp (state:State) =
         | RequestHeaders (peerId, from, endHash) ->
             effectsWriter {
                 if state.tipState.tip.hash <> Hash.zero then
-                    do! InitialBlockDownload.getHeaders chainParams session peerId from endHash
+                    do! InitialBlockDownload.getHeaders session peerId from endHash
 
                 return state
             }
@@ -316,6 +316,10 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
         blockReward blockNumber state.cgp.allocation
         |> (+) (blockAllocation blockNumber state.cgp.allocation)
         |> requestId.reply
+    | GetWinner ->
+        CGP.getInterval chain state.tipState.tip.header.blockNumber
+        |> Tally.Handler.getWinner session
+        |> requestId.reply<Winner option>
     | GetCGP ->
         let blockNumber = state.tipState.tip.header.blockNumber + 1ul
         if CGP.isPayoutBlock chain blockNumber then
@@ -346,11 +350,11 @@ let handleRequest chain (requestId:RequestId) request session timestamp state =
                 (cgp :: cgpList)
                 |> getCGP (interval - 1ul) lastHeader
          
-        let currentInterval = CGP.getInterval chain state.tipState.tip.header.blockNumber
+        let currentInterval = CGP.getInterval chain state.tipState.tip.header.blockNumber - 1ul
                 
         []
         |> getCGP currentInterval state.tipState.tip
-        |> List.mapi (fun i cgp -> (uint32 i,cgp))
+        |> List.mapi (fun i cgp -> (uint32 i + 1ul,cgp))
         |> requestId.reply<(uint32 * CGP.T) list>
     |> ignore
 

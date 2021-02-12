@@ -1,6 +1,4 @@
-FSharp.Core
-NUnit
 FsUnit
+FSharp.Core redirects: on
 FsCheck.NUnit
 FSharp.Compiler.Tools
-

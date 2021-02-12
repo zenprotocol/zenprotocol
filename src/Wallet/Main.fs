@@ -74,7 +74,7 @@ let commandHandler client command dataAccess session accountStatus =
         |> Log.info
 
         accountStatus
-    | Exist view ->
+    | Exist _ ->
         match command with
         | Resync ->
             Account.reset dataAccess session
@@ -170,7 +170,7 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             error
             |> reply<string> requestId
             NoAccount
-        | GetTransactionCount _ ->
+        | GetTransactionCount ->
             error
             |> reply<int> requestId
             NoAccount
@@ -439,7 +439,7 @@ type Wipe =
     | Reset
     | NoWipe
 
-let main dataPath busName chain (wipe:Wipe) =
+let main dataPath busName chain (isRunning: bool) (wipe:Wipe) =
     let dataPath = Platform.combine dataPath "walletdb"
 
     if wipe = Full then
@@ -459,19 +459,23 @@ let main dataPath busName chain (wipe:Wipe) =
             let account = DataAccess.Account.tryGet dataAccess session
 
             let accountStatus =
-                match wipe, account with
-                | Reset, Some _  ->
-                    eventX "Resetting account"
-                    |> Log.info
+                if isRunning then
+                    match wipe, account with
+                    | Reset, Some _  ->
+                        eventX "Resetting account"
+                        |> Log.info
 
-                    Account.reset dataAccess session
-                    sync dataAccess session client
-                | NoWipe, Some _ ->
-                    eventX "Syncing account..."
-                    |> Log.info
+                        Account.reset dataAccess session
+                        sync dataAccess session client
+                    | NoWipe, Some _ ->
+                        eventX "Syncing account..."
+                        |> Log.info
 
-                    sync dataAccess session client
-                | _, _ -> NoAccount
+                        sync dataAccess session client
+                    | _, _ ->
+                        NoAccount
+                else
+                    NoAccount
 
             Session.commit session
 

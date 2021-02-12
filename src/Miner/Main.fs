@@ -28,8 +28,8 @@ let handleEvent client publisher event =
         |> Log.info)
     |> ignore
 
-let main busName chain numberOfThreads =
-    Actor.create<unit,unit,Event,unit> busName "Miner" (fun poller sbObservable ebObservable  ->
+let main busName numberOfThreads =
+    Actor.create<unit,unit,Event,unit> busName "Miner" (fun _ _ ebObservable  ->
         let client = ServiceBus.Client.create busName
         let publisher = FsNetMQ.Socket.pub ()
 
@@ -38,7 +38,7 @@ let main busName chain numberOfThreads =
 
         let actors =
             [1..numberOfThreads]
-            |> List.map (fun _ -> MiningActor.create chain busName address)
+            |> List.map (fun _ -> MiningActor.create busName address)
 
         eventX "Miner running"
         |> Log.info

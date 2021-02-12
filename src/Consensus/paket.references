@@ -1,10 +1,6 @@
-FsNetMQ
-FSharp.Core
 FsPickler
-BouncyCastle
-FsBech32
+FSharp.Core redirects: on
 FSharp.Compiler.Tools
-FSharp.Compatibility.OCaml
 FsNetMQ
 FSharpx.Extras
 Logary

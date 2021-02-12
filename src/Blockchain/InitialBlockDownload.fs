@@ -112,7 +112,7 @@ let processHeaders chain session timestamp peerId (headers:BlockHeader list) ibd
                     else
                         List.skip maxDownloading missingBlocks, List.take maxDownloading missingBlocks
 
-                for (hash,block) in blocksToDownload do
+                for (hash,_) in blocksToDownload do
                     do! getBlockFrom peerId hash
 
                 let inprogress =
@@ -182,7 +182,7 @@ let received timestamp blockHash ibd = effectsWriter {
             return ibd
 }
 
-let invalid timestamp blockHash ibd = effectsWriter {
+let invalid blockHash ibd = effectsWriter {
     match ibd with
     | Inactive
     | GettingHeaders _ -> return ibd
@@ -239,7 +239,7 @@ let tick now ibd = effectsWriter {
                 return DownloadingBlocks (syncing, downloading, now)
 }
 
-let getHeaders (chainParams:Chain.ChainParameters) session peerId from endHash =
+let getHeaders session peerId from endHash =
     let rec getHeaders (fromHeader:ExtendedBlockHeader.T) toHash left acc =
         if fromHeader.hash = toHash || left = 0 then
             acc |> List.rev

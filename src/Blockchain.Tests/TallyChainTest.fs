@@ -138,7 +138,7 @@ let createVoteData ballot blockNumber =
             |> Map.ofList
         Zen.Types.Data.Collection (Zen.Types.Data.Dict (map, Map.count map |> uint32))
     let signatures =
-        Zen.Dictionary.add signatureString signatureData Zen.Dictionary.empty
+        Zen.Dictionary.add signatureString signatureData (Map.empty, 0ul)
         |> Zen.Cost.Realized.__force
 
     Zen.Dictionary.add ballotString (Zen.Types.Data.String ballotSer) signatures
@@ -480,7 +480,7 @@ let ``edge cases of allocation bounds`` () =
         |> Map.add (voteBlock 15ul)  [ voteTx (voteBlock 15ul) 90uy ; voteTx (voteBlock 15ul) 91uy ]
         |> Map.add (voteBlock 16ul)  [ voteTx (voteBlock 16ul) 91uy ]
     
-    let (blocks, account) = createChainFromGenesisWithSession 1611 1 cgps txs
+    let (blocks, _) = createChainFromGenesisWithSession 1611 1 cgps txs
     
     let _, state' = validateChain session blocks state
     

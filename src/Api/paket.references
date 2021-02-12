@@ -1,9 +1,8 @@
-FSharp.Core
 FsNetMQ
 FSharp.Control.Reactive
 FSharp.Data
 FSharp.Compiler.Tools
-FsBech32
+FSharp.Core redirects: on
 Newtonsoft.Json
 Logary
 Zulib

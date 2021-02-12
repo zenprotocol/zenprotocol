@@ -266,7 +266,7 @@ let ``create execute contract transaction``() =
 
     // last pkwitness should use FollowingWitnesses
     List.findBack (function | PKWitness _ -> true | _ -> false) tx.witnesses
-    |> function PKWitness (sigHash,_,_) -> sigHash
+    |> function PKWitness (sigHash,_,_) -> sigHash | _ -> failwith "Not supposed to be here"
     |> should equal FollowingWitnesses
 
 
@@ -304,7 +304,7 @@ let ``create execute contract transaction without explicitly spending any Zen sh
 
     // last pkwitness should use FollowingWitnesses
     List.findBack (function | PKWitness _ -> true | _ -> false) tx.witnesses
-    |> function PKWitness (sigHash,_,_) -> sigHash
+    |> function PKWitness (sigHash,_,_) -> sigHash | _ -> failwith "Not supposed to be here"
     |> should equal FollowingWitnesses
 
 
@@ -695,8 +695,6 @@ let ``sign contract wintess``() =
 
     let publicKey = ExtendedKey.derivePath "m/0'" privateKey |> Result.get |> ExtendedKey.getPublicKey |> Result.get
 
-    let (Crypto.PublicKey pk) = publicKey
-
     match tx.witnesses.[1] with
     | ContractWitness cw ->
         match cw.signature with
@@ -727,8 +725,8 @@ let ``Typescript testvector``() =
 //    printfn "%A" (Transaction.toHex tx)
 
     let expectedTxHash =
-        (Hash.fromString "2df00d7cf448facbe9883a032dd435b08c74e40a18c9f91c1a43be583ea3ce4a")
-        |> Infrastructure.Result.get
+        Hash.fromString "2df00d7cf448facbe9883a032dd435b08c74e40a18c9f91c1a43be583ea3ce4a"
+        |> Option.get
 
     Transaction.hash tx |> should equal expectedTxHash
 

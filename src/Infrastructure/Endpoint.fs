@@ -46,3 +46,4 @@ let parseIp bindPort (address:string) =
     else
         tryGetFirstIpFromHost address bindPort
             
+let getEndpoint url port = sprintf "%s:%i" url port

@@ -9,21 +9,17 @@ open Serialization.Serialization
 open Crypto
 open Types
 open FsBech32
-open System.Text
 open Newtonsoft.Json
 open Wallet
 open Infrastructure
 open Infrastructure.Result
+open Infrastructure.Http
+open Config
 
 let private getSpend asset amount =
     match Asset.fromString asset with
     | Some asset -> Ok { asset = asset; amount = uint64 amount }
     | None -> Error "invalid asset"
-
-let private getOutpoint txHash index =
-    Hash.fromString txHash
-    |> Result.mapError (fun _ -> "invalid txHash")
-    <@> fun txHash -> { txHash = txHash; index = index }
 
 let parseSendJson chain json =
     try
@@ -205,6 +201,22 @@ let parseContractExecuteFromTransactionJson chain json =
     <@> (fun (json, contractId, tx, messageBody, sender) ->
         contractId, json.Command, messageBody, tx, sender)
 
+let parseAddressDBContractInfo json =
+    try
+        let json = ContractInfoRequestJson.Parse json
+        let rlimit =
+            if json.Rlimit < (int TransactionCreator.Rlimit) then
+                None
+            else
+                Some (uint32 json.Rlimit)
+
+        if String.length json.Code = 0 then
+            Error "Contract code is empty"
+        else
+            Ok (json.Code, rlimit)
+    with _ as ex ->
+        Error ("Json is invalid: " + ex.Message)
+
 let parseContractActivateJson json =
     try
         let json = ContractActivateRequestJson.Parse json
@@ -325,9 +337,9 @@ let parseSignJson json =
             Error "Password is empty"
         else
             match Hash.fromString json.Message with
-            | Ok message ->
+            | Some message ->
                 Ok (message, json.Path, json.Password)
-            | _ -> Error "invalid message"
+            | None -> Error "invalid message"
     with _ as ex ->
         Error ("Json is invalid: " + ex.Message)
 
@@ -429,9 +441,18 @@ let private checkAddresses chain addresses =
 
 let parseGetBalanceJson chain json =
     try
-        let json = GetBalanceJson.Parse json
-
+        
+        let json =
+            json
+            |> JsonValue.Parse
+            |> GetBalanceJson.Root
+        
+        let blockNumber =
+            json.BlockNumber
+            |> Option.map uint32
+        
         checkAddresses chain json.Addresses
+        >>= (fun addresses -> Ok (addresses,blockNumber))
     with _ as ex ->
         Error ("Json invalid: " + ex.Message)
 
@@ -444,17 +465,30 @@ let parseGetHistoryJson chain json =
     with _ as ex ->
         Error ("Json invalid: " + ex.Message)
 
+let parseGetHistoryByBlockNumberJson chain json =
+    try
+        let json = GetHistoryFilterByBlockJson.Parse json
+
+        checkAddresses chain json.Addresses
+        <@> fun addresses -> addresses, uint32 json.Start, uint32 json.End
+    with _ as ex ->
+        Error ("Json invalid: " + ex.Message)
+
 let parseGetOutputsJson chain json =
     try
         let json = GetOutputsJson.Parse json
+        
+        let blockNumber =
+            json.BlockNumber
+            |> Option.map uint32
 
         checkAddresses chain json.Addresses
         >>= fun addresses ->
             match json.Mode with
             | "all" ->
-                Ok (addresses, Messaging.Services.AddressDB.Mode.All)
+                Ok (addresses, Messaging.Services.AddressDB.Mode.All, blockNumber)
             | "unspentOnly" ->
-                Ok (addresses, Messaging.Services.AddressDB.Mode.UnspentOnly)
+                Ok (addresses, Messaging.Services.AddressDB.Mode.UnspentOnly, blockNumber)
             | _ ->
                 Error "unrecognized mode"
     with _ as ex ->
@@ -472,8 +506,8 @@ let parseAsset json =
         let json = GetAssetsJson.Parse json
 
         match Asset.fromString json.Asset with
-        | Some (Asset (c,hash)) when Hash.zero <> hash -> Ok (Asset(c,hash))
-        | _ -> Error "invalid asset"
+        | Some asset -> Ok asset
+        | None -> Error "invalid asset"
 
     with _ as ex ->
         Error ("Json invalid: " + ex.Message)
@@ -488,3 +522,40 @@ let parseGetContractHistoryJson json =
         <@> fun contractId -> contractId, json.Skip, json.Take
     with _ as ex ->
         Error ("Json invalid: " + ex.Message)
+        
+let parseGetContractHistoryByBlockNumber json =
+    try
+        let json = GetContractHistoryFilterByBlockJson.Parse json
+
+        json.ContractId
+        |> ContractId.fromString
+        |> Result.ofOption "invalid contractId"
+        <@> fun contractId -> contractId, uint32 json.Start,uint32 json.End
+    with _ as ex ->
+        Error ("Json invalid: " + ex.Message)
+        
+             
+let handleTxResult config result =
+    match result with
+    | Error error ->
+        config.replyError error
+    | Ok tx ->
+        Transaction.hash tx
+        |> Hash.toString
+        |> JsonValue.String
+        |> JsonContent
+        |> config.reply StatusCode.OK
+
+let handleRawTxResult config result =
+    match result with
+    | Error error ->
+        config.replyError error
+    | Ok raw ->
+        let txHash = Transaction.fromRaw raw |> Transaction.hash |> Hash.toString
+        let hex = Serialization.RawTransaction.toHex raw
+
+        (new RawTransactionResultJson.Root(txHash, hex)).JsonValue
+        |> JsonContent
+        |> config.reply StatusCode.OK
+
+

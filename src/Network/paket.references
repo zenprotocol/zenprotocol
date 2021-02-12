@@ -1,8 +1,8 @@
 FsPickler
+FSharp.Core redirects: on
 FsNetMQ
 FSharp.Control.Reactive
 System.Reactive.Compatibility
-FSharp.Core
 FSharp.Compiler.Tools
 FSharp.Data
 Logary

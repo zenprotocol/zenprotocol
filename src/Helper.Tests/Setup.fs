@@ -1,4 +1,4 @@
-namespace Node.Tests
+namespace Helper.Tests
 
 open NUnit.Framework
 

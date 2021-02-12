@@ -12,10 +12,12 @@ type BalanceResponseJson = JsonProvider<"""
 ]
 """>
 
-type ContractActivateResponseJson = JsonProvider<"""
+type ContractActivateOrExtendResponseJson = JsonProvider<"""
 {
     "address" : "address",
-    "contractId" : "contractId"
+    "contractId" : "contractId",
+    "txHash": "txHash",
+    "numberOfBlocks": "txHash"
 }
 """>
 
@@ -24,7 +26,7 @@ type CreateRawTransactionJson = JsonProvider<"""
     "outputs": [{
         "address": "address",
         "asset": "asset",
-        "amount": 2147483649
+        "amount": "amount"
     }]
 }
 """>
@@ -48,7 +50,7 @@ type SendRequestJson = JsonProvider<"""
     "outputs": [{
         "address": "address",
         "asset": "asset",
-        "amount": 2147483649
+        "amount": "amount"
     }],
     "password": "password"
 }
@@ -60,6 +62,13 @@ type ContractActivateRequestJson = JsonProvider<"""
     "rlimit": 2723280,
     "numberOfBlocks": 1,
     "password": "password"
+}
+""">
+
+type ContractInfoRequestJson = JsonProvider<"""
+{
+    "code": "string",
+    "rlimit": 2723280
 }
 """>
 
@@ -83,7 +92,7 @@ type ContractExecuteRequestJson = JsonProvider<"""
     "spends": [
         {
             "asset": "asset",
-            "amount": 2147483649
+            "amount": "amount"
         }
     ],
     "password": "password"
@@ -136,7 +145,7 @@ type TransactionsResponseJson = JsonProvider<"""
     {
         "txHash": "hash",
         "asset":"asset",
-        "amount":2147483453648,
+        "amount":"amount",
         "confirmations": 0,
         "lock": "lock"
     }
@@ -250,7 +259,7 @@ type AllocationRequestJson = JsonProvider<"""
 type SpendJson = JsonProvider<"""
 {
     "asset": "c234",
-    "amount": 1234567890000
+    "amount": "amount"
 }
 """>
 
@@ -271,7 +280,7 @@ type ReceivedByAddressJson = JsonProvider<"""
 {
     "address":"address",
     "asset":"asset",
-    "amount":1234567890000
+    "amount":"amount"
 }
 """>
 
@@ -282,7 +291,7 @@ type AddressOutputJson = JsonProvider<"""
         "index": 0
     },
     "asset":"abcd",
-    "amount":1234567890000,
+    "amount":"amount",
     "confirmations":0,
     "spent":true
 }
@@ -322,9 +331,14 @@ type ImportZenPublicKey = JsonProvider<"""
 }""">
 
 type GetBalanceJson = JsonProvider<"""
-{
-    "addresses": ["abcd1234", "abcd1234" ]
-}""">
+[
+    {
+        "addresses": ["abcd1234", "abcd1234" ],
+        "blockNumber": "3"
+    },{
+        "addresses": ["abcd1234", "abcd1234" ]
+    }
+]""",SampleIsList=true>
 
 type GetHistoryJson = JsonProvider<"""
 {
@@ -333,13 +347,35 @@ type GetHistoryJson = JsonProvider<"""
     "take": 1000
 }""">
 
-type GetOutputsJson = JsonProvider<"""
+type GetContractHistoryFilterByBlockJson = JsonProvider<"""
 {
-    "addresses": ["abcd1234", "abcd1234" ],
-    "mode": "all"
+    "contractId": "abcd1234",
+    "start": 1000,
+    "end": 1000
 }""">
 
-type GetTransactionCountJson = GetBalanceJson
+type GetHistoryFilterByBlockJson = JsonProvider<"""
+{
+    "addresses": ["abcd1234", "abcd1234" ],
+    "start": 1000,
+    "end": 1000
+}
+""">
+
+type GetOutputsJson = JsonProvider<"""
+[{
+    "addresses": ["abcd1234", "abcd1234" ],
+    "mode": "all",
+    "blockNumber": "3"
+},{
+    "addresses": ["abcd1234", "abcd1234" ],
+    "mode": "all"
+}]""",SampleIsList=true>
+
+type GetTransactionCountJson = JsonProvider<"""
+{
+    "addresses": ["abcd1234", "abcd1234" ]
+}""">
 
 type GetAssetsJson = JsonProvider<"""
 {

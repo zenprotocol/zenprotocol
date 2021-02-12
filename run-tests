@@ -6,7 +6,6 @@ function run {
     mono packages/NUnit.ConsoleRunner/tools/nunit3-console.exe --labels=Before --stoponerror --workers=1 --inprocess --trace=Debug $1
 }
 
-run src/Node.Tests/bin/Debug/Node.Tests.dll
 run src/Zulib.Tests/bin/Debug/Zulib.Tests.dll
 run src/Infrastructure.Tests/bin/Debug/Infrastructure.Tests.dll
 run src/Consensus.Tests/bin/Debug/Consensus.Tests.dll

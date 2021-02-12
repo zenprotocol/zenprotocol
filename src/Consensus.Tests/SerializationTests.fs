@@ -11,7 +11,7 @@ open FsUnit
 open Infrastructure
 open Consensus.Tests
 
-let txInMode mode tx =
+let txInMode mode tx : Transaction =
     match mode with
     | Full -> tx
     | WithoutWitness -> {tx with witnesses=[]}

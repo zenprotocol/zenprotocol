@@ -33,7 +33,6 @@ let fstToFsString : Prims.string -> string =
 
 let toResult = function
     | ERR err -> Error (fstToFsString err)
-    | EX err -> Error err.Message //TODO: remove EX
     | OK value -> Ok value
 
 let private throwNotImplemented s1 s2 =

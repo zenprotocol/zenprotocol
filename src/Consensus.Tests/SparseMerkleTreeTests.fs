@@ -112,7 +112,7 @@ let ``update root with auditpath only``() =
     
     SparseMerkleTree.verifyEmpty tree tree.root auditPath key |> should equal true
     
-    let root = SparseMerkleTree.addToRoot tree auditPath key 0 tree.root
+    let root = SparseMerkleTree.addToRoot tree auditPath key 0
     
     SparseMerkleTree.verifyValue tree root auditPath key 0 |> should equal true
                 

@@ -78,11 +78,11 @@ let private remove (contractsToRemove: seq<Hash.Hash>) ((merkleTree,changes):T) 
             |> Option.map (fun value-> cHash,value)) contractsToRemove
 
     let changes =
-        Seq.fold(fun changes (cHash,(value:Contract.T)) -> Map.add value.contractId Expired changes) changes contractsToRemove
+        Seq.fold (fun changes (_,  (value:Contract.T)) -> Map.add value.contractId Expired changes) changes contractsToRemove
 
     let merkleTree =
         contractsToRemove
-        |> Seq.map (fun (key,value) -> key, SparseMerkleTree.Empty)
+        |> Seq.map (fun (key,_) -> key, SparseMerkleTree.Empty)
         |> Seq.toArray
         |> SparseMerkleTree.updateMultiple merkleTree
 

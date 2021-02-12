@@ -26,7 +26,7 @@ let context0 = { blockNumber=1u; timestamp = 1UL }
 let contractPath =
     NUnit.Framework.TestContext.CurrentContext.TestDirectory
 
-let changeMessageBody messageBody =
+let changeMessageBody _ =
     ZFStar.fsToFstList []
     |> ZData.List
     |> ZData.Collection
@@ -316,8 +316,6 @@ let ``valid payout, 2 asset Zen`` () =
     
     let res = executeCgpContractInContext [ {lock=PK Hash.zero ; spend = { asset=Asset.defaultOf cgpContractId; amount=20UL }}; {lock=PK Hash.zero ; spend = { asset=Asset.defaultOf cgpContractId; amount=20UL }  } ] context
     
-    let test1 =
-        res >>= fun (ex, _, _) -> TransactionValidation.checkStructure ex.tx |@!> sprintf "%A"
     let test1 =
         res >>= fun (ex, _, _) -> TransactionValidation.validateBasic ex.tx |@!> sprintf "%A"
     

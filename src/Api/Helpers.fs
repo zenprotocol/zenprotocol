@@ -28,7 +28,7 @@ let rec omitNullFields = function
 let emptyRecord = JsonValue.Record [| |]
 
 let spendEncoder spend =
-    SpendJson.Root (spend.asset.AsString, (int64)spend.amount)
+    SpendJson.Root (spend.asset.AsString, string spend.amount)
     |> fun j -> j.JsonValue
 
 let inputEncoder (input:Input) =
@@ -37,7 +37,7 @@ let inputEncoder (input:Input) =
         OutpointJson.Root (pnt.txHash.AsString,(int)pnt.index)
         |> fun j -> JsonValue.Record [| ("outpoint", j.JsonValue) |]
     | Mint spend ->
-        SpendJson.Root (spend.asset.AsString, (int64)spend.amount)
+        SpendJson.Root (spend.asset.AsString, string spend.amount)
         |> fun j -> JsonValue.Record [| ("mint", j.JsonValue) |]
 
 let recipientEncoder chain = function
@@ -217,8 +217,8 @@ let witnessEncoder (chain:Chain) (witness:Witness) =
             cw.messageBody
             |> Option.map Serialization.Data.serialize
             |> Option.map Base16.encode
-            |> Option.defaultValue ""
-            |> JsonValue.String
+            |> Option.map JsonValue.String
+            |> Option.defaultValue JsonValue.Null
             
         JsonValue.Record [|
             ("contractId", JsonValue.String ( ContractId.toString cw.contractId))
@@ -250,7 +250,7 @@ let transactionHistoryEncoder chain txHash asset (amount:int64) (confirmations:u
         [|
             ("txHash",JsonValue.String (Hash.toString txHash));
             ("asset", JsonValue.String (Asset.toString asset));
-            ("amount", JsonValue.Number (decimal amount))
+            ("amount", JsonValue.String (string amount))
             ("confirmations", JsonValue.Number (decimal confirmations))
             ("lock", lockEncoder chain lock)
         |]

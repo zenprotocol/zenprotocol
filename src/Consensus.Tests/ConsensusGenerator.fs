@@ -407,7 +407,7 @@ type ConsensusGenerator =
             |> Gen.map (fun w -> Witness w)
 
         let emptyPKWitnessGenerator = gen {
-            let secretKey, publicKey = KeyPair.create()
+            let _, publicKey = KeyPair.create()
             return EmptyPKWitness (TxHash, publicKey, "m/0'/168'/0'/0'/0/1")
         }
 
