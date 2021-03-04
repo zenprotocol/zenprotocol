@@ -383,7 +383,7 @@ module AddressDB =
 
     type Request =
         | GetBalance of addresses:string list * blockNumber:uint32 option
-        | GetOutputs of addresses:string list * Mode * blockNumber:uint32 option
+        | GetOutputs of addresses:string list * Mode
         | GetTransactions of addresses:string list * skip: int * take: int
         | GetTransactionsByBlockNumber of addresses:string list * start: uint32 * stop: uint32
         | GetContractHistory of contractId : ContractId * skip: int * take: int

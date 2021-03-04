@@ -119,9 +119,9 @@ let requestHandler chain (requestId:RequestId) request dataAccess session (statu
             decodeAddresses addresses
             <@> View.getBalance dataAccess session view UnspentOnly blockNumber
             |> reply<BalanceResponse> requestId
-        | GetOutputs (addresses, mode, blockNumber) ->
+        | GetOutputs (addresses, mode) ->
             decodeAddresses addresses
-            <@> View.getOutputs dataAccess session view mode blockNumber
+            <@> View.getOutputs dataAccess session view mode
             |> reply<List<PointedOutput>> requestId
         | GetTransactionCount (addresses, blockNumber) ->
             decodeAddresses addresses

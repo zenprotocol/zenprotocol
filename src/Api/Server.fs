@@ -598,8 +598,8 @@ module AddressDB =
         : unit =
             match parseGetOutputsJson config.chain body with
             | Error error -> config.replyError error
-            | Ok (addresses, mode, blockNumber) ->
-                match AddressDB.getOutputs config.client (addresses, mode, blockNumber) with
+            | Ok (addresses, mode) ->
+                match AddressDB.getOutputs config.client (addresses, mode) with
                 | Ok pointedOutputs ->
                     pointedOutputs
                     |> Seq.map (pointedOutputEncoder config.chain)
