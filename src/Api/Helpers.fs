@@ -245,13 +245,14 @@ let transactionEncoder chain (tx:Transaction) =
         |]
     |> omitNullFields
     
-let transactionHistoryEncoder chain txHash asset (amount:int64) (confirmations:uint32) lock=
+let transactionHistoryEncoder chain txHash asset (amount:int64) (confirmations:uint32) (timestamp:uint64 option) lock=
     JsonValue.Record
         [|
             ("txHash",JsonValue.String (Hash.toString txHash));
             ("asset", JsonValue.String (Asset.toString asset));
             ("amount", JsonValue.String (string amount))
             ("confirmations", JsonValue.Number (decimal confirmations))
+            ("timestamp", timestamp |> Option.map (JsonValue.Number << decimal) |> Option.defaultValue JsonValue.Null)
             ("lock", lockEncoder chain lock)
         |]
     |> omitNullFields

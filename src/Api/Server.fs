@@ -615,10 +615,10 @@ module AddressDB =
         txs =
         let json =
                 txs
-                |> List.map (fun (txHash,direction, spend, confirmations, lock) ->
+                |> List.map (fun (txHash,direction, spend, confirmations,timestamp, lock) ->
                     let amount = (if direction = TransactionDirection.In then 1L else -1L) * int64 spend.amount
 
-                    transactionHistoryEncoder config.chain txHash spend.asset amount confirmations lock)
+                    transactionHistoryEncoder config.chain txHash spend.asset amount confirmations (Some timestamp) lock)
                 |> List.toArray
                 |> JsonValue.Array
         (new TransactionsResponseJson.Root(json)).JsonValue
@@ -950,7 +950,7 @@ module Wallet =
                         |> List.map (fun (txHash,direction, spend, confirmations, lock) ->
                             let amount = (if direction = TransactionDirection.In then 1L else -1L) * int64 spend.amount
 
-                            transactionHistoryEncoder config.chain txHash spend.asset amount confirmations lock)
+                            transactionHistoryEncoder config.chain txHash spend.asset amount confirmations None lock)
                         |> List.toArray
                         |> JsonValue.Array
                     (new TransactionsResponseJson.Root(json)).JsonValue

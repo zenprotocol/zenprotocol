@@ -4,7 +4,6 @@ open Blockchain
 open DataAccess
 open Infrastructure
 open Messaging.Services
-open Messaging.Services.Wallet
 open Messaging.Events
 open ServiceBus.Agent
 open Consensus
@@ -86,7 +85,7 @@ let requestHandler chain (requestId:RequestId) request dataAccess session (statu
         match request with
         | GetBalance _ ->
             error
-            |> reply<BalanceResponse> requestId
+            |> reply<Wallet.BalanceResponse> requestId
         | GetOutputs _ ->
             error
             |> reply<List<PointedOutput>> requestId
@@ -118,7 +117,7 @@ let requestHandler chain (requestId:RequestId) request dataAccess session (statu
         | GetBalance (addresses, blockNumber) ->
             decodeAddresses addresses
             <@> View.getBalance dataAccess session view UnspentOnly blockNumber
-            |> reply<BalanceResponse> requestId
+            |> reply<Wallet.BalanceResponse> requestId
         | GetOutputs (addresses, mode) ->
             decodeAddresses addresses
             <@> View.getOutputs dataAccess session view mode

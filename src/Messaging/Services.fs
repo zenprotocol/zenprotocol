@@ -371,6 +371,7 @@ module Wallet =
 
 module AddressDB =
     open Wallet
+    type TransactionsResponse = List<Hash*TransactionDirection*Spend*uint32*uint64*Lock>
 
     type ContractHistoryResponse = List<string * data option * Hash * uint32> // command, messageBody, txHash, confirmations
 

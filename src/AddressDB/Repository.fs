@@ -3,17 +3,12 @@ module AddressDB.Repository
 open Blockchain.Tally.Types
 open Consensus
 open Types
-open Wallet.Types
 open Hash
 open Logary.Message
 open Infrastructure
 open Messaging.Services
 open Messaging.Services.Wallet
 open AddressDB
-open Consensus.Types
-open Consensus.Types
-open Consensus.Types
-open Result
 
 type Action =
     | UndoBlock
@@ -145,7 +140,7 @@ module Block =
         match op with
         | Add ->
             block.transactions
-            |> List.mapi (fun index ex -> Confirmed (block.header.blockNumber, blockHash, index),ex)
+            |> List.mapi (fun index ex -> Confirmed (block.header.timestamp, block.header.blockNumber, blockHash, index),ex)
         | Remove ->
             block.transactions
             |> List.rev

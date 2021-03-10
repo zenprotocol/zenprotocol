@@ -215,7 +215,7 @@ let private filterDBOutput blockNumber dbOutput  =
 
     let compareToConfirmationStatus blockNumberUpperBound =
         match dbOutput.confirmationStatus with
-        | Confirmed (databaseBlockNumber,_,_) ->
+        | Confirmed (_,databaseBlockNumber,_,_) ->
             databaseBlockNumber <= blockNumberUpperBound
         | _ -> false
 
@@ -280,21 +280,21 @@ let getBalance dataAccess session view mode (blockNumber: uint32 option) address
                 ) balance) Map.empty
 let getConfirmations blockNumber =
     function
-    | Confirmed (blockNumber',_,blockIndex) ->
-        blockNumber - blockNumber' + 1ul, blockIndex
+    | Confirmed (timestamp,blockNumber',_,blockIndex) ->
+        blockNumber - blockNumber' + 1ul, blockIndex, timestamp
     | Unconfirmed ->
-        0ul,0
+        0ul, 0,Timestamp.now()
 
 let private filterDBOutputStartEnd startBlock endBlock currentBlockNumber outputsInfos =
     match outputsInfos with
-    | _,_,_,confirmation,_,_ ->
+    | _,_,_,confirmation,_,_,_ ->
         let confirmationStart = currentBlockNumber - startBlock + 1ul
         let confirmationEnd   = currentBlockNumber - endBlock   + 1ul
         confirmationEnd < confirmation && confirmation <= confirmationStart
 
 let private filterConfirmationStartEnd startBlock endBlock confirmation =
     match snd confirmation with
-    | Confirmed (databaseBlockNumber,_,_) ->
+    | Confirmed (_,databaseBlockNumber,_,_) ->
         startBlock <= databaseBlockNumber && databaseBlockNumber < endBlock
     | Unconfirmed -> true
 
@@ -302,30 +302,30 @@ let getOutputsInfo blockNumber outputs =
 
     let incoming = List.map (fun (output:DBOutput) ->
         let txHash = output.outpoint.txHash
-        let confirmations,blockIndex = getConfirmations blockNumber output.confirmationStatus
+        let confirmations,blockIndex,timestamp = getConfirmations blockNumber output.confirmationStatus
 
-        txHash, output.spend.asset, output.spend.amount |> bigint,confirmations,blockIndex,output.lock) outputs
+        txHash, output.spend.asset, output.spend.amount |> bigint, timestamp, confirmations, blockIndex, output.lock) outputs
 
     let outgoing = List.choose (fun (output:DBOutput) ->
         match output.status with
         | Unspent -> None
         | Spent (txHash,confirmationStatus) ->
-            let confirmations,blockIndex = getConfirmations blockNumber confirmationStatus
+            let confirmations,blockIndex,timestamp = getConfirmations blockNumber confirmationStatus
 
-            (txHash, output.spend.asset, output.spend.amount |> bigint |> (*) -1I,confirmations,blockIndex,output.lock)
+            (txHash, output.spend.asset, output.spend.amount |> bigint |> (*) -1I, timestamp, confirmations,blockIndex,output.lock)
             |> Some) outputs
 
     incoming @ outgoing
-    |> List.fold (fun txs (txHash, asset, amount, confirmations, blockIndex, lock) ->
+    |> List.fold (fun txs (txHash, asset, amount,timestamp, confirmations, blockIndex, lock) ->
         match Map.tryFind (txHash, asset) txs with
-        | None -> Map.add (txHash, asset) (amount, confirmations, blockIndex, lock) txs
-        | Some (amount',_,_,lock) -> Map.add (txHash, asset) (amount + amount', confirmations, blockIndex, lock) txs) Map.empty
+        | None -> Map.add (txHash, asset) (amount, confirmations,timestamp, blockIndex, lock) txs
+        | Some (amount',_,_,_,lock) -> Map.add (txHash, asset) (amount + amount', confirmations,timestamp, blockIndex, lock) txs) Map.empty
     |> Map.toSeq
-    |> Seq.map (fun ((txHash, asset),(amount, confirmations, blockIndex, lock)) ->
+    |> Seq.map (fun ((txHash, asset),(amount, confirmations,timestamp, blockIndex, lock)) ->
         if amount >= 0I then
-            (txHash,TransactionDirection.In, {asset=asset;amount = uint64 amount}, confirmations, blockIndex, lock)
+            (txHash,TransactionDirection.In, {asset=asset;amount = uint64 amount}, confirmations, timestamp, blockIndex, lock)
         else
-            (txHash,TransactionDirection.Out, {asset=asset;amount = amount * -1I |> uint64}, confirmations, blockIndex, lock))
+            (txHash,TransactionDirection.Out, {asset=asset;amount = amount * -1I |> uint64}, confirmations, timestamp, blockIndex, lock))
     |> List.ofSeq
 
 let getTransactionCount dataAccess session view blockNumber addresses =
@@ -334,15 +334,23 @@ let getTransactionCount dataAccess session view blockNumber addresses =
         |> OutpointOutputs.get view dataAccess session
     List.length (outputs |> getOutputsInfo blockNumber)
 
+let txComparer (_,_,_,confirmation,_,blockIndex,_) (_,_,_,confirmation',_,blockIndex',_) =
+    if confirmation < confirmation' then
+       -1
+    elif confirmation > confirmation' then
+       1
+    else
+        blockIndex' - blockIndex
+
 let getHistory dataAccess session view skip take addresses =
     let account = DataAccess.Tip.get dataAccess session
 
     AddressOutpoints.get view dataAccess session addresses
     |> OutpointOutputs.get view dataAccess session
     |> getOutputsInfo account.blockNumber
-    |> List.sortWith Wallet.Account.txComparer
+    |> List.sortWith txComparer
     |> Wallet.Account.paginate skip take
-    |> List.map (fun (txHash,direction,spend,confirmations,_,lock) -> txHash,direction,spend,confirmations,lock)
+    |> List.map (fun (txHash,direction,spend,confirmations,timestamp,_,lock) -> txHash,direction,spend,confirmations,timestamp,lock)
 
 let getHistoryByBlockNumber dataAccess session view startBlock endBlock addresses =
     let account = DataAccess.Tip.get dataAccess session
@@ -351,11 +359,11 @@ let getHistoryByBlockNumber dataAccess session view startBlock endBlock addresse
     |> OutpointOutputs.get view dataAccess session
     |> getOutputsInfo account.blockNumber
     |> List.filter (filterDBOutputStartEnd startBlock endBlock account.blockNumber)
-    |> List.sortWith Wallet.Account.txComparer
-    |> List.map (fun (txHash,direction,spend,confirmations,_,lock) -> txHash,direction,spend,confirmations,lock)
+    |> List.sortWith txComparer
+    |> List.map (fun (txHash,direction,spend,confirmations,timestamp,_,lock) -> txHash,direction,spend,confirmations,timestamp,lock)
 
 let private contractHistoryComparer a1 a2 =
-    let comparer (index1, block1) (index2, block2) =
+    let comparer (index1, block1, _) (index2, block2, _) =
             if index1 = index2 then
                 block2 - block1
             else
@@ -372,7 +380,7 @@ let getContractHistory dataAccess session view skip take contractId =
         |> getConfirmations account.blockNumber)
     |> List.sortWith contractHistoryComparer
     |> Wallet.Account.paginate skip take
-    |> List.map (fun ((command, messageBody, txHash), (confirmations, _)) -> command, messageBody, txHash, confirmations)
+    |> List.map (fun ((command, messageBody, txHash), (confirmations, _, _)) -> command, messageBody, txHash, confirmations)
 
 let getContractHistoryByBlockNumber dataAccess session view startBlock endBlock contractId =
     let account = DataAccess.Tip.get dataAccess session
@@ -384,7 +392,7 @@ let getContractHistoryByBlockNumber dataAccess session view startBlock endBlock 
     |> List.filter (filterConfirmationStartEnd startBlock endBlock)
     |> List.map (fun (contractData, confirmationStatus) -> contractData, confirmationStatus |> getConfirmations account.blockNumber)
     |> List.sortWith contractHistoryComparer
-    |> List.map (fun ((command, messageBody, txHash), (confirmations, _)) -> command, messageBody, txHash, confirmations)
+    |> List.map (fun ((command, messageBody, txHash), (confirmations, _,_)) -> command, messageBody, txHash, confirmations)
 
 
 let getContractAsset dataAccess session view asset =
