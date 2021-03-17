@@ -2,13 +2,17 @@ module AddressDB.Types
 
 open Consensus
 open Types
-open Crypto
-open Types
 open Hash
-open Wallet.Types
-open AddressDB
 open Wallet.Address
 
+type ConfirmationStatus =
+    | Confirmed of uint64 * uint32 * Hash * int // Block timestamp, blockNumber,blockHash,blockIndex (tx index within block)
+    | Unconfirmed
+    
+type Status =
+    | Spent of Hash * ConfirmationStatus
+    | Unspent
+    
 type DBOutput =
     {
         address: Address

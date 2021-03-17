@@ -365,10 +365,6 @@ type GetHistoryFilterByBlockJson = JsonProvider<"""
 type GetOutputsJson = JsonProvider<"""
 [{
     "addresses": ["abcd1234", "abcd1234" ],
-    "mode": "all",
-    "blockNumber": "3"
-},{
-    "addresses": ["abcd1234", "abcd1234" ],
     "mode": "all"
 }]""",SampleIsList=true>
 

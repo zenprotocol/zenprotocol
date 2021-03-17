@@ -5,7 +5,6 @@ open Infrastructure
 open DataAccess
 open Consensus
 open Types
-open Wallet.Serialization
 open AddressDB.Serialization
 open Consensus.Serialization
 open Wallet.Address
@@ -14,14 +13,14 @@ open Zen.Types.Data
 let private getBytes str = Encoding.UTF8.GetBytes (str : string)
 
 [<Literal>]
-let DbVersion = 3
+let DbVersion = 4
 
 type T = {
     outpointOutputs: Collection<Outpoint, DBOutput>
     addressOutpoints: MultiCollection<Address, Outpoint>
     contractHistory: MultiCollection<ContractId, WitnessPoint>
     contractData: Collection<WitnessPoint, string * data option>
-    contractConfirmations: Collection<WitnessPoint, Wallet.Types.ConfirmationStatus>
+    contractConfirmations: Collection<WitnessPoint, ConfirmationStatus>
     contractAssets: Collection<Asset,uint32 * string option* string * data option>
     tip: SingleValue<Tip>
     dbVersion: SingleValue<int>
@@ -38,18 +37,29 @@ let init databaseContext =
     use session = DatabaseContext.createSession databaseContext
     let outpointOutputs = Collection.create session "outpointOutputs" Outpoint.serialize Output.serialize Output.deserialize
     let addressOutpoints = MultiCollection.create session "addressOutpoints" Address.serialize Outpoint.serialize Outpoint.deserialize
-    let contractData = Collection.create session "contracData" WitnessPoint.serialize ContractData.serialize ContractData.deserialize
+    let contractData = Collection.create session "contractData" WitnessPoint.serialize ContractData.serialize ContractData.deserialize
     let contractHistory = MultiCollection.create session "contractHistory" Serialization.ContractId.serialize WitnessPoint.serialize WitnessPoint.deserialize
     let contractConfirmations = Collection.create session "contractConfirmations" WitnessPoint.serialize ConfirmationStatus.serialize ConfirmationStatus.deserialize
     let contractAssets = Collection.create session "contractAssets" Asset.serialize ContractAsset.serialize ContractAsset.deserialize
     let tip = SingleValue.create databaseContext "blockchain" Tip.serialize Tip.deserialize
-    let dbVersion = SingleValue.create databaseContext "dbVersion" Version.serialize Version.deserialize
+    let dbVersion = SingleValue.create databaseContext "dbVersion" Wallet.Serialization.Version.serialize Wallet.Serialization.Version.deserialize
 
     match SingleValue.tryGet dbVersion session with
     | None ->
         SingleValue.put dbVersion session DbVersion
-    | Some version when version < DbVersion->
-        Platform.cleanDirectory "addressDB"
+    | Some version when version < DbVersion ->
+        Collection.truncate outpointOutputs session
+        Collection.truncate contractData session
+        Collection.truncate contractConfirmations session
+        Collection.truncate contractAssets session
+        MultiCollection.truncate addressOutpoints session
+        MultiCollection.truncate contractHistory session
+        match SingleValue.tryGet tip session with
+        | Some acc ->
+            {acc with blockHash = Hash.zero; blockNumber = 0ul}
+            |> SingleValue.put tip session
+        | None ->
+            ()
         SingleValue.put dbVersion session DbVersion
     | Some DbVersion ->
         ()
