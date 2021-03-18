@@ -288,9 +288,9 @@ let getConfirmations blockNumber =
 let private filterDBOutputStartEnd startBlock endBlock currentBlockNumber outputsInfos =
     match outputsInfos with
     | _,_,_,confirmation,_,_,_ ->
-        let confirmationStart = currentBlockNumber - startBlock + 1ul
-        let confirmationEnd   = currentBlockNumber - endBlock   + 1ul
-        confirmationEnd < confirmation && confirmation <= confirmationStart
+        let databaseBlockNumber = currentBlockNumber - confirmation + 1ul
+        startBlock <= databaseBlockNumber && databaseBlockNumber < endBlock
+
 
 let private filterConfirmationStartEnd startBlock endBlock confirmation =
     match snd confirmation with
