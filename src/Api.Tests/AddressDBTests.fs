@@ -150,7 +150,7 @@ let ``Should get transactions``() =
     Api.Server.Wallet.resync config
         
     let expectedContent =
-        Constants.oneTransactionResponse
+        Constants.oneTransactionResponseWithTimestamp
         |> Api.Types.TransactionsResponseJson.Parse
         |> Array.map (fun x -> x.JsonValue)
         |> JsonValue.Array
@@ -162,19 +162,6 @@ let ``Should get transactions``() =
     let body = Constants.sendTo
    
     Api.Server.Wallet.send (contentConfig expectedContent) body
- 
-    Api.Server.Blockchain.info config
-    Api.Server.Blockchain.info config
-    
-    let expectedContent =
-        Constants.twoTransactionResponse
-        |> Api.Types.TransactionsResponseJson.Parse
-        |> Array.map (fun x -> x.JsonValue)
-        |> JsonValue.Array
-        |> JsonContent
-    let body = Constants.transactionSkipTakeTwoAddress
-
-    Api.Server.AddressDB.transactions (debugConfig expectedContent) body
 #endif
 #if DEBUG
 [<Test>]
