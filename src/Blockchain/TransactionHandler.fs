@@ -15,7 +15,7 @@ open Result
 let getUTXO = UtxoSetRepository.get
 let getContractState = ContractStateRepository.get
 
-let private validateOrphanTransaction chainParams session contractPath blockNumber timestamp state ex =
+let private validateOrphanTransaction chainParams session contractPath blockNumber timestamp shouldPublish state ex =
     effectsWriter
         {
             match TransactionValidation.validateInContext chainParams (getUTXO session) contractPath (blockNumber + 1ul) timestamp
@@ -23,8 +23,8 @@ let private validateOrphanTransaction chainParams session contractPath blockNumb
             | Ok (_, acs, contractCache, contractStates) ->
                 let utxoSet = UtxoSet.handleTransaction (getUTXO session) ex.txHash ex.tx state.utxoSet
                 let mempool = MemPool.add ex state.mempool
-
-                do! publish (TransactionAddedToMemPool (ex.txHash, ex.tx))
+                if shouldPublish then
+                    do! publish (TransactionAddedToMemPool (ex.txHash, ex.tx))
 
                 eventX "Orphan transaction {hash} added to mempool"
                 >> setField "hash" (Hash.toString ex.txHash)
@@ -61,13 +61,13 @@ let private validateOrphanTransaction chainParams session contractPath blockNumb
                 return {state with orphanPool = orphanPool}
         }
 
-let rec validateOrphanTransactions chainParams session contractPath blockNumber timestamp state=
+let rec validateOrphanTransactions chainParams session contractPath blockNumber timestamp shouldPublish state=
     effectsWriter {
-        let! state' = OrphanPool.foldWriter (validateOrphanTransaction chainParams session contractPath blockNumber timestamp) state state.orphanPool 
+        let! state' = OrphanPool.foldWriter (validateOrphanTransaction chainParams session contractPath blockNumber timestamp shouldPublish) state state.orphanPool 
 
         // if orphan pool changed we run again until there is no change
         if state'.orphanPool <> state.orphanPool then
-            return! validateOrphanTransactions chainParams session contractPath blockNumber timestamp state'
+            return! validateOrphanTransactions chainParams session contractPath blockNumber timestamp shouldPublish state'
         else
             return state'
     }
@@ -131,7 +131,7 @@ let validateInputs chainParams session contractPath blockNumber timestamp ex sta
                         contractStates = contractStates
                     }
 
-                return! validateOrphanTransactions chainParams session contractPath blockNumber timestamp state
+                return! validateOrphanTransactions chainParams session contractPath blockNumber timestamp shouldPublishEvents state
         }
 
 let validateTransaction chainParams session contractPath blockNumber timestamp ex (state:State) =
@@ -150,7 +150,12 @@ let validateTransaction chainParams session contractPath blockNumber timestamp e
 
                 return state.memoryState
             | Ok _ ->
-                return! validateInputs chainParams session contractPath blockNumber timestamp ex state.memoryState true
+                /// we publish if the local height is equal to the IBD peer's height
+                let shouldPublish =
+                    InitialBlockDownload.getPeerHeader state.initialBlockDownload
+                    |> Option.map (fun bh -> bh.blockNumber = state.headers)
+                    |> Option.defaultValue true
+                return! validateInputs chainParams session contractPath blockNumber timestamp ex state.memoryState shouldPublish
     }
 
 let executeContract session txSkeleton timestamp contractId command sender messageBody state commitToState =
