@@ -117,6 +117,24 @@ let twoTransactionResponse =
   }
 ]
 """
+let oneTransactionResponseWithTimestamp =
+    """
+[
+  {
+    "txHash": "835300081736d721821c6316bd8f2324ce973e02ab3e579e1230c30bd5f02f17",
+    "asset": "00",
+    "amount": "2300000000000",
+    "confirmations": 1,
+    "timestamp": 1515594186383,
+    "lock": {
+      "PK": {
+        "hash": "30759b07ca01caf8e524fc279946a1e96afc3546ee5f1fd4a1cfaf644763c2b4",
+        "address": "tzn1qxp6ekp72q8903efylsnej34pa940cd2xae03l49pe7hkg3mrc26qyh2rgr"
+      }
+    }
+  }
+]
+"""
 
 let oneOutputResponse =
     """

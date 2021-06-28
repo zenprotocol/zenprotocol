@@ -186,7 +186,7 @@ let getMemoryState
     }
 
     let memoryState =
-        TransactionHandler.validateOrphanTransactions env.chainParams env.session env.contractsPath blockNumber env.timestamp memoryState
+        TransactionHandler.validateOrphanTransactions env.chainParams env.session env.contractsPath blockNumber env.timestamp false memoryState
 
     Map.fold (fun writer _ (_,ex) ->
         Writer.bind writer (fun memoryState ->

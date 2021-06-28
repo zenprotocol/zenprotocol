@@ -121,6 +121,15 @@ let deserialize fn bytes =
         |> Option.Some
     with
     | SerializationException as ex-> None
+let deserializeNonZero fn bytes =
+    if (Array.forall ((=) 0uy) bytes) then None
+    else
+        try
+            Stream(bytes)
+            |> fn
+            |> Option.Some
+        with
+        | SerializationException as ex-> None
 
 [<Literal>]
 let SerializedHeaderSize = 100
@@ -1557,7 +1566,7 @@ open Serialization
 
 module RawTransaction =
     let serialize = serialize RawTransaction.size RawTransaction.write
-    let deserialize = deserialize RawTransaction.read
+    let deserialize = deserializeNonZero RawTransaction.read
     let toHex = serialize >> FsBech32.Base16.encode
 
     let fromHex hex =
@@ -1566,17 +1575,17 @@ module RawTransaction =
 
 module Transaction =
     let serialize mode = serialize (Transaction.size mode) (Transaction.write mode)
-    let deserialize mode = deserialize (Transaction.read mode)
+    let deserialize mode = deserializeNonZero (Transaction.read mode)
 
 module TransactionExtended =
     let serialize = serialize TransactionExtended.size TransactionExtended.write
-    let deserialize = deserialize TransactionExtended.read
+    let deserialize = deserializeNonZero TransactionExtended.read
 
 module TransactionsRaw =
     let serialize txs = Array.concat txs
 
 module TransactionsExtended =
-    let deserialize count = deserialize (List.readBody count TransactionExtended.read)
+    let deserialize count = deserializeNonZero (List.readBody count TransactionExtended.read)
 
 module Header =
     let serialize = serialize (fun _ -> SerializedHeaderSize) Header.write
