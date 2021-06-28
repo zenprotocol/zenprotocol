@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.0.7](https://gitlab.com/zenprotocol/zenprotocol/compare/v1.0.6...v1.0.7) (2021-06-28)
+
+
+### Features
+
+* update version expiry ([c1c080a](https://gitlab.com/zenprotocol/zenprotocol/commit/c1c080a6eb9520c5b17858a0933d7242cfb1f7af))
+
+### Bug Fixes
+
+* wrong subtraction when filtering ([9485a22](https://gitlab.com/zenprotocol/zenprotocol/commit/9485a225564be5b4c19f49f4071c4b08adc463e3))
+
+
+## [1.0.6](https://gitlab.com/zenprotocol/zenprotocol/compare/v1.0.5...v1.0.6) (2021-03-17)
+
+
+### Features
+
+* add timestamp to address history ([cf3e023](https://gitlab.com/zenprotocol/zenprotocol/commit/cf3e023a60b68402b84b72cfdc6b983f2ba2e7d4))
+
 ## [1.0.5](https://gitlab.com/zenprotocol/zenprotocol/compare/v1.0.3...v1.0.5) (2021-02-11)
 
 
