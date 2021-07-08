@@ -39,53 +39,57 @@ module Server =
                 (x.listener :> System.IDisposable).Dispose()
 
     let private getBody (request : System.Net.HttpListenerRequest) : Result<string option,string> =
-        match request.HasEntityBody with
-        | false -> Ok None
-        | true ->
+        if request.HasEntityBody then
             if request.ContentType.StartsWith HttpContentTypes.Json then
                use reader = new System.IO.StreamReader(request.InputStream,request.ContentEncoding)
-               let body = reader.ReadToEnd()
                 
-               Ok(Some(body))
+               reader.ReadToEnd()
+               |> Some
+               |> Ok
             else
-               Error(sprintf "only %s ContentType is supported" HttpContentTypes.Json)
-    
-
-    let private writeTextResponse (response : System.Net.HttpListenerResponse) (code : StatusCode) (text : string) =
-        response.StatusCode <- int code
-        response.ContentType <- HttpContentTypes.Text
-        response.ContentLength64 <- int64 (System.Text.Encoding.UTF8.GetByteCount(text))
-        
-        try 
-            let bytes = System.Text.Encoding.UTF8.GetBytes(text)
-            response.OutputStream.Write(bytes, 0, Array.length bytes)
-            response.OutputStream.Close()
-        with 
-        | _ -> ()
-
-    let private writeJsonResponse (response : System.Net.HttpListenerResponse) (code : StatusCode) (json : JsonValue) =
-        let stringWriter = new System.IO.StringWriter(System.Globalization.CultureInfo.InvariantCulture)
-        json.WriteTo(stringWriter, JsonSaveOptions.DisableFormatting)
-        let text = stringWriter.ToString()
-        response.StatusCode <- int code
-        response.ContentType <- HttpContentTypes.Json
-        response.ContentLength64 <- int64 (System.Text.Encoding.UTF8.GetByteCount(text))
-        
-        try 
-            let bytes = System.Text.Encoding.UTF8.GetBytes(text)
-            response.OutputStream.Write(bytes, 0, Array.length bytes)
-            response.OutputStream.Close()
-        with 
-        | _ -> ()
-
+               sprintf "only %s ContentType is supported" HttpContentTypes.Json
+               |> Error
+        else Ok None
 
     let private writeEmptyResponse (response : System.Net.HttpListenerResponse) (code : StatusCode) =
-        try 
-            response.StatusCode <- int code
-            response.OutputStream.Close()
-        with 
-        | _ -> ()
+        response.StatusCode <- int code
+        response.OutputStream.Close()
+
+    let private handleResponse
+        (contentType : string )
+        (response : System.Net.HttpListenerResponse)
+        (code : StatusCode)
+        (text : string)
+        : unit =
+            try
+                response.StatusCode <- int code
+                response.ContentType <- contentType
+                response.ContentLength64 <- int64 (System.Text.Encoding.UTF8.GetByteCount(text))
+                let bytes = System.Text.Encoding.UTF8.GetBytes(text)
+                response.OutputStream.Write(bytes, 0, Array.length bytes)
+                response.OutputStream.Close()
+            with _ ->
+                writeEmptyResponse response StatusCode.InternalServerError
         
+    
+    let private writeTextResponse
+        (response : System.Net.HttpListenerResponse)
+        (code : StatusCode)
+        (text : string)
+        : unit =
+            handleResponse HttpContentTypes.Text response code text
+
+    let private writeJsonResponse
+        (response : System.Net.HttpListenerResponse)
+        (code : StatusCode)
+        (json : JsonValue)
+        : unit =
+            let stringWriter = new System.IO.StringWriter(System.Globalization.CultureInfo.InvariantCulture)
+            json.WriteTo(stringWriter, JsonSaveOptions.DisableFormatting)
+            stringWriter.ToString()
+            |> handleResponse HttpContentTypes.Json response code
+
+       
     let private writeResponse (response : System.Net.HttpListenerResponse) statusCode =
         function
         | TextContent text -> writeTextResponse response statusCode text 
@@ -105,11 +109,11 @@ module Server =
 
     let private subscribe poller (origin:Origin) (listener:System.Net.HttpListener) observer =
         let source = new System.Threading.CancellationTokenSource()
-
-        let async () =
-            while not source.IsCancellationRequested do
-                try 
-                    let context = listener.GetContext()
+        Async.Start(
+            async {
+                while not source.IsCancellationRequested || listener.IsListening do
+                try
+                    let! context = Async.FromBeginEnd(listener.BeginGetContext, listener.EndGetContext)
 
                     let path = removePostfixSlash context.Request.Url.AbsolutePath
                     match origin with
@@ -151,15 +155,10 @@ module Server =
                     | _ ->
                             writeEmptyResponse context.Response StatusCode.MethodNotAllowed
                 with
-                | :? System.Net.HttpListenerException -> source.Cancel()
-            
-        let task = new System.Threading.Tasks.Task(async, System.Threading.Tasks.TaskCreationOptions.LongRunning)
-        task.Start()
-        task.ContinueWith(fun task ->
-            if task.IsFaulted then
-                System.Environment.FailFast("http thread crashed", task.Exception.Flatten().InnerException) 
-            ) |> ignore
-    
+                | error ->
+                    sprintf "http thread crashed message: %s in: %s stacktrace: %s %s" error.Message error.Source error.StackTrace error.HelpLink
+                    |> System.Environment.FailFast
+            }, source.Token)
              
         { new System.IDisposable with
            member this.Dispose() = source.Cancel() }
