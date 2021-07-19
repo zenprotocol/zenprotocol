@@ -55,7 +55,7 @@ module Request =
             "wallet/contract/activate"
             |> getUri
             |> ContractActivateRequestJson.Root(
-                code, numberOfBlocks, rlimit, pass
+                code, Some rlimit , numberOfBlocks, pass
                 ).JsonValue.Request 
             |> getResponse
 
