@@ -40,7 +40,7 @@ module Server =
 
     let private getBody (request : System.Net.HttpListenerRequest) : Result<string option,string> =
         if request.HasEntityBody then
-            if request.ContentType.StartsWith HttpContentTypes.Json then
+            if request.ContentType <> null && request.ContentType.StartsWith HttpContentTypes.Json then
                use reader = new System.IO.StreamReader(request.InputStream,request.ContentEncoding)
                 
                reader.ReadToEnd()
@@ -69,8 +69,8 @@ module Server =
                 response.OutputStream.Write(bytes, 0, Array.length bytes)
                 response.OutputStream.Close()
             with _ ->
-                writeEmptyResponse response StatusCode.InternalServerError
-        
+                if response <> null then 
+                   writeEmptyResponse response StatusCode.InternalServerError
     
     let private writeTextResponse
         (response : System.Net.HttpListenerResponse)
