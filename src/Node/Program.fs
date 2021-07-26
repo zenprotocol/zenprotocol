@@ -297,14 +297,17 @@ module CheckPlatform =
 
                 System.Environment.FailFast("Please install mono", null)
             | Some version ->
-                if version >= Version(5,10,0) then
+                let boundedToVersion = Version(6,12,0)
+                if version >= boundedToVersion then
                     eventX "Mono check passed"
                     |> Log.info
                 else
-                    eventX "Old version of mono, please upgrade"
+                    
+                    eventX "Old version of mono, please upgrade to at least {version}"
+                    >> setField "version" (boundedToVersion.ToString())
                     |> Log.error
 
-                    System.Environment.FailFast("Please install mono", null)
+                    System.Environment.FailFast("Please upgrade mono", null)
 
 [<EntryPoint>]
 let main argv =
