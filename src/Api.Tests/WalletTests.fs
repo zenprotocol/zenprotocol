@@ -475,3 +475,28 @@ let ``Should get external address``() =
         |> JsonContent
  
     Api.Server.Wallet.address (contentConfig expectedContent) 
+
+[<Test>]
+let ``Should get mempool``() =
+    let chainParams = { Utils.chainParams with genesisHashHash = Hash.fromString "46d1e8e4d397bbcf13f96346dfb998d7445600806d09e6e5d1740b3d8412fd24" |> Option.get |> Hash.computeOfHash }
+    use actors = customChainActor chainParams
+    let client = ServiceBus.Client.create Utils.busName
+    let config = {config with client = client; chain = Chain.getChain chainParams }
+    
+    let body = Constants.publishBlock
+
+    Api.Server.Blockchain.publishBlock config body
+    
+    let body = Constants.import
+    
+    Api.Server.Wallet.import config body
+    
+    Api.Server.Wallet.resync config
+    
+    let body = Constants.sendTo
+   
+    Api.Server.Wallet.send config body
+    
+    System.Threading.Thread.Sleep(1000)
+    
+    Api.Server.Blockchain.mempool config
