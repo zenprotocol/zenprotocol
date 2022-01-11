@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.0.8](https://gitlab.com/zenprotocol/zenprotocol/compare/v1.0.7...v1.0.8) (2022-01-11)
+
+
+### Features
+
+* mono must be at least 6.12.0 ([2f8b08e](https://gitlab.com/zenprotocol/zenprotocol/commit/2f8b08e20400086d1f8847c09c3f85a6155c4225))
+* update version expiry ([b56a04b](https://gitlab.com/zenprotocol/zenprotocol/commit/b56a04bfe367e8f93566fe1035a0804a4b635a52))
+* use async in HTTP module ([2639633](https://gitlab.com/zenprotocol/zenprotocol/commit/263963360d096d3026294a32304376ba3468a718))
+
+### Bug Fixes
+
+* ContentType must be provided in POST ([992c167](https://gitlab.com/zenprotocol/zenprotocol/commit/992c167d9c88718a7c6252fdd482b894a8dadfbb))
+* update mono image in gitlab ci ([d30e991](https://gitlab.com/zenprotocol/zenprotocol/commit/d30e9915a88332736ff51d84ce4b0b2f7c03e8fe))
+
 ## [1.0.7](https://gitlab.com/zenprotocol/zenprotocol/compare/v1.0.6...v1.0.7) (2021-06-28)
 
 

@@ -325,3 +325,13 @@ let headerEncoder header =
         "0x" + header.difficulty.ToString("x"),
         Difficulty.uncompress header.difficulty |> Hash.toString
     )
+    
+let mempoolEncoder chain (mempool: List<Hash.Hash * Transaction>) =
+    mempool
+    |> List.map( fun (hash, tx) ->
+        transactionEncoder chain tx
+        |> fun j -> JsonValue.Record [| (Hash.toString hash , j) |]
+        )
+    |> List.toArray
+    |> JsonValue.Array
+    |> omitNullFields

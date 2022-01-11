@@ -1,7 +1,7 @@
-image: mono:5.18
+image: mono:latest
 
 before_script:
- - apt-get update
+ - apt-get update -y
  - apt-get install -y -qq fsharp libgomp1 libstdc++6 liblmdb0
 
 build:

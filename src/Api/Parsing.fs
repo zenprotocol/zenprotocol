@@ -205,10 +205,8 @@ let parseAddressDBContractInfo json =
     try
         let json = ContractInfoRequestJson.Parse json
         let rlimit =
-            if json.Rlimit < (int TransactionCreator.Rlimit) then
-                None
-            else
-                Some (uint32 json.Rlimit)
+            json.Rlimit
+            |> Option.map uint32
 
         if String.length json.Code = 0 then
             Error "Contract code is empty"
@@ -222,10 +220,8 @@ let parseContractActivateJson json =
         let json = ContractActivateRequestJson.Parse json
         
         let rlimit =
-            if json.Rlimit < (int TransactionCreator.Rlimit) then
-                None
-            else
-                Some (uint32 json.Rlimit)
+            json.Rlimit
+            |> Option.map uint32
 
         if String.length json.Code = 0 then
             Error "Contract code is empty"

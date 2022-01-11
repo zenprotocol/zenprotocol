@@ -36,7 +36,7 @@ let ``AddressDB should show contract history``() =
     |> get |> i
 
     let response = 
-        contractActivateRequestJson sampleContractCode 10 2723280 Constants.password
+        contractActivateRequestJson sampleContractCode (Some 2723280) 10 Constants.password
         |> post "wallet/contract/activate"
         |> ContractActivateOrExtendResponseJson.Parse
 

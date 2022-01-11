@@ -420,6 +420,13 @@ module Blockchain =
             |> JsonValue.Array
             |> JsonContent
             |> config.reply StatusCode.OK
+    let mempool
+        (config: Config)
+        : unit =
+            Blockchain.getMempool config.client
+            |> mempoolEncoder config.chain
+            |> JsonContent
+            |> config.reply StatusCode.OK
 
 module AddressDB =
 
@@ -1208,14 +1215,16 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
     match request with
     | Get ("/network/connections/count", _) ->
         Network.connectionCount config
-    | Get("/address/decode", query) ->
+    | Get ("/address/decode", query) ->
         Address.decode config query
-    | Get("/blockchain/headers", query) ->
+    | Get ("/blockchain/headers", query) ->
         Blockchain.headers config query
     | Get ("/blockchain/info", _) ->
         Blockchain.info config
     | Get ("/blockchain/cgp", _) ->
         Blockchain.cgp config
+    | Get ("/blockchain/mempool", _ ) ->
+        Blockchain.mempool config
     | Get ("/blockchain/cgp/history", _) ->
         Blockchain.cgpHistory config
     | Get ("/blockchain/contract/cgp", _) ->

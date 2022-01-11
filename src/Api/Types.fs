@@ -57,20 +57,32 @@ type SendRequestJson = JsonProvider<"""
 """>
 
 type ContractActivateRequestJson = JsonProvider<"""
-{
-    "code": "string",
-    "rlimit": 2723280,
-    "numberOfBlocks": 1,
-    "password": "password"
-}
-""">
+[
+    {
+        "code": "string",
+        "rlimit": 2723280,
+        "numberOfBlocks": 1,
+        "password": "password"
+    },
+    {
+        "code": "string",
+        "numberOfBlocks": 1,
+        "password": "password"
+    }
+]
+""",SampleIsList=true>
 
 type ContractInfoRequestJson = JsonProvider<"""
-{
-    "code": "string",
-    "rlimit": 2723280
-}
-""">
+[
+    {
+        "code": "string",
+        "rlimit": 2723280
+    },
+    {
+        "code": "string"
+    }
+]
+""",SampleIsList=true>
 
 type ContractExtendRequestJson = JsonProvider<"""
 {
