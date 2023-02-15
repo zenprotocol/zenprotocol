@@ -632,6 +632,20 @@ module AddressDB =
         |> JsonContent
         |> config.reply StatusCode.OK
     
+    let private getDiscovery
+        (config: Config)
+        (addressDiscovery: AddressDB.DiscoveryResponse) 
+        (full: bool) =
+        let json =
+                addressDiscovery
+                |> List.map (addressDiscoveryEncoder config.chain full)
+                |> List.toArray
+                |> JsonValue.Array
+        (new TransactionsResponseJson.Root(json)).JsonValue
+        |> JsonContent
+        |> config.reply StatusCode.OK
+    
+    
     let transactions
         (config: Config)
         (body: string)
@@ -643,6 +657,20 @@ module AddressDB =
                 | Ok txs ->
                     getContractHistory config txs
                 | Error error -> config.replyError error
+            
+            
+    let discovery
+        (config: Config)
+        (body: string)
+        : unit =
+            match parseDiscoveryJson config.chain body with
+            | Error error -> config.replyError error
+            | Ok (addresses, isFull) ->
+                match AddressDB.getDiscovery config.client addresses with
+                | Ok addressDiscovery ->
+                    getDiscovery config addressDiscovery isFull
+                | Error error -> config.replyError error  
+            
     
     let transactionsByBlockNumber
         (config: Config)
@@ -1345,6 +1373,8 @@ let handleRequest (chain:Chain) client (request,reply) (templateCache : BlockTem
         AddressDB.contractHistoryByBlockNumber config body
     | Post("/addressdb/contract/info", Some body) ->
         AddressDB.contractInfo config body
+    | Post("/addressdb/discovery", Some body) ->
+       AddressDB.discovery config body
     | _ ->
         config.replyError "unmatched request"
 
