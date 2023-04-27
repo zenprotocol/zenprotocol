@@ -372,6 +372,8 @@ module Wallet =
 module AddressDB =
     open Wallet
     type TransactionsResponse = List<Hash*TransactionDirection*Spend*uint32*uint64*Lock>
+    
+    type DiscoveryResponse = List<Recipient*int*List<Asset*uint64>> // txs, balance by address, asset, amount
 
     type ContractHistoryResponse = List<string * data option * Hash * uint32> // command, messageBody, txHash, confirmations
 
@@ -392,6 +394,7 @@ module AddressDB =
         | GetTransactionCount of addresses:string list * uint32
         | GetContractAssets of asset: Asset
         | GetContractInfo of code: string * rlimit: uint32 option
+        | GetDiscovery of addresses: string list
 
     let serviceName = "addressDB"
     let resyncAccount client =
@@ -411,6 +414,10 @@ module AddressDB =
     let getTransactions client args =
         GetTransactions args
         |> send<TransactionsResponse> client
+        
+    let getDiscovery client args =
+        GetDiscovery args
+        |> send<DiscoveryResponse> client
 
     let getContractHistory client args =
         GetContractHistory args

@@ -245,7 +245,7 @@ let transactionEncoder chain (tx:Transaction) =
         |]
     |> omitNullFields
     
-let transactionHistoryEncoder chain txHash asset (amount:int64) (confirmations:uint32) (timestamp:uint64 option) lock=
+let transactionHistoryEncoder chain txHash asset (amount:int64) (confirmations:uint32) (timestamp:uint64 option) lock =
     JsonValue.Record
         [|
             ("txHash",JsonValue.String (Hash.toString txHash));
@@ -255,6 +255,29 @@ let transactionHistoryEncoder chain txHash asset (amount:int64) (confirmations:u
             ("timestamp", timestamp |> Option.map (JsonValue.Number << decimal) |> Option.defaultValue JsonValue.Null)
             ("lock", lockEncoder chain lock)
         |]
+    |> omitNullFields
+
+let addressDiscoveryEncoder chain isFull (address,(txs:int) , balance ) =
+    let spends =
+        balance
+        |> List.map (fun (asset,amount) -> spendEncoder {asset=asset; amount= amount})
+        |> List.toArray
+    if isFull then
+        JsonValue.Record
+            [|
+                ("address",recipientEncoder chain address |> JsonValue.String);
+                ("balance", JsonValue.Array spends)
+                ("hasBalance", spends |> Array.isEmpty |> not |> JsonValue.Boolean)
+                ("txs", JsonValue.Number (decimal txs))
+                ("hasTxs", txs > 0 |>  JsonValue.Boolean)
+            |]
+    else
+        JsonValue.Record
+            [|
+                ("address",recipientEncoder chain address |> JsonValue.String);
+                ("hasBalance", spends |> Array.isEmpty |> not |> JsonValue.Boolean)
+                ("hasTxs", txs > 0 |>  JsonValue.Boolean)
+            |]
     |> omitNullFields
 
 let blockHeaderEncoder (bh:BlockHeader) =

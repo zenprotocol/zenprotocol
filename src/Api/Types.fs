@@ -385,6 +385,17 @@ type GetTransactionCountJson = JsonProvider<"""
     "addresses": ["abcd1234", "abcd1234" ]
 }""">
 
+type DiscoveryJson = JsonProvider<"""
+[
+    {
+        "addresses": ["abcd1234"],
+        "full": true
+    },
+    {
+        "addresses": ["abcd1234"]
+    }
+]""",SampleIsList=true>
+
 type GetAssetsJson = JsonProvider<"""
 {
     "asset": "asset"

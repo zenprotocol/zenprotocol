@@ -96,8 +96,8 @@ module AddressOutpoints =
             | Some list -> list
             | None -> List.empty)
         |> List.concat
-    let get view dataAcesss session addresses =
-        AddressOutpoints.get dataAcesss session addresses @ get' view addresses
+    let get view dataAccess session addresses =
+        AddressOutpoints.get dataAccess session addresses @ get' view addresses
 
 module ContractHistory =
     let private get' view contractId =
@@ -361,6 +361,16 @@ let getHistoryByBlockNumber dataAccess session view startBlock endBlock addresse
     |> List.filter (filterDBOutputStartEnd startBlock endBlock account.blockNumber)
     |> List.sortWith txComparer
     |> List.map (fun (txHash,direction,spend,confirmations,timestamp,_,lock) -> txHash,direction,spend,confirmations,timestamp,lock)
+
+let discovery dataAccess session view addresses =
+    let account = DataAccess.Tip.get dataAccess session
+    addresses
+    |> List.map (fun address -> 
+        let txCount = getTransactionCount dataAccess session view account.blockNumber [address]
+        let balance = getBalance dataAccess session view UnspentOnly None [address] |> Map.toList
+        
+        match address with | Address.PK pk -> Recipient.PKRecipient pk | Address.Contract cid -> Recipient.ContractRecipient cid
+        , txCount, balance)
 
 let private contractHistoryComparer a1 a2 =
     let comparer (index1, block1, _) (index2, block2, _) =

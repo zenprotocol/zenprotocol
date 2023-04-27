@@ -110,6 +110,9 @@ let requestHandler chain (requestId:RequestId) request dataAccess session (statu
         | GetTransactionsByBlockNumber _ ->
             error
             |> reply<TransactionsResponse> requestId
+        | GetDiscovery _ ->
+            error
+            |> reply<TransactionsResponse> requestId
         status
     | Running view ->
         let decodeAddresses = Result.traverseResultM (Wallet.Address.decodeAny chain)
@@ -149,6 +152,10 @@ let requestHandler chain (requestId:RequestId) request dataAccess session (statu
             decodeAddresses addresses
             <@> View.getHistoryByBlockNumber dataAccess session view startBlock endBlock
             |> reply<TransactionsResponse> requestId
+        | GetDiscovery addresses ->
+            decodeAddresses addresses
+            <@> View.discovery dataAccess session view
+            |> reply<DiscoveryResponse> requestId
         
         status
 

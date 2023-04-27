@@ -432,6 +432,7 @@ let private checkAddresses chain addresses =
     else
         addresses
         |> Array.toList
+        |> List.distinct
         |> Infrastructure.Result.traverseResultM (Address.decodeAny chain)
         <@> List.map (Wallet.Address.encode chain)
 
@@ -458,6 +459,18 @@ let parseGetHistoryJson chain json =
 
         checkAddresses chain json.Addresses
         <@> fun addresses -> addresses, json.Skip, json.Take
+    with _ as ex ->
+        Error ("Json invalid: " + ex.Message)
+
+let parseDiscoveryJson chain json =
+    try
+        let json = DiscoveryJson.Parse json
+
+        checkAddresses chain json.Addresses
+        <@> fun addresses ->
+            match json.Full with
+            | Some isFull -> (addresses,isFull)
+            | None -> (addresses, false)
     with _ as ex ->
         Error ("Json invalid: " + ex.Message)
 
