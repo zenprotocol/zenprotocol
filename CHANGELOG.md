@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.0.11](https://gitlab.com/zenprotocol/zenprotocol/compare/v1.0.10...v1.0.11) (2023-04-27)
+
+
+### Features
+
+* add address discovery api via addressDB ([d0cbf79](https://gitlab.com/zenprotocol/zenprotocol/commit/d0cbf7942c0ecbf4a6b0d892ad95fb5c92f73bb6))
+* update version expiry ([6f1b72b](https://gitlab.com/zenprotocol/zenprotocol/commit/6f1b72b590a1f3957bc1f15c6bdf85a4af4ee3f3))
+
 ### [1.0.10](https://gitlab.com/zenprotocol/zenprotocol/compare/v1.0.9...v1.0.10) (2022-10-27)
 
 
