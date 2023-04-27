@@ -17,7 +17,7 @@ assembly_info:
   assembly_informational_version: '{version}'
 
 install:
-  - ps: Install-Product node 12
+  - ps: Install-Product node 16.13.0
   - npm install --global npm@latest
   - set PATH=%APPDATA%\npm;%PATH%
 
