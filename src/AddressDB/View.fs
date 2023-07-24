@@ -32,14 +32,11 @@ let addContractHistory contractData contractId data =
     Map.add contractId data contractData
 
 let addContractAsset
-    (contractAssetData:Map<Asset, uint32 * string option * string * data option>)
+    (contractAssetData: Map<Asset, uint32 * string option * string * data option>)
     (mintLists: List<Asset * uint32 * string option * string * data option>) =
-        let mutable mintMap = contractAssetData
-        for mint in mintLists do
-            match mint with
-            | asset,blockNumber, sender, command, msgBody ->
-               mintMap <- Map.add asset (blockNumber, sender, command, msgBody) mintMap
-        mintMap
+    List.fold (fun acc (asset, blockNumber, sender, command, msgBody) -> 
+        Map.add asset (blockNumber, sender, command, msgBody) acc) contractAssetData mintLists
+
 
 let setContractData contractData witnessPoint data =
     Map.add witnessPoint data contractData

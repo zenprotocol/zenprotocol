@@ -24,71 +24,62 @@ let private getSpend asset amount =
 let parseSendJson chain json =
     try
         let json = SendRequestJson.Parse json
-        let mutable outputs = List.empty
-        let mutable errors = List.empty
-
-        if String.length json.Password = 0 then
-            errors <- "Password is empty" :: errors
-        if json.Outputs.Length = 0 then
-            errors <- "Outputs is empty" :: errors
-        else
-            for output in json.Outputs do
+        let outputs, errors =
+            json.Outputs
+            |> Array.fold (fun (outs, errs) output ->
                 match Address.decodeAny chain output.Address with
                 | Error err ->
-                    errors <- ("Address is invalid: " + err) :: errors
+                    (outs, ("Address is invalid: " + err) :: errs)
                 | Ok (Address.PK pkHash) ->
                     match getSpend output.Asset output.Amount with
-                    | Ok spend ->
-                        outputs <- (PK pkHash, spend) :: outputs
-                    | Error err ->
-                        errors <- err :: errors
+                    | Ok spend -> ((PK pkHash, spend) :: outs, errs)
+                    | Error err -> (outs, err :: errs)
                 | Ok (Address.Contract cId) ->
                     match getSpend output.Asset output.Amount with
-                    | Ok spend ->
-                        outputs <- (Contract cId, spend) :: outputs
-                    | Error err ->
-                        errors <- err :: errors
-
-        if List.isEmpty errors then
-            Ok (outputs, json.Password)
-        else
-            errors
-            |> String.concat " "
-            |> Error
-
-    with _ as ex ->
+                    | Ok spend -> ((Contract cId, spend) :: outs, errs)
+                    | Error err -> (outs, err :: errs)) (List.empty, List.empty)
+        
+        let errors = 
+            if String.length json.Password = 0 then
+                "Password is empty" :: errors
+            else if json.Outputs.Length = 0 then
+                "Outputs is empty" :: errors
+            else errors
+        
+        match errors with
+        | [] -> Ok (List.rev outputs, json.Password)
+        | _  -> Error (String.concat " " errors)
+    with ex ->
         Error ("Json invalid: " + ex.Message)
+
 
 let parseCreateRawTransactionJson chain json =
     try
         let json = CreateRawTransactionJson.Parse json
-        let mutable outputs = List.empty
-        let mutable errors = List.empty
-
-        if json.Outputs.Length = 0 then
-            errors <- "Outputs is empty" :: errors
-        else
-            for output in json.Outputs do
-                Address.decodePK chain output.Address
-                |> function
+        let outputs, errors =
+            json.Outputs
+            |> Array.fold (fun (outs, errs) output ->
+                match Address.decodePK chain output.Address with
                 | Error err ->
-                    errors <- ("Address is invalid: " + err) :: errors
+                    (outs, ("Address is invalid: " + err) :: errs)
                 | Ok pkHash ->
                     match getSpend output.Asset output.Amount with
                     | Ok spend ->
-                        outputs <- (pkHash, spend) :: outputs
+                        ((pkHash, spend) :: outs, errs)
                     | Error err ->
-                        errors <- err :: errors
-
-        if List.isEmpty errors then
-            Ok outputs
-        else
-            errors
-            |> String.concat " "
-            |> Error
-
-    with _ as ex ->
+                        (outs, err :: errs)) (List.empty, List.empty)
+        
+        match errors with
+        | [] when json.Outputs.Length <> 0 -> Ok (List.rev outputs)
+        | _ -> 
+            let errors = 
+                if json.Outputs.Length = 0 then
+                    "Outputs is empty" :: errors
+                else errors
+            Error (String.concat " " errors)
+    with ex ->
         Error ("Json invalid: " + ex.Message)
+
 
 let parseSignRawTransactionJson json =
     try
@@ -128,28 +119,22 @@ let parseContractExecuteJson chain json =
             match Address.decodeContract chain json.Address with
             | Error err -> Error ("Address is invalid: " + err)
             | Ok contractId ->
-                let mutable spends = Map.empty
-                let mutable errors = List.empty
-
-                for item in json.Spends do
-                    getSpend item.Asset item.Amount
-                    |> function
-                    | Ok spend -> spends <- Map.add spend.asset spend.amount spends
-                    | Error err -> errors <- err :: errors
-                    |> ignore
+                let spends, errors =
+                    json.Spends
+                    |> Array.fold (fun (spends, errs) item ->
+                        match getSpend item.Asset item.Amount with
+                        | Ok spend -> (Map.add spend.asset spend.amount spends, errs)
+                        | Error err -> (spends, err :: errs)) (Map.empty, List.empty)
 
                 if List.isEmpty errors then
                     let messageBody =
-                        if System.String.IsNullOrEmpty json.MessageBody then
-                            None
+                        if System.String.IsNullOrEmpty json.MessageBody then None
                         else
                             match Base16.decode json.MessageBody with
                             | Some data ->
-                                match Serialization.Data.deserialize data with
-                                | Some data -> Some data
-                                | None -> failwith "Invalid Data"
+                                Serialization.Data.deserialize data
                             | None -> failwith "Invalid Data"
-
+                    
                     let sign =
                         if System.String.IsNullOrEmpty json.Options.Sign then
                             None
@@ -161,7 +146,7 @@ let parseContractExecuteJson chain json =
                     errors
                     |> String.concat " "
                     |> Error
-    with _ as ex ->
+    with ex ->
         Error ("Json is invalid: " + ex.Message)
 
 let parseContractExecuteFromTransactionJson chain json =
@@ -297,18 +282,15 @@ let parseSubmitBlockHeaderJson json =
 let parseImportSeedJson json =
     try
         let json = ImportSeedJson.Parse json
-
-        let mutable words = List.empty
-
-        for item in json.Words do
-            words <- item :: words
+        let words = List.ofArray json.Words
 
         if String.length json.Password = 0 then
             Error "Password is empty"
         else
-            Ok (List.rev words, json.Password)
-    with _ as ex ->
+            Ok (words, json.Password)
+    with ex ->
         Error ("Json is invalid: " + ex.Message)
+
 
 let parseGetPublicKeyJson json =
     try

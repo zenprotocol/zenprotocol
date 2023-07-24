@@ -126,10 +126,8 @@ let private connectTips
     ( tips      : ExtHeader list  )
     : OriginState
     =
-    let mutable state = origState
-    for tip in tips do
-            state <- connectTip env op state tip
-    state
+    List.fold (connectTip env op) origState tips
+
 
 let private getHeaders (env : Env) (origHeader : ExtHeader) (tipHeader : ExtHeader) : ExtHeader list =
     let rec getHeadersAux (tipHeader : ExtHeader) (headers : ExtHeader list) : ExtHeader list =
