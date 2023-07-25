@@ -111,7 +111,7 @@ module Server =
         let source = new System.Threading.CancellationTokenSource()
         Async.Start(
             async {
-                while not source.IsCancellationRequested || listener.IsListening do
+                while not source.IsCancellationRequested && listener.IsListening do
                 try
                     let! context = Async.FromBeginEnd(listener.BeginGetContext, listener.EndGetContext)
 

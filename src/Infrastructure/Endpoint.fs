@@ -9,14 +9,14 @@ let getPort (address:string)  =
     if index = -1 then 
         failwith "invalid address"
     else 
-        let port = address.Substring(1 + index)
-        let isInteger, port = System.Int32.TryParse port
+        let port = address.Substring(index + 1)  // Correct index offset
+        let isInteger, portValue = System.Int32.TryParse(port)  // Rename output of TryParse
         
-        if isInteger && port >= 1 && port <= 65535 then
-            port
+        if isInteger && portValue >= 1 && portValue <= 65535 then
+            portValue
         else                      
             failwith "invalid address"     
-    
+
 let isValid (address:string) = 
     let index = address.LastIndexOf(':')
     
@@ -24,16 +24,16 @@ let isValid (address:string) =
         false
     else          
         let host = address.Substring(0, index)
-        let port = address.Substring(1 + index)
+        let port = address.Substring(index + 1) 
         
-        let isInteger, port = System.Int32.TryParse port
-        if isInteger && port >= 1 && port <= 65535 then                     
+        let isInteger, portValue = System.Int32.TryParse port
+        if isInteger && portValue >= 1 && portValue <= 65535 then                     
             match Uri.CheckHostName (host) with
             | UriHostNameType.IPv4 
             | UriHostNameType.IPv6 -> true
             | _ -> false
         else false
-        
+
 let tryGetFirstIpFromHost (address:string) (bindPort:string) : Option<string>  =
     try
         Some (sprintf "%s:%d" (Dns.GetHostAddresses(address).[0].ToString()) (getPort bindPort))
