@@ -480,30 +480,7 @@ module AddressDB =
             | Ok address ->
                 match AddressDB.getContractAssets config.client address with
                 | Ok (Some (blockNumber, pk, command, messageBody)) ->
-                    [|
-                        "executionBlock",
-                            blockNumber
-                            |> decimal
-                            |> JsonValue.Number
-                        "sender",
-                            pk
-                            |> Option.map JsonValue.String
-                            |> Option.defaultValue JsonValue.Null
-                        "command",
-                            command
-                            |> JsonValue.String
-                        "messageBody",
-                            messageBody
-                            |> Option.map (dataEncoder config.chain)
-                            |> Option.defaultValue JsonValue.Null
-                        "messageBodyRaw",
-                            messageBody
-                            |> Option.map Serialization.Data.serialize
-                            |> Option.map Base16.encode
-                            |> Option.map JsonValue.String
-                            |> Option.defaultValue JsonValue.Null
-                    |]
-                    |> JsonValue.Record
+                    mintEncoder config.chain blockNumber pk command messageBody 
                     |> JsonContent
                     |> config.reply StatusCode.OK
                 | Ok None ->
@@ -513,34 +490,12 @@ module AddressDB =
 
     let private contractHistoryData
         (config: Config)
-        data =
-            data
-            <@> List.map (fun (command, messageBody, txHash, confirmations) ->
-                    [|
-                        "command",
-                            command
-                            |> JsonValue.String
-                        "messageBody",
-                            messageBody
-                            |> Option.map (dataEncoder config.chain)
-                            |> Option.defaultValue JsonValue.Null
-                        "txHash",
-                            txHash
-                            |> Hash.toString
-                            |> JsonValue.String
-                        "confirmations",
-                            confirmations
-                            |> decimal
-                            |> JsonValue.Number
-                    |]
-                    |> JsonValue.Record
-                )
-                <@> List.toArray
-                <@> JsonValue.Array
-                <@> JsonContent
-                <@> config.reply StatusCode.OK
-                |> Result.mapError config.replyError
-            |> ignore//TODO: check me
+        (data : Result<AddressDB.ContractHistoryResponse,string>) =
+            contractHistoryEncoder config.chain data
+            <@> JsonContent
+            <@> config.reply StatusCode.OK
+            |> Result.mapError config.replyError
+            |> ignore
 
     let contractHistory
         (config: Config)
@@ -568,32 +523,7 @@ module AddressDB =
             else 
                 parseAddressDBContractInfo body
                 >>= AddressDB.getContractInfo config.client
-                <@> (fun (contractId, contractV0) ->
-                    let address =
-                        Address.Contract contractId
-                        |> Address.encode config.chain
-                    [|
-                        "contractId",
-                            contractId
-                            |> ContractId.toString
-                            |> JsonValue.String
-                        "address",
-                            address
-                            |> JsonValue.String
-                        "hints",
-                            contractV0.hints
-                            |> JsonValue.String
-                        "queries",
-                            contractV0.queries
-                            |> decimal
-                            |> JsonValue.Number
-                        "rlimit",
-                            contractV0.rlimit
-                            |> decimal
-                            |> JsonValue.Number
-                    |]
-                    |> JsonValue.Record
-                )
+                |> contractInfoEncoder config.chain
                 <@> JsonContent
                 <@> config.reply StatusCode.OK
                 |> Result.mapError config.replyError
