@@ -6,7 +6,6 @@ open Infrastructure
 open Result
 open Serialization
 open Chain
-open Consensus.Serialization.Serialization
 open Block
 open ReaderResult
 

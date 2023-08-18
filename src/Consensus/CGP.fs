@@ -225,6 +225,7 @@ module Connection =
         ( chainParams: ChainParameters )
         ( block         : Block        )
         : bool =
-            List.filter (isPayoutTransaction chainParams) block.transactions
+            block.transactions
+            |> List.filter (isPayoutTransaction chainParams)
             |> List.isSingleton
     
