@@ -15,6 +15,9 @@ open Logary.Message
 open Chain
 open Environment
 
+[<Literal>]
+let THRESHOLD_DURATION = 10000UL
+
 let getUnionCaseName (x:'a) =
     match Microsoft.FSharp.Reflection.FSharpValue.GetUnionFields(x, typeof<'a>) with
     | case, _ -> case.Name
@@ -25,7 +28,7 @@ let logStartAction actionType action =
     |> Log.info
 
 let logEndAction timestamp actionType action =
-    if Timestamp.now() > timestamp + 10000UL then
+    if Timestamp.now() > timestamp + THRESHOLD_DURATION then
         eventX (sprintf "Blockchain: Handling %s {action} ended, action took more than 10 seconds" actionType)
         >> setField "action" (getUnionCaseName action)
         |> Log.warning

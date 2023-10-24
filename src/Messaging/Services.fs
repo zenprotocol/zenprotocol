@@ -66,49 +66,55 @@ module Blockchain =
 
     type Response = unit
     
+    let private sendCommand client command =
+        Command.send client serviceName command
+        
+    let private sendRequest<'a> client =
+        Request.send<Request, 'a> client serviceName
+
     let validateTransaction client tx =
-        Command.send client serviceName (ValidateTransaction tx)
+        sendCommand client (ValidateTransaction tx)
 
     let requestMemPool client peerId =
-        Command.send client serviceName (RequestMemPool peerId)
+        sendCommand client (RequestMemPool peerId)
 
     let requestTransactions client peerId txHashes =
-        Command.send client serviceName (RequestTransactions (peerId,txHashes))
+        sendCommand client (RequestTransactions (peerId,txHashes))
 
     let handleMemPool client peerId txHashes =
-        Command.send client serviceName (HandleMemPool (peerId,txHashes))
+        sendCommand client (HandleMemPool (peerId,txHashes))
 
     let executeContract client contractId command sender messageBody txSkeleton =
         ExecuteContract (contractId,command, sender, messageBody, txSkeleton)
-        |> Request.send<Request, Result<Transaction,string>> client serviceName
+        |> sendRequest<Result<Transaction,string>> client
 
     let validateBlock client peerId block =
         ValidateBlock (peerId, block)
-        |> Command.send client serviceName
+        |> sendCommand client
 
     let validateMinedBlock client block =
         ValidateMinedBlock block
-        |> Command.send client serviceName
+        |> sendCommand client
 
     let handleTip client peerId header =
         HandleTip (peerId, header)
-        |> Command.send client serviceName
+        |> sendCommand client
 
     let validateNewBlockHeader client peerId header =
         ValidateNewBlockHeader (peerId,header)
-        |> Command.send client serviceName
+        |> sendCommand client
 
     let requestBlock client peerId blockHash =
         RequestBlock (peerId,blockHash)
-        |> Command.send client serviceName
+        |> sendCommand client
 
     let requestTip client peerId =
         RequestTip peerId
-        |> Command.send client serviceName
+        |> sendCommand client
 
     let getBlockTemplate client pkHash =
         GetBlockTemplate pkHash
-        |> Request.send<Request,Block> client serviceName
+        |> sendRequest<Block> client
 
     let tryGetBlockTemplate client pkHash =
         GetBlockTemplate pkHash
@@ -116,84 +122,99 @@ module Blockchain =
 
     let getAllBlocks client from =
         GetAllBlocks from
-        |> Request.send<Request,Map<Hash.Hash, byte array>> client serviceName 
+        |> sendRequest<Map<Hash.Hash, byte array>> client
     
     let getBlocks client take blockNumber  =
-        GetBlocks (blockNumber, take) |> Request.send<Request,List<uint32 * byte array>> client serviceName
+        GetBlocks (blockNumber, take)
+        |> sendRequest<List<uint32 * byte array>> client
     
     let getBlockHeader client blockHash =
-        Request.send<Request,BlockHeader option> client serviceName (GetBlockHeader blockHash)
+        GetBlockHeader blockHash
+        |> sendRequest<BlockHeader option> client
 
     let getBlock client mainChain blockHash =
-        Request.send<Request,Block option> client serviceName (GetBlock (mainChain,blockHash))
+        GetBlock (mainChain,blockHash)
+        |> sendRequest<Block option> client
 
     let getTransaction client txHash =
-        Request.send<Request,(Transaction*uint32) option> client serviceName (GetTransaction txHash)
+        GetTransaction txHash
+        |> sendRequest<(Transaction*uint32) option> client
 
     let getBlockByNumber client blockNumber =
-        Request.send<Request,Block option> client serviceName (GetBlockByNumber blockNumber)
+        GetBlockByNumber blockNumber
+        |> sendRequest<Block option> client
 
     let getTip client =
-        Request.send<Request,(Hash*BlockHeader) option> client serviceName GetTip
+        GetTip
+        |> sendRequest<(Hash*BlockHeader) option> client
 
     let getActiveContracts client =
-        Request.send<Request,ActiveContract list> client serviceName GetActiveContracts
+        GetActiveContracts
+        |> sendRequest<ActiveContract list> client
 
     let getActiveContract client contractId =
-        Request.send<Request,ActiveContract option> client serviceName (GetActiveContract contractId)
+        GetActiveContract contractId
+        |> sendRequest<ActiveContract option> client
 
     let getBlockChainInfo client =
-        Request.send<Request,BlockchainInfo> client serviceName GetBlockChainInfo
+        GetBlockChainInfo
+        |> sendRequest<BlockchainInfo> client
 
     let tryGetBlockChainInfo client =
-        Request.trySend<Request,BlockchainInfo> client serviceName GetBlockChainInfo
+        GetBlockChainInfo
+        |> Request.trySend<Request,BlockchainInfo> client serviceName
 
     let requestHeaders client peerId startBlockHash endBlockHash=
-        RequestHeaders (peerId,startBlockHash,endBlockHash) |> Command.send client serviceName
+        RequestHeaders (peerId,startBlockHash,endBlockHash)
+        |> sendCommand client
 
     let handleHeaders client peerId headers =
-        HandleHeaders (peerId,headers) |> Command.send client serviceName
+        HandleHeaders (peerId,headers)
+        |> sendCommand client
 
     let getAllHeaders client =
-        GetAllHeaders |> Request.send<Request, BlockHeader list> client serviceName
+        GetAllHeaders
+        |> sendRequest<BlockHeader list> client
         
     let getHeaders client take blockNumber  =
-        GetHeaders (blockNumber, take) |> Request.send<Request, BlockHeader list> client serviceName
+        GetHeaders (blockNumber, take)
+        |> sendRequest<BlockHeader list> client
 
     let getMempool client =
-        GetMempool |> Request.send<Request, (Hash.Hash * Transaction) list> client serviceName
+        GetMempool
+        |> sendRequest<(Hash.Hash * Transaction) list> client
 
     let handleNewTransactions client peerId txHashes =
         HandleNewTransactions (peerId,txHashes)
-        |> Command.send client serviceName
+        |> sendCommand client
 
     let checkTransaction client transaction =
         CheckTransaction transaction
-        |> Request.send<Request, Result<Hash,ValidationError.ValidationError>> client serviceName
+        |> sendRequest<Result<Hash,ValidationError.ValidationError>> client
 
     let getTotalZP client =
         GetTotalZP
-        |> Request.send<Request, uint64> client serviceName
+        |> sendRequest<uint64> client
         
     let getCandidates client interval =
         GetCandidates interval
-        |> Request.send<Request, List<Recipient * Spend list>> client serviceName
+        |> sendRequest<List<Recipient * Spend list>> client
 
     let getBlockReward client blockNumber =
         GetBlockReward blockNumber
-        |> Request.send<Request, uint64> client serviceName
+        |> sendRequest<uint64> client
         
     let getCgp client =
         GetCGP 
-        |> Request.send<Request, CGP.T> client serviceName
+        |> sendRequest<CGP.T> client
         
     let getWinner client =
         GetWinner
-        |> Request.send<Request,Winner option> client serviceName
+        |> sendRequest<Winner option> client
         
     let getCgpHistory client =
         GetCgpHistory
-        |> Request.send<Request, (uint32 * CGP.T) list> client serviceName
+        |> sendRequest<(uint32 * CGP.T) list> client
 
 module Network =
     type Command =
@@ -268,106 +289,135 @@ module Wallet =
         
     let serviceName = "wallet"
 
-    //TODO: apply same convention to other services
-    let private send<'a> = Request.send<Request, Result<'a,string>>
+    let private sendCommand client command =
+        Command.send client serviceName command
+        
+    let private sendRequest<'a> client =
+        Request.send<Request, Result<'a,string>> client serviceName
 
     let getBalance client =
-        send<BalanceResponse> client serviceName GetBalance
+        GetBalance
+        |> sendRequest<BalanceResponse> client
 
     let getAddressPKHash client =
-        send<Hash> client serviceName GetAddressPKHash
+        GetAddressPKHash
+        |> sendRequest<Hash> client
 
     let getAddress client =
-        send<string> client serviceName GetAddress
+        GetAddress
+        |> sendRequest<string> client
 
     let createRawTransaction client outputs =
         RawTransactionCreate outputs
-        |> send<RawTransaction> client serviceName
+        |> sendRequest<RawTransaction> client
 
     let signRawTransaction client rawTx password =
         RawTransactionSign (rawTx, password)
-        |> send<RawTransaction> client serviceName
+        |> sendRequest<RawTransaction> client
 
     let createTransaction client publish outputs password =
-        send<Transaction> client serviceName (Send (publish, outputs, password))
+        Send (publish, outputs, password)
+        |> sendRequest<Transaction> client
 
     let activateContract client publish code numberOfBlocks rlimit password =
-        send<ActivateContractResponse> client serviceName (ActivateContract (publish, code, numberOfBlocks, rlimit, password))
+        ActivateContract (publish, code, numberOfBlocks, rlimit, password)
+        |> sendRequest<ActivateContractResponse> client
 
     let extendContract client publish address numberOfBlocks password =
-        send<Transaction> client serviceName (ExtendContract (publish, address, numberOfBlocks, password))
+        ExtendContract (publish, address, numberOfBlocks, password)
+        |> sendRequest<Transaction> client
 
     let executeContract client publish address command messageBody provideReturnAddress sign spends password =
-        send<Transaction> client serviceName (ExecuteContract (publish, address, command, messageBody, provideReturnAddress, sign, spends, password))
+        ExecuteContract (publish, address, command, messageBody, provideReturnAddress, sign, spends, password)
+        |> sendRequest<Transaction> client 
 
     let executeCGP client publish password =
-        send<Transaction> client serviceName (ExecuteCGP (publish, password))
+        ExecuteCGP (publish, password)
+        |> sendRequest<Transaction> client
 
     let importSeed client words password =
-        send<unit> client serviceName (ImportSeed (words, password))
+        ImportSeed (words, password)
+        |> sendRequest<unit> client
         
     let getTransactionCount client =
-        send<int> client serviceName GetTransactionCount
+        GetTransactionCount
+        |> sendRequest<int> client
 
     let getTransactions client skip take =
-        send<TransactionsResponse> client serviceName (GetTransactions (skip, take))
+        GetTransactions (skip, take)
+        |> sendRequest<TransactionsResponse> client
 
     let accountExists client =
-        send<bool> client serviceName AccountExists
+        AccountExists
+        |> sendRequest<bool> client
 
     let checkPassword client password =
-        send<bool> client serviceName (CheckPassword password)
+        CheckPassword password
+        |> sendRequest<bool> client
 
     let resyncAccount client =
-        Command.send client serviceName Resync
+        Resync
+        |> sendCommand client
 
     let getPublicKey client path password =
-        Request.send<Request, Result<Crypto.PublicKey,string>> client serviceName (GetPublicKey (path, password))
+        GetPublicKey (path, password)
+        |> sendRequest<Crypto.PublicKey> client
 
     let sign client message path password =
-        Request.send<Request, Result<Crypto.Signature,string>> client serviceName (Sign (message, path, password))
+        Sign (message, path, password)
+        |> sendRequest<Crypto.Signature> client
 
     let getMnemonicPhrase client password =
-        Request.send<Request, Result<string, string>> client serviceName (GetMnemonicPhrase password)
+        GetMnemonicPhrase password
+        |> sendRequest<string> client
         
     let changeSecure client oldPass newPass =
-        send<unit> client serviceName (ChangePassword (oldPass,newPass))
+        ChangePassword (oldPass,newPass)
+        |> sendRequest<unit> client
 
     let importWatchOnlyAddress client address =
-        Request.send<Request, Result<unit,string>> client serviceName (ImportWatchOnlyAddress address)
+        ImportWatchOnlyAddress address
+        |> sendRequest<unit> client
 
     let getNewAddress client =
-        Request.send<Request, Result<string * int,string>> client serviceName GetNewAddress
+        GetNewAddress
+        |> sendRequest<string * int> client
 
     let restoreNewAddresses client maxIndex =
         RestoreNewAddresses maxIndex
-        |> Command.send client serviceName
+        |> sendCommand client
 
     let getReceivedByAddress client confirmations =
-        Request.send<Request, Result<Map<(string*Asset), uint64>,string>> client serviceName (GetReceivedByAddress confirmations)
+        GetReceivedByAddress confirmations
+        |> sendRequest<Map<(string*Asset), uint64>> client
 
     let getAddressOutputs client address =
-        Request.send<Request, Result<List<(Outpoint*Spend*uint32*bool)>,string>> client serviceName (GetAddressOutputs address)
+        GetAddressOutputs address
+        |> sendRequest<List<(Outpoint*Spend*uint32*bool)>> client
 
     let getAddressBalance client address confirmations =
-        Request.send<Request, Result<Map<Asset, uint64>,string>> client serviceName (GetAddressBalance (address,confirmations))
+        GetAddressBalance (address,confirmations)
+        |> sendRequest<Map<Asset, uint64>> client
 
     let exportZenPublicKey client =
-        Request.send<Request,Result<string,string>> client serviceName ExportZenPublicKey
+        ExportZenPublicKey
+        |> sendRequest<string> client
 
     let importZenPublicKey client publicKey =
         ImportZenPublicKey publicKey
-        |> Request.send<Request,Result<unit,string>> client serviceName
+        |> sendRequest<unit> client
 
     let removeAccount client password =
         RemoveAccount password
-        |> Request.send<Request,Result<unit,string>> client serviceName
+        |> sendRequest<unit> client
 
     let getKeys client password =
-        Request.send<Request, Result<Map<Crypto.PublicKey, string>,string>> client serviceName (GetKeys password)
+        GetKeys password
+        |> sendRequest<Map<Crypto.PublicKey, string>> client
         
     let getUtxo client =
-        Request.send<Request, Result<List<PointedOutput>,string>> client serviceName GetUtxo
+        GetUtxo
+        |> sendRequest<List<PointedOutput>> client
 
 module AddressDB =
     open Wallet
@@ -400,45 +450,44 @@ module AddressDB =
     let resyncAccount client =
         Command.send client serviceName Resync
 
-    //TODO: apply same convention to other services
-    let private send<'a> client = Request.send<Request, Result<'a,string>> client serviceName
+    let private sendRequest<'a> client = Request.send<Request, Result<'a,string>> client serviceName
 
     let getBalance client addresses blockNumber =
         GetBalance (addresses, blockNumber)
-        |> send<BalanceResponse> client
+        |> sendRequest<BalanceResponse> client
 
     let getOutputs client args =
         GetOutputs args
-        |> send<List<PointedOutput>> client
+        |> sendRequest<List<PointedOutput>> client
 
     let getTransactions client args =
         GetTransactions args
-        |> send<TransactionsResponse> client
+        |> sendRequest<TransactionsResponse> client
         
     let getDiscovery client args =
         GetDiscovery args
-        |> send<DiscoveryResponse> client
+        |> sendRequest<DiscoveryResponse> client
 
     let getContractHistory client args =
         GetContractHistory args
-        |> send<ContractHistoryResponse> client
+        |> sendRequest<ContractHistoryResponse> client
         
     let getTransactionCount client args =
         GetTransactionCount args
-        |> send<int> client
+        |> sendRequest<int> client
         
     let getContractAssets client args =
         GetContractAssets args
-        |> send<option<uint32 * string option * string * Zen.Types.Data.data option>> client
+        |> sendRequest<option<uint32 * string option * string * Zen.Types.Data.data option>> client
 
     let getContractInfo client args =
         GetContractInfo args
-        |> send<ContractId * ContractV0> client
+        |> sendRequest<ContractId * ContractV0> client
         
     let getContractHistoryByBlockNumber client args =
         GetContractHistoryByBlockNumber args
-        |> send<ContractHistoryResponse> client
+        |> sendRequest<ContractHistoryResponse> client
     
     let getTransactionsByBlockNumber client addresses start stop =
         GetTransactionsByBlockNumber (addresses, start, stop)
-        |> send<TransactionsResponse> client
+        |> sendRequest<TransactionsResponse> client
