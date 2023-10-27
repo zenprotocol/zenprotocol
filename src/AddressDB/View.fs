@@ -32,14 +32,11 @@ let addContractHistory contractData contractId data =
     Map.add contractId data contractData
 
 let addContractAsset
-    (contractAssetData:Map<Asset, uint32 * string option * string * data option>)
+    (contractAssetData: Map<Asset, uint32 * string option * string * data option>)
     (mintLists: List<Asset * uint32 * string option * string * data option>) =
-        let mutable mintMap = contractAssetData
-        for mint in mintLists do
-            match mint with
-            | asset,blockNumber, sender, command, msgBody ->
-               mintMap <- Map.add asset (blockNumber, sender, command, msgBody) mintMap
-        mintMap
+    List.fold (fun acc (asset, blockNumber, sender, command, msgBody) -> 
+        Map.add asset (blockNumber, sender, command, msgBody) acc) contractAssetData mintLists
+
 
 let setContractData contractData witnessPoint data =
     Map.add witnessPoint data contractData
@@ -373,11 +370,16 @@ let discovery dataAccess session view addresses =
         , txCount, balance)
 
 let private contractHistoryComparer a1 a2 =
-    let comparer (index1, block1, _) (index2, block2, _) =
-            if index1 = index2 then
-                block2 - block1
+    let comparer (blockNumber, blockIndex, _) (blockNumber', blockIndex', _) =
+        if blockNumber < blockNumber' then
+           1
+        elif blockNumber > blockNumber' then
+           -1
+        else
+            if blockIndex < blockIndex' then
+                -1
             else
-                int (index2 - index1)
+                1
     comparer (snd a1) (snd a2)
 
 let getContractHistory dataAccess session view skip take contractId =

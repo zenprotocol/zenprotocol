@@ -62,7 +62,7 @@ type Argument =
 
 let busName = "main"
 
-type MainConfig =
+type MainConfig = 
     {
         chainParams: ChainParameters
         wipe: bool
@@ -102,15 +102,12 @@ module Local =
 #endif
 
 module Init =
-    
     let broker (config:MainConfig) =
         Actor.create (fun shim ->
             use poller = Poller.create ()
             use emObserver = Poller.registerEndMessage poller shim
-
             use sbBroker = ServiceBus.Broker.create poller busName config.serviceBusAddress
             use evBroker = EventBus.Broker.create poller busName config.publisherAddress
-
             Actor.signal shim
             Poller.run poller
         )
@@ -269,53 +266,47 @@ module Config =
             isRemote          = isRemote
         }
 module CheckPlatform =
-    
-    let check =
-        eventX "Node running... press CTRL+C to exit"
-        |> Log.info
 
+    let private checkZ3Availability () =
         match Platform.runNative ZFStar.z3Name ["--help"] with
         | Ok _ ->
-            eventX "Z3 check passed"
-            |> Log.info
+            Log.info (eventX "Z3 check passed")
         | Error error ->
-            eventX "Failed to run z3. Exit node.\n{error}"
-            >> setField "error" error
-            |> Log.error
-
+            Log.error (eventX "Failed to run z3. Exit node.\n{error}" >> setField "error" error)
             System.Environment.FailFast(sprintf "Failed to run z3.exe\n%s" error, null)
 
+    let private checkOSArchitecture () =
         // Check if 64bit machine
         if Platform.platform = PlatformID.Win32NT && not Platform.is64bit  then
             System.Environment.FailFast("Zen-node can only run on 64 bit OS", null)
 
+    let private checkMonoVersion () =
         if Platform.isUnix then
             match Platform.monoVersion with
             | None ->
-                eventX "Please install mono."
-                |> Log.error
-
+                Log.error (eventX "Please install mono.")
                 System.Environment.FailFast("Please install mono", null)
             | Some version ->
                 let boundedToVersion = Version(6,12,0)
                 if version >= boundedToVersion then
-                    eventX "Mono check passed"
-                    |> Log.info
+                    Log.info (eventX "Mono check passed")
                 else
-                    
-                    eventX "Old version of mono, please upgrade to at least {version}"
-                    >> setField "version" (boundedToVersion.ToString())
-                    |> Log.error
-
+                    Log.error (eventX "Old version of mono, please upgrade to at least {version}" >> setField "version" (boundedToVersion.ToString()))
                     System.Environment.FailFast("Please upgrade mono", null)
+
+    let check () =
+        Log.info (eventX "Node running... press CTRL+C to exit")
+        checkZ3Availability()
+        checkOSArchitecture()
+        checkMonoVersion()
+
 
 [<EntryPoint>]
 let main argv =
 
-    CheckPlatform.check
+    CheckPlatform.check ()
 
     let errorHandler = ProcessExiter(colorizer = function ErrorCode.HelpText -> None | _ -> Some ConsoleColor.Red)
-
     let parser = ArgumentParser.Create<Argument>(programName = "zen-node.exe", errorHandler = errorHandler)
     let results = parser.Parse argv
 
@@ -341,15 +332,14 @@ let main argv =
 #if DEBUG        
     Local.addGenesis config
 #endif
+
     use event = new Threading.ManualResetEvent(false)
 
     Console.CancelKeyPress.Add (fun e ->
         e.Cancel <- true
-        eventX "Closing..."
-        |> Log.info
+        Log.info (eventX "Closing...")
         event.Set() |> ignore
     )
 
     event.WaitOne() |> ignore
-
     0

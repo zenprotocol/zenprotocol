@@ -165,15 +165,13 @@ let getBlockCoinbase
 
         Map.add Asset.Zen (totalZen + blockReward + blockSacrifice) blockFees
     
-    let lock = Coinbase (blockNumber, coinbasePkHash)
-    
     // Get the coinbase outputs by summing the fees per asset and adding the block reward
     let coinbaseOutputs =
         Map.toSeq blockRewardAndFees
         |> Seq.map
             begin fun (asset, amount) ->
             {
-                lock  = lock
+                lock  = Coinbase (blockNumber, coinbasePkHash)
                 spend = { asset=asset; amount=amount }
             }
             end

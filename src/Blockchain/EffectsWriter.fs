@@ -12,62 +12,52 @@ type Effect =
 
 type EffectsWriter<'a> = Writer<Effect, 'a>
 
-let publish (event:Event) = Writer([EventEffect event],())
+let createEffect effect = Writer([ effect ], ())
+
+let publish (event: Event) = createEffect (EventEffect event)
+
+let wrapNetworkCommand cmd = createEffect (NetworkCommand cmd)
 
 let sendMemPool peerId txHashes =
-    let command = Network.SendMemPool (peerId, txHashes)
-    Writer([NetworkCommand command],())
+    Network.SendMemPool(peerId, txHashes) |> wrapNetworkCommand
 
 let sendTransactions peerId txs =
-    let command = Network.SendTransactions (peerId, txs)
-    Writer([NetworkCommand command],())
+    Network.SendTransactions(peerId, txs) |> wrapNetworkCommand
 
 let getTransactions peerId txHashes =
-    let command = Network.GetTransactions (peerId, txHashes)
-    Writer([NetworkCommand command],())
+    Network.GetTransactions(peerId, txHashes) |> wrapNetworkCommand
 
 let getBlock blockHash =
-    let command = Network.GetBlock blockHash
-    Writer([NetworkCommand command],())
+    Network.GetBlock blockHash |> wrapNetworkCommand
 
 let getBlockFrom peerId blockHash =
-    let command = Network.GetBlockFrom (peerId,blockHash)
-    Writer([NetworkCommand command],())
+    Network.GetBlockFrom(peerId, blockHash) |> wrapNetworkCommand
 
 let sendTip peerId blockHeader =
-    let command = Network.SendTip (peerId, blockHeader)
-    Writer([NetworkCommand command],())
+    Network.SendTip(peerId, blockHeader) |> wrapNetworkCommand
 
 let sendBlock peerId block =
-    let command = Network.SendBlock (peerId, block)
-    Writer([NetworkCommand command],())
+    Network.SendBlock(peerId, block) |> wrapNetworkCommand
 
 let publishBlock blockHeader =
-    let command = Network.PublishBlock blockHeader
-    Writer([NetworkCommand command],())
+    Network.PublishBlock blockHeader |> wrapNetworkCommand
 
 let sendHeaders peerId headers =
-    let command = Network.SendHeaders (peerId, headers)
-    Writer([NetworkCommand command],())
+    Network.SendHeaders(peerId, headers) |> wrapNetworkCommand
 
 let getHeaders peerId startHash endHash =
-    let command = Network.GetHeaders (peerId, startHash, endHash)
-    Writer([NetworkCommand command],())
+    Network.GetHeaders(peerId, startHash, endHash) |> wrapNetworkCommand
 
 let disconnectPeer peerId =
-    let command = Network.DisconnectPeer peerId
-    Writer([NetworkCommand command],())
+    Network.DisconnectPeer peerId |> wrapNetworkCommand
 
-let getTipsFromAllPeers =
-    let command = Network.GetTipFromAllPeers
-    Writer([NetworkCommand command],())
+let getTipsFromAllPeers = Network.GetTipFromAllPeers |> wrapNetworkCommand
 
-let run (Writer (effects, x)) publisher client =
-    List.iter (function
+let run (Writer(effects, x)) publisher client =
+    effects
+    |> List.iter (function
         | EventEffect event -> Publisher.publish publisher event
-        | NetworkCommand command ->
-            Command.send client Network.serviceName command
-        ) effects
+        | NetworkCommand command -> Command.send client Network.serviceName command)
 
     x
 

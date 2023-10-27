@@ -6,9 +6,11 @@ open Api.Types
 open Consensus.Types
 open Consensus
 open Consensus.Crypto
+open Messaging.Services
 open Wallet
 open Zen.Types.Data
 open FsBech32
+open Infrastructure.Result
 
 let rec omitNullFields = function
     | JsonValue.Array items ->
@@ -358,3 +360,76 @@ let mempoolEncoder chain (mempool: List<Hash.Hash * Transaction>) =
     |> List.toArray
     |> JsonValue.Array
     |> omitNullFields
+
+
+let mintEncoder chain (blockNumber : uint32) pk command messageBody =
+    [|
+        "executionBlock",
+            blockNumber
+            |> decimal
+            |> JsonValue.Number
+        "sender",
+            pk
+            |> Option.map JsonValue.String
+            |> Option.defaultValue JsonValue.Null
+        "command",
+            command
+            |> JsonValue.String
+        "messageBody",
+            messageBody
+            |> Option.map (dataEncoder chain)
+            |> Option.defaultValue JsonValue.Null
+        "messageBodyRaw",
+            messageBody
+            |> Option.map Serialization.Data.serialize
+            |> Option.map Base16.encode
+            |> Option.map JsonValue.String
+            |> Option.defaultValue JsonValue.Null
+    |]
+    |> JsonValue.Record
+    
+let contractHistoryEncoder chain
+    (data : Result<AddressDB.ContractHistoryResponse,string>) =
+    data
+    <@> List.map (fun (command, messageBody, txHash, confirmations) ->
+            [|
+                "command", command |> JsonValue.String
+                "messageBody", messageBody
+                    |> Option.map (dataEncoder chain)
+                    |> Option.defaultValue JsonValue.Null
+                "txHash", txHash |> Hash.toString |> JsonValue.String
+                "confirmations", confirmations |> decimal |> JsonValue.Number
+            |]
+            |> JsonValue.Record
+        )
+    <@> List.toArray
+    <@> JsonValue.Array
+    
+let contractInfoEncoder chain data =
+    data
+    <@> (fun (contractId, contractV0) ->
+            let address =
+                Address.Contract contractId
+                |> Address.encode chain
+            [|
+                "contractId",
+                    contractId
+                    |> ContractId.toString
+                    |> JsonValue.String
+                "address",
+                    address
+                    |> JsonValue.String
+                "hints",
+                    contractV0.hints
+                    |> JsonValue.String
+                "queries",
+                    contractV0.queries
+                    |> decimal
+                    |> JsonValue.Number
+                "rlimit",
+                    contractV0.rlimit
+                    |> decimal
+                    |> JsonValue.Number
+            |]
+            |> JsonValue.Record
+        )

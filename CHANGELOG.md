@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.0.12](https://gitlab.com/zenprotocol/zenprotocol/compare/v1.0.11...v1.0.12) (2023-10-27)
+
+
+### Features
+
+* update version expiry ([8c5fcaa](https://gitlab.com/zenprotocol/zenprotocol/commit/8c5fcaab3e3d472e32df638cdba22b081710755d))
+
 ### [1.0.11](https://gitlab.com/zenprotocol/zenprotocol/compare/v1.0.10...v1.0.11) (2023-04-27)
 
 

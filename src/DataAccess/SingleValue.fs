@@ -1,11 +1,11 @@
 module DataAccess.SingleValue
 
-let create (databaseContext:DatabaseContext) (name:string) serializer deserialzer =
+let create (databaseContext:DatabaseContext) (name:string) serializer deserializer =
     {
         collection=databaseContext.values
         name=System.Text.Encoding.ASCII.GetBytes(name);
         serializer=serializer;
-        deserializer=deserialzer;
+        deserializer=deserializer;
     }
     
 let tryGet<'value> (singleValue:SingleValue<'value>) (session:Session) =         

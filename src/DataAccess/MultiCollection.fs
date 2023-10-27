@@ -7,7 +7,7 @@ open System.Runtime.InteropServices
 let create (session:Session) name keySerializer valueSerializer valueDeseralizer =
     let mutable db = 0ul
 
-    mdb_dbi_open(session.tx, name, MDB_CREATE ||| MDB_DUPSORT, &db)
+    mdb_dbi_open(session.tx, name, (MDB_CREATE ||| MDB_DUPSORT), &db)
     |> checkErrorCode
 
     {

@@ -255,9 +255,9 @@ let requestHandler chain client (requestId:RequestId) request dataAccess session
             error
             |> reply<Map<PublicKey, string>> requestId
             NoAccount
-        | GetUtxo _ ->
+        | GetUtxo ->
             error
-            |> reply<Map<PublicKey, string>> requestId
+            |> reply<List<PointedOutput>> requestId
             NoAccount
     | Exist view ->
         let chainParams = Consensus.Chain.getChainParameters chain

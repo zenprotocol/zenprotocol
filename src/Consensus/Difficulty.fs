@@ -4,13 +4,13 @@ let compress (Hash.Hash h) =
     // Count the number of initial zero bytes
     let zeroes = defaultArg <| Array.tryFindIndex ((<>) 0uy) h <| Hash.Length
     let length = Hash.Length - zeroes
-    let exp = uint32 (length) <<< 24
+    let exp = uint32 length <<< 24
 
     match length with
-    | 0 ->  0u
-    | 1 ->  (uint32 h.[Hash.Length - 1]) + exp
-    | 2 ->  (uint32 h.[Hash.Length - 1]) + ((uint32 h.[Hash.Length - 2]) <<< 8) + exp
-    | _ ->  (uint32 h.[zeroes + 2]) + ((uint32 h.[zeroes + 1]) <<< 8) + (uint32 (h.[zeroes]) <<< 16) + exp
+    | 0 -> 0u
+    | 1 -> uint32 h.[Hash.Length - 1] + exp
+    | 2 -> uint32 h.[Hash.Length - 1] + (uint32 h.[Hash.Length - 2] <<< 8) + exp
+    | _ -> uint32 h.[zeroes + 2] + (uint32 h.[zeroes + 1] <<< 8) + (uint32 h.[zeroes] <<< 16) + exp
 
 let uncompress (target:uint32) =
     let shifted_exp = (int (target >>> 24))

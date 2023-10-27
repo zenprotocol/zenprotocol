@@ -15,7 +15,7 @@ type ConnectionStatus =
 type T = {
     seeds: List<string>
     connections: Map<string,ConnectionStatus>
-    maxConnections: int;
+    maxConnections: int
 }
 
 [<LiteralAttribute>]
