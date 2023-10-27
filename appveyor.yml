@@ -18,7 +18,7 @@ assembly_info:
 
 install:
   - ps: Install-Product node 16.13.0
-  - npm install --global npm@latest
+  - npm install --global npm@8.1.0
   - set PATH=%APPDATA%\npm;%PATH%
 
 skip_non_tags: true
