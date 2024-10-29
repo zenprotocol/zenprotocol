@@ -1,8 +1,5 @@
 module Consensus.Chain
 open Consensus.Types
-open FSharp.Compatibility.OCaml
-open Infrastructure
-open Infrastructure.Result
 
 [<Literal>]
 let ContractSacrificePerBytePerBlock = 1UL
@@ -27,7 +24,6 @@ type ChainParameters =
         genesisTime:uint64
         networkId:uint32;
         contractSacrificePerBytePerBlock:uint64
-        versionExpiry:Timestamp.Timestamp
         coinbaseMaturity:uint32
         intervalLength:uint32
         snapshot:uint32
@@ -52,7 +48,6 @@ let mainParameters =
         genesisTime= new System.DateTime(2018,6,30,17,0,0,System.DateTimeKind.Utc) |> Infrastructure.Timestamp.fromDateTime // 1530378000000UL
         networkId=1000ul
         contractSacrificePerBytePerBlock=ContractSacrificePerBytePerBlock
-        versionExpiry= new System.DateTime(2024,10,30,0,0,0,System.DateTimeKind.Utc) |> Infrastructure.Timestamp.fromDateTime
         intervalLength=10000ul
         snapshot=9000ul
         nomination=500ul
@@ -80,7 +75,6 @@ let testParameters =
         genesisTime=1535968146719UL
         networkId=2016ul
         contractSacrificePerBytePerBlock=ContractSacrificePerBytePerBlock
-        versionExpiry= new System.DateTime(2200,1,1,0,0,0,System.DateTimeKind.Utc) |> Infrastructure.Timestamp.fromDateTime
         intervalLength=100ul
         snapshot=90ul
         nomination=5ul
@@ -105,7 +99,6 @@ let localParameters = {
             |> Hash.computeOfHash
         genesisTime=1515594186383UL
         networkId=1002ul
-        versionExpiry=System.UInt64.MaxValue
         thresholdFactor=(1UL, 500UL)
 }
 

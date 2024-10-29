@@ -34,22 +34,3 @@ let ``seralizing and deserialing yield same header``(header:BlockHeader) =
 [<Property(Arbitrary=[| typeof<ConsensusGenerator> |])>]
 let ``header with wrong size doesn't deserialize``(header) =
     Array.length header <> SerializedHeaderSize ==> (Header.deserialize header = None)
-
-[<Test>]
-let ``header with timestamp after the version expiry``() =
-
-    let header = {
-        version=0ul
-        parent=Hash.zero
-        blockNumber=80000ul
-        commitments=Hash.zero
-        timestamp=new System.DateTime(2200,1,2,0,0,0,System.DateTimeKind.Utc) |> Infrastructure.Timestamp.fromDateTime
-        difficulty= Difficulty.compress testParameters.proofOfWorkLimit
-        nonce=0UL,0UL
-    }
-
-    let result = BlockValidation.Header.validate testParameters header
-
-    let expected:Result<BlockHeader,string> = Error "expired node version, please upgrade"
-
-    result |> should equal expected

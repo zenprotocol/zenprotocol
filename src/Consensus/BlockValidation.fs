@@ -23,22 +23,19 @@ module Header =
         ( header      : BlockHeader     )
         : Result<BlockHeader, string> =
         
-        if header.timestamp > chainParams.versionExpiry then
-            Error "expired node version, please upgrade"
+        let blockHash     = hash header
+        let blockHashHash = Hash.computeOfHash blockHash
+    
+        if blockHashHash = chainParams.genesisHashHash then
+            Ok header
         else
-            let blockHash     = hash header
-            let blockHashHash = Hash.computeOfHash blockHash
-        
-            if blockHashHash = chainParams.genesisHashHash then
+            let difficulty       = Difficulty.uncompress header.difficulty
+            let proofOfWorkLimit = chainParams.proofOfWorkLimit
+    
+            if difficulty <= proofOfWorkLimit && blockHash <= difficulty then
                 Ok header
             else
-                let difficulty       = Difficulty.uncompress header.difficulty
-                let proofOfWorkLimit = chainParams.proofOfWorkLimit
-        
-                if difficulty <= proofOfWorkLimit && blockHash <= difficulty then
-                    Ok header
-                else
-                    Error "proof of work failed"
+                Error "proof of work failed"
     
     let check : Check = fun block chainParams ->
         validate chainParams block.header
